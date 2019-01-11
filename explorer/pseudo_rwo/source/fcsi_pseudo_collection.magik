@@ -1,0 +1,613 @@
+#% text_encoding = iso8859_1
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       fcsi_pseudo_collection is used to provide a modified
+# version of a real collection. This allows you to change the
+# fields available to view in the explorer. Should only be used
+# thru fcsi_pseudo_rwo.
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+# cross dependencies...
+_global fcsi_pseudo_rwo << _unset 
+$
+_pragma(classify_level=basic, topic={collections})
+##
+## fcsi_pseudo_collection
+##
+def_slotted_exemplar(:fcsi_pseudo_collection,
+	{{:fcsi_fields,_unset,:readable},
+	 {:fcsi_desc,_unset,:readable},
+	 {:fcsi_cache,_unset,:readable}
+	},:fcsi_pseudo)
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection.new(coll,fields,_optional coll_name)
+	## Parameters  : coll - actual source collection
+	##               fields - the fields of the records of coll. If
+	##                  it is normal field on record, then the
+	##                  element is just the symbol name, otherwise
+	##                  it is a simple vector with field (method)
+	##                  name, the magik class (;ds_int,
+	##                  :ds_char16_vec, etc, see
+	##                  view.defined_types), and external name (optional)
+	##               coll_name the collection name to show in the explorer
+	## Returns     : 
+	## Function    : 
+	## Methodology : calls clone.init()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/11/06 - Mark Field (FCSI)): Modified - added coll_name
+	#----------------------------------------------
+	
+	>> _clone.init(coll,fields,coll_name)
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection.init(coll,fields,coll_name)
+	## Parameters  : coll - actual source collection
+	##               fields - the fields of the records of coll. If
+	##                  it is normal field on record, then the
+	##                  element is just the symbol name, otherwise
+	##                  it is a simple vector with field (method)
+	##                  name and the magik class (;ds_int,
+	##                  :ds_char16_vector, etc) see view.defined_types
+	##               coll_name the collection name to show in the explorer
+	## Returns     : 
+	## Function    : sets up the slots and gets field information
+	## ready for use. 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/11/06 - Mark Field (FCSI)): Modified - added coll_name
+	# & field props
+	# (2015/05/20 - Mark Field (FCSI)): Modified - added check for
+	# existence of field
+	#----------------------------------------------
+	_super.init(coll)
+	.fcsi_fields << rope.new()
+	.fcsi_cache << property_list.new()
+	.fcsi_cache[:coll_name] << coll_name
+	.fcsi_cache[:field_class] << property_list.new()
+	.fcsi_cache[:field_ext_name] << property_list.new()
+	.fcsi_cache[:field_props] << property_list.new()
+	_for aFld _over fields.fast_elements()
+	_loop
+		_if aFld.class_name _is :symbol
+		_then
+			_if coll.has_field?(aFld)
+			_then
+				.fcsi_fields.add_last(aFld)
+			_endif
+			_continue
+		_endif
+		# Then it is a simplevector with the secon
+		.fcsi_cache[:field_class][aFld[1]] << aFld[2]
+		.fcsi_cache[:field_props][aFld[1]] << {}
+		.fcsi_cache[:field_ext_name][aFld[1]] <<
+			_if aFld.size > 2
+			_then
+				_if aFld.size > 3
+				_then
+					.fcsi_cache[:field_props][aFld[1]] << aFld.subseq(4)
+				_endif
+				>> aFld[3]
+			_else
+				>> _unset 
+			_endif
+		.fcsi_fields.add_last(aFld[1])
+	_endloop
+	
+	>> _self 
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection.name 
+	## Parameters  : nothing
+	## Returns     : cached name
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/02 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if .fcsi_cache[:coll_name] _isnt _unset 
+	_then
+		_return .fcsi_cache[:coll_name]
+	_endif
+	>> .fcsi_receiver.name
+		
+		
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection.external_name
+	## Parameters  : none
+	## Returns     : string
+	## Function    : cached name or from pseudo reference
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/11/06 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if .fcsi_cache[:coll_name] _isnt _unset 
+	_then
+		_return .fcsi_cache[:coll_name]
+	_endif
+	>> .fcsi_receiver.external_name
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection.visible_field_names
+	## Parameters  : none
+	## Returns     : collection of field names from .fcsi_names
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	>> .fcsi_fields
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection.all_field_names
+	## Parameters  : none
+	## Returns     : collection of field names from .fcsi_names
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	>> .fcsi_fields
+		
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.descriptor
+	## Parameters  : none
+	## Returns     : pseudo descriptor
+	## Function    : finalizes the field information for the pseudo
+	## descriptor and returns a new pseudo descriptor if one hasn't
+	## been created yet.
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/11/07 - Mark Field (FCSI)): Modified - added field props
+	#----------------------------------------------
+	_if .fcsi_desc _is _unset 
+	_then
+		_local fldRope << rope.new()
+		_for aFld  _over .fcsi_fields.fast_elements()
+		_loop
+			_if .fcsi_cache[:field_class][aFld] _isnt _unset 
+			_then
+				fldRope.add_last({aFld,.fcsi_cache[:field_class][aFld],
+								  .fcsi_cache[:field_ext_name][aFld],
+								  .fcsi_cache[:field_props][aFld]})
+			_else
+				fldRope.add_last(aFld)
+			_endif
+		_endloop
+		
+		
+		.fcsi_desc << fcsi_pseudo_descriptor.new(
+						  .fcsi_receiver.descriptor,fldRope)
+	_endif
+	>> .fcsi_desc
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.source
+	## Parameters  : 
+	## Returns     : self
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+		
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.is_kind_of?(thing)
+	## Parameters  : thing - the thing to compare to
+	## Returns     : boolean
+	## Function    : true if thing is a transient_collection
+	## otherwise the result from the receiver's is_kind_of?()
+	## call. 
+	## Methodology : This is to get the correct info to the explorer
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_if thing.is_kind_of?(transient_collection)
+	_then
+		# Fake for explorer
+		_return _true 
+	_endif
+	_return .fcsi_receiver.is_kind_of?(thing)
+		
+_endmethod
+
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.equality_hash
+	## Parameters  : 
+	## Returns     : result from receiver's equality_hash
+	## Function    : 
+	## Methodology : This may be desired at the fcsi_pseudo exemplar
+	## one day. Let the community decide...
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_return .fcsi_receiver.equality_hash
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.identity_hash
+	## Parameters  : 
+	## Returns     : result from receiver's identity_hash
+	## Function    : 
+	## Methodology : This may be desired at the fcsi_pseudo exemplar
+	## one day. Let the community decide...
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_return .fcsi_receiver.identity_hash
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.inherits_from?(thing)
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_return .fcsi_receiver.inherits_from?(thing)
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.field(name)
+	## Parameters  : name - field name to look up
+	## Returns     : field descriptor of that name
+	## Function    : If receiver doesn't return a field descriptor,
+	## check the psuedo fields
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local fd << .fcsi_receiver.field(name)
+	_if fd _isnt _unset 
+	_then
+		_return fd
+	_endif
+	_return .fcsi_desc.field(name)
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.all_fields
+	## Parameters  : none
+	## Returns     : keyed set
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/03 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local ks << keyed_set.new()
+	_local realAllFields << 
+		_if .fcsi_receiver _isnt _unset 
+		_then
+			>> .fcsi_receiver.all_fields
+		_else
+			>> property_list.new()
+		_endif
+	_for aFld _over .fcsi_fields.fast_elements()
+	_loop
+		_if .fcsi_cache[:field_class][aFld] _is _unset 
+		_then
+			ks.add(realAllFields[aFld])
+		_else
+			ks.add(fcsi_pseudo_field.new(
+					   aFld,gis_ds_view.defined_types[.fcsi_cache[:field_class][aFld]],
+					   .fcsi_cache[:field_ext_name][aFld],
+					   _scatter .fcsi_cache[:field_props][aFld]))
+		_endif
+	_endloop
+	_return ks
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.record_exemplar
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	
+
+	>> fcsi_pseudo_rwo.new(.fcsi_receiver.an_element(),.fcsi_fields,_self,_unset,_true)
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.fcsi_pseudo_fields
+	## Parameters  : none
+	## Returns     : rope
+	## Function    : parses .fcsi_fields looking for non symbols
+	## which signify pseudo fields
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if .fcsi_cache[:int!fcsi_cached_pseudo_fields] _isnt _unset 
+	_then
+		_return .fcsi_cache[:int!fcsi_cached_pseudo_fields]
+	_endif
+	_return .fcsi_cache[:int!fcsi_cached_pseudo_fields] <<
+		.fcsi_cache[:field_class].keys
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.has_field?(fld_name)
+	## Parameters  : fld_name - field name
+	## Returns     : boolean
+	## Function    : see if fld_name is pseudo, if not pass it to
+	## receiver. 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if _self.fcsi_pseudo_fields.includes?(fld_name)
+	_then
+		_return _true 
+	_endif
+	_return .fcsi_receiver.has_field?(fld_name)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.fcsi_add(prec)
+	## Parameters  : prec - fcsi_pseudo_rwo to add to self
+	## Returns     : nothing
+	## Function    : adds prec to .fcsi_cache[:records]
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	
+	_if .fcsi_cache[:records] _is _unset 
+	_then
+		.fcsi_cache[:records] << fcsi_pseudo_rwo_set.new(1000)
+	_endif
+	.fcsi_cache[:records].add(prec)
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.fcsi_remove(prec)
+	## Parameters  : prec - fcsi_pseudo_rwo to add to self
+	## Returns     : nothing
+	## Function    : removes the prec from cached records
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/07/14 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	.fcsi_cache[:records].remove(prec)
+		
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.fcsi_clear_record_cache()
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/24 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if .fcsi_cache[:records] _is _unset 
+	_then
+		.fcsi_cache[:records] << fcsi_pseudo_rwo_set.new(1000)
+	_endif
+	.fcsi_cache[:records].empty()
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.fcsi_clone()
+	## Parameters  : 
+	## Returns     : fcsi_pseudo_collection - generated from self
+	## Function    : copies the basic data over for use to add new
+	## rwo set information
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/24 - Mark Field (FCSI)): Created.
+	# (2014/11/06 - Mark Field (FCSI)): Modified - added collection name
+	#----------------------------------------------
+	_local copy << _self.new(.fcsi_receiver,{},.fcsi_cache[:coll_name])
+	copy.sys!slot(:fcsi_fields) << .fcsi_fields.deep_copy()
+	copy.fcsi_cache[:field_class] << .fcsi_cache[:field_class].copy()
+	copy.fcsi_cache[:field_ext_name] << .fcsi_cache[:field_ext_name].copy()
+	copy.fcsi_cache[:field_props] << .fcsi_cache[:field_props].copy()
+	copy.fcsi_cache[:int!fcsi_cached_pseudo_fields] <<
+					.fcsi_cache[:int!fcsi_cached_pseudo_fields].copy()
+	copy.fcsi_clear_record_cache()
+	_return copy
+_endmethod
+$
+
+
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.an_element()
+	## Parameters  : nothing
+	## Returns     : 1st thing from .fcsi_cache[:records]
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_return .fcsi_cache[:records].an_element()
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.inherits_from?(thing)
+	## Parameters  : thing - object to test inheritency 
+	## Returns     : booelan
+	## Function    : true if dd_collection_mixin, otherwise resutl
+	## from super.inherits_from?()
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if thing _is dd_collection_mixin
+	_then
+		_return _true 
+	_endif
+	_return _super.inherits_from?(thing)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.size_is_fast?
+	## Parameters  : none
+	## Returns     : true 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_return _true 
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.size
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/23 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	>> .fcsi_cache[:records].size
+		
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={records})
+_iter _method fcsi_pseudo_collection.fast_elements()
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/23 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+
+	
+	_for anEl _over .fcsi_cache[:records].fast_elements()
+	_loop
+		_loopbody(anEl)
+	_endloop
+	
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.read_stream()
+	## Parameters  : none
+	## Returns     : the read stream from the cached records
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/11/06 - Mark Field (FCSI)): Created.
+	# (2016/02/02 - Mark Field (FCSI)): Modified - if records is
+	# unset, return the read stream from the collection itself.
+	# (2017/12/26 - Mark Field (FCSI)): Modified - use get_global_value()
+	#----------------------------------------------
+	_if .fcsi_cache[:records] _is _unset 
+	_then
+		_return get_global_value(:fcsi_pseudo_collection_stream).new(_self)
+	_endif
+	_return .fcsi_cache[:records].read_stream()
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.set_readonly()
+	## Parameters  : 
+	## Returns     : 
+	## Function    : does nothing
+	## Methodology : For SQL API
+	#---------------- HISTORY ---------------------
+	# (2016/02/02 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+		
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_collection.dataset
+	## Parameters  : none
+	## Returns     : dataset 
+	## Function    : returns dataset of an_element(), if unset then
+	## return dataset from .fcsi_receiver
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/09/11 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local aRec << _self.an_element()
+	_if aRec _is _unset
+	_then
+		_return .fcsi_receiver
+	_endif
+	_return arec.dataset
+_endmethod
+$
+
+

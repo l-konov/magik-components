@@ -1,0 +1,100 @@
+#% text_encoding = iso8859_1
+# Copyright (C) Field Consulting and Services, Inc. :y, all rights reserved.
+########################################################################
+##
+## Created By: Mark Field (FCSI)
+## Date: 2016/02/02
+## Last Modified Time-stamp: <09/11/2016 20:51, Mark Field (FCSI)>
+##
+## Project Files
+##
+## Description: 
+##
+########################################################################
+
+
+#% text_encoding = iso8859_1
+$
+_pragma(classify_level=basic, topic={collections})
+def_slotted_exemplar(:fcsi_pseudo_collection_stream,
+	{{:fcsi_collection,_unset,:readable},
+	 {:fcsi_result_stream,_unset,:readable}
+},{})
+$
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection_stream.new(coll)
+	## Parameters  : coll -pseudo_collection
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/02 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	>> _clone.init(coll)
+
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection_stream.init(coll)
+	## Parameters  : coll -pseudo_collection
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/02 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	.fcsi_collection << coll
+	.fcsi_result_stream << coll.fcsi_receiver.read_stream()
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection_stream.close()
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/02 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_try
+		.fcsi_result_stream.close()
+	_when error
+		  #ok?
+	_endtry
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_collection_stream.get_n(num)
+	## Parameters  : num - number of records to fetch
+	## Returns     : simple vector of pseudo recs
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/02 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	#_dynamic  !fcsi_report_data!
+	_local pRecs << rope.new_for(num)
+	_local recs  << .fcsi_result_stream.get_n(num)
+	_local pRec
+	#DEBUG _global !cs ; !cs << _self 
+	_for aRec _over recs.fast_elements()
+	_loop
+		pRec << fcsi_pseudo_rwo.new(aRec,.fcsi_collection.fcsi_fields,
+									.fcsi_collection,_true)
+		_for aPRec _over pRec.fcsi_secondary_pseudos.fast_elements()
+		_loop
+			pRecs.add_last(aPRec)
+		_endloop
+		pRecs.add_last(pRec)
+	_endloop
+	
+	_return pRecs.as_simple_vector()
+_endmethod
+$
+
+

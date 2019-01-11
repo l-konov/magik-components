@@ -1,0 +1,465 @@
+#% text_encoding = iso8859_1
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       This is the main entry point to provide pseudo information to
+# the explorer. A pseudo_rwo allows you to change the displayed
+# fields of a record within the explorer. This functionality is
+# designed and tested for the explorer in 4.2. Other uses of
+# pseudo records can be imagined... The pseudo rwo can be
+# dataless. There is nothing in the code that cares about geometries.
+#
+# The basic functionality is to create a fcsi_pseudo_rwo using
+# the new() method. You pass it original record and a list of
+# fields you want to display in the explorer results. This list
+# of fields could be real fields or simple methods (no
+# arguments) that is passed to the real objects. The column
+# name for non-real fields are the method name by default but
+# can be a message created on the fcsi_pseudo_field message handler.
+#
+# The field definition is either the field name as a symbol or
+# a simple vector containing the method name and the field
+# type. The field type has to be one of the defined field types
+# in the source view. See view.defined_types for a complete
+# definition. There is a good example of a simple pseudo rwo in
+# the example directory one above here.
+#
+# Note that the field name can be shown if it is hidden by the
+# ACE or data model description by adding that field to the
+# list. For example you could add :ds!version as a field to see
+# the version information in the explorer.
+#
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+
+_pragma(classify_level=basic, topic={records})
+##
+## fcsi_pseudo_rwo
+##
+def_slotted_exemplar(:fcsi_pseudo_rwo,
+	{{:fcsi_fields,_unset,:readable},
+	 {:fcsi_coll,_unset,:readable},
+	 {:fcsi_cache,_unset,:readable},
+	 {:fcsi_secondary_pseudos,_unset,:readable}
+	},:fcsi_pseudo)
+$
+_global !current_fcsi_pseudo_rwo! << _unset
+$
+urn_record_handler.add_class(fcsi_pseudo_rwo)
+$
+_pragma(classify_level=basic, topic={records})
+fcsi_pseudo_rwo.define_shared_variable(
+	:fcsi_message_handler,
+	## The message handler for pseudo fields/methods
+	message_handler.new(:fcsi_pseudo_rwo),
+	:public)
+
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.new(rec,fields,_optional pseudo_collection,eval?,exemplar?)
+	## Parameters  : rec - the actual record
+	##               fields - the fields of the records of coll. If
+	##                  it is normal field on record, then the
+	##                  element is just the symbol name, otherwise
+	##                  it is a simple vector with field (method)
+	##                  name and the magik class (;ds_int,
+	##                  :ds_char16_vector, etc) see view.defined_types
+	##               pseudo_collection - if known pass it to save memory
+	##               eval? - if true will evalute/cache the pseudo fields
+	##               exemplar? - is this an exemplar request
+	## Returns     : initialized pseudo rwo
+	## Function    : 
+	## Methodology : calls clone.init()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/08/27 - Mark Field (FCSI)): Modified - added eval?
+	#----------------------------------------------
+	>> _clone.init(rec,fields,pseudo_collection,eval?.default(_false),
+				   exemplar?.default(_false))
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.init(rec,fields,pseudo_collection,eval?,exemplar?)
+	## Parameters  : rec - the actual record
+	##               fields - the fields of the records of coll. If
+	##                  it is normal field on record, then the
+	##                  element is just the symbol name, otherwise
+	##                  it is a simple vector with field (method)
+	##                  name, the magik class (:ds_int,
+	##                  :ds_char16_vec, etc see
+	##                  view.defined_types), and external name
+	##               pseudo_collection - if known pass it to save memory
+	##               eval? - evaluate the pseudo fields now?
+	##               exemplar? - is this an exemplar request?
+	## Returns     : initialized pseudo rwo
+	## Function    : stores the receiver and field definition. Also
+	## creates a link to a pseudo collection if one isn't passed in
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	
+	_super.init(rec)
+	.fcsi_fields << fields
+	.fcsi_coll <<
+		_if pseudo_collection _isnt _unset
+		_then
+			>> pseudo_collection
+		_else
+			>> fcsi_pseudo_collection.new(rec.source_collection,fields)
+		_endif 
+	.fcsi_cache << property_list.new()
+	.fcsi_secondary_pseudos << equality_set.new()
+	_if _not exemplar? _andif eval?
+	_then
+		_dynamic !current_fcsi_pseudo_rwo! << _self 
+		_for aPF _over _self.fcsi_coll.fcsi_pseudo_fields.fast_elements()
+		_loop
+			_if _not .fcsi_cache.includes_key?(aPF)
+			_then
+				_self.perform(aPF)
+			_endif
+		_endloop 
+	_endif
+	_if _not exemplar?
+	_then
+		.fcsi_coll.fcsi_add(_self)
+	_endif 
+	>> _self 
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.source_collection
+	## Parameters  : none
+	## Returns     : the pseudo collection for self
+	## Function    : returns .fcsi_coll
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	>> .fcsi_coll
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.descriptor
+	## Parameters  : none
+	## Returns     : pseudo_descriptor - that is associated to the
+	## pseudo collection
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	#DEBUG show(:fcsi_pseudo_rwo,:descriptor)
+	>> .fcsi_coll.descriptor
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.equality_hash
+	## Parameters  : none
+	## Returns     : result from receiver's equality_hash
+	## Function    : 
+	## Methodology : This may be desired at the fcsi_pseudo exemplar
+	## one day. Let the community decide...
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_return .fcsi_receiver.equality_hash
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.identity_hash
+	## Parameters  : 
+	## Returns     : result from receiver's identity_hash
+	## Function    : 
+	## Methodology : This may be desired at the fcsi_pseudo exemplar
+	## one day. Let the community decide...
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_return .fcsi_receiver.identity_hash
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.acpt_record_flavour
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_return :uds_record
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.does_not_understand(a_message,private?)
+	## Parameters  : a_message - the method and arguments being
+	##                     passed to the receiving object
+	##               private? - boolean is this a private method?
+	## Returns     : the result of the message being passed to
+	##                 self's receiver
+	## Function    : 
+	## Methodology : uses perform or perform_private on the
+	## receiver object
+	#---------------- HISTORY ---------------------
+	# (08/28/2014 - Mark Field, FCSI): Created.
+	# (2015/05/20 - Mark Field (FCSI)): Modified - if there is no
+	# field on the receiver, set it to the message
+	# fcsi_no_field. fixes error if multiple collections were used,
+	# yet field not in all collections
+	#----------------------------------------------
+	#DEBUG show(:fcsi_pseudo_rwo,:does_not_understand|()|,a_message.selector,.fcsi_receiver)
+	#DEBUG show(:receiver,.fcsi_receiver)
+	_dynamic !fcsi_pseudo! << _self 
+	_local meth << a_message.selector
+	_local cVal << .fcsi_cache[meth]
+	_if cVal _isnt _unset 
+	_then
+		_return cVal
+	_endif
+	_if meth _is :|get_spatial_context()|
+	_then
+		print(a_message.args)
+	_endif
+	_try
+	cVal <<
+		_if private?
+		_then
+			>> .fcsi_receiver.perform_private(meth,_scatter a_message.args )
+		_else
+			>> .fcsi_receiver.perform(meth,_scatter a_message.args)
+		_endif
+	_when does_not_understand
+		cVal << _self.fcsi_message_handler.human_string(:fcsi_no_field)
+	_endtry
+
+	_if _self.fcsi_coll.fcsi_pseudo_fields.includes?(meth)
+	_then
+		.fcsi_cache[meth] << cVal
+		_for aSec _over .fcsi_secondary_pseudos.fast_elements()
+		_loop
+			_if _not aSec.fcsi_cache.includes_key?(meth)
+			_then
+				aSec.fcsi_cache[meth] << cVal
+			_endif
+		_endloop
+		
+	_endif 
+	_return cVal
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.responds_to?(somethng)
+	## Parameters  : somethng - the message to check on self
+	## Returns     : boolean
+	## Function    : returns true if super or receiver responds to
+	## something. 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+#	_if .fcsi_fields.includes?(somethng)
+#	_then
+#		_return .fcsi_receiver.responds_to?(somethng)
+#	_endif
+	_return _super.responds_to?(somethng) _orif
+		.fcsi_receiver.responds_to?(somethng)
+_endmethod
+$
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo.fcsi_pseduo_fields
+#	## Parameters  : none
+#	## Returns     : rope
+#	## Function    : parses .fcsi_fields looking for non symbols
+#	## which signify pseudo fields
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/08/27 #- Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	_if .fcsi_cache[:int!fcsi_cached_pseudo_fields] _isnt _unset 
+#	_then
+#		_return .fcsi_cache[:int!fcsi_cached_pseudo_fields]
+#	_endif
+#	_local cache << rope.new_for(10)
+#	_for fldInfo _over .fcsi_fields.fast_elements()
+#	_loop
+#		_if fldInfo.class_name _is :symbol
+#		_then
+#			_continue
+#		_endif
+#		cache.add_last(fldInfo[1])
+#	_endloop
+#	_return .fcsi_cache[:int!fcsi_cached_pseudo_fields] << cache
+#_endmethod
+#$
+
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.fcsi_clone(_gather new_vals)
+	## Parameters  : new_vals - key/values pairs that will be copied to
+	##                 the cloned fcsi_pseudo_rwo fcsi_cache 
+	## Returns     : new/updated fcsi_pseudo_rwo
+	## Function    : does a copy of self, and a subsequent copy of
+	## the cache so it can be changed w/o modifying original.
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/27 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local new << _self.copy()
+	new.sys!slot(:fcsi_cache) << .fcsi_cache.copy()
+	_if new_vals _isnt _unset 
+	_then
+		new.fcsi_cache.add_all(property_list.new_with(_scatter new_vals))
+	_endif
+	new.fcsi_coll.fcsi_add(new)
+	_return new
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.get_spatial_context(name, _optional ace_name,props)
+	## Parameters  : 
+	## Returns     : 
+	## Function    : if this geom has geometry (real or pseudo) in
+	## .fcsi_cache[:int!fcsi_+name], return the spatial context of
+	## it otherwise return the receiver's information
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/08/28 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	
+	_local spatCon << .fcsi_receiver.get_spatial_context(name, ace_name,props)
+	#DEBUG show(:spatCon,spatCon)
+	_local cGeom << .fcsi_cache[:int!fcsi_+name]
+	_if cGeom _isnt _unset 
+	_then
+		_local geom << spatCon.an_element()
+		_if geom _is _unset 
+		_then
+			_return spatCon
+		_endif
+		_local wrld << geom.world
+		_local geomSet << geometry_set.new()
+		geomSet.add(cGeom)
+		spatCon << spatial_context.new(name,.fcsi_receiver)
+		spatCon.add_element(wrld,geomSet)
+	_elif .fcsi_cache[:fcsi_geometry] _isnt _unset 
+	_then
+		_local wrld << .fcsi_cache[:fcsi_geometry].world
+		_local geomSet << geometry_set.new()
+		geomSet.add(.fcsi_cache[:fcsi_geometry])
+		spatCon << spatial_context.new(name,.fcsi_receiver)
+		spatCon.add_element(wrld,geomSet)
+	_endif
+	_return spatCon
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.sys!slot(slot)
+	## Parameters  : slot - symbol of slot name
+	## Returns     : value on slot
+	## Function    : if slot is :ds!vector, {} is returned. It is
+	## required for ds_uint fields to work during Excel
+	## export. Otherwise super is called
+	## Methodology :
+	## Made change here versus trying to change
+	## acpt_type.init_new_record_type(). Couldn't figure out what
+	## exactly to return to get it to work without failing
+	#---------------- HISTORY ---------------------
+	# (2015/01/26 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_if slot _is :ds!vector
+	_then
+		condition.raise(:acpt_unsupported_type_for_field)
+		_return {}
+	_endif
+	_return _super.sys!slot(slot)
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo.fcsi_add_seondary_pseudo(_gather values)
+	## Parameters  : values are the "replacement" field/value pairs
+	##                  from which self is cloned and changed.
+	## Returns     : the cloned pseudo rwo.
+	## Function    : adds new cloned pseudo rwo to fcsi_secondary_pseudos
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2015/07/17 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local nRec << _self.fcsi_clone(_scatter values)
+	.fcsi_secondary_pseudos.add(nRec)
+	_return nRec
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_iter _method fcsi_pseudo_rwo.all_geometry(_optional including_meatball?)
+	##
+	## Yields each geometry object currently owned by _self. Only
+	## geometries which are authorised with at least select access
+	## will be yielded. 
+	##
+	## For advanced users: unless including_meatball? is true,
+	## meatballs are ignored.
+	##
+	## FCSI Mods : will get cached int!fcsi_ geometry if available
+	#---------------- HISTORY ---------------------
+	# (2015/07/09 - Mark Field (FCSI)): Created.
+	# (2017/09/14 - Mark Field (FCSI)): Modified - return cached
+	# geom if exists.
+	#----------------------------------------------
+	_if .fcsi_cache[:fcsi_geometry] _isnt _unset 
+	_then
+		_loopbody(.fcsi_cache[:fcsi_geometry])
+		_return 
+	_endif
+	_local map
+	_for aGeom _over .fcsi_receiver.all_geometry(including_meatball?)
+	_loop
+		_try
+			map << aGeom.fcsi_mapped_geom_field
+		_when error
+			map << aGeom.app_type
+		_endtry
+		_if .fcsi_cache[:int!fcsi_+map] _isnt _unset 
+		_then
+			_loopbody (.fcsi_cache[:int!fcsi_+map])
+		_else
+			_loopbody(aGeom)
+		_endif
+	_endloop
+	
+		
+_endmethod
+$

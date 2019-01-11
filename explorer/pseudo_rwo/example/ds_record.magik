@@ -1,0 +1,43 @@
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       the method ds_record.fcsi_id just returns a string
+# version of the id. simple example of creating a pseudo field
+# to be displayed in the explorer
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+_pragma(classify_level=basic, topic={fcsi,pseudo})
+_method ds_record.fcsi_id
+	## Parameters  : 
+	## Returns     : id as a string or "No ID Field"
+	## Function    : backstop for pseudo record example
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_try
+		_return  _self.id.write_string		
+	_when error
+		_return  "No ID field"
+	_endtry
+	
+_endmethod
+$
+

@@ -1,0 +1,11 @@
+fcsi_pseudo_rwo 400
+
+description
+	Pseudo RWO functionality for explorer
+end
+
+requires
+		ds_src
+		universal_rwo
+end
+

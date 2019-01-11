@@ -1,0 +1,7 @@
+fcsi_pseudo
+fcsi_pseudo_field
+fcsi_pseudo_descriptor
+fcsi_pseudo_rwo_set
+fcsi_pseudo_collection
+fcsi_pseudo_rwo
+fcsi_pseudo_collection_stream

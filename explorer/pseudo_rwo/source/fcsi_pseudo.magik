@@ -1,0 +1,150 @@
+#% text_encoding = iso8859_1
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       The fcsi_pseudo exemplar is a base exemplar that allows
+# you to create a "pseudo" representation of an object. You
+# create a fcsi_pseudo object using fcsi_pseudo.new(obj). When
+# you call a method on the fcsi_pseudo object, anything that is
+# not understood will be passed to the original object. So it's
+# behaviour is almost duplicate of the original object. You can
+# add functionality on top of this anyway you see fit. This is
+# used by fcsi_pseudo_rwo that will mimic a true datastore
+# object that can be used to change what is shown in the
+# explorer. 
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+_global !fcsi_pseudo! << _unset
+$
+
+_pragma(classify_level=basic, topic={records})
+##
+## fcsi_pseudo
+##
+def_slotted_exemplar(:fcsi_pseudo,
+	{{:fcsi_receiver,_unset,:readable}
+	})
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo.new(receiver)
+	## Parameters  : receiver - the target object to receive any messages
+	## Returns     : initialized fcsi_pseudo
+	## Function    : 
+	## Methodology : calls _clone.init()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	>> _clone.init(receiver)	
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo.init(receiver)
+	## Parameters  : receiver - the target object to receive any messages
+	## Returns     : initialized fcsi_pseudo
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	.fcsi_receiver << receiver
+	>> _self 	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo.does_not_understand(a_message,private?)
+	## Parameters  : a_message - the method and arguments being
+	##                     passed to the receiving object
+	##               private? - boolean is this a private method?
+	## Returns     : the result of the message being passed to
+	##                 self's receiver
+	## Function    : 
+	## Methodology : uses perform or perform_private on the
+	## receiver object
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_dynamic !fcsi_pseudo! << _self 
+	#_if _self.class_name = :fcsi_pseudo_rwo
+	#_then
+	
+	#DEBUG show(:fcsi_pseudo,_self,:does_not_understand|()|,a_message.selector,.fcsi_receiver)
+	#_endif
+	_if private?
+	_then
+		_return .fcsi_receiver.perform_private(a_message.selector,_scatter a_message.args )
+	_else
+		_return .fcsi_receiver.perform(a_message.selector,_scatter a_message.args)
+	_endif
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_iter _method fcsi_pseudo.does_not_understand_iter(a_message,private?)
+	## Parameters  : a_message - the method and arguments being
+	##                     passed to the receiving object
+	##               private? - boolean is this a private method?
+	## Returns     : the result of the message being passed to
+	##                 self's receiver
+	## Loopbody    : the loopbody of the message being passed to
+	##                 self's receiver
+	## Function    : 
+	## Methodology : uses perform_iter or perform_iter_private on the
+	## receiver object
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_dynamic !fcsi_pseudo! << _self 
+	_if _self.class_name = :fcsi_pseudo_collection
+	_then
+	#DEBUG show(:fcsi_pseudo,:does_not_understand_iter|()|,a_message.selector,.fcsi_receiver)
+		
+	_endif
+	_local res
+	_if private?
+	_then
+		res << _for a _over .fcsi_receiver.perform_iter_private(a_message.selector,_scatter a_message.args)
+		_loop
+			_loopbody(a)
+		_endloop
+	_else
+		res << _for a _over .fcsi_receiver.perform_iter(a_message.selector,_scatter a_message.args)
+		_loop
+			_loopbody(a)
+		_endloop
+	_endif
+	_return res 	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo.is_kind_of?(thing)
+	## Parameters  : thing - the inheritance object to test
+	## Returns     : boolean
+	## Function    : calls is_kind_of?() on the receiver
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+		
+	_return _super.is_kind_of?(thing) _orif .fcsi_receiver.is_kind_of?(thing)
+_endmethod
+$
+

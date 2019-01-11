@@ -1,0 +1,167 @@
+#% text_encoding = iso8859_1
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       fcsi_pseudo_field is used to provide a fake field to be
+# used by the explorer. Should only be called by fcsi_pseudo_descriptor.
+#
+# To label your pseudo field create message entries on
+# fcsi_pseudo_field. See fcsi_pseudo_field.msg in resources
+# directory for example.
+#
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+_pragma(classify_level=basic, topic={records})
+##
+## fcsi_pseudo_field
+##
+def_slotted_exemplar(:fcsi_pseudo_field,
+	{{:fcsi_name,_unset,:readable},
+	 {:fcsi_ext_name,_unset,:readable},
+	 {:fcsi_props,_unset,:readable}
+	},:fcsi_pseudo)
+$
+_pragma(classify_level=basic, topic={records})
+fcsi_pseudo_field.define_shared_variable(
+	:fcsi_message_handler,
+	## The message handler for pseudo fields/methods
+	_unset,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_field.new(f_name,type,_optional ext_name,_gather props)
+	## Parameters  : f_name - field name
+	##               type - (symbol) the type of field see view.defined_types
+	##               ext_name - external name, otherwise use
+	##                 fcsi_pseudo_field message handler
+	##               props - are key/value pairs representing
+	##                 settings of the field like print_width
+	## Returns     : initalized self
+	## Function    : 
+	## Methodology : calls clone.init()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/08/27 - Mark Field (FCSI)): Modified - added ext_name slot
+	# (2014/11/06 - Mark Field (FCSI)): Modified - added props
+	#----------------------------------------------
+	
+	>> _clone.init(f_name,type,ext_name,props)
+		 
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_field.init(f_name,type,ext_name,props)
+	## Parameters  : f_name - field name
+	##               type - (symbol) the type of field see view.defined_types
+	##               ext_name - external name
+	##               props - vec of key/value pairs representing
+	##                 settings of the field like print_width
+	## Returns     : initalized self
+	## Function    : creates a uds_phys_field of type given with
+	## name given. Also will initialize the message handler if it
+	## has't been done
+	## Methodology : calls uds_phys_field.new() and message_handler.new()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/08/27 - Mark Field (FCSI)): Modified - added ext_name slot
+	# (2014/11/06 - Mark Field (FCSI)): Modified - added props
+	#----------------------------------------------
+	.fcsi_receiver << uds_phys_field.new(f_name,type)
+	.fcsi_name << f_name
+	_if _self.fcsi_message_handler _is _unset 
+	_then
+		_self.fcsi_message_handler << message_handler.new(_self.class_name)
+	_endif
+	.fcsi_ext_name << ext_name
+	.fcsi_props << property_list.new_with(_scatter props)
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_field.external_name 
+	## Parameters  : none
+	## Returns     : string 
+	## Function    : returns fcsi_ext_name slot if set, or
+	## if there is a message on fcsi_pseudo_field for
+	## .fcsi_name, it is returned. Otherwise fcsi_name is returend
+	## as a string 
+	## Methodology : uses human_string()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/08/27 - Mark Field (FCSI)): Modified - added ext_name slot
+	#----------------------------------------------
+	_if .fcsi_ext_name _isnt _unset
+	_then
+		_return .fcsi_ext_name
+	_endif
+	_return _self.fcsi_message_handler.human_string(.fcsi_name,.fcsi_name.write_string)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_field.does_not_understand(a_message,private?)
+	## Parameters  : a_message - the method and arguments being
+	##                     passed to the receiving object
+	##               private? - boolean is this a private method?
+	## Returns     : the result of the message being passed to
+	##                 self's receiver
+	## Function    : looks for a_message in fcsi_props, if found
+	## returns it, otherwise call super
+	## Methodology : 
+	_if .fcsi_props[a_message.selector] _isnt _unset
+	_then
+		_return .fcsi_props[a_message.selector]
+	_endif
+	_return _super.does_not_understand(a_message,private?)
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_field.dataset
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/03 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_try
+		_return .fcsi_receiver.dataset
+	_when error 
+		_return _unset 
+	_endtry
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_field.show_on(strm)
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/02/04 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	strm.write("fcsi_pseudo_field(",.fcsi_name,%))
+		
+_endmethod
+$
+

@@ -1,0 +1,69 @@
+#% text_encoding = iso8859_1
+_package sw
+$
+_block 
+	_if lazy_record_collection.method(:sw!init|()|) _is _unset 
+	_then
+		lazy_record_collection.define_method(
+			:sw!init|()|,lazy_record_collection.method(:init|()|).value,
+			_false)
+	_endif
+_endblock #
+$
+_private _method lazy_record_collection.init(a_collection)
+	## 
+	## Initialise _self. Note that we don't start a stream until
+	## the first request. If A_COLLECTION is an empty, non-dd
+	## thing, then A_COLLECTION is returned itself. 
+	##
+	## FCSI Mods : if a_collection is fcsi_pseudo_rwo_set, return
+	## the owning pseudo collection
+	
+	
+	_if _not a_collection.is_kind_of?(user:fcsi_pseudo_rwo_set)
+	_then
+		#DEBUG show(:returning,:lazy)
+		_return _self.sw!init(a_collection)
+	_endif
+
+	
+	a_rec << a_collection.an_element()
+	_if a_rec _is _unset 
+	_then
+		#DEBUG show(:returning,:emppty_rwo_set)
+		_return rwo_set.new()
+	_endif
+	#DEBUG show(:returning,a_rec.fcsi_coll)
+	_return a_rec.fcsi_coll
+	
+
+_endmethod
+$
+_pragma(classify_level=advanced, topic={explorer_model,pseudo})
+_method lazy_record_collection.field(name)
+	## Parameters  : name of field 
+	## Returns     : 
+	## Function    : 
+	##  returns field descriptor of that name
+	## Methodology : 
+	## FCSI Mods   : Also checks for internal information
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local res << _super.field(name)
+	_if res _isnt _unset 
+	_then
+		_return res
+	_endif
+	# do internal test...
+	_try
+		res << _self.an_element().descriptor.field(name)
+	_when error
+		#ok
+	_endtry
+	_return res
+_endmethod
+$
+
+load_file_stop()
+$

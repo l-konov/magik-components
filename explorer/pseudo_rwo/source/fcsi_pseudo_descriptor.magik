@@ -1,0 +1,148 @@
+#% text_encoding = iso8859_1
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       fcsi_pseudo_descriptor is used to provide a modified
+# version of a real descriptor. This allows you to change the
+# fields available to view in the explorer. Should only be used
+# thru fcsi_pseudo_collection.
+#
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+_pragma(classify_level=basic, topic={collections})
+##
+## fcsi_pseudo_descriptor
+##
+def_slotted_exemplar(:fcsi_pseudo_descriptor,
+	{{:fcsi_fields,_unset,:readable},
+	 {:fcsi_cache,_unset,:readable}
+	},:fcsi_pseudo)
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_descriptor.new(descriptor,fields)
+	## Parameters  : descriptor - actual collection descriptor
+	##               fields - the fields of the records of coll. If
+	##                  it is normal field on record, then the
+	##                  element is just the symbol name, otherwise
+	##                  it is a simple vector with field (method)
+	##                  name and the magik class (;ds_int,
+	##                  :ds_char16_vector, etc) see view.defined_types
+	## Returns     : initialized fcsi_pseudo_descriptor
+	## Function    : 
+	## Methodology : calls clone.init()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	>> _clone.init(descriptor,fields)
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_descriptor.init(descriptor,fields)
+	## Parameters  : descriptor - actual collection descriptor
+	##               fields - the fields of the records of coll. If
+	##                  it is normal field on record, then the
+	##                  element is just the symbol name, otherwise
+	##                  it is a simple vector with field (method)
+	##                  name and the magik class (;ds_int,
+	##                  :ds_char16_vector, etc) see view.defined_types
+	##               field_props - property list of field props
+	##                  (like :print_width, 10)
+	## Returns     : 
+	## Function    : sets up the field data for final use later
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	# (2014/11/07 - Mark Field (FCSI)): Modified - added field props
+	#----------------------------------------------
+	_super.init(descriptor)
+	.fcsi_fields << rope.new()
+	.fcsi_cache << property_list.new()
+	.fcsi_cache[:field_class] << property_list.new()
+	.fcsi_cache[:field_ext_name] << property_list.new()
+	.fcsi_cache[:field_props] << property_list.new()
+	#.fcsi_cache[:field_props] << field_props.default(property_list.new())
+	_for aFld _over fields.fast_elements()
+	_loop
+		_if aFld.class_name _is :symbol
+		_then
+			.fcsi_fields.add_last(aFld)
+			_continue
+		_endif
+		# Then it is a simplevector with the secon
+		.fcsi_cache[:field_class][aFld[1]] << aFld[2]
+		.fcsi_cache[:field_props][aFld[1]] << {}
+		.fcsi_cache[:field_ext_name][aFld[1]] <<
+			_if aFld.size > 2
+			_then
+				_if aFld.size > 3
+				_then
+					.fcsi_cache[:field_props][aFld[1]] << aFld[4]
+				_endif
+				>> aFld[3]
+			_else
+				>> _unset 
+			_endif		
+		.fcsi_fields.add_last(aFld[1])
+	_endloop
+	
+	>> _self 
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_descriptor.field(f_name)
+	## Parameters  : f_name - symbol of field or method
+	## Returns     : a fcsi_pseudo_field or real field
+	## Function    : attempts to get the receivers field named
+	## f_name. If it doesn't exist then a pseudo field is created
+	## and returned
+	## Methodology : users fcsi_pseudo_field.new()
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	
+	_local fld << .fcsi_receiver.field(f_name)
+	_if fld _isnt _unset 
+	_then
+		_return  fld
+	_endif
+	_if .fcsi_cache[:p_fields] _is _unset 
+	_then
+		.fcsi_cache[:p_fields] <<property_list.new()
+	_endif
+	 
+	_if (fld << .fcsi_cache[:p_fields][f_name]) _isnt _unset 
+	_then
+		_return fld
+	_endif
+
+	# incorporate field props...
+	_return .fcsi_cache[:p_fields][f_name] <<
+		fcsi_pseudo_field.new(
+			f_name,
+			uds_field_type.new_scalar(
+				.fcsi_receiver.dd,f_name,.fcsi_cache[:field_class][f_name]),
+			.fcsi_cache[:field_ext_name][f_name],
+			_scatter .fcsi_cache[:field_props][f_name])
+_endmethod
+$

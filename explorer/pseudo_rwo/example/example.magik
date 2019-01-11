@@ -1,0 +1,73 @@
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       fcsi_pseudo_rwo_example() demonstrates the use of a
+# pseudo rwo to display different information to the explorer
+# that is not part of the real visible field description. This
+# proc will take the RWOs or records you supply convert them to
+# pseudo rwos with 2 fields and send them to the explorer. Note
+# you may have to have the explorer already open. I have heard
+# of issues with EO if the explorer was not already active...
+#
+#----------------------------------------------------------------------------
+#                    ------ Change Log ------
+# $Log$
+#
+#
+#============================================================================
+$
+_pragma(classify_level=basic, topic={fcsi,pseudo})
+_global fcsi_pseudo_rwo_example <<
+_proc(some_rwos,appl)
+	## Parameters  : some_rwos - a set of rwos. will be used to add
+	##                   to an rwo set to be passed to the explorer
+	##               appl - the application with an explorer plugin
+	## Returns     : nothing
+	## Function    : sends a set of pseudo_records with fcsi_id as
+	## one of 2 fields (other is the first visible field) 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/14/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+
+	_local rs << fcsi_pseudo_rwo_set.new()
+	_local colls << equality_property_list.new()
+	_local cColl,pRwo
+	_for aRec _over some_rwos.fast_elements()
+	_loop
+		cColl << aRec.source_collection
+		_if (cData << colls[cColl]) _isnt _unset 
+		_then
+			rs.add(fcsi_pseudo_rwo.new(aRec,_scatter cData))
+		_else
+			pRwo <<
+				fcsi_pseudo_rwo.new(
+					aRec,{{:fcsi_id,:ds_char16_vec},
+						  aRec.source_collection.visible_fields[1].name})
+			colls[cColl] << {pRwo.fcsi_fields,pRwo.fcsi_coll}
+			rs.add(pRwo)
+		_endif
+
+	_endloop
+	#DEBUG _global !rs;!rs << rs
+	appl.databus.make_data_available(:rwo_set,{:a,rs,
+											   :name,"list",
+											   :set_current?,_true,
+											   :keep,5})
+	_return rs
+_endproc
+
+$
+

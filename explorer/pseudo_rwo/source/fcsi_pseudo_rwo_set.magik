@@ -1,0 +1,290 @@
+#% text_encoding = iso8859_1
+#============================================================================
+#       ********* Proprietary Information ************
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the product
+# directory, and is also available at http://www.fsf.org.
+#
+# This program is supplied for use as reference only and is
+# distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+# KIND, either expressed or implied.
+#
+# Copyright (C)  2001-2012, Field Consulting and Services, Inc
+#----------------------------------------------------------------------------
+#----------------------------------------------------------------------------
+#   Description:
+#       fcsi_pseudo_rwo_set will allow the explorer to sort
+# pseudo fields and regular fields in large sets.
+#----------------------------------------------------------------------------
+#
+#
+#============================================================================
+$
+_pragma(classify_level=basic, topic={collections})
+##
+## fcsi_pseudo_collection
+##
+def_slotted_exemplar(:fcsi_pseudo_rwo_set,
+	{
+	 {:fcsi_cache,_unset,:readable}
+	},{:fcsi_pseudo})
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_rwo_set.new(_optional size)
+	## Parameters  : size to allocate space with
+	## Returns     : 
+	## Function    : 
+	## Methodology : calls clone.init()
+	#---------------- HISTORY ---------------------
+	# (2014/09/19 - Mark Field (FCSI)) : Created. 
+	#----------------------------------------------
+	>> _clone.init(size)
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_rwo_set.init(size)
+	## Parameters  : size to allocate space with
+	## Returns     : 
+	## Function    : sets up the the super self.
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (03/13/2012 - Mark Field, FCSI): Created.
+	#----------------------------------------------
+	_super.init(rwo_set.new(size))
+
+	>> _self 
+		
+_endmethod
+$
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_rwo_set.select(selector_or_predicate, _gather args)
+	## Parameters  : selector_or_predicate - predicate to use
+	##               args to pass to receiver's select() method
+	## Returns     : fcsi_pseudo_rwo_set
+	## Function    : does a select on receiver and adds the recs to
+	## the fcsi_pseudo_rwo_set
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/19 - Mark Field (FCSI)): Created.
+	# (2015/05/20 - Mark Field (FCSI)): Modified - create with size
+	# (better perfromance in explorer)
+	#----------------------------------------------
+	_local recSet << .fcsi_receiver.select(
+						selector_or_predicate,_scatter args)
+	_local newSet << fcsi_pseudo_rwo_set.new(recSet.size)
+	_for aRec _over recSet.fast_elements()
+	_loop
+		newSet.add(aRec)
+	_endloop
+	_return newSet
+		
+_endmethod
+$
+#_pragma(classify_level=basic, topic={collections})
+#_method fcsi_pseudo_rwo_set.all_collections()
+#	## Parameters  : 
+#	## Returns     : a set of dataset collections that contribute RWOs to self
+#	## Function    : 
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2016/09/09 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	_local es << equality_set.new()
+#	_for aRec _over _self.fast_elements()
+#	_loop
+#		es.add(aRec.source_collectioN)
+#	_endloop
+#	_return es
+#_endmethod
+#$
+_pragma(classify_level=basic, topic={collections})
+_method fcsi_pseudo_rwo_set.remove_invalid_elements()
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2016/09/09 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local es << equality_set.new()
+	_for aRec _over _self.fast_elements()
+	_loop
+		_if _not aRec.is_valid?
+		_then
+			es.add(aRec)
+		_endif 
+	_endloop
+	.fcsi_receiver.remove_all(es)
+		
+_endmethod
+$
+
+
+
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo_set.inherits_from?(thing)
+#	## Parameters  : thing - object to test inheritency 
+#	## Returns     : booelan
+#	## Function    : true if dd_collection_mixin, otherwise resutl
+#	## from super.inherits_from?()
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/09/22 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	_if thing _is dd_collection_mixin
+#	_then
+#		_return _true 
+#	_endif
+#	_return _super.inherits_from?(thing)
+#_endmethod
+#$
+#
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo_set.size_is_fast?
+#	## Parameters  : none
+#	## Returns     : true 
+#	## Function    : 
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/09/22 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	_return _true 
+#		
+#_endmethod
+#$
+#
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo_set.name
+#	## Parameters  : 
+#	## Returns     : 
+#	## Function    : 
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/09/22 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	_return _self.descriptor.name
+#		
+#_endmethod
+#$
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo_set.descriptor
+#	## Parameters  : 
+#	## Returns     : 
+#	## Function    : 
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/09/22 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	_return .fcsi_receiver.an_element().descriptor
+#		
+#_endmethod
+#$
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo_set.record_exemplar
+#	## Parameters  : 
+#	## Returns     : 
+#	## Function    : 
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/09/22 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#		
+#	_return _self.descriptor.record_exemplar
+#_endmethod
+#$
+#_pragma(classify_level=basic, topic={records})
+#_method fcsi_pseudo_rwo_set.source
+#	## Parameters  : 
+#	## Returns     : 
+#	## Function    : 
+#	## Methodology : 
+#	#---------------- HISTORY ---------------------
+#	# (2014/09/22 - Mark Field (FCSI)): Created.
+#	#----------------------------------------------
+#	>> _self 
+#		
+#_endmethod
+#$
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo_set.dataset
+	## Parameters  : none
+	## Returns     : dataset (can be unset) 
+	## Function    : uses an_element() of self to determine
+	## dataset. 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local aRec << .fcsi_receiver.an_element()
+	_if aRec _is _unset 
+	_then
+		_return _unset 
+	_endif
+	_return aRec.dataset
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo_set.source_view
+	## Parameters  : 
+	## Returns     : 
+	## Function    : 
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2014/09/22 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	>> _unset #_self.dataset
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo_set.match?(rwo1, rwo2)
+	## Parameters  : rwo1 & rwo2 - records to compare
+	## Returns     : boolean
+	## Function    : 
+	## Returns a boolean which is true if rwo1 and rwo2 should
+	## be regarded as the same
+	## Methodology : Calls rwo1.fcsi_receiver =
+	## rwo2.fcsi_receiver. faster then letting does_not_understand
+	## handle code.
+	#---------------- HISTORY ---------------------
+	# (2015/05/14 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_try
+		_return rwo1.fcsi_receiver = rwo2.fcsi_receiver _andif
+			rwo1.fcsi_receiver.dataset = rwo2.fcsi_receiver.dataset
+	_when db_stale_handle
+		_return _false 
+	_endtry
+
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={records})
+_method fcsi_pseudo_rwo_set.fcsi_as_real_rwo_set()
+	## Parameters  : none
+	## Returns     : rwo_set
+	## Function    : return an rwo_set that contains the referenced
+	## rwos within self. Note the # of elements may not equal to
+	## this size because duplicates would be removed.
+	## Methodology : 
+	#---------------- HISTORY ---------------------
+	# (2017/12/26 - Mark Field (FCSI)): Created.
+	#----------------------------------------------
+	_local rs << rwo_set.new(.fcsi_receiver.size)
+	_for aRec _over _self.elements()
+	_loop
+		rs.add(aRec.sys!slot(:fcsi_receiver))
+	_endloop
+	_return rs
+_endmethod
+$
+
+
