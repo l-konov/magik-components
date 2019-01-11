@@ -1,0 +1,31 @@
+
+
+sw!patch_software("mss_ptrules",1)
+$
+_package sw
+$
+
+_pragma(classify_level=restricted)
+_method gui_framework.undo_manager
+	## 
+	## Returns the object that provides undo/redo functionality
+	## Looks first for a plugin providing the :undo_manager service
+	## If no such plugin is found, return the database.
+	##
+	#  Change Log
+	#
+	# 2009-01-14 rdscpe/rdhare: initial version adapted from
+	# ${SMALLWORLD_GIS}/modules/sw_core/application/source/application.magik
+	# 
+	>> _if ( undo_man << _self.get_service_provider( :undo_service ) ) _isnt _unset
+	   _then
+		   >> undo_man
+	   _else
+		   >> _self.database
+	   _endif 
+	
+_endmethod
+$
+
+
+sw!declare_custom_patch(548,0,"Fehlendes Verhalten undo_manager auf gui_framework")

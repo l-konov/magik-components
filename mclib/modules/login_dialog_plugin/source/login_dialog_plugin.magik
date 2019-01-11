@@ -1,0 +1,98 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Created By: David Little
+## Date: 03-16-2005
+## Copyright 2005 David Little
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+$
+
+## This plugin can be added to an application, and manages the
+## action that activates the Login Panel Dialog.
+##
+## XML-Impact: Yes
+##
+## XML-Details:
+## Xml changes are required to existing application modules.
+##
+## For Example:
+##       config.xml
+##       <plugin name="login_dialog" class_name="mclib:login_dialog_plugin" />
+##
+##       gui.xml
+##       <action name="login_dialog.change_login" />
+##
+
+_pragma(classify_level=basic, topic={authorisation}, usage={redefinable})
+## Plugin to allow user to login into product as different user
+# (03-16-2005 David Little, GeoSpatial Innovations, Inc.): created.
+def_slotted_exemplar(:login_dialog_plugin, {}, :plugin)
+$
+
+_pragma(classify_level=basic, topic={authorisation}, usage={redefinable})
+_method login_dialog_plugin.init_actions()
+	##   Initialise the actions provided by the plugin
+	# (03-16-2005 David Little, GeoSpatial Innovations, Inc.): created.
+	
+	_self.add_action(sw_action.new(
+				 :change_login,
+				 :engine, _self,
+				 :caption, "Change Login",
+				 :toolbar_control, :button_item,
+				 :enabled?, gis_program_manager.authorisation_view _isnt _unset,
+				 :action_message, :activate_login_dialog|()|))
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={authorisation}, usage={redefinable})
+## Cached login_panel.
+# (03-16-2005 David Little, GeoSpatial Innovations, Inc.): created.
+login_dialog_plugin.def_property( :login_dialog,
+				  :type, :object,
+				  :readable?, _false,
+				  :writable?, _false )
+$
+
+_pragma(classify_level=basic, topic={authorisation}, usage={redefinable})
+_method login_dialog_plugin.activate_login_dialog()
+	## Activates the Login Panel Dialog
+	# (03-16-2005 David Little, GeoSpatial Innovations, Inc.): created.
+	
+	_if ( pp << _self.login_dialog ) _is _unset
+	_then
+		pp << _self.login_dialog <<
+			login_panel.new_dialog( _self.top_frame,
+						gis_program_manager.authorisation_view )
+		
+		pp.action <<
+			_proc()
+				# New User may have access to different applications
+				smallworld_application_manager.changed( :application_list, :renew )
+			_endproc
+	_endif
+
+	# New User may not have access to tables!!
+	_self.application.plugin(:editor_manager).clear_editor_cache()
+	_self.application.plugin(:editor_manager).current_embedded_editor.clear()
+	
+	pp.activate_relative_to(_unset, _self.top_frame, 200, 200 )
+_endmethod
+$

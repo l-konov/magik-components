@@ -1,0 +1,191 @@
+#% text_encoding = iso8859_1
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: 16 May 2011
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+########################################################################
+
+# use define_method_synonym() to wrap some of our behavior
+# around the core method without redefining the core behavior. 
+_if viewport_layout.method(:original!initialise_for_page|()|) _is _unset 
+_then
+	viewport_layout.define_method_synonym(:original!initialise_for_page|()|,:initialise_for_page|()|)
+_endif
+$
+_pragma(classify_level=advanced, topic={plotting}, usage={subclassable})
+_method viewport_layout.initialise_for_page ( a_layout_page )
+	## 
+	## Check we have a unique name 
+	## 
+
+	# call the original core code...
+	_self.original!initialise_for_page(a_layout_page)
+
+	# ... and then run our enhancements
+	_dynamic !if_copied_viewport_layout?!
+
+	_if !if_copied_viewport_layout?!
+	_then
+		# don't continue if we are in this method because of the
+		# viewport cloning we did in int!create_internal_viewports() 
+		_return 
+	_endif
+	
+	_local current_page << _self.layout
+
+	_local my_bounds << _self.bounds
+
+	# of all the viewports that contain self, pick the one with the
+	# smallest area AND has a mapping as the one that we are
+	# interested in.
+	_local candidate_container_viewports << sorted_collection.new(_unset,
+								      _proc(a,b)
+									      >> a.area _cf b.area
+								      _endproc)
+	
+	_for i_vp _over current_page.all_elements_of(viewport_layout).fast_elements()
+	_loop
+		_if i_vp.mapped? _andif
+		    i_vp.contains?(my_bounds)
+		_then
+			candidate_container_viewports.add(i_vp)
+		_endif
+	_endloop
+
+	_local my_original_bounds_layout << _self.bounds.copy()
+	
+	_if _not candidate_container_viewports.empty?
+	_then
+		_local container_viewport << candidate_container_viewports.first
+		
+		_self.int!create_internal_viewports(container_viewport,my_original_bounds_layout)
+		_self.int!create_detail_viewport(container_viewport)
+	_endif
+
+_endmethod
+$
+_pragma(classify_level=restricted, topic={plotting}, usage={subclassable})
+_private _method viewport_layout.int!create_detail_viewport(container_viewport)
+	## int!create_detail_viewport(viewport_layout CONTAINER_VIEWPORT) : _unset
+	##
+	## based on where self is inside of CONTAINER_VIEWPORT, modify
+	## the :centre coordinate to essentially magnify the region
+	## that self is covering.  Once that is done, also make the
+	## bounds bigger so we can see all the magnified data.
+
+	# setting the parent_viewport copies all the properties from
+	# CONTAINER_VIEWPORT to _self...
+	_self.parent_viewport << container_viewport
+
+	# ... and then setting the parent viewport ID back to 0 severs
+	# the parent/child relationship but still keeps all the
+	# properties that were originally copied.
+	_self.parent_viewport_id << 0
+
+	_local my_centre_coord_layout << _self.bounds.centre
+
+	# the transform from layout page space to world coordinates
+	_local container_vp_transform << transform.new_matching_bounds(container_viewport.bounds,container_viewport.projection_bounds.bounds)
+	
+	_local my_centre_coord_world << container_vp_transform.convert(my_centre_coord_layout)
+
+	_self.centre << my_centre_coord_world
+
+	_local zoom_factor << 3.0
+	
+	_self.view_scale /<< zoom_factor
+
+	_self.bounds << _self.bounds.new_enlarging(zoom_factor)
+
+	_self.shadow_style << fill_style.new(colour.called(:black))
+_endmethod
+$
+_pragma(classify_level=restricted, topic={plotting}, usage={subclassable})
+_private _method viewport_layout.int!create_internal_viewports(container_viewport,original_bounds_layout)
+	## int!create_internal_viewports(viewport_layout CONTAINER_VIEWPORT,
+	##                               bounding_box ORIGINAL_BOUNDS_LAYOUT) : _unset
+	##
+	## based on where self is inside of CONTAINER_VIEWPORT, find
+	## all the objects inside the bounds of self's world bounds
+	## that correspond to ORIGINAL_BOUNDS_LAYOUT and if they have
+	## an internal world, create a viewport layout for them.  
+
+	_dynamic !if_copied_viewport_layout?! << _true
+	
+	# the transform from layout page space to world coordinates
+	_local container_vp_transform << transform.new_matching_bounds(container_viewport.bounds,container_viewport.projection_bounds.bounds)
+	
+	_local world_scan_bounds << original_bounds_layout.transform(container_vp_transform)
+
+	_local geoms << container_viewport.geometry_set_for_render
+
+	geoms << geoms.select(:within,world_scan_bounds)
+
+	_local rwos_in_bounds << equality_set.new_from(geoms.rwo_set())
+
+	_local current_page << _self.layout
+	_local app << current_page.map_manager.application
+	
+	_for i_rwo _over rwos_in_bounds.fast_elements()
+	_loop
+		_for i_context_name _over i_rwo.get_spatial_context_names().fast_elements()
+		_loop
+			_for i_context_element _over i_rwo.get_spatial_context(i_context_name).fast_elements()
+			_loop
+				_local gs << i_context_element.geometry_set()
+
+				# copy by writing/reading the serialized version of _self
+				_local o_str << internal_text_output_stream.new()
+				serial_xml_thing.write_thing_to({_self},o_str)
+
+				_local i_str << internal_text_input_stream.new(o_str.string)
+				_local list << serial_xml_thing.read_thing_from(i_str)
+				_local new_vp << list.an_element()
+				_local tr << transform.new().translate(100,-100)
+				new_vp.transform_in_situ(tr)
+				current_page.add_element(new_vp)
+				
+				new_vp.centre << gs.bounds.centre
+				new_vp.world << gs.world
+				new_vp.ace_name << app.get_ace_name_for_spatial_context(i_context_name)
+
+				
+				_local zoom_factor << 3.0
+
+				_local new_vp_bounds << new_vp.bounds
+				_local gs_bounds << gs.bounds
+
+				# the layout document has internal units of :dmm, so we need to
+				# consider that when deciding on the view scale.
+				_local unit_scale_factor << unit_value.new(1,new_vp.world.unit_name).value_in(:dmm)
+				
+				new_vp.view_scale << ( gs_bounds.width / new_vp_bounds.width ).min ( gs_bounds.height / new_vp_bounds.height ) * unit_scale_factor
+
+				new_vp.bounds << new_vp.bounds.new_enlarging(zoom_factor)
+				
+				new_vp.shadow_style << fill_style.new(colour.called(:black))
+				
+			_endloop
+		_endloop
+	_endloop
+_endmethod
+$
+

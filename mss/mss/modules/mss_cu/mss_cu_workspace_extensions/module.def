@@ -1,0 +1,9 @@
+mss_cu_workspace_extensions	1
+
+description
+	Extensions to mss_workspace modules to enable Compatible Units
+end
+
+requires
+	mss_cu_workspace_data_model
+end

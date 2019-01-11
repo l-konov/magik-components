@@ -1,0 +1,1464 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_search_plugin.magik
+##
+## GUI plugin for handling functions related to searching job
+## and design data for MSS workspace functionality.
+##
+
+def_slotted_exemplar(:mss_wm_search_plugin,
+{
+	{:items, _unset, :readable},
+	{:search_field_list, _unset, :readable},
+	{:result_list, _unset, :readable},
+	{:job_result_list_lookup, _unset, :readable},
+	{:design_result_list_lookup, _unset, :readable},
+	{:selected_job, _unset, :readable},
+	{:selected_design, _unset, :readable},
+	{:editor_cache, _unset, :readable},
+	{:thread, _unset, :readable},
+	{:run_status, _unset, :readable}
+},
+{:mss_application_databus_plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_search_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:selected_job, :selected_design, :selected_jobs_and_designs, :all_jobs_and_designs,
+	 :set_active_design, :run_status_string, :status_string},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_search_plugin.define_shared_constant(
+	:application_databus_consumer_data_types,
+	{:map_trail},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_wm_search_plugin.define_shared_constant(
+	:job_prompt_attributes,
+	## A vector of attributes to prompt for when querying for
+	## jobs.
+	{:name, :type, :status, :start_date, :end_date},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_wm_search_plugin.define_shared_constant(
+	:design_prompt_attributes,
+	## A vector of attributes to prompt for when querying for
+	## designs. 
+	{:name, :status, :owner, :last_update_time},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_wm_search_plugin.define_shared_constant(
+	:result_list_column_widths,
+	## Column widths to use for result list.
+	{100, 90, 75, 75, 90},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_search_plugin.result_list_column_headings
+	## 
+	## Column headings to use for result list.
+	## 
+
+	_return {_self.message(:rch_job_name),
+		 _self.message(:rch_design_full_name),
+		 _self.message(:rch_design_status),
+		 _self.message(:rch_design_owner),
+		 _self.message(:rch_design_last_update_date)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_search_plugin.result_list_value_formatters
+	## 
+	## Value formatters to use for displaying data in result list.
+	##
+
+	_return {}
+	
+_endmethod
+$
+
+# Thread handling methods - copied from engine_model.
+#
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.run_status << status
+	## 
+	## Similar functionality as for engine_model.
+	##
+
+	_self.framework.top_frame.busy? << status _is :running
+	_self.action(:perform_search).enabled? << status _isnt :running
+	_self.action(:interrupt).enabled? << status _is :running
+	.run_status << status
+	_self.changed(:run_status)
+	_self.changed(:run_status_string)
+	_self.databus_make_data_available(:run_status_string, _self.run_status_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.run_status_string
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_return _self.message(.run_status)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.run_engine(priority, method_name, _gather args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		_self.user_error(:engine_running)
+	_endif
+	.thread << _proc(model, method, args)
+			   model.int!run_engine(method, args)
+		   _endproc.fork_at(priority, _self, method_name, args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.int!run_engine(method, _optional args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_protect
+		_handling user_error _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		_self.run_status << :running
+		_if method.is_class_of?({})
+		_then
+			method.new_appending(_scatter args).send_to(_self)
+		_else
+			_self.perform(method,_scatter args)
+		_endif
+	_protection
+		.thread << _unset
+		_self.run_status << :ready
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.interrupt()
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		.thread.kill_and_wait()
+	_endif
+	_self.run_status << :ready
+	_self.status_string << _self.message(:interrupted)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_search_plugin.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_search_plugin.trail
+	##
+	## Request the trail from the application databus.
+	##
+
+	_for info _over _self.application_databus_request_all_data(:map_trail)
+	_loop
+		# Just in case there are any other (custom) things producing
+		# trails, specifically get one that is managed by an actual
+		# map. 
+		_if info[1].is_kind_of?(map)
+		_then 
+			_return info[2], info[1]
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.init(_gather args)
+	## 
+	##
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	.selected_job << _unset
+	.selected_design << _unset
+	.editor_cache << equality_hash_table.new()
+	.thread << _unset
+	.run_status << :ready
+	.result_list << sorted_collection.new(100, _proc(a, b)
+							   sk1 << a.value[:initial_sort_key]
+							   sk2 << b.value[:initial_sort_key]
+							   _for i _over 1.upto(sk1.size)
+							   _loop
+								   v1 << sk1[i]
+								   v2 << sk2[i]
+								   _if v1 _is _unset _andif
+								       v2 _isnt _unset
+								   _then
+									   _return _false
+								   _elif v1 _isnt _unset _andif
+									 v2 _is _unset
+								   _then
+									   _return _true
+								   _elif v1 _is _unset _andif
+									 v2 _is _unset
+								   _then
+									   _continue 
+								   _elif (retval << v1 _cf v2) _isnt _maybe
+								   _then
+									   _return retval
+								   _endif
+							   _endloop
+							   _return _maybe 
+					      _endproc)
+	.job_result_list_lookup << equality_hash_table.new()
+	.design_result_list_lookup << equality_hash_table.new()
+	_self.init_search_field_list()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_search_plugin.selected_job
+	## 
+	## Ensure record is valid before returning it.
+	##
+
+	_if .selected_job _isnt _unset _andif
+	    _not .selected_job.is_valid?
+	_then
+		.selected_job << _unset
+	_endif
+	_return .selected_job
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_search_plugin.selected_design
+	## 
+	## Ensure record is valid before returning it.
+	##
+
+	_if .selected_design _isnt _unset _andif
+	    _not .selected_design.is_valid?
+	_then
+		.selected_design << _unset
+	_endif
+	_return .selected_design
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.pre_activation()
+	## 
+	## 
+
+	mss_workspace_manager_engine.view.add_dependent(_self, :view)
+	mss_workspace_manager_engine.view.add_observer(_self, {:insert, :update, :pre_delete},
+						       {:mss_job, :mss_design})
+	_super.pre_activation()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.terminate()
+	## 
+	## 
+
+	mss_workspace_manager_engine.view.remove_dependent(_self, :view)
+	mss_workspace_manager_engine.view.remove_observer(_self, {:insert, :update, :pre_delete},
+							  {:mss_job, :mss_design})
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_dynamic !dsst_operation!
+	_dynamic !mss_workspace_view_operation!
+	
+	_if who _is mss_workspace_manager_engine.view
+	_then
+		_if {:insert, :update, :pre_delete}.includes?(what)
+		_then 
+			tbl << data[1]
+			_if tbl.name _is :mss_job
+			_then
+				_if what _is :insert
+				_then
+					_self.note_job_insert(data[2])
+				_elif what _is :update
+				_then
+					_self.note_job_update(data[2])
+				_elif what _is :pre_delete
+				_then
+					_self.note_job_delete(data[2])
+				_endif
+			_elif tbl.name _is :mss_design
+			_then
+				_if what _is :insert
+				_then
+					_self.note_design_insert(data[2])
+				_elif what _is :update
+				_then
+					_self.note_design_update(data[2])
+				_elif what _is :pre_delete
+				_then
+					_self.note_design_delete(data[2])
+				_endif
+			_endif
+		_elif what _is :view
+		_then
+			_if !dsst_operation! _is :start_transaction _orif
+			    !mss_workspace_view_operation! _is :rollforward
+			_then
+				# Don't refresh during a planned rollforward operation.
+				_return
+			_endif
+
+			# If a transaction goes wrong, it is potentially unfeasible to
+			# refresh self's list fully (if there are a lot of items
+			# displayed).  So, just refresh selected items.
+			any_change? << _false 
+			_for i _over _self.result_list_selection.fast_elements()
+			_loop
+				any_change? << _true 
+				val << i.value
+				_self.set_result_list_attributes(val, val[:job], val[:design])
+			_endloop
+			_if any_change?
+			_then
+				_self.changed(:result_list)
+			_endif 
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_job_insert(rec)
+	## 
+	## Add any inserted job to the result list.
+	##
+
+	_self.add_search_result(rec, _unset, _false)
+	_self.changed(:result_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_job_update(rec)
+	## 
+	## Update result tree data for any updated job that is managed
+	## by self.
+	##
+
+	_if (r << .job_result_list_lookup[rec.id]) _isnt _unset _andif
+	    r.size > 0
+	_then
+		_for dt _over r.fast_elements()
+		_loop
+			pl << dt.value
+			_if (design_rec << pl[:design]) _isnt _unset _andif
+			    _not design_rec.is_valid?
+			_then
+				pl[:design] << _unset
+				pl[:design_id] << _unset
+				design_rec << _unset
+			_endif 
+			_self.set_result_list_attributes(pl, rec, design_rec)
+		_endloop 
+		_self.changed(:result_list)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_job_delete(rec)
+	## 
+	## Remove all display trees that refer to job REC.
+	##
+
+	_if (r << .job_result_list_lookup[rec.id]) _isnt _unset _andif
+	    r.size > 0
+	_then
+		_for dt _over r.fast_elements()
+		_loop
+			pl << dt.value
+			_if (design_id << pl[:design_id]) _isnt _unset
+			_then
+				.design_result_list_lookup.remove_key(design_id)
+			_endif
+			.result_list.remove(dt)
+		_endloop
+		.job_result_list_lookup.remove_key(rec.id)
+		_self.changed(:result_list, :refresh)
+	_endif 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_design_insert(rec)
+	## 
+	## Add any inserted design to the result list.
+	##
+
+	_self.add_search_result(rec.mss_job, rec, _false)
+	_self.changed(:result_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_design_update(rec)
+	## 
+	## Update result tree data for any updated design that is managed
+	## by self.
+	## 
+
+	_if (dt << .design_result_list_lookup[rec.id]) _isnt _unset
+	_then
+		pl << dt.value
+		_self.set_result_list_attributes(pl, rec.mss_job, rec)
+		_self.changed(:result_list)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.note_design_delete(rec)
+	## 
+	## Note the deletion of design REC.
+	##
+
+	any_change? << _false 
+	job_rec << rec.mss_job
+	_if (dt << .design_result_list_lookup.remove_key(rec.id)) _isnt _unset
+	_then
+		any_change? << _true
+		.result_list.remove(dt)
+	_endif
+
+	# Keep cached job info up-to-date also.
+	_if (r << .job_result_list_lookup[job_rec.id]) _isnt _unset
+	_then
+		any_removed? << _false 
+		_for i _over r.size.downto(1)
+		_loop
+			dt << r[i]
+			_if dt.value[:design_id] = rec.id
+			_then
+				r.remove_nth(i)
+				any_change? << _true 
+				any_removed? << _true 
+
+				# The following should be redundant, but just make sure that
+				# all cached info is tidy.
+				.result_list.remove(dt)
+			_endif
+		_endloop
+		_if any_removed? _andif r.size = 0
+		_then
+			# Re-add a record for the job only.
+			_self.add_search_result(job_rec, _unset, _false)
+			any_change? << _true 
+		_endif
+	_endif
+
+	_if any_change?
+	_then
+		_self.changed(:result_list, :refresh)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.init_search_field_list()
+	## 
+	## Initialize the display trees being displayed to prompt for
+	## attribute values.
+	##
+
+	.search_field_list << rope.new()
+
+	# Add search fields for job.
+	det_rec << mss_workspace_manager_engine.job_table.new_detached_record()
+	attr_names << _self.job_prompt_attributes
+	_self.init_search_field_list_for_record(det_rec, attr_names)
+
+	# Add search fields for design.
+	det_rec << mss_workspace_manager_engine.design_table.new_detached_record()
+	attr_names << _self.design_prompt_attributes
+	_self.init_search_field_list_for_record(det_rec, attr_names)
+
+	# Add special search fields.
+	sstr << {:bold, :value, :attribute_name}
+	dt << display_tree.new(:special_search_fields,
+			       property_list.new_with(
+				       :det_rec, _unset,
+				       :fd, _unset,
+				       :attribute_name, _self.message(:special_search_fields),
+				       :attribute_value, _unset))
+	dt.styled_string << sstr
+	.search_field_list.add_last(dt)
+
+	# Limit search to inside trail.
+	sstr << {:value, :attribute_name, :tab,
+		 :toggle, :attribute_value,
+		 :value, :attribute_value}
+	dt << display_tree.new(:inside_trail,
+			       property_list.new_with(
+				       :det_rec, _unset,
+				       :fd, _unset,
+				       :attribute_name, _self.message(:inside_trail),
+				       :attribute_value, _false))
+	dt.styled_string << sstr
+	.search_field_list.add_last(dt)
+	
+	# Limit search to current user.
+	dt << display_tree.new(:current_user,
+			       property_list.new_with(
+				       :det_rec, _unset,
+				       :fd, _unset,
+				       :attribute_name, _self.message(:current_user, gis_program_manager.login_name),
+				       :attribute_value, _false))
+	dt.styled_string << sstr
+	.search_field_list.add_last(dt)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.init_search_field_list_for_record(det_rec, attr_names)
+	## 
+	## 
+
+	sstr << {:bold, :value, :attribute_name}
+	dt << display_tree.new(det_rec, property_list.new_with(
+						:det_rec, det_rec,
+						:fd, _unset,
+						:attribute_name, _self.message(:attributes_for, det_rec.source_collection.external_name),
+						:attribute_value, _unset,
+						:to_indicator, _unset,
+						:attribute_value_range, _unset))
+	dt.styled_string << sstr
+	.search_field_list.add_last(dt)
+	
+	sstr1 << {:value, :attribute_name, :tab,
+		 :value, :attribute_value}
+	sstr2 << {:value, :attribute_name, :tab,
+		 :value, :attribute_value, :tab,
+		 :value, :to_indicator, :tab,
+		 :value, :attribute_value_range}
+	_for i _over attr_names.fast_elements()
+	_loop
+		fd << det_rec.all_fields[i]
+
+		# Use an overriding message if defined.
+		ext_key << write_string("ext_name_", det_rec.source_collection.name,
+					"_", fd.name).as_symbol()
+		_if _self.has_message?(ext_key)
+		_then
+			ext_name << _self.message(ext_key)
+		_else
+			ext_name << fd.external_name.as_charvec()
+		_endif
+		pl << property_list.new_with(:det_rec, det_rec,
+					     :fd, fd,
+					     :attribute_name, ext_name,
+					     :attribute_value, _unset,
+					     :to_indicator, _unset,
+					     :attribute_value_range, _unset)
+		_if fd.is_physical? _andif
+		    {:ds_date, :ds_time}.includes?(fd.type.phys_type)
+		_then
+			pl[:to_indicator] << _self.message(:to_indicator)
+			dt << display_tree.new(fd, pl)
+			dt.styled_string << sstr2
+		_else 
+			dt << display_tree.new(fd, pl)
+			dt.styled_string << sstr1
+		_endif 
+		.search_field_list.add_last(dt)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	##
+
+	_if data_type_name _is :selected_job
+	_then
+		_return _self.selected_job
+	_elif data_type_name _is :selected_design
+	_then
+		_return _self.selected_design
+	_elif data_type_name _is :all_jobs_and_designs
+	_then
+		_return _self.ordered_result_list
+	_elif data_type_name _is :selected_jobs_and_designs
+	_then
+		_return _self.result_list_selection
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:perform_search,
+				       :short_help_text, _self.message(:perform_search_sh),
+				       :engine, _self,
+				       :image, {:find, :ui_resources},
+				       :action_message, {:|run_engine()|, _thisthread.vm_priority - 1,
+							 :|perform_search()|}))
+	_self.add_action(sw_action.new(:interrupt,
+				       :short_help_text, _self.message(:interrupt_sh),
+				       :enabled?, _false,
+				       :engine, _self,
+				       :image, {:stop, :ui_resources},
+				       :action_message, :|interrupt()|))
+	_self.add_action(sw_action.new(:clear,
+				       :short_help_text, _self.message(:clear_sh),
+				       :engine, _self,
+				       :image, {:clear, :ui_resources},
+				       :action_message, :|clear()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	
+	p.start_row()
+	.items[:search_field_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :search_field_list,
+			      :data_selector, :search_field_list,
+			      :editor_required_notifier, :|editor_required()|,
+			      :value_changed_notifier, :|value_changed()|,
+			      :edit_always_on?, _true,
+			      :height_in_chars, (.search_field_list.size + 2).max(5).min(15),
+			      :column_widths, {170, 150, 20, 150},
+			      :column_headings, {_self.message(:ch_attribute_name),
+						 _self.message(:ch_attribute_value),
+						 _self.message(:ch_to_indicator),
+						 _self.message(:ch_attribute_value_range)},
+			      :col_resize_values, {49, 49, 1, 1},
+			      #:distribute_spare_width, :initial,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _false) 
+
+	p.start_row()
+	.items[:result_list] << ti <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :result_list,
+			      :data_selector, :result_list,
+			      :select_notifier, {:|perform_safely()|, :|result_list_selected()|},
+			      :double_click_notifier, {:|perform_safely()|, :|result_list_double_click()|},
+			      :height_in_chars, 12,
+			      :column_widths, _self.result_list_column_widths.copy(),
+			      :column_headings, _self.result_list_column_headings.copy(),
+			      :value_formatters, _self.result_list_value_formatters,
+			      :distribute_spare_width, :always,
+			      :column_allow_sort?, _true,
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :results_list)
+
+	_self.custom_post_build_gui(container)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_search_plugin.custom_post_build_gui(container)
+	## 
+	## Perform any custom processing after build_gui() is
+	## complete.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.result_list_selected(selection, by_user?)
+	## 
+	## 
+
+	_if selection _isnt _unset _andif
+	    selection.size = 1
+	_then
+		pl << selection.an_element().value
+		sel_job << pl[:job]
+		sel_design << pl[:design]
+	_else
+		sel_job << _unset
+		sel_design << _unset
+	_endif
+
+	# It is going to be really hard to get stale record handles in
+	# a short transaction environment, but just in case...
+	_if sel_job _isnt _unset _andif
+	    _not sel_job.is_valid?
+	_then
+		sel_job << _unset
+	_endif
+	_if sel_design _isnt _unset _andif
+	    _not sel_design.is_valid?
+	_then
+		sel_design << _unset
+	_endif
+	
+	.selected_job << sel_job
+	.selected_design << sel_design
+	
+	_self.databus_make_data_available(:selected_job, sel_job)
+	_self.databus_make_data_available(:selected_design, sel_design)
+
+	# Also notify multi-select, just using the raw selection set.
+	# N.B.: explicitly calling result_list_selection, rather than
+	# just using selection passed in, in order to get an ordered result.
+	_self.databus_make_data_available(:selected_jobs_and_designs, _self.result_list_selection)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.result_list_double_click()
+	## 
+	## When a record is double-clicked, open the design.
+	##
+
+	# N.B.: if the user happened to hold down ctrl while double
+	# clicking, it will actually de-select the record... so ignore
+	# the arguments passed in, and just go with the selected_design slot.
+	_if (rec << _self.selected_design) _isnt _unset
+	_then
+		_self.open_design()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.result_list_selection
+	## 
+	## Returns the current selection in the result_list.
+	##
+
+	_if (ti << .items[:result_list]) _is _unset
+	_then
+		_return {}
+	_endif
+
+	r << rope.new_from_iter(ti.tree_manager, :|fast_selected_trees()|)
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.ordered_result_list
+	## 
+	## Returns the result_list, in the order that it is displayed.
+	##
+
+	_if (ti << .items[:result_list]) _is _unset
+	_then
+		_return {}
+	_endif
+
+	r << rope.new_from_iter(ti.tree_manager, :|fast_visible_trees()|)
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## Allow in-place editing of attribute_value column.
+	##
+
+	_if value_id _is :attribute_value _orif
+	    (value_id _is :attribute_value_range _andif
+	     a_tree.value[:to_indicator] _isnt _unset)
+	_then
+		# OK.
+	_else 
+		_return
+	_endif
+	
+	_if (fd << a_tree.value[:fd]) _is _unset
+	_then
+		_return
+	_endif
+	
+	_if (ed << .editor_cache[fd]) _isnt _unset
+	_then
+		_return ed
+	_endif
+
+	_if fd.is_join? _andif
+	    fd.join_type _is :text
+	_then
+		ed << in_place_multi_line_editor.new(an_agent)
+		.editor_cache[fd] << ed
+		_return ed
+	_endif
+	
+	_if _not fd.is_physical?
+	_then
+		_return _unset
+	_endif
+	
+	det_rec << a_tree.value[:det_rec]
+	fd_type << fd.type
+	phys_type << fd_type.phys_type
+
+	_if det_rec.can_match?(fd)
+	_then
+		items << rope.new_from(det_rec.match_string(fd, "", det_rec))
+		_if items.size = 0 _orif
+		    items[1] ~= ""
+		_then
+			items.add_first("")
+		_endif 
+		ed << in_place_choice_editor.new(an_agent, :items, items)
+	_elif phys_type _is :ds_bool
+	_then
+		ed << in_place_boolean_editor.new(an_agent)
+	_elif phys_type _is :ds_kleene
+	_then
+		ed << in_place_kleenean_editor.new(an_agent)
+	_elif phys_type _is :ds_date
+	_then
+		ed << in_place_date_editor.new(an_agent)
+	_elif phys_type _is :ds_time
+	_then
+		ed << in_place_date_time_editor.new(an_agent)
+	_else
+		ed << in_place_value_editor.new(an_agent)
+	_endif 
+
+	.editor_cache[fd] << ed
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.value_changed(a_tree, value_id, new_value, old_value, an_ed)
+	## 
+	## Allow in-place editing of attribute_value column.
+	## 
+	
+	_if value_id _is :attribute_value _orif
+	    (value_id _is :attribute_value_range _andif
+	     a_tree.value[:to_indicator] _isnt _unset)
+	_then
+		# OK.
+	_else 
+		_return
+	_endif
+
+	key << a_tree.key
+	fd << a_tree.value[:fd]
+
+	owner_fd << mss_workspace_manager_engine.design_table.all_fields[:owner]
+	_if key _is :current_user _andif
+	    new_value _is _true
+	_then
+		# If any input item manages the design owner field, set its
+		# value to the current user.
+		_for i _over .search_field_list.fast_elements()
+		_loop
+			_if i.key _is owner_fd
+			_then
+				i.value[:attribute_value] << gis_program_manager.login_name
+				_self.changed(:search_field_list)
+			_endif
+		_endloop 
+	_endif
+	_if key _is :current_user _andif
+	    new_value _is _false
+	_then
+		# If any input item manages the design owner field, and its
+		# value is currently set to the current user, clear it out.
+		_for i _over .search_field_list.fast_elements()
+		_loop
+			_if i.key _is owner_fd
+			_then
+				_if i.value[:attribute_value].write_string.canonical = gis_program_manager.login_name.canonical
+				_then 
+					i.value[:attribute_value] << ""
+					_self.changed(:search_field_list)
+				_endif 
+			_endif
+		_endloop 
+	_endif
+
+	_if key _is owner_fd
+	_then
+		# If any input item manages the :current_user toggle, set its
+		# value based on what was entered for design owner.
+		cur_user? << new_value.write_string.canonical = gis_program_manager.login_name.canonical
+		_for i _over .search_field_list.fast_elements()
+		_loop
+			_if i.key _is :current_user
+			_then
+				i.value[:attribute_value] << cur_user?
+				_self.changed(:search_field_list)
+			_endif
+		_endloop 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.clear()
+	## 
+	## 
+
+	_self.init_search_field_list()
+	_self.changed(:search_field_list, :renew)
+
+	.result_list.empty()
+	.job_result_list_lookup.empty()
+	.design_result_list_lookup.empty()
+	_self.changed(:result_list, :renew)
+	_self.status_string << ""
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.build_predicate_for_table(tbl_name)
+	## 
+	## Build a predicate for performing a search of the table named
+	## TBL_NAME (either :mss_job or :mss_design).
+	##
+
+	# Keep track of the best index score that can be used for this query.
+	tbl << mss_workspace_manager_engine.view.collections[tbl_name]
+	idx_scores << property_list.new()
+	_for i _over tbl.all_index_names.fast_elements()
+	_loop
+		fname << i[1]
+		fidx << tbl.physical_field_names.index_of(fname)
+		idx_scores[fname] << tbl.record_exemplar.field_scores_for_index[fidx]
+	_endloop
+
+	best_index_score << 0
+	full_pred << _unset
+	_for i _over .search_field_list.fast_elements()
+	_loop
+		field_pred << _unset 
+		_if (det_rec << i.value[:det_rec]) _is _unset _orif
+		    det_rec.source_collection.name _isnt tbl_name _orif
+		    (fd << i.value[:fd]) _is _unset
+		_then
+			_continue
+		_endif
+		v1 << i.value[:attribute_value].default("")
+		v2 << i.value[:attribute_value_range].default("")
+		use_range? << i.value[:to_indicator] _isnt _unset
+
+		_if v1 = "" _andif
+		    v2 = ""
+		_then
+			# No values entered.
+			_continue
+		_endif
+
+		# Note that some in-place editors will return a value in a
+		# native format (date, boolean), and others will return a
+		# string that must be converted.
+		_if v1.species _is "".species
+		_then
+			_if v1 = ""
+			_then
+				v1 << _unset
+			_else
+				v1 << det_rec.value_from_string(fd, v1)
+			_endif
+		_endif
+		_if v1.species _is "".species
+		_then
+			v1_pred_args << {:ci}
+		_else
+			v1_pred_args << {}
+		_endif 
+		_if v2.species _is "".species
+		_then
+			_if v2 = ""
+			_then
+				v2 << _unset
+			_else
+				v2 << det_rec.value_from_string(fd, v1)
+			_endif
+		_endif
+		_if v2.species _is "".species
+		_then
+			v2_pred_args << {:ci}
+		_else
+			v2_pred_args << {}
+		_endif 
+
+		can_use_index? << _true 
+		_if _not use_range?
+		_then
+			# Single value, which may be wildcarded.
+			_if v1 _is _unset _orif
+			    v1 = ""
+			_then
+				_continue
+			_endif
+			_if v1.species _is "".species _andif
+			    (v1.index_of(%*) _isnt _unset _orif
+			     v1.index_of(%?) _isnt _unset)
+			_then
+				_if v1.index_of(%*) = 1 _orif
+				    v1.index_of(%?) = 1
+				_then
+					# Can't make good use of an index.
+					can_use_index? << _false
+				_endif 
+				field_pred << predicate.wild(fd.name, v1, _scatter v1_pred_args)
+			_else
+				field_pred << predicate.eq(fd.name, v1, _scatter v1_pred_args)
+			_endif
+		_else
+			# Range value, with no wildcards.
+			_if v1 _isnt _unset _andif
+			    v1 ~= ""
+			_then
+				field_pred << predicate.ge(fd.name, v1)
+			_endif
+			_if v2 _isnt _unset _andif
+			    v2 ~= ""
+			_then
+				_if field_pred _is _unset
+				_then 
+					field_pred << predicate.le(fd.name, v2)
+				_else
+					# If both ends of the range are entered, ensure they are legit.
+					_if v1 > v2
+					_then
+						condition.raise(:user_error, :string,
+								_self.message(:invalid_range, i.value[:attribute_name], v1, v2))
+					_endif 
+					field_pred _and<< predicate.le(fd.name, v2)
+				_endif 
+			_endif
+		_endif
+
+		_if field_pred _isnt _unset
+		_then
+			_if full_pred _is _unset
+			_then
+				full_pred << field_pred
+			_else
+				full_pred _and<< field_pred
+			_endif
+			_if can_use_index? _andif
+			    (field_index_score << idx_scores[fd.name]) _isnt _unset _andif
+			    field_index_score > best_index_score
+			_then
+				best_index_score << field_index_score
+			_endif 
+		_endif
+	_endloop
+
+	# If spatial criteria is entered, then use it.
+	_if tbl_name _is :mss_design _andif
+	    _self.use_trail?
+	_then
+		# Require a trail to define the design boundary.
+		_if (tr << _self.trail) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_trail))
+		_endif
+		(sr_ok?, sr) << area.check_proposed_sectors(tr.sectors)
+		_if _not sr_ok?
+		_then
+			condition.raise(:user_error, :string, _self.message(:incomplete_trail))
+		_endif
+		pa << pseudo_area.new(sr)
+		pa.world << tr.world
+		field_pred << predicate.interacts(:extent, {pa})
+		_if full_pred _is _unset
+		_then
+			full_pred << field_pred
+		_else
+			full_pred _and<< field_pred
+		_endif
+
+		# Consider a spatial predicate to be the best (although this
+		# will not necessarily be true if the user has selected a
+		# particularly large trail area).
+		best_index_score << 10
+	_endif
+	
+	_if full_pred _is _unset
+	_then
+		full_pred << predicate
+	_endif 
+	_return full_pred, best_index_score
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.use_trail?
+	## 
+	## Return true if the inside_trail checkbox is selected.
+	##
+
+	_for i _over .search_field_list.fast_elements()
+	_loop
+		_if i.key _is :inside_trail
+		_then
+			_return i.value[:attribute_value].default(_false)
+		_endif
+	_endloop
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.perform_search()
+	## 
+	## Perform the search, based on criteria entered by user.
+	##
+
+	_dynamic !mss_workspace_view_operation!
+	
+	_protect
+		ok? << _false 
+		_self.status_string << _self.message(:performing_search)
+
+		.result_list.empty()
+		.job_result_list_lookup.empty()
+		.design_result_list_lookup.empty()
+		_self.changed(:result_list, :refresh)
+
+		# Perform a rollforward to ensure the most recent available
+		# data is queried.
+		!mss_workspace_view_operation! << :rollforward
+		mss_workspace_manager_engine.view.rollforward()
+		!mss_workspace_view_operation! << _unset
+		
+		(job_pred, job_index_score) << _self.build_predicate_for_table(:mss_job)
+		(design_pred, design_index_score) << _self.build_predicate_for_table(:mss_design)
+		
+		_if job_index_score >= design_index_score
+		_then
+			# Start the query with the job, and drill down to all designs
+			# that match the design predicate.
+			tbl << mss_workspace_manager_engine.job_table
+			_for job_rec _over tbl.select(job_pred).fast_elements()
+			_loop
+				has_designs? << _false
+				_for design_rec _over job_rec.mss_designs.fast_elements()
+				_loop
+					has_designs? << _true
+					_if design_pred.test?(design_rec) _is _true
+					_then
+						_self.add_search_result(job_rec, design_rec)
+					_endif
+				_endloop
+				
+				# Special case: if there are no designs for this job, and if
+				# there is no design predicate, then create a single records
+				# for the job without a design.
+				_if _not has_designs? _andif
+				    design_pred _is predicate
+				_then
+					_self.add_search_result(job_rec, _unset)
+				_endif
+			_endloop
+		_else
+			# Start the query with the design, and drill up to the job.
+			tbl << mss_workspace_manager_engine.design_table
+			_for design_rec _over tbl.select(design_pred).fast_elements()
+			_loop
+				_if (parent_job << design_rec.mss_job) _is _unset _orif
+				    job_pred.test?(parent_job) _is _false
+				_then
+					_continue
+				_endif
+				_self.add_search_result(parent_job, design_rec)
+			_endloop
+		_endif
+		ok? << _true 
+	_protection
+		_if ok?
+		_then
+			_if (sz << .result_list.size) = 0
+			_then 
+				_self.status_string << _self.message(:performing_search_done_zero)
+			_elif sz = 1
+			_then
+				_self.status_string << _self.message(:performing_search_done_one)
+			_else
+				_self.status_string << _self.message(:performing_search_done_many, sz)
+			_endif 
+		_else
+			_self.status_string << _self.message(:failed)
+		_endif 
+		_self.changed(:result_list, :refresh)
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.add_search_result(job_rec, design_rec, _optional update_status?)
+	## 
+	## Add a new search result for JOB_REC (a mss_job) and
+	## DESIGN_REC (a mss_design, which may be unset).  Unless
+	## UPDATE_STATUS is true, the status bar will update with the
+	## search progress.
+	##
+
+	_if design_rec _is _unset
+	_then
+		job_id << job_rec.id
+		design_id << _unset
+		key_val << job_id
+	_else
+		job_id << job_rec.id
+		design_id << design_rec.id
+		key_val << design_id
+	_endif
+	
+	_if (dt << _self.find_search_result(job_rec, design_rec)) _is _unset
+	_then
+		_if design_rec _is _unset
+		_then
+			isk << {job_rec.name.as_charvec(), _unset}
+		_else
+			isk << {job_rec.name.as_charvec(),design_rec.full_name.default("").as_charvec()}
+		_endif 
+		pl << property_list.new_with(
+			      :initial_sort_key, isk,
+			      :job_id, job_id,
+			      :design_id, design_id,
+			      :job, job_rec,
+			      :design, design_rec)
+		_self.set_result_list_attributes(pl, job_rec, design_rec)
+		dt << display_tree.new(key_val, pl)
+		dt.styled_string << _self.result_list_styled_string(dt)
+		
+		.result_list.add(dt)
+
+		# Add to lookup cache based on job_id - there may be multiple
+		# for a job.
+		_if (r << .job_result_list_lookup[job_id]) _is _unset
+		_then
+			r << .job_result_list_lookup[job_id] << rope.new()
+		_endif
+		r.add_last(dt)
+
+		_if design_id _isnt _unset
+		_then
+			# Add to lookup cache based on design_id - there can only be
+			# one for a design.
+			.design_result_list_lookup[design_id] << dt
+		_endif 
+		
+		_if update_status? _isnt _false
+		_then 
+			_if (sz << .result_list.size) _mod 10 = 0
+			_then
+				_self.status_string << _self.message(:performing_search_progress, sz)
+			_endif
+		_endif
+	_else
+		# At this point, it is possible that the found record has a job
+		# only, but not design.  In this case, set the design.
+		pl << dt.value
+		_if design_id _isnt _unset _andif
+		    pl[:design_id] _is _unset
+		_then
+			pl[:design] << design_rec
+			pl[:design_id] << design_id
+			.design_result_list_lookup[design_id] << dt
+		_endif 
+		_self.set_result_list_attributes(pl, job_rec, design_rec)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.find_search_result(job_rec, design_rec)
+	## 
+	## If there is a display tree that already manages JOB_REC and
+	## DESIGN_REC, then return it.
+	##
+
+	_if design_rec _isnt _unset
+	_then
+		design_id << design_rec.id
+		_if (dt << .design_result_list_lookup[design_id]) _isnt _unset
+		_then
+			_return dt
+		_endif
+	_endif
+	
+	job_id << job_rec.id
+	# Special case: if there is a design tree for the job with an
+	# unset design, return that. 
+	_if (r << .job_result_list_lookup[job_id]) _isnt _unset
+	_then
+		_for try_dt _over r.fast_elements()
+		_loop
+			_if try_dt.value[:design_id] _is _unset
+			_then
+				_return try_dt
+			_endif
+		_endloop 
+	_endif
+
+	_return _unset 
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_search_plugin.result_list_styled_string(disp_tree)
+	##
+	## The styled_string to use for displaying data in the result list.
+	##
+
+	_return styled_string.new(:value, :job_name, :tab,
+				  :value, :design_full_name, :tab,
+				  :value, :design_status, :tab,
+				  :value, :design_owner, :tab,
+				  :value, :design_last_update_date)
+
+_endmethod 
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_search_plugin.set_result_list_attributes(pl, job_rec, design_rec)
+	##
+	## Set the attributes for displaying the search result for job
+	## and design records JOB_REC and DESIGN_REC.  PL is the
+	## property list in which to store the attributes.
+	##
+	## This may be redefined, in conjunction with result_list_styled_string(),
+	## result_list_column_widths, and result_list_column_headings.
+	##
+
+	pl[:job_name] << job_rec.name.default("").as_charvec()
+	_if design_rec _isnt _unset
+	_then 
+		pl[:design_full_name] << design_rec.full_name.default("").as_charvec()
+		pl[:design_status] << design_rec.status.default("").as_charvec()
+		pl[:design_owner] << design_rec.owner.default("").as_charvec()
+		pl[:design_last_update_date] << design_rec.last_update_date
+	_endif 
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_search_plugin.open_design()
+	##
+	## Make the selected design the active design.
+	##
+
+	_if _self.selected_design _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_design))
+	_endif
+
+	_self.databus_make_data_available(:set_active_design, {_self.selected_design})
+	
+_endmethod
+$

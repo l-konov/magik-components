@@ -1,0 +1,211 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+
+_pragma(classify_level=restricted)
+## Class which represents an XMI Foundation.Core.Class element
+def_slotted_exemplar(:uml_interface,
+{
+   {:package, _unset},
+   {:generalizations, _unset},
+   {:specializations, _unset},
+   {:operations, _unset},
+   {:mt, _unset},
+   {:owner, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=basic)
+## what package is this interface in.
+uml_interface.define_slot_access(:package, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## All superclasses
+uml_interface.define_slot_access(:generalizations, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## All subclasses
+uml_interface.define_slot_access(:specializations, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## All methods
+uml_interface.define_slot_access(:operations, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## The method table which defines this class
+uml_interface.define_slot_access(:mt, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## The uml model element which owns self
+uml_interface.define_slot_access(:owner, :write, :readonly)
+$
+
+
+
+_pragma(classify_level=basic)
+_method uml_interface.new(owner, an_mt, _optional levels_to_go)
+   ## Creates a new XMI class
+   ##
+   ## an_mt : method_table -- the magik class this XMI class represents.
+   ##
+   ## returns : uml_interface
+   
+   _return _clone.init(owner, an_mt, levels_to_go)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_private _method uml_interface.init(owner, an_mt, _optional levels_to_go)
+   ## Inits self
+   ##
+   ## an_mt : method_table -- the magik class this XMI class represents
+   ##
+   ## returns uml_interface -- self, but inited
+
+   _self.mt << an_mt
+   _self.owner << owner
+   _self.operations << equality_hash_table.new()
+   _self.generalizations << rope.new()
+   _self.specializations << rope.new()
+      
+   _for a_method _over an_mt.local_methods(_true)
+   _loop
+      a_uml_op << uml_operation.new(_self, a_method)
+      _self.operations[a_uml_op.name] << a_uml_op
+   _endloop
+
+   next_levels_to_go << _unset
+   _if levels_to_go _isnt _unset
+   _then
+      next_levels_to_go << levels_to_go - 1      
+   _endif
+
+      
+   _if levels_to_go _is _unset _orif
+       levels_to_go > 0
+   _then
+      _for a_parent _over _self.mt.parents()
+      _loop
+	 _self.model.include_class(a_parent, next_levels_to_go)
+	 _self.owner.add_generalization(_self.model.get_class(a_parent), _self)
+      _endloop
+   _endif
+   
+   _return _self 
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_iter _method uml_interface.features()
+   ## Interates over all the methods of this interface
+   ## 
+
+   _for an_op _over _self.operations.fast_elements()
+   _loop
+      _loopbody(an_op)
+   _endloop
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.model
+   ## Returns : uml_model -- the model to which self belongs
+   ## 
+
+   _return _self.owner.model
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.name
+   ## returns : symbol -- the name of this interface
+   ## 
+
+   _return _self.mt.metadata[:class_name]
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.private?
+   ## returns : boolean -- is the interface private?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.abstract?
+   ## returns : boolean -- is this interface abstract? 
+   ## 
+
+   _return _true
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.add_specialization(an_xmi_generalization)
+   ## Adds a subclass relationship to this interface
+   ##
+   ## an_xmi_generalization : uml_generalization -- the
+   ##   relationship
+   ##
+   ## returns : unset
+
+   _self.specializations.add_last(an_xmi_generalization)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.add_generalization(an_xmi_generalization)
+   ## Adds a superclass relationship to this interface
+   ##
+   ## an_xmi_generalization : uml_generalization -- the
+   ##   relationship
+   ##
+   ## returns : unset
+ 
+
+   _self.generalizations.add_last(an_xmi_generalization)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_interface.export_on(an_uml_output_stream)
+   ## Exports self
+   ## 
+
+   an_uml_output_stream.write_uml_interface(_self)
+_endmethod
+$

@@ -1,0 +1,28 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+
+_pragma(classify_level=restricted, topic={streams})
+_method simple_index_mixin.write_as_json(a_stream)
+    ## 
+    ##
+  
+    _local s << a_stream
+
+    _local first? << _true 
+    
+    s.write("[")
+    
+    _for a_value _over _self.fast_elements()
+    _loop
+	_if ~first?
+	_then s.write(", ")
+	_else first? << _false
+	_endif
+
+	a_value.write_as_json(s)
+    _endloop
+
+    s.write("]")
+_endmethod
+$

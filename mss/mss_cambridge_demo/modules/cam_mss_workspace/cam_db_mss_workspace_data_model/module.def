@@ -1,0 +1,9 @@
+cam_db_mss_workspace_data_model	1
+
+description
+	MSS workspace data model for Cambridge database
+end
+
+requires
+	mss_workspace_data_model
+end

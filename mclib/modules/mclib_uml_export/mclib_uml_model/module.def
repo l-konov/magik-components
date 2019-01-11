@@ -1,0 +1,6 @@
+mclib_uml_model 1 1
+
+description
+  Classes to represent Magik as a UML Model
+end
+

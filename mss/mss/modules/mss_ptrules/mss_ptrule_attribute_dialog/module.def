@@ -1,0 +1,8 @@
+mss_ptrule_attribute_dialog 1
+
+description
+	MSS pointing rule attribute dialog
+end
+
+requires
+end

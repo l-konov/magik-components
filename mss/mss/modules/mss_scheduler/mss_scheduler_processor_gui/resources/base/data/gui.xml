@@ -1,0 +1,82 @@
+<gui>
+  <accelerators>
+    <accelerator id="refresh_a" name="refresh"/>
+  </accelerators>
+
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="versions.activate_version_management"/>
+      <action name="close"/>
+    </submenu>
+    <submenu name="view">
+      <action name="refresh"/>
+    </submenu>
+    <submenu name="search">
+      <action name="mss_scheduler_engine.process_tasks"/>
+      <action name="mss_scheduler_engine.soft_interrupt"/>
+      <separator/>
+      <action name="mss_scheduler_engine.hard_interrupt"/>
+    </submenu>
+    <submenu name="edit">
+      <action name="mss_scheduler_processor_plugin.insert_task"/>
+      <action name="mss_scheduler_processor_plugin.update_selected_task"/>
+      <action name="mss_scheduler_processor_plugin.delete_selected_task"/>
+    </submenu>
+    <submenu name="results">
+      <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+      <action name="mss_scheduler_results_plugin.resubmit_selected_task_result"/>
+      <separator/>
+      <action name="mss_scheduler_results_plugin.mark_pending_as_failed"/>
+    </submenu>
+  </menu>
+
+  <menu name="processor_result_list" type="popup">
+    <action name="mss_scheduler_processor_plugin.update_selected_task"/>
+    <action name="mss_scheduler_processor_plugin.delete_selected_task"/>
+  </menu>
+
+  <menu name="results_result_list" type="popup">
+    <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+    <action name="mss_scheduler_results_plugin.resubmit_selected_task_result"/>
+  </menu>
+
+  <toolbar name="search">
+    <action name="mss_scheduler_engine.process_tasks"/>
+    <action name="mss_scheduler_engine.soft_interrupt"/>
+  </toolbar>
+
+  <toolbar name="view">
+    <action name="refresh"/>
+  </toolbar>
+
+  <toolbar name="edit">
+    <action name="mss_scheduler_processor_plugin.insert_task"/>
+    <action name="mss_scheduler_processor_plugin.update_selected_task"/>
+    <action name="mss_scheduler_processor_plugin.delete_selected_task"/>
+  </toolbar>
+
+  <toolbar name="results">
+    <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+    <action name="mss_scheduler_results_plugin.resubmit_selected_task_result"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="search"/>
+    <toolbar name="view"/>
+    <toolbar name="edit"/>
+    <toolbar name="results"/>
+  </dock>
+ 
+  <work_area>
+    <tab_box>
+      <plugin plugin_name="mss_scheduler_processor_plugin"/>
+      <plugin plugin_name="mss_scheduler_results_plugin"/>
+      <plugin plugin_name="mss_scheduler_engine"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

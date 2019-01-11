@@ -1,0 +1,140 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## TOOLBAR_ACTION_ELEMENT - object to hold toolbar (action) element data.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:toolbar_action_element,
+		     {
+			     {:name,_unset,:writable},
+			     {:type,_unset,:writable},
+			     {:action_name,_unset,:writable},
+			     {:plugin_name,_unset,:writable},
+			     {:image_file_name,_unset,:writable},
+			     {:image_module_name,_unset,:writable},
+			     {:control_type,_unset,:writable},
+			     {:mode,_unset,:writable},
+			     {:execute,_unset,:writable},
+			     {:style,_unset,:writable},
+			     {:action_message,_unset,:writable}    
+		     },:dd_element) 
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+toolbar_action_element.define_shared_constant(
+	:control_types,
+	{
+		:image_button_item, 
+		:button_item, 
+		:image_item, 
+		:toggle_item, 
+		:text_toggle_item, 
+		:image_toggle_item, 
+		:combo_box_item, 
+		:choice_item, 
+		:text_item, 
+		:text_display
+	},:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+toolbar_action_element.define_shared_constant(:dd_properties,
+	property_list.new_with(
+		:name,:string,
+		:action_message,:string,
+		:image_file_name,:string,
+		:image_module_name,:string,
+		:action_name,:string,
+		:plugin_name,:string,
+		:control_type,toolbar_action_element.control_types,
+		:type,:string),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method toolbar_action_element.init(vals)
+	## 
+	## Initialise SELF from the property list VALS.
+
+	.name              << vals[:name]
+	.type              << vals[:type]
+	.action_message    << vals[:action_message].default("action_msg")
+	.image_file_name   << vals[:image_file_name].default("image_button_item")
+	.image_module_name << vals[:image_module_name].default("dialog_designer")
+	.action_name       << vals[:action_name]
+	.plugin_name       << vals[:plugin_name]
+	.control_type      << vals[:control_type].default(:image_button_item)
+
+	_if vals[:type] _is :dock_base
+	_then
+		.image_file_name << "use_docks"
+	_endif
+	
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method toolbar_action_element.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over _self.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	_if _self.type _isnt :button
+	_then
+		props.remove_key(:image_file_name)
+		props.remove_key(:image_module_name)
+	_endif
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method toolbar_action_element.dialog_description()
+	## 
+	## Return descriptive text for SELF.
+
+	>> .name
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method toolbar_action_element.insert << val
+	## 
+	## Do nothing, backstop method.
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method toolbar_action_element.dialog_element_id
+	## 
+	## Return the :name slot value.
+	>> .name
+_endmethod
+$
+
+
+
+

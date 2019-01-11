@@ -1,0 +1,40 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method busbar.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to busbar or internal_cable.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    {:busbar, :internal_cable}.includes?(corr_rwo.source_collection.name) _andif
+	    corr_geom.geom_category _is :linear
+	_then
+		_return _true
+	_endif
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method busbar.mss_ptrule_update_from_correlation(cat, corr_geom, ptrule)
+	## 
+	## Update self's attributes from correlated feature.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    {:busbar, :internal_cable}.includes?(corr_rwo.source_collection.name)
+	_then
+		_self.voltage << corr_rwo.voltage
+	_endif
+	
+_endmethod
+$

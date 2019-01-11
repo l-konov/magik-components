@@ -1,0 +1,385 @@
+#% text_encoding = utf8
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"mss_cu_operation_type", 
+				       :ds_uint, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(0, "")
+enum.add_archive_values(10, "Install")
+enum.add_archive_values(20, "Abandon")
+enum.add_archive_values(30, "Remove")
+enum.add_archive_values(40, "Transfer")
+
+_endblock
+$
+
+_block
+
+man << case_manifold.new_from_archive(
+                                    {560,
+                                    "mss_cu_work_point",
+                                    _unset, _unset})
+man.add_archive_rule(1,1,:do_nothing,:do_nothing)
+man.add_archive_rule(1,2,:do_nothing,:do_nothing)
+man.add_archive_rule(1,3,:do_nothing,:do_nothing)
+man.add_archive_rule(2,1,:do_nothing,:do_nothing)
+man.add_archive_rule(2,2,:endsplit_link,:endsplit_link)
+man.add_archive_rule(2,3,:split_link,:connect)
+man.add_archive_rule(3,1,:do_nothing,:do_nothing)
+man.add_archive_rule(3,2,:connect,:split_link)
+man.add_archive_rule(3,3,:connect,:connect)
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {227624,
+                                  "mss_cu_reference",
+                                  write_string("CU Reference"),
+                                  "mss_cu_reference",
+                                  _unset,{0,0,0},0} ,0.00000000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("record_tid", "Record TID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("record_id", "Record ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_design_id", "Design ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_cu_work_point_id", "Work Point ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("cu_code", "CU Code", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|mss_cu_operation_type|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("work_point_number", "Work Point Number", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("quantity", "Quantity", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,_unset)
+an_f.print_width << 10
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("unit_multiplier", "Unit Multiplier", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << (0.0)
+
+
+an_f << o.add_field("mss_cu_reference_complex_key", "Complex Key", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {227643,
+                                  "mss_cu_reference_complex_key",
+                                  write_string("CU Reference Complex Key"),
+                                  "mss_cu_reference_complex_key",
+                                  _unset,{0,0,0},0} ,0.00000000000, -13500.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("mss_cu_reference_id", "Mss Cu Reference Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.mandatory? << True
+
+
+an_f << o.add_field("record_tid", "Record TID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("complex_key", "Complex Key", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,48)
+an_f.print_width << 48
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_cu_reference", "CU Reference", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {227655,
+                                  "mss_cu_work_point",
+                                  write_string("Work Point"),
+                                  "mss_cu_work_point",
+                                  _unset,{0,0,0},0} ,0.00000000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("mss_design_id", "Design ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("prefix", "Prefix", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,4)
+an_f.print_width << 4
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("number", "Number", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,16)
+an_f.print_width << 16
+an_f.mandatory? << True
+
+
+an_f << o.add_field("work_point_number", "Work Point Number", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("job_and_design_full_name", "Job / Design Full Name", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("location", "Location", :geometric)
+an_f.priority << 63
+an_f.set_geometry_type(:point)
+an_f.archive_manifold << "mss_cu_work_point"
+
+
+an_f << o.add_field("route", "Route", :geometric)
+an_f.priority << 63
+an_f.set_geometry_type(:chain)
+an_f.archive_manifold << "mss_cu_work_point"
+
+
+an_f << o.add_field("extent", "Extent", :geometric)
+an_f.priority << 63
+an_f.set_geometry_type(:area)
+an_f.archive_manifold << "mss_cu_work_point"
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("annotation", "Annotation", :geometric)
+an_f.priority << 63
+an_f.set_geometry_type(:text)
+an_f.set_text_method_name("annotation_text")
+
+
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {227673,
+                                        "1:0",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_reference", "mss_cu_reference_complex_key")
+r.add_default_join_names()
+r.join_name << "mss_cu_refere_to_mss_cu_refere"
+r.reverse_join_name << "mss_cu_refere_to_mss_cu_refer"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((0.0),(-375*2.0**5),(0.0),(-1125*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_cu_reference, :mss_cu_reference_complex_key, 227673, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_cu_reference_complex_key, :mss_cu_reference_id, :mss_cu_reference, :id, 227673)
+case_object.archive_join_field_info(:mss_cu_reference_complex_key, :mss_cu_reference, 227673, :child)
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_reference,
+                                            {"record_tid",
+                                            "record_id",
+                                            "mss_design_id",
+                                            "mss_cu_work_point_id",
+                                            "cu_code",
+                                            "operation",
+                                            "work_point_number",
+                                            "quantity",
+                                            "unit_multiplier",
+                                            "mss_cu_reference_complex_key"})
+case_object.archived_indices(:mss_cu_reference, {"record_id"}, {})
+case_object.archived_indices(:mss_cu_reference, {"mss_design_id"}, {})
+case_object.archived_indices(:mss_cu_reference, {"mss_cu_work_point_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_reference_complex_key,
+                                            {"record_tid",
+                                            "complex_key",
+                                            "mss_cu_reference"})
+case_object.archived_indices(:mss_cu_reference_complex_key, {"complex_key"}, {})
+case_object.archive_aspect_field(:mss_cu_reference_complex_key, :mss_cu_reference, :mss_cu_reference, :id)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_work_point,
+                                            {"prefix",
+                                            "number",
+                                            "work_point_number",
+                                            "job_and_design_full_name",
+                                            "location",
+                                            "route",
+                                            "extent",
+                                            "annotation"})
+case_object.archived_indices(:mss_cu_work_point, {"mss_design_id","work_point_number"}, {})
+
+_endblock
+$
+
+
+$
+
+$
+
+$

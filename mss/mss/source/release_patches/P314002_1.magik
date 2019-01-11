@@ -1,0 +1,49 @@
+#% text_encoding = iso8859_1
+#
+#Patch-Number: 314002_1
+#Issuer: MSS
+#
+#Release-Note:
+# This custom patch is used to avoid a traceback when datasets
+# are added after initialization of topology_editor_plugin.
+
+sw!patch_software("swaf_topology_editors", 1)
+$
+
+_pragma(classify_level=restricted, topic={topology,editors})
+_method topology_editor_plugin.manifold << a_manifold
+	## Overwrite standard manifold setter to send changed messages.
+
+	# 2005/05/26 TM  Suppress errors in updating manifold action state.
+	
+	_self.set_property(:manifold, a_manifold)
+	
+	_if _self.action(:manifold) _isnt _unset 
+	_then
+		# TM START CHANGE
+		_try 
+			_self.action(:manifold).value << a_manifold
+		_when no_such_value
+			# Note that the best way to deal with this is to note additions
+			# and removals of datasets from self's database, but that
+			# involves more intrusive changes to core code.  The following
+			# commented out bits could also be used to dynamically add a
+			# manifold when it is first selected - however, that can introduce
+			# other problems if/when the dataset associated with the new
+			# manifold is closed.  So, just ignore this error entirely.
+			#_self.action(:manifold).items << _self.get_manifold_list()
+			#_self.action(:manifold).value << a_manifold
+		_endtry 
+		# TM END CHANGE
+	_endif
+
+	# Send change notification to children
+	_self.changed(:manifold_changed)
+
+	# This is expected by the rules_editor and the tolerances_editor
+	_self.changed(:engine_changed)
+_endmethod
+$
+
+sw!declare_patch(314002, "1", "MSS custom patch: avoid traceback when datasets added after initialization of topology_editor_plugin.")
+$

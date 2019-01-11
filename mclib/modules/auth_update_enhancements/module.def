@@ -1,0 +1,12 @@
+mclib_auth_update_enhancements	4000
+
+description
+	Support for easier editing and bulk update of auth items
+end
+
+requires
+	authorisation
+	authorisation_magik_gui
+	component_framework
+	mclib_package
+end

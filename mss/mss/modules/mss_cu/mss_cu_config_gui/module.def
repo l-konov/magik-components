@@ -1,0 +1,12 @@
+mss_cu_config_gui	1
+
+description
+	MSS Compatible Units configuration menu
+end
+
+requires
+	mss_component_framework
+	mss_config_editor
+	mss_cu_data_model
+	mss_cu_engine
+end

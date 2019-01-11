@@ -1,0 +1,334 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_TAB_BOX - object to represent a tab_box but still
+## acts like rowcol for rendering and analysis. 
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_tab_box,{},:rowcol)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_tab_box.define_shared_constant(
+	:dd_properties,
+	property_list.new_with(
+		:dialog_description,     :string,
+		:dialog_element_id,      :string,
+		:multiline?,             :boolean,
+		:default_row_alignment,  {:fill,:top,:centre,:bottom},
+		:default_col_alignment,  {:fill,:left,:centre,:right},
+		:tab_location,           {:top,:bottom,:left,:right}
+		      ),
+	:public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.dd_properties()
+	## 
+	##  Return the editable properties for SELF.
+
+	>> dd_tab_box.dd_properties
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.text_choice_item_driver
+	## 
+	## Backstop method, return UNSET.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)	
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id, "] << ",
+		  _self.dialog_element_id," << tab_box.new(",parent_id,%,,
+		  ":resize?,_true,:row,",_self.row,",:col,",_self.col,
+		  ",:row_alignment,:fill,:col_alignment,:fill")
+
+	_if _self.multiline?
+	_then
+		txt.write(",:multiline?,_true")
+	_endif 
+
+	_if (tl << _self.tab_location.default(:top)) _is :top
+	_then
+		txt.write(%))
+	_elif tl _is :bottom
+	_then
+		txt.write(",:bottom?,_true)",%newline)
+	_elif tl _is :left
+	_then
+		txt.write(",:vertical?,_true)",%newline)
+	_else # :right
+		txt.write(",:vertical?,_true,:bottom?,_true)",%newline)
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.default_min_width
+	## 
+	##  Return the minimum width for SELF.
+	
+	ts  << text_style.new_with_properties(:colour,colour.called(:black))
+	vts << vtext_style.new(ts.font)
+	txt << _self.tab_index_text()
+	txtb  << vts.box_coordinates(txt,0,0,0).bounds
+
+	>> 100 + txtb.width.floor
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.render_on(canv,bb,_optional x0,y0)
+	## 
+	## Render SELF on the canvas CANV.
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+	
+	_dynamic !dialog_element_footprints!
+	!dialog_element_footprints![pbb] << _self
+
+	gb << pbb.deep_copy()
+
+	txt << _self.active_page.tab_label.default("Tab")
+
+	ts  << text_style.new_with_properties(:colour,colour.called(:black))
+	vts << vtext_style.new(ts.font)
+	txtb  << vts.box_coordinates(txt,gb.xmin+10,gb.ymin,0).bounds
+	ptb << pixel_bounding_box.new_from(txtb)
+	
+	wb << pixel_bounding_box.new(bb.xmin+1,txtb.ymax+5,gb.xmax+1,gb.ymax+1)
+	ls << line_style.new(colour.called(:gray),1)
+
+	pcv << coords_vector.new_with_xy(
+		       bb.xmin+2,ptb.ymin,
+		       ptb.xmax-2,ptb.ymin,
+		       ptb.xmax,ptb.ymin+2,
+		       ptb.xmax,ptb.ymax+2,
+		       ptb.xmax+2,ptb.ymax+4,
+		       pbb.xmax,ptb.ymax+4,
+		       pbb.xmax,ptb.ymax+4,
+		       pbb.xmax,pbb.ymax,
+		       pbb.xmin,pbb.ymax,
+		       pbb.xmin,ptb.ymin+2,
+		       pbb.xmin+2,ptb.ymin
+			     )
+
+	canv.draw(pcv,ls)
+	canv.draw_text(ts,gb.xmin+5,gb.ymin+txtb.height.floor,txt)
+
+	tb_bb << pbb.expand(-5)
+	tb_bb.ymin +<< 20
+
+	txt << _self.tab_index_text()
+	txtb  << vts.box_coordinates(txt,0,0,0).bounds
+
+	x << tb_bb.xmax - 25 - txtb.width.floor
+	y << tb_bb.ymin - 26
+	
+	canv.draw_text(ts,x+16,y+13,txt)
+
+	_dynamic !dialog_pseudo_buttons!
+	
+	_if _self.properties[:active_page_n] > 1
+	_then
+		canv.render_raster(slider_item.slider_raster(:left),x,y,_false)
+		lbb << pixel_bounding_box.new_with_size(x,y,15,15)
+		!dialog_pseudo_buttons![lbb] << {_self,:|change_tab()|,-1}		
+	_endif
+
+	_if _self.properties[:active_page_n] < .items.size
+	_then
+		canv.render_raster(slider_item.slider_raster(:right),x+txtb.width.floor+15,y,_false)
+		lbb << pixel_bounding_box.new_with_size(x+txtb.width.floor+15,y,15,15)
+		!dialog_pseudo_buttons![lbb] << {_self,:|change_tab()|,1}		
+	_endif
+
+	_self.active_page.render_on(canv,tb_bb,x0,y0)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.change_tab(n)
+	## 
+	## Set the :active_page_n property by incrementing the
+	## active_tab_n by N.
+	
+	_self.properties[:active_page_n] +<< n
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.dialog_footprint(_optional bb)
+	## 
+	## Return row,col,total_h,total_w and rendering footprint (a
+	## pixel bounding box)
+	tb_h << 0
+	tb_w << 0
+	
+	_for p _over .items.fast_elements()
+	_loop
+		(row_h,col_w,total_h,total_w) << p.cell_sizes()
+
+		tb_h << tb_h.max(total_h)
+		tb_w << tb_w.max(total_w)
+	_endloop
+
+	total_w << max(tb_w+10,_self.default_min_width)
+	total_h << tb_h+30
+
+	_if bb _is _unset 
+	_then
+		bb << pixel_bounding_box.new(0,0,total_w,total_h)
+	_endif
+	
+	x << bb.xmin 
+	y << bb.ymin 
+	
+	_if _self.default_col_alignment _is :right
+	_then
+		x << bb.xmax - total_w 
+	_elif _self.default_col_alignment _is :centre
+	_then
+		x << bb.centre.x - total_w _div 2	
+	_elif _self.default_col_alignment _is :fill
+	_then
+		total_w << bb.width
+	_endif
+	
+	_if _self.default_row_alignment _is :bottom
+	_then
+		y << bb.ymax - total_h
+	_elif _self.default_row_alignment _is :centre
+	_then
+		y << bb.centre.y - total_h _div 2	
+	_elif _self.default_row_alignment _is :fill
+	_then
+		total_h << bb.height
+	_endif
+
+	>> _self.row,_self.col,total_h,total_w,pixel_bounding_box.new(x,y,x+total_w,y+total_h)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.tab_index_text()
+	## 
+	## Return the text to be shown on the current tab.
+	
+	siz << .items.size
+	n << _self.properties[:active_page_n]
+
+	>> write_string(" ",n,%/,siz," ")
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.active_page
+	## 
+	## Return the current page number.
+	
+	i << _self.properties[:active_page_n]
+	>> .items[i]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+	
+	gb << tab_box.new_dialog_default(parent,props[:row],props[:col])
+
+	_for k,e _over props.fast_keys_and_elements()
+	_loop
+		_if e _isnt _unset 
+		_then
+			gb.perform(k.with_chevron,e)			
+		_endif
+	_endloop
+
+	>> gb
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.add_tab()
+	## 
+	## Add a tab to SELF.
+
+	tbrc << rowcol.new_dialog_default(_self,_self.nrows,1)
+	tbrc.tab_label << write_string("Tab")
+	_self.set_property(:active_page_n,.items.size)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.delete_tab()
+	## 
+	## Delete the current tab.
+	
+	n << _self.properties[:active_page_n]
+
+	_self.remove_row(n)
+	.items.remove_nth(n)
+	
+	_self.properties[:active_page_n] << n.min(.items.size)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tab_box.move_tab(to)
+	## 
+	## Move the current tab to position TO in the tab order.
+	
+	n << _self.properties[:active_page_n]
+
+	_if to > n
+	_then
+		to -<< 1
+	_endif
+
+	v << .items[n]
+	.items.remove_nth(n)
+	.items.add_nth(v,to)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method dd_tab_box.row_ordered_items(_optional which)
+	## 
+	## Return the items of SELF.
+
+	_for i _over .items.fast_elements()
+	_loop
+		_loopbody(i)
+	_endloop
+_endmethod
+$

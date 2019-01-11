@@ -1,0 +1,10 @@
+mclib_directory_action	4000
+
+description
+	provides an action which allows for handling directory input values
+end
+
+requires
+	actions
+	mclib_package
+end

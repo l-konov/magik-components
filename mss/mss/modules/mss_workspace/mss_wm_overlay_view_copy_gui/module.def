@@ -1,0 +1,11 @@
+mss_wm_overlay_view_copy_gui	1
+
+description
+	MSS workspace manager overlay view copy gui
+end
+
+requires
+	mss_application_databus
+	mss_wm_overlay_view
+	mss_workspace_manager
+end

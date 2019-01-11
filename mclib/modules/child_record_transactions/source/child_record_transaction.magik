@@ -1,0 +1,77 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-02-14 10:38:17 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-14-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+_pragma(classify_level=advanced)
+## A transaction that will insert its record as a child of some
+## record created by another transaction. To use this class,
+## setup a normal list of proposed_values as you would for any
+## record_transaction. In the fields that describe the parent
+## joins, insert the record_transaction that will create the
+## parent. the .result of this will be swapped in during the
+## execution of the transaction. It is up to the user to be
+## sure that the parent transaction executes first, generally
+## by wrapping everything in a single dataset_transaction()
+## with the children at the end.
+##
+##  Something like this:
+##
+##  rt << record_transaction.new_insert(coll, proposed_values)
+##  c1 << child_record_transaction.new_insert(child_coll,
+##                             property_list.new_with(:parent_join_field, rt,  <other keys and vals>))
+##  c2 << child_record_transaction.new_insert(child_coll,
+##                             property_list.new_with(:parent_join_field, rt,  <other keys and vals>))
+## dt << dataset_transaction.new({rt,c1,c2})
+##  dt.run()
+##
+                       
+def_slotted_exemplar(:child_record_transaction,
+		    {},
+		    {:record_transaction})
+$
+
+_pragma(classify_level=advanced)
+_method child_record_transaction.int!run_first_pass()
+	## Runs me, substituting results for any transactions in my
+	## values with the .result of those transactions. This allows
+	## joins to be built on the fly inside of the transaction
+	## environment. See the class comments for details
+	## 
+	##
+
+	# (02-04-2005 Brad Sileo, TenSails): created.
+	_for a_key,a_val _over .proposed_values.keys_and_elements()
+	_loop
+		_if a_val.is_kind_of?(abstract_transaction)
+		_then
+			.proposed_values[a_key] << a_val.result
+		_endif
+	_endloop
+	>> _super.int!run_first_pass()
+_endmethod
+$

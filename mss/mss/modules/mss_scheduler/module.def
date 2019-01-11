@@ -1,0 +1,11 @@
+mss_scheduler	1
+
+description
+	MSS scheduler
+end
+
+requires
+	mss_scheduler_data_model
+	mss_scheduler_engine
+	mss_scheduler_processor_gui
+end

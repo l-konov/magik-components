@@ -1,0 +1,55 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-07-06 16:40:01 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-05-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+_pragma(classify_level=restricted, topic={case}, usage={external})
+_method rwo_style.image_file_name(_optional type)
+	## Returns a unique name for _self that can be used as file
+	## name when dunping _self to an image file. TYPE defaults
+	## to "jpg"
+	## 
+	## Arguments:
+	## Return Values:
+
+	>> write_string(_self.rwo_name,"_",
+			_self.app_name,"_",
+			_self.sub_code,%.,type.default("jpg"))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={case}, usage={external})
+_method rwo_style.as_image_file(file_path, _optional a_type, a_window)
+	## generate an image file to represent me at file_path
+	## A_WINDOW is a memory canvas as previously returned by this
+	## method, which avoids resources problems for large sets of outputs.
+	##
+
+	# (07-05-2005 Brad Sileo): created.
+	>> _self.actual_gis_style.as_image_file(file_path, a_type, a_window)
+_endmethod
+$

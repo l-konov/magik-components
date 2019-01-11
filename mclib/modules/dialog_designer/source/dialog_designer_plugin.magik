@@ -1,0 +1,94 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+########################################################################
+##
+## @author Graham Garlick
+##
+## Dialog Designer Plugin - Activating class for the Dialog Designer.
+##
+########################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dialog_designer_plugin,
+		     {
+		     },:plugin)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer_plugin.init_actions()
+	##
+	## Initializes the actions for the Dialog Designer plugin.
+	##
+
+	_local action_name << :activate_dialog
+
+	_self.add_action(
+		sw_action.new(
+			action_name,
+			:caption,         _self.message(:caption),
+			:short_help_text, _self.message(:short_help_text),
+			:engine,          _self,
+			:image,           {:dialog_designer,_self.module_name},
+			:action_message,  :|activate_dialog()|
+			  ) )
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer_plugin.build_gui(a_container,_optional xml_element)
+	## 
+	## Build the GUI for SELF.
+	## 
+	
+	d << dialog_designer_framework.new(_self.message(:framework_title),_self.framework)
+
+	a_panel << d.build_gui(a_container,xml_element)
+	d.tab_label << _self.message(:tab_title)
+	
+	>> a_panel
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer_plugin.activate_dialog() 
+	##
+	## Activate the dialog.
+	## 
+
+	name << :dialog_designer
+
+	_if (d << _self.get_dialog(name)) _is _unset 
+	_then
+		d << dialog_designer_framework.new(_self.message(:title),_unset)
+
+		_self.cache_dialog(name,d)
+	_endif
+
+	d.activate(_unset,_self.message(name))
+	
+	>> d
+_endmethod
+$
+
+# Shortcut to open the Dialog Designer.
+_pragma(classify_level=restricted, topic={dialog_designer})
+_global ddp <<
+_proc()
+
+	d << dialog_designer_plugin.new()
+	f << d.activate_dialog()
+
+	_global dd
+	dd << f.component(:dialog_designer)
+	
+	>> f.component(:dialog_designer)
+_endproc
+$

@@ -1,0 +1,143 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_workspace_tracking_record
+##
+## A record that tracks an insert, update, or delete of another
+## database record.
+##
+
+def_slotted_exemplar(:mss_workspace_tracking_record,
+{},
+{:mss_record_tracking_ds_record, :mss_workspace_record_mixin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_workspace_tracking_record.define_shared_constant(
+	:mss_complex_key_table_name,
+	## Table name used to store complex key values.
+	:mss_wtr_complex_key,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_tracking_record.mss_complex_key_record
+	## 
+	## The record used to store complex key values.
+	##
+
+	_return _self.mss_wtr_complex_key
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_tracking_record.mss_track_record?()
+	##
+	## These should never be tracked.
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_tracking_record.make_sysid()
+	## 
+	## Use a separate mss_workspace_tracking_record UVA for
+	## generating these values.
+	##
+
+	_return _self.source_view.uvas[:mss_workspace_tracking_record].get()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_workspace_tracking_record.field_scores_for_index
+	##
+	## Returns a vector containing appropriate scores for each
+	## field to be used in index selection for a predicate
+	## selection.
+	##
+	## All other things being equal, prefer the index on record_id,
+	## as the index on mss_design_id will return potentially many
+	## results. 
+	##
+	## This implementation defines a method on the actual class so
+	## that subsequent calls will use that.
+	##
+
+	v << _self.physical_fields.copy()
+	_for i,f _over v.keys_and_elements()
+	_loop
+		v[i] << _if f.name _is :record_id
+			_then >> 8
+			_elif f.name _is :mss_design_id
+			_then >> 4
+			_elif f.type.enumerator _is _unset
+			_then >> 5
+			_else >> 3
+			_endif
+	_endloop
+	_self.define_shared_constant(:field_scores_for_index, v, _false)
+	_self.dd!add_derived_method(:field_scores_for_index)
+	
+	>> v
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_tracking_record.new(rec, design, operation)
+	## 
+	## Create and return a new record to associate any database
+	## record REC to the mss_design record DESIGN.  OPERATION is an
+	## integer indicating the operation being performed: 1=insert,
+	## 2=update, 3=delete.
+	##
+	## This can be called on the exemplar.
+	##
+
+	_if (tid << rec.mss_tid) _is _unset _orif
+	    tid <= 0
+	_then
+		_self.user_error(:no_tid, rec)
+	_endif 
+	_if (track_tbl << _self.source_collection) _is _unset
+	_then
+		track_tbl << rec.source_view.collections[_self.class_name]
+	_endif
+	ndr << track_tbl.new_detached_record()
+	ndr.record_tid << tid
+	_if design.species _is 1.species
+	_then
+		ndr.mss_design_id << design
+	_else 
+		ndr.mss_design_id << design.id
+	_endif 
+	ndr.operation << operation
+
+	_return _self.insert_tracking_record(rec, ndr)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_tracking_record.mss_design
+	## 
+	## Return the mss_design record that owns self.
+	##
+
+	_return mss_workspace_manager_engine.design_table.at(_self.mss_design_id)
+	
+_endmethod
+$

@@ -1,0 +1,779 @@
+<?xml version="1.0" encoding="windows-1252" standalone="yes"?>
+<serial_xml_thing format="1">
+	<indexed class="sw:rope" size="9">
+		<keyed class="sw:property_list" size="1">
+			<entry key="version">
+				<number>1</number>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Add vertex</string>
+			</entry>
+			<entry key="internal_name">
+				<string>add_vertex</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_action_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Point to the desired position of the new vertex on a chain or area geometry.  Note: if you have selected any geometries in the map, this will only snap to any of those selected geometries.  Otherwise, it will snap to any chain or area.
+
+After the new vertex is placed, you will automatically be placed in Move Vertex mode.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Release</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>add_vertex()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>correlation_category</string>
+						</entry>
+						<entry key="value">
+							<string>cg_chain_or_area</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Line intersection</string>
+			</entry>
+			<entry key="internal_name">
+				<string>line_intersection</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_action_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Make two pointings to identify the two chains which are to be extended.  Each pointing should be near the endpoint of the chain that is to be adjusted.
+
+After the second pointing is done, a preview of the proposed line extend results will be drawn.  If this preview is acceptable, then either press F9 to complete the operation, or point near the proposed intersection point.  If it is not acceptable, then make a pointing at least 50 pixels away from the proposed intersection point, and the operation will be cancelled.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="2">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Release</string>
+						</entry>
+						<entry key="seq">
+							<number>1</number>
+						</entry>
+						<entry key="action_method">
+							<string>line_intersection_correlate()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>1</number>
+						</entry>
+						<entry key="action_method">
+							<string>line_intersection_complete()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="2">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>correlation_category</string>
+						</entry>
+						<entry key="value">
+							<string>chain</string>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>transaction_on_complete?</string>
+						</entry>
+						<entry key="value">
+							<string>true</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Line trim/extend</string>
+			</entry>
+			<entry key="internal_name">
+				<string>line_trim_extend</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_action_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Make two pointings: the first pointing identifies the chain to be trimmed or extended, and the second pointing identifies the chain or area that the first chain should be trimmed or extended to.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Release</string>
+						</entry>
+						<entry key="seq">
+							<number>1</number>
+						</entry>
+						<entry key="action_method">
+							<string>line_trim_extend_correlate()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>correlation_category</string>
+						</entry>
+						<entry key="value">
+							<string>chain</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Move and rotate set</string>
+			</entry>
+			<entry key="internal_name">
+				<string>move_and_rotate_set</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_transform_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>If you have selected a geometry (or set of geometries), this tool will move those geometries.  Otherwise, it will move the geometry that is correlated where you first press the mouse button.
+
+Press and drag to move the geometry to its new position.  Hold down the Shift key while dragging to rotate the data.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Move and rotate set (with manifold interactions)</string>
+			</entry>
+			<entry key="internal_name">
+				<string>move_and_rotate_set_with_man_int</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_transform_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>If you have selected a geometry (or set of geometries), this tool will move those geometries.  Otherwise, it will move the geometry that is correlated where you first press the mouse button.
+
+Press and drag to move the geometry to its new position.  Hold down the Shift key while dragging to rotate the data.
+
+Upon completion, manifold interactions will be re-run for all data.  This means that if you drag one feature on top of another feature that it would normally connect to, then these features will now be connected.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>do_manifold_interaction?</string>
+						</entry>
+						<entry key="value">
+							<string>true</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Move vertex</string>
+			</entry>
+			<entry key="internal_name">
+				<string>move_vertex</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_transform_vertex_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Point to the vertex of a chain or area geometry.  Note: if you have selected a chain or area geometry in the map, this will only snap to that selected geometry.  Otherwise, it will snap to any chain or area.
+
+Drag the vertex to the desired location, and then release the mouse button to complete this operation.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Remove vertex</string>
+			</entry>
+			<entry key="internal_name">
+				<string>remove_vertex</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_action_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Point to the vertex to be removed.  Note: if you have selected any geometries in the map, this will only snap to any of those selected geometries.  Otherwise, it will snap to any chain or area.
+
+As you drag, the vertex to be removed is highlighted with a red circle.  Release the mouse button to complete this operation.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="5">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Release</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>remove_vertex()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Press</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>highlight_nearest_vertex()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Drag</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>highlight_nearest_vertex()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Pre Release</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>xor_dynamic_geometry()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Press</string>
+						</entry>
+						<entry key="seq">
+							<number>-1</number>
+						</entry>
+						<entry key="action_method">
+							<string>clear_dynamic_geometry()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>correlation_category</string>
+						</entry>
+						<entry key="value">
+							<string>cg_chain_or_area</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Split chain</string>
+			</entry>
+			<entry key="internal_name">
+				<string>split_chain</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_action_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Point to the chain to be split.  The position where you release the mouse defines the split point.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Release</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>split_chain()</string>
+						</entry>
+						<entry key="param_1">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>correlation_category</string>
+						</entry>
+						<entry key="value">
+							<string>chain</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Utilities</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+	</indexed>
+</serial_xml_thing>

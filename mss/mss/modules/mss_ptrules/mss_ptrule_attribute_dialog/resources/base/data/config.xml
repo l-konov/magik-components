@@ -1,0 +1,6 @@
+<config>
+  <plugins>
+    <plugin name="attribute_lister" class_name="mss_ptrule_attribute_lister"/>
+    <plugin name="hierarchy_display" class_name="mss_ptrule_hierarchy_display"/>
+  </plugins>
+</config>

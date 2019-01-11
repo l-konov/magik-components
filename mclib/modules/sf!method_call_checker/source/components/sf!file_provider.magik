@@ -1,0 +1,789 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## The task of this class is to
+## - determine which files are needed for an analysis
+## - provide all input files for an analysis
+## - provide file editing services for all sibling components.
+##
+def_slotted_exemplar( :sf!file_provider,
+{
+	{ :file_list, _unset },
+	{ :gui_items, _unset },
+	{ :dialogs,   _unset },
+	{ :progress,  _unset },
+	{ :thread,    _unset }
+},
+{ :sw_component, :sf!component_mixin } )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_slot_access( :file_list, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_slot_access( :gui_items, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_slot_access( :dialogs, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_slot_access( :progress, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_shared_constant( :default_input_choice, :file, :private )
+$
+
+_pragma(classify_level=basic, topic={Magik,QA})
+sf!file_provider.define_shared_constant( :file_match_pattern,
+	"*.magik",
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_shared_constant( :files_to_ignore,
+	"message_usages.magik",
+	:public )
+$
+
+
+##
+##	R E D E F I N E D   M E T H O D S
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_shared_constant( :databus_consumer_data_types,
+	{
+		:processing_request,
+		:edit_file
+	},
+	:public )
+$
+
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!file_provider.define_shared_constant( :databus_producer_data_types,
+	{
+		:reset_statistics,
+		:process_file,
+		:progress_string,
+		:refresh
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_private _method sf!file_provider.init( _gather args )
+
+	## Initialize and return _self.
+
+	.file_list << sw:rope.new()
+	.gui_items << sw:property_list.new()
+	.dialogs   << sw:property_list.new()
+
+	>> _super.init( _scatter args )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_private _method sf!file_provider.init_actions()
+
+	## Define the actions for this component.
+
+	_for an_action _over { :select_path, :run_analysis, :stop_analysis
+			     }.fast_elements()
+	_loop
+		_self.add_action(
+			_self.sf!create_standard_action_for( an_action ) )
+	_endloop
+
+	_for an_action _over { :recursive?, :load_list? }.fast_elements()
+	_loop
+		_self.add_action(
+			_self.sf!create_standard_action_for(
+				an_action, _false,
+				:enabled?, _false,
+				:value,    _false,
+				:toolbar_control, :toggle_item ) )
+	_endloop
+
+	_self.add_action(
+		_self.sf!create_standard_action_for( :edit_file, _true,
+			:image, { :edit_object, :ui_resources } ) )
+
+	_self.action( :select_path ).enabled? << _true
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.sw_databus_data_available( data_type_name, data )
+
+	_if data_type_name _is :processing_request
+	_then
+		_self.process_request( data )
+
+	_elif data_type_name _is :edit_file
+	_then
+		_self.edit_file( _scatter data )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.build_in_framework( a_container )
+
+	## Create the widgets in the main GUI that determine
+	## how self operates.
+
+	_local height  << _self.framework.gui_row_spacing()
+	_local gi      << .gui_items
+	_local ctl
+	_local gb
+
+	#
+	# First row - user selections, actions, display options...
+	#
+	ctl << _self.build_first_row_in_gui( a_container )
+	#
+	# Second row: path information
+	#
+	a_container.start_row( _unset, height )
+	gb << sw:group_box.new( a_container, _self.message( :input_path ),
+				:resize_x?, _true, :resize_y?, _false )
+	gi[ :path_info ] <<
+		sw:label_item.new( gb, "", :model, _self,
+				   :resize_x?, _true, :resize_y?, _false )
+	>> gb
+_endmethod
+$
+
+
+##
+##	N E W   F U N C T I O N A L I T Y
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.progress_string
+
+	## Provides a string about the current progress status
+	## for the status bar...
+
+	_local data << _self.progress
+
+	>> _if data _is _unset
+	   _then
+		   >> _self.message( :no_progress_info )
+	   _else
+		   _dynamic !print_float_precision! << 4
+
+		   >> _self.message( data[ :message_id ],
+				     _scatter data[ :data ] )
+	   _endif
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA})
+_method sf!file_provider.process_information()
+
+	## Returns two strings that
+	## - describe which data is read
+	## - from where data is read.
+
+	>> _self.message( _self.input_choice ),
+	   _self.gui_items[ :path_info ].value
+_endmethod
+$
+
+
+##
+##	G U I   C A L L B A C K S
+##	_________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.input_choice
+
+	## Returns the currently active/selected mode of operation
+	## (either file or directory processing). Returns one of
+	## these symbols: :file, :directory.
+
+	>> _self.gui_items[ :input_choice ].value
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.input_choice<< a_selection
+
+	## Callback when the user changes the input mode.
+	## A_SELECTION should either be :file or :directory.
+
+	_self.action( :recursive? ).enabled? <<
+	_self.action( :load_list? ).enabled? << a_selection _is :directory
+
+	_self.action( :recursive? ).value <<
+	_self.action( :load_list? ).value << a_selection <> :file
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.path_info
+
+	## Returns the currently selected location in the file system.
+	## A string is returned that refers either to a directory or
+	## a file.
+
+	>> _self.gui_items[ :path_info ].value
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!file_provider.int!selected_path( _optional a_path )
+
+	## Callback for the file/directory selection dialog
+	## when something has been selected or the selection
+	## has been cancelled.
+	## If A_PATH is passed, the string refers to an existing
+	## file or directory (this validation has been performed
+	## by the dialog that calls this method!).
+
+	_if a_path _is _unset _then _return _endif
+
+	_self.gui_items[ :path_info ].value << a_path
+	_self.action( :run_analysis ).enabled? << _not a_path.empty?
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!file_provider.int!selected_module( a_module )
+
+	## Callback for the file/directory selection dialog
+	## when something has been selected.
+
+	_self.int!selected_path( a_module.safe_full_directory )
+_endmethod
+$
+
+
+##
+##	A C T I O N   C A L L B A C K S
+##	_______________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!file_provider.select_path()
+
+	## Callback to launch a dialog that allows either the selection
+	## of a file, a directory, or a module.
+
+	_local type
+
+	_if ( type << _self.input_choice ) = :module
+	_then
+		_self.launch_module_choice_lister()
+		_return
+	_endif
+
+	_local file_attr << "lpstrFile"
+	_local key       <<  type + :|_dialog|
+	_local dlg
+
+	_if ( dlg << _self.dialogs[ key ] ) _is _unset
+	_then
+		_local exemplar << _if type = :file
+				   _then >> sw:file_selection
+				   _else >> sw:directory_selection
+				   _endif
+
+		dlg << _self.dialogs[ key ] <<
+			exemplar.new( _self,
+				      _self.message( key + :|_title| ),
+				      :|int!selected_path()|,
+				      :|int!selected_path()|,
+				      :do_existence_check?, _true,
+				      :filter, "*.magik" )
+	_endif
+
+	dlg.activate()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!file_provider.run_analysis( _optional a_path,
+				       recursive?, load_list? )
+
+	## Launch the analysis run in a background thread.
+
+	_if a_path _is _unset _then a_path << _self.path_info _endif
+	_if recursive? _is _unset
+	_then
+		recursive? << _self.action( :recursive? ).value
+	_endif
+	_if load_list _is _unset
+	_then
+		load_list? << _self.action( :load_list? ).value
+	_endif
+
+	_proc @file_provider_thread( a_model, a_path, recursive?, load_list? )
+
+		a_model.int!process_request(
+			{ a_path, recursive?, load_list? } )
+
+	_endproc.fork_at( _thisthread.vm_priority,
+			  _self, a_path, recursive?, load_list? )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!file_provider.stop_analysis( _optional a_path, recursive? )
+
+	## Callback to stop a currently running analysis thread.
+
+	_if .thread _isnt _unset _andif
+	    _thisthread _isnt .thread
+	_then
+		.thread.kill_and_wait()
+
+		_self.progress[ :message_id ] << :processing_aborted
+		#
+		# The following line will cause a refresh of the status bar...
+		#
+		_self.progress << _self.progress
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable})
+_method sf!file_provider.edit_file( a_path, _optional a_line_no )
+
+	## Launch an editor for the specified file.
+	## If possible the editor will also jump to the specified
+	## line in in the given file...
+
+	_local ed << system.getenv( :sf!editor_cmd )
+	_local cmd
+
+	_if ed _is _unset
+	_then
+		ed << _self.message( _if a_line_no.is_kind_of?( 0 )
+				     _then >> :gnuclient_cmd_jump
+				     _else >> :gnuclient_cmd
+				     _endif,
+				     a_line_no.default( "" ) )
+	_endif
+	cmd << _self.message( :edit_file_command, ed, a_path )
+
+	system.do_command( cmd.trim_spaces() )
+_endmethod
+$
+
+
+##
+##	I N T E R N A L   C O D E
+##	_________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable})
+_private _method sf!file_provider.build_first_row_in_gui( a_container )
+
+	## Creates the user controls for the file selection & processing
+
+	_local top_rc << sw:rowcol.new( a_container, 1, 3, :pixel,
+					:col_spacing, 10,
+					:default_row_alignment, :centre )
+
+	_self.build_input_selections( top_rc )
+	_self.build_analysis_selections( top_rc )
+	_self.build_action_items( top_rc )
+
+	>> top_rc
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable, subclassable})
+_private _method sf!file_provider.build_input_selections( a_container )
+
+	## Creates all the widgets that allow the user to select the
+	## input/files to be processed.
+
+	_local gi << _self.gui_items
+	_local gb << sw:group_box.new( a_container,
+				       _self.message( :input_selections ),
+				       :row, 1, :col, 1 )
+	_local rc << sw:rowcol.new( gb, 1, _unset, :pixel, :col_spacing, 10,
+				    :default_row_alignment, :centre )
+	_local input_choice << _self.default_input_choice
+	_local rc2
+	_local ctl
+
+	gi[ :input_choice ] <<
+		sw:choice_item.new( rc, _self.message( :input_type ),
+				    { _self.message( :file ),
+				      _self.message( :directory ),
+				      _self.message( :module ) },
+				    { :file, :directory, :module },
+				    :display_all?,    _true,
+				    :model,           _self,
+				    :change_selector, :|input_choice<<|,
+				    :value,           input_choice )
+
+	_self.action( :select_path ).place_control_on( rc, :dialog )
+
+	rc2 << sw:rowcol.new( rc, 2, 1, :pixel )
+	ctl << _self.action( :recursive? ).place_control_on( rc2, :dialog )
+	ctl.enabled? << input_choice = :directory
+	ctl.row << 1; ctl.col << 1
+
+	ctl << _self.action( :load_list? ).place_control_on( rc2, :dialog )
+	ctl.enabled? << input_choice = :directory
+	ctl.row << 2; ctl.col << 1
+
+	>> gi[ :input_container ] << gb
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable, subclassable})
+_private _method sf!file_provider.build_analysis_selections( a_container )
+
+	## This class only builds the container, another component has
+	## to place the actions in it...
+
+	_local gi << _self.gui_items
+	_local gb << sw:group_box.new( a_container,
+				       _self.message( :analysis_selections ),
+				       :row, 1, :col, 2 )
+	_local rc << sw:rowcol.new( gb, 2, _unset, :pixel,
+				    :col_spacing, 10, :row_spacing, 2 )
+
+	>> gi[ :analysis_container ] << gb
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable, subclassable})
+_private _method sf!file_provider.build_action_items( a_container )
+
+	## Places all the available actions in a group box.
+
+	_local fwk << _self.framework
+	_local gi  << _self.gui_items
+	_local gb  << sw:group_box.new( a_container,
+					_self.message( :action_selections ),
+					:row, 1, :col, 3 )
+	_local rc  << sw:rowcol.new( gb, 2, 4, :pixel,
+				     :col_spacing, 10, :row_spacing, 2 )
+	_local ctl
+
+	ctl << _self.action( :run_analysis ).place_control_on( rc, :dialog )
+	ctl.row << 1 ; ctl.col << 1
+	ctl << _self.action( :stop_analysis ).place_control_on( rc, :dialog )
+	ctl.row << 1 ; ctl.col << 2
+
+	ctl << fwk.action( :help ).place_control_on( rc, :dialog )
+	ctl.row << 1 ; ctl.col << 3
+	ctl << fwk.action( :quit ).place_control_on( rc, :dialog )
+	ctl.row << 1 ; ctl.col << 4
+	ctl << fwk.action( :print ).place_control_on( rc, :dialog )
+	ctl.row << 2 ; ctl.col << 3
+	ctl << fwk.action( :export ).place_control_on( rc, :dialog )
+	ctl.row << 2 ; ctl.col << 4
+
+	>> gi[ :action_container ] << gb
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_private _method sf!file_provider.launch_module_choice_lister()
+
+	## Launches a new dialog that allows the user to pick
+	## a module from a list of all known modules.
+
+	_local key  << :module_choice_dialog
+	_local dlg
+
+	_if ( dlg << _self.dialogs[ key ] ) _is _unset
+	_then
+		dlg << _self.dialogs[ key ] <<
+			sw:choice_lister.new( :one_shot )
+	_endif
+
+	dlg.setup( sw_module_manager.defined_modules,
+		   _self, :|int!selected_module()|,
+		   :name, :one,
+		   _self.message( :known_modules ) )
+	dlg.activate()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!file_provider.int!process_request( data )
+
+	## Internal callback to start gathering all files
+	## required for an analysis.
+
+	.thread << _thisthread
+
+	_thisthread.role << :|process_request()|
+	_thisthread.set_name( _self.class_name )
+
+	_protect
+		_self.busy? << _true
+		_self.action( :run_analysis ).enabled?  << _false
+		_self.action( :stop_analysis ).enabled? << _true
+
+		_self.databus_make_data_available( :reset_statistics, _unset )
+
+		_self.process_request( data )
+
+		_self.databus_make_data_available( :refresh, _unset )
+
+	_protection
+		_if _thisthread _is .thread _then .thread << _unset _endif
+
+		_self.busy? << _false
+		_self.action( :stop_analysis ).enabled? << _false
+		_self.action( :run_analysis ).enabled?  << _true
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!file_provider.progress<< some_data
+
+	## Set the local slot value and issue some change notifications.
+
+	.progress << some_data
+
+	_self.changed( :progress_data, some_data )
+	_self.databus_make_data_available( :progress_string,
+					   _self.progress_string )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_private _method sf!file_provider.process_request( data )
+
+	## This method dispatches the work by checking if the initial
+	## path selection refers to an object that still exists in the
+	## file system.
+
+	_local path << system.canonicalise( data.first )
+	_local fs
+	_local ft
+
+	_if _not system.file_exists?( path ) _then _return _endif
+
+	fs << sw:file_status.new( path )
+
+	_if ( ft << fs.type ) = :file
+	_then
+		_local file
+		_local dir
+		( file, dir ) << system.pathname_components( path )
+
+		_self.send_all_files_to_databus( dir, file, _false, _false )
+
+	_elif ft = :directory
+	_then
+		_local recursive? << data.size > 1 _andif
+				     data[ 2 ] _isnt _false
+		_local load_list? << data.size > 2 _andif
+				     data[ 3 ] _is _true
+
+		_self.send_all_files_to_databus(
+			path, _self.file_match_pattern, recursive?, load_list? )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!file_provider.send_all_files_to_databus(
+			 a_directory, a_pattern, recursive?, load_list? )
+
+	## This method collects all files to process and then
+	## sends one-by-one on the databis so that they get
+	## processed.
+
+	_local list       << _self.file_list
+	_local data       << sw:property_list.new_with(
+				     :message_id, :progress_info,
+				     :data,       { 0, 0, 0 } )
+	_local to_process
+
+	list.empty()
+	_self.databus_make_data_available( :progress_string,
+					   _self.message( :collecting_files ) )
+	_self.collect_files_to_process( a_directory, a_pattern,
+					recursive?, load_list? )
+
+	to_process << list.size
+
+	_for count,a_file_status _over list.fast_keys_and_elements()
+	_loop
+		path << a_file_status.name
+		_if _not system.file_exists?( path ) _then _continue _endif
+		#
+		# Store in slot progress this data:
+		# - the list position (file) that is being processed,
+		# - the total number of files to process,
+		# - the complete path of the file to be processed,
+		# - a percent complete number.
+		#
+		# The computed percent complete (number) will either be
+		# an integer (when less than 100 files have to be processed)
+		# or a floating point number with two decimals...
+		#
+		data[ :data ] <<
+			{ count,
+			  to_process,
+			  _if to_process > 100
+			  _then >> ( ( count * 10000.0 ) /
+				     to_process ).floor / 100.0
+			  _else >> ( count * 100 ) _div to_process
+			  _endif,
+			  path, system.pathname_components( path ) }
+
+		_self.progress << data
+
+		_self.databus_make_data_available( :process_file, path )
+	_endloop
+
+	data[ :message_id ] << _if data[ :data ].first = 1
+			       _then >> :completed_info_1
+			       _else >> :completed_info_n
+			       _endif
+	data[ :data ][ 3 ]  << 100
+
+	_self.progress << data
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!file_provider.collect_files_to_process(
+			 a_directory, a_pattern, recursive?, load_list? )
+
+	## The files in a directory will be collected in 2 steps:
+	## a) first all subdirectories (if RECURSIVE? is _true)
+	## b) then all file matching A_PATTERN.
+	## Store all found files in slot file_list.
+
+	_if load_list?
+	_then
+		sw:magik_rep.sf!load_file_list( a_directory, _self,
+						:|int!add_to_file_list()| )
+		_return
+	_endif
+
+	_local list << _self.file_list
+	_local dc
+	_local entry
+
+	_if recursive?
+	_then
+		_self.process_subdirectories( a_directory, a_pattern )
+	_endif
+
+	_protect
+		dc << sw:directory_channel.new(
+				 a_directory, a_pattern, _false )
+		_loop
+			entry << dc.get_status()
+			_if entry _is _unset _then _leave _endif
+
+			_if entry.type _is :file
+			_then
+				list.add( entry )
+			_endif
+		_endloop
+	_protection
+		_if dc _isnt _unset _then dc.close() _endif
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!file_provider.process_subdirectories(
+			 a_directory, a_pattern )
+
+	## The only task of this method is to run deeper in the
+	## file tree hierarchy and call method send_all_files_to_databus().
+
+	_local dc
+	_local entry
+
+	_protect
+		dc << sw:directory_channel.new( a_directory )
+		_loop
+			entry << dc.get_status()
+			_if entry _is _unset _then _leave _endif
+
+			_if entry.type <> :directory _then _continue _endif
+
+			_self.collect_files_to_process(
+				entry.name, a_pattern, _true )
+		_endloop
+	_protection
+		_if dc _isnt _unset _then dc.close() _endif
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!file_provider.int!add_to_file_list( a_path )
+
+	## This callback is specified in method collect_files_to_process().
+	## Because this method is called from another class it can't
+	## be private...
+
+	_self.file_list.add( sw:file_status.new( a_path ) )
+_endmethod
+$

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mclib_xslt_report_templates>
+    <template name="default" directory="default" external_name="Full Report"/>
+    <template name="manifolds" directory="default" file_name="manifolds" external_name="Manifolds Report"/>
+</mclib_xslt_report_templates>

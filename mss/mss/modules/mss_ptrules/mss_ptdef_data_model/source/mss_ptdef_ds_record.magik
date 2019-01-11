@@ -1,0 +1,136 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef_ds_record
+##
+## Generic superclass for mss_ptdef datastore records.
+##
+
+def_slotted_exemplar(:mss_ptdef_ds_record,
+{},
+{:user_ds_record})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_ds_record.message(message_id, _gather args)
+	## 
+	## 
+
+	_if (tbl << _self.source_collection) _isnt _unset
+	_then
+		mh_name << tbl.name
+	_else
+		mh_name << _self.class_name
+	_endif 
+	_return message_handler.new(mh_name).human_string(message_id, _unset, _scatter args)
+				    
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_ds_record.insert_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_ds_record.update_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_ds_record.delete_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_ds_record.general_validator()
+	## 
+	## 
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef_ds_record.prepare_for_serial(_optional include_id?, include_fk_join_fields?)
+	## 
+	## Return a property list of keys and values that describe self
+	## in a manner that can be written to an XML stream.
+	## If INCLUDE_ID? is true, then self's id field will be
+	## included.  If INCLUDE_FK_JOIN_FIELDS? is true, then foreign
+	## key join fields will be included.  The default for these is false.
+	##
+
+	_dynamic !mss_recursion!
+
+	_if !mss_recursion! _is _unset
+	_then
+		!mss_recursion! << equality_set.new()
+	_endif
+	_if !mss_recursion!.includes?(_self) _then _return _endif
+	!mss_recursion!.add(_self)
+	
+	flds_to_ignore << set.new_with(:ds!version, :rwo_id)
+	_if include_id? _isnt _true
+	_then
+		# Ignore id field if instructed.
+		flds_to_ignore.add(:id)
+	_endif 
+	_for i _over _self.join_fields.fast_elements()
+	_loop
+		fd_name << i.name
+		_if i.join_type _is :text
+		_then
+			# Always ignore aspect fields for text joins.
+			flds_to_ignore.add(i.parameters[1])
+		_elif i.simple_result? _andif
+		      include_fk_join_fields? _isnt _true 
+		_then
+			# This works for the join fields I've defined in the data model
+			# right now, but it would need re-testing for other join types.
+			_for my_fname _over i.relation_fields()
+			_loop
+				flds_to_ignore.add(my_fname)
+			_endloop 
+		_endif 
+	_endloop 
+	
+	pl << property_list.new()
+	_for i _over _self.physical_fields.fast_elements()
+	_loop
+		_if flds_to_ignore.includes?(fd_name << i.name)
+		_then
+			_continue
+		_endif
+		pl[fd_name] << _self.perform(fd_name)
+	_endloop
+	_for i _over _self.join_fields.fast_elements()
+	_loop
+		fd_name << i.name
+		_if i.join_type _is :text
+		_then
+			pl[fd_name] << _self.perform(fd_name)
+		_endif 
+	_endloop 
+	_return pl
+	
+_endmethod
+$

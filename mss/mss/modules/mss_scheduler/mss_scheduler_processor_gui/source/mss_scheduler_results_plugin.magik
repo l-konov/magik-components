@@ -1,0 +1,614 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_results_plugin
+##
+## Plugin for providing main GUI for reviewing results
+## in mss_scheduler_processor_framework.
+##
+
+def_slotted_exemplar(:mss_scheduler_results_plugin,
+{
+	{:items, _unset, :readable},
+	{:sorter, _unset, :readable}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+mss_scheduler_results_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:managed_task_types},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+mss_scheduler_results_plugin.define_shared_constant(
+	:result_list_column_widths,
+	## Column widths to use for result list.
+	{180, 120, 60, 60, 80},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_results_plugin.result_list_column_headings
+	## 
+	## Column headings to use for result list.
+	## 
+
+	_return {_self.message(:rch_type),
+		 _self.message(:rch_actual_end_time),
+		 _self.message(:rch_submitter),
+		 _self.message(:rch_outcome_code),
+		 _self.message(:rch_failure_code)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_results_plugin.result_list_styled_string(disp_tree)
+	##
+	## The styled_string to use for displaying data in the result list.
+	##
+
+	_if (oc << disp_tree.value[:outcome_code]) = "OK"
+	_then
+		col << :black
+	_elif oc = "Fail"
+	_then
+		col << :red
+	_else
+		col << :orange
+	_endif 
+	_return styled_string.new(col, :value, :type, :tab,
+				  :value, :actual_end_time, :tab,
+				  :value, :submitter, :tab,
+				  :value, :outcome_code, :tab,
+				  :value, :failure_code)
+
+_endmethod 
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_results_plugin.set_result_list_attributes(pl, task_rec)
+	##
+	## Set the attributes for displaying the search result for
+	## task result record TASK_REC.  PL is the property list in
+	## which to store the attributes. 
+	##
+	## This may be redefined, in conjunction with result_list_styled_string(),
+	## result_list_column_widths, and result_list_column_headings.
+	##
+
+	task_type << task_rec.type.as_symbol()
+	handler << mss_scheduler_engine.get_task_handler_exemplar(task_type)
+	
+	pl[:mss_scheduled_task_result] << task_rec
+	_if handler _is _unset
+	_then 
+		pl[:type] << task_type
+	_else
+		pl[:type] << handler.external_name_for_task(task_rec)
+	_endif
+	
+	pl[:actual_end_time] << task_rec.actual_end_time
+	pl[:submitter] << task_rec.submitter
+	pl[:outcome_code] << task_rec.outcome_code
+	pl[:failure_code] << task_rec.failure_code
+
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	_self.set_option(:search_time_interval, time_value.new(24, unit.check_type(:hour)))
+	_self.set_option(:max_to_display, 100)
+	_self.set_option(:current_user_only?, _false)
+	_self.set_option(:failed_tasks_only?, _false)
+	sort_proc <<
+		_proc(a, b)
+			_return b.value[:actual_end_time].default(date_time) _cf
+				a.value[:actual_end_time].default(date_time)
+		_endproc 
+	.sorter << sorted_collection.new(10, sort_proc)
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.pre_activation()
+	## 
+	## 
+
+	mss_scheduler_engine.view.add_dependent(_self, :view, :commit)
+	_self.manage_actions_for_selection()
+	_self.refresh_result_list()
+	_super.pre_activation()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.terminate()
+	## 
+	## 
+
+	mss_scheduler_engine.view.remove_dependent(_self, :view, :commit)
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_dynamic !mss_scheduler_view_operation!
+	
+	_if who _is mss_scheduler_engine.view
+	_then
+		_if what _is :commit _andif
+		    data[1] _is :after
+		_then
+			_self.refresh_result_list()
+		_elif what _is :view
+		_then
+			_if !dsst_operation! _is :start_transaction _orif
+			    !mss_scheduler_view_operation! _is :rollforward
+			_then
+				# Don't refresh during a planned rollforward operation.
+				_return
+			_endif
+			
+			_if data.size >= 3 _andif
+			    data[3].includes?(mss_scheduler_engine.scheduled_task_result_table_name)
+			_then
+				_self.refresh_result_list()
+			_endif 
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:view_selected_task_result,
+				       :short_help_text, _self.message(:view_selected_task_result_sh),
+				       :image, {:view_object, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|view_selected_task_result()|))
+	_self.add_action(sw_action.new(:resubmit_selected_task_result,
+				       :short_help_text, _self.message(:resubmit_selected_task_result_sh),
+				       :image, {:undo, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|resubmit_selected_task_result()|))
+	_self.add_action(sw_action.new(:refresh_result_list,
+				       :short_help_text, _self.message(:refresh_result_list_sh),
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh_result_list()|))
+	_self.add_action(sw_action.new(:mark_pending_as_failed,
+				       :short_help_text, _self.message(:mark_pending_as_failed_sh),
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|mark_pending_as_failed()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.build_gui(container)
+	## 
+	## 
+
+	.items << property_list.new()
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+	
+	ps << :|perform_safely()|
+	go << :|get_option()|
+
+	p.start_row()
+	rc << rowcol.new(p, _unset, 3, :pixel, :row_spacing, 6, :col_spacing, 6, :outer_spacing, 0)
+
+	label_item.new(rc, _self.message(:search_time_interval))
+	mgr << unit_value_manager.new_with_properties(:hour,
+						      :internal_units, :hour,
+						      :display_unit_format, :hour)
+	.items[:search_time_interval] <<
+		managed_value_text_item.new(rc, "",
+					    :display_length, 12,
+					    :manager, mgr,
+					    :value, _self.get_option(:search_time_interval),
+					    :model, _self,
+					    :aspect, :search_time_interval,
+					    :value_selector, {go, :search_time_interval},
+					    :change_selector, {ps, :|search_time_interval<<|})
+
+	.items[:current_user_only?] <<
+		toggle_item.new(rc, _self.message(:current_user_only?),
+				:value, _self.get_option(:current_user_only?),
+				:model, _self,
+				:value_selector, {go, :current_user_only?},
+				:change_selector, {ps, :|current_user_only?<<|})
+	
+	label_item.new(rc, _self.message(:max_to_display))
+	mgr << numeric_value_manager.new_with_properties(:integer?, _true)
+	.items[:max_to_display] <<
+		managed_value_text_item.new(rc, "",
+					    :display_length, 12,
+					    :manager, mgr,
+					    :value, _self.get_option(:max_to_display),
+					    :model, _self,
+					    :aspect, :max_to_display,
+					    :value_selector, {go, :max_to_display},
+					    :change_selector, {ps, :|max_to_display<<|})
+
+	.items[:failed_tasks_only?] <<
+		toggle_item.new(rc, _self.message(:failed_tasks_only?),
+				:value, _self.get_option(:failed_tasks_only?),
+				:model, _self,
+				:value_selector, {go, :failed_tasks_only?},
+				:change_selector, {ps, :|failed_tasks_only?<<|})
+	
+	p.start_row()
+	.items[:result_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :result_list,
+			      :data_selector, :result_list,
+			      :select_notifier, :|manage_actions_for_selection()|,
+			      :double_click_notifier, handler.new( _self, :|view_selected_task_result()|),
+			      :height_in_chars, 10,
+			      :column_widths, _self.result_list_column_widths.copy(),
+			      :column_headings, _self.result_list_column_headings.copy(),
+			      :distribute_spare_width, :always,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :results_result_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.search_time_interval << x
+	## 
+	## 
+
+	_self.set_option(:search_time_interval, x, _true)
+	_self.refresh_result_list()
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.current_user_only? << x
+	## 
+	## 
+
+	_self.set_option(:current_user_only?, x, _true)
+	_self.refresh_result_list()
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.max_to_display << x
+	## 
+	## 
+
+	_self.set_option(:max_to_display, x, _true)
+	_self.refresh_result_list()
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.failed_tasks_only? << x
+	## 
+	## 
+
+	_self.set_option(:failed_tasks_only?, x, _true)
+	_self.refresh_result_list()
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.selected_task_result
+	## 
+	## 
+
+	_if (ti << .items[:result_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		rec << sel.value[:mss_scheduled_task_result]
+		_if rec _isnt _unset _andif
+		    _not rec.is_valid?
+		_then
+			rec << _unset
+		_endif
+		_return rec, sel
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.manage_actions_for_selection()
+	## 
+	## 
+
+	sel << _self.selected_task_result
+	has_auth? << ((av << gis_program_manager.authorisation_view) _is _unset) _orif
+		     ((cu << av.current_user) _is _unset) _orif
+		     cu.access_to?(mss_scheduler_processor_plugin.edit_auth_right)
+	
+	_self.action(:view_selected_task_result).enabled? << sel _isnt _unset 
+	_self.action(:resubmit_selected_task_result).enabled? << sel _isnt _unset _andif has_auth?
+	_self.action(:mark_pending_as_failed).enabled? << sel _isnt _unset _andif sel.outcome_code = "Pending" _andif has_auth?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :managed_task_types
+	_then
+		_self.refresh_result_list()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.result_list
+	## 
+	## Return all tasks that have been run based on the entered options
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_if (range << _self.get_option(:search_time_interval)) _is _unset
+	_then
+		_return _false
+	_endif
+	_if (max << _self.get_option(:max_to_display)) _is _unset
+	_then
+		_return _false
+	_endif
+	cur_user_only? << _self.get_option(:current_user_only?).default(_false)
+	fail_only? << _self.get_option(:failed_tasks_only?).default(_false)
+	
+	end_time << date_time.now() - range
+	tbl << mss_scheduler_engine.scheduled_task_result_collection
+
+	task_types << _unset 
+	_if (task_info << _self.databus_request_data(:managed_task_types)) _isnt _unset
+	_then
+		task_types << equality_set.new()
+		_for i, j _over task_info.fast_keys_and_elements()
+		_loop
+			_if j _is _true
+			_then
+				task_types.add(i.write_string)
+			_endif
+		_endloop
+	_endif
+
+	pred << predicate.ge(:actual_end_time, end_time)
+	_if cur_user_only?
+	_then
+		pred _and<< predicate.eq(:submitter, gis_program_manager.login_name)
+	_endif
+	_if fail_only?
+	_then
+		pred _and<< predicate.ne(:outcome_code, "OK")
+	_endif
+
+	count << 0
+	_for i _over tbl.select(pred).fast_elements()
+	_loop
+		# If task type filter is available, apply it.
+		_if task_types _isnt _unset _andif
+		    _not task_types.includes?(i.type)
+		_then
+			_continue
+		_endif
+
+		pl << property_list.new()
+		_self.set_result_list_attributes(pl, i)
+		dt << display_tree.new(i.id, pl)
+		dt.styled_string << _self.result_list_styled_string(dt)
+		sc.add(dt)
+		count +<< 1
+		_if count >= max
+		_then
+			_leave
+		_endif 
+	_endloop
+
+	_return sc
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.refresh()
+	## 
+	## Synonymous with refresh_result_list()
+	##
+
+	_return _self.refresh_result_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.refresh_result_list()
+	## 
+	## 
+
+	_dynamic !mss_scheduler_view_operation!
+
+	# Perform a rollforward to ensure the most recent available
+	# data is queried.
+	!mss_scheduler_view_operation! << :rollforward
+	mss_scheduler_engine.view.rollforward()
+	!mss_scheduler_view_operation! << _unset
+	
+	_self.changed(:result_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.ensure_selected_task_result()
+	##
+	## Ensure that a task has been selected.
+	##
+
+	_if (sel_rec << _self.selected_task_result) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_task_result))
+	_endif
+	_return sel_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.view_selected_task_result(_optional double_click_tree)
+	## 
+	## View the task result currently selected in the result_list.
+	##
+
+	_if double_click_tree _is _unset
+	_then
+		# Invoked directly - require a selection, and error if nothing
+		# selected. 
+		rec << _self.ensure_selected_task_result()
+	_else
+		# Invoked via double click - in odd cases, there may be no
+		# selection.  So, don't error
+		_if (rec << _self.selected_task_result) _is _unset
+		_then
+			_return
+		_endif
+	_endif 
+	_return _self.get_service_provider(:editor_manager).edit_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.resubmit_selected_task_result()
+	## 
+	## Resubmit the task currently selected in the result_list.
+	##
+
+	_dynamic !mss_scheduler_initiator! << _self
+	
+	_self.ensure_selected_task_result()
+	(rec, sel) << _self.selected_task_result
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel),
+				_self.message(:confirm_resubmit, sel.value[:type])) _is _false
+	_then
+		_return
+	_endif
+
+	# Create a transaction to resubmit this record.
+	task_tbl << mss_scheduler_engine.scheduled_task_collection
+	pl << property_list.new_with(
+		      :type, rec.type,
+		      :submitter, rec.submitter,
+		      :priority, rec.priority,
+		      :scheduled_start_time, date_time.now(),
+		      :schedule_interval, 0,
+		      :parameter_text, rec.parameter_text)
+	trans << record_transaction.new_insert(task_tbl, pl)
+	trans.run()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_results_plugin.mark_pending_as_failed()
+	##
+	## Mark the task currently selected in the result_list with an
+	## outcome_code Failed - it must already have a Pending
+	## outcome_code value.  This is intended to finalize the result
+	## for a task that was running during a hard interrupt.
+	##
+
+	_dynamic !mss_scheduler_initiator! << _self
+	
+	run_status << _self.databus_request_data(:run_status)
+	_if run_status _is _unset _orif
+	    run_status _is :ready
+	_then
+		# OK.
+	_else
+		# Disallow while an engine is running.
+		condition.raise(:user_error, :string, _self.message(:disallowed_engine_running))
+	_endif 
+	
+	_self.ensure_selected_task_result()
+	(rec, sel) << _self.selected_task_result
+	_if rec.outcome_code ~= "Pending"
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_pending_task_result))
+	_endif
+	
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel),
+				_self.message(:confirm_mark_pending_as_failed, sel.value[:type])) _is _false
+	_then
+		_return
+	_endif
+	
+	# Create a transaction to update this record.
+	pl << property_list.new_with(:outcome_code, "Fail",
+				     :failure_code, _self.message(:administrator_termination).truncate(48))
+	trans << record_transaction.new_update(rec, pl)
+	trans.run()
+
+	_self.manage_actions_for_selection()
+	
+_endmethod
+$

@@ -1,0 +1,3 @@
+message_usages.magik
+mss_wp_single_ptrule_plugin.magik
+mss_wp_multi_ptrule_plugin.magik

@@ -1,0 +1,40 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-07-31 10:12:55 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+_global framework_inspector << _proc(_gather frameworks)
+				       gf << gui_framework.new(_unset,_unset,
+						     :config_definition_module_name,:mclib_framework_display,
+						     :gui_definition_module_name,:mclib_framework_display,
+						     :title,"Framework Inspector"
+						     )
+				       pu << gf.plugin(:framework_display)
+				       pu.add_frameworks(frameworks)
+				       gf.activate()
+				       
+				       >> pu
+			       _endproc 

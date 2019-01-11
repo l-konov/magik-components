@@ -1,0 +1,50 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2010 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# Add join_lister_tree_item slot to get a handle on the
+# homogenous join lister tree item in self's GUI.
+#
+_pragma(classify_level=restricted)
+join_field_value_viewer.define_pseudo_slot(
+	:join_lister_tree_item, _unset, :readable)
+$
+
+# Make the following slot readable.
+#
+_pragma(classify_level=basic)
+join_field_value_viewer.define_slot_access(
+	:actions,
+	## The actions that self manages.
+	:readable,
+	:public)
+$
+
+_pragma(classify_level=advanced)
+_method join_field_value_viewer.public_join_lister_popup_actions
+	## 
+	## Provide public access to the private
+	## popup_actions shared constant.
+	## 
+
+	_return _self.popup_actions
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method join_field_value_viewer.field_descriptor
+	## 
+	## Provide public access to the field_descriptor method defined
+	## on the abstract_field_value_editor superclass.
+	##
+
+	_return _super.field_descriptor
+	
+_endmethod
+$

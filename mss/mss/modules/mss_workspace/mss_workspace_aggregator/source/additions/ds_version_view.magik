@@ -1,0 +1,106 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method ds_version_view.mss_aggregator_merge(parent_view, base_view)
+	##
+	## Merges changes made in PARENT_VIEW relative to BASE_VIEW
+	## into self.  Returns a boolean value indicating if anything
+	## changed.
+	##
+
+	_self.assert(:already_at_the_top, _self.alternative_level ~= 0)
+
+	_self.check_alternative_access(:merge)
+
+	# Need to keep track of changes made, so that they can be
+	# notified later.
+	any_change? << _false
+	updated_table_names << set.new()
+	ref_view << _self.replicate()
+	_protect
+		_for tbl_info _over parent_view.table_changes_to(base_view).fast_elements()
+		_loop
+			# Only deal with ds_collections - skip any view or extdb
+			# stuff. 
+			tbl_name << tbl_info.tablename
+			_if (my_tbl << _self.collections[tbl_name]) _is _unset _orif
+			    _not my_tbl.is_class_of?(ds_collection)
+			_then
+				_continue
+			_endif
+
+			_if (base_tbl << base_view.collections[tbl_name]) _is _unset _orif
+			    (parent_tbl << parent_view.collections[tbl_name]) _is _unset
+			_then
+				_continue
+			_endif
+
+			my_tbl_updated? << _false 
+			diffs << ds_difference_stream.new_on(parent_tbl, base_tbl, my_tbl)
+			_protect
+				my_tbl.disable_vstamp()
+				_loop
+					(parent_change, parent_rec, base_rec, conflict?, my_change, my_rec) << diffs.get()
+					_if parent_change _is _unset
+					_then
+						_leave
+					_endif
+
+					_if conflict? _is _true
+					_then
+						# Skip conflicts here (effectively, force_child until/unless
+						# conflict resolution happens).
+						_continue
+					_endif 
+
+					_if parent_change _is :insert _orif
+					    parent_change _is :update
+					_then
+						my_tbl.ds!clone_record(parent_rec, _false)
+						my_tbl_updated? << _true 
+					_elif parent_change _is :remove
+					_then
+						my_tbl.ds!remove_record(my_rec)
+						my_tbl_updated? << _true 
+					_endif 
+				_endloop
+			_protection
+				my_tbl.enable_vstamp()
+			_endprotect
+
+			_if my_tbl_updated?
+			_then
+				any_change? << _true
+				updated_table_names.add(tbl_name)
+			_endif 
+		_endloop
+
+		_self.commit()
+		_self.mss_aggregator_merge_refresh_all_tables(ref_view, updated_table_names)
+	_protection
+		ref_view.discard()
+	_endprotect
+	
+	_return any_change?
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method ds_version_view.mss_aggregator_merge_refresh_all_tables()
+	## 
+	## Simulate behavior of refresh_all_tables() method, without
+	## prim support.
+	##
+
+	_return {}
+	
+_endmethod
+$

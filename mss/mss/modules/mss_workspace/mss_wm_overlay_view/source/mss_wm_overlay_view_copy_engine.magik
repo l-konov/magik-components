@@ -1,0 +1,309 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+##
+## mss_wm_overlay_view_copy_engine
+##
+## Coordinating class for performing a raw copy of records from
+## an overlay view into the active design.
+##
+
+# N.B: currently does not support deletions - only
+# inserts/updates.  There is not currently any way for
+# mss_workspace GUIs to pass deletes to this tool.
+
+def_slotted_exemplar(:mss_wm_overlay_view_copy_engine,
+{
+	{:dataset_mapping, _unset, :readable},
+	{:insert_update_records, _unset, :readable},
+	{:pending_insert_update_records, _unset, :readable},
+	{:copy_parameters, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.new()
+	## 
+	##
+
+	_return _clone.init()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.init()
+	## 
+	## 
+
+	.dataset_mapping << equality_property_list.new()
+	.insert_update_records << equality_set.new()
+	.pending_insert_update_records << equality_set.new()
+	_self.set_copy_parameters(_unset)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.clear()
+	## 
+	## Reset all properties of self.
+	##
+
+	.dataset_mapping.empty()
+	.insert_update_records.empty()
+	.pending_insert_update_records.empty()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.set_dataset_mapping(from_to_ds_pl)
+	## 
+	## Setup dataset mapping: FROM_TO_DS_PL is an equality_property_list
+	## where each key is a dataset being copied from, and each
+	## value is the corresponding dataset being copied to.
+	##
+
+	.dataset_mapping.empty()
+	_for i, j _over from_to_ds_pl.fast_keys_and_elements()
+	_loop
+		.dataset_mapping[i] << j
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.set_copy_parameters(pl)
+	## 
+	## Initialize parameters that describe how copying will be
+	## performed.  This can include the following keys and values:
+	## - :copy_tracking_records? - if true, then
+	##   mss_workspace_tracking_records will be copied.
+	## - :reassign_tracking_records? - if true, then
+	##   mss_workspace_tracking_records will be copied, and they
+	##   will be reassigned from their original design to the design
+	##   being copied into.
+	## - :copy_cus? - if true, then mss_cu_references will be
+	##   copied. 
+	## - :reassign_cus? - if true, then mss_cu_references will be
+	##   copied, and they will be reassigned from their original
+	##   design to the design being copied into.
+	##
+	## If any "reassign" property is set, then the following properties
+	## must also be set:
+	## - :all_from_design_ids - an equality set of the ID value of
+	##   the designs being copied from.
+	## - :to_design_id - the ID value of the design being copied to.
+	##
+	
+	_if pl _is _unset
+	_then
+		pl << property_list.new_with(
+			      :copy_tracking_records?, _true,
+			      :reassign_tracking_records?, _false,
+			      :copy_cus?, _true,
+			      :reassign_cus?, _false)
+	_endif
+	.copy_parameters << pl
+
+	_return .copy_parameters
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.add_insert_update_records(recs_to_do)
+	## 
+	## Add all records in the collection RECS_TO_DO to be processed
+	## as inserts or updates.
+	##
+
+	dsm << .dataset_mapping
+	.pending_insert_update_records.add_all(recs_to_do)
+	_for i _over recs_to_do.fast_elements()
+	_loop
+		_if (target_dataset << dsm[i.source_view]) _is _unset
+		_then
+			# Shouldn't normally happen, but just in case custom processing
+			# is trying to follow joins to other datasets...
+			_continue
+		_endif
+		
+		tops << i.mss_ovc_consistency_roots(:insert_update, _self, target_dataset)
+		.insert_update_records.add_all(tops)
+		.pending_insert_update_records.add_all(tops)
+	_endloop
+	
+	_return .insert_update_records
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.perform_copy()
+	## 
+	## Do the work of copying all records in .insert_update_records
+	## into the appropriate target dataset.
+	##
+
+	# Note: source_refs is a collection of consistency refs in the
+	# source dataset, which will need to be fixed if they can be
+	# located in the target dataset; target_refs is a collection of
+	# consistency refs that are already known to exist in the
+	# target dataset.
+	dsm << .dataset_mapping
+	source_refs << rope.new()
+	target_refs << rope.new()
+	
+	_for i _over .insert_update_records.fast_elements()
+	_loop
+		_if (target_dataset << dsm[i.source_view]) _is _unset
+		_then
+			# Shouldn't normally happen, but just in case custom processing
+			# is trying to follow joins to other datasets...
+			_continue
+		_endif
+
+		# If the corresponding record can be found in the target
+		# dataset, start by removing it there, in preparation for
+		# replacing it with the source record.
+		_if (target_rec << i.corresponding_record(target_dataset, _false)) _isnt _unset
+		_then
+			target_refs.add_all_last(target_rec.mss_ovc_prepare_to_replace_substructure(_self, target_dataset))
+		_endif
+
+		# If there are any remnants of that record left, remove them.
+		# This is unlikely to happen, but could occur in unusual cases
+		# (i.e. substructure has been dissassociated, but still exists,
+		# in the target view; at the same time, that substructure has
+		# been updated in the source view).
+		source_refs.add_all_last(i.mss_ovc_prepare_to_replace_substructure(_self, target_dataset))
+
+		# Finally, clone the record and its substructure from the
+		# source to the target.
+		source_refs.add_all_last(i.mss_ovc_clone_substructure_into(_self, target_dataset))
+	_endloop 
+
+	# At this point, things in target_refs are detached copies of
+	# records that have been deleted, and which could be expected to
+	# be shared as substructure of other things.  (Typically, this
+	# will include links, nodes, and polygons).  Resurrect these,
+	# and give them a chance to stay resurrected if they are indeed
+	# shared by something else.  If they are truly not shared, the
+	# fix_ref_counts() call will ensure that they get terminated.
+	resurrected_target_refs << equality_set.new()
+	_for i _over target_refs.fast_elements()
+	_loop
+		ref_rec << i.attached()
+		_if ref_rec _is _unset _andif
+		    i.responds_to?(:|fix_ref_counts()|)
+		_then
+			ref_rec << i.source_collection.ds!clone_record(i)
+		_endif
+		_if ref_rec _isnt _unset
+		_then
+			resurrected_target_refs.add(ref_rec)
+		_endif 
+	_endloop
+	
+	# Fix ref counts for anything that needs it.
+	refs_to_do << equality_set.new()
+	_for i _over resurrected_target_refs.fast_elements()
+	_loop
+		ref_rec << i
+		_if ref_rec _isnt _unset _andif
+		    ref_rec.is_valid? _andif 
+		    ref_rec.responds_to?(:|fix_ref_counts()|)
+		_then
+			refs_to_do.add(ref_rec)
+		_endif
+	_endloop
+	_for i _over source_refs.fast_elements()
+	_loop
+		_if (target_dataset << dsm[i.source_view]) _is _unset
+		_then
+			_continue
+		_endif
+		ref_rec << i.corresponding_record(target_dataset, _false)
+		_if ref_rec _isnt _unset _andif
+		    ref_rec.responds_to?(:|fix_ref_counts()|)
+		_then
+			refs_to_do.add(ref_rec)
+		_endif
+	_endloop
+
+	# Keep fixing refs until nothing changes.
+	refs_to_do << rope.new_from(refs_to_do)
+	_loop 
+		any_change? << _false
+		_for i _over refs_to_do.fast_elements()
+		_loop
+			_if _not i.is_valid? _then _continue _endif
+			_if i.fix_ref_counts() _is _true
+			_then
+				any_change? << _true
+			_endif
+		_endloop
+		_if _not any_change?
+		_then
+			_leave
+		_endif
+	_endloop
+
+	_self.post_process_copy()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_overlay_view_copy_engine.post_process_copy()
+	## 
+	## Perform any application-specific processing that may be
+	## required as a result of completing a copy operation.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.record_in_process_set?(a_rec)
+	## 
+	## Return true if A_REC is in the set of records to be processed.
+	##
+
+	_if .insert_update_records.includes?(a_rec) _orif
+	    .pending_insert_update_records.includes?(a_rec)
+	_then 
+		_return _true
+	_endif
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_engine.mark_as_pending_insert_update(a_rec)
+	## 
+	## Mark A_REC as being a pending insert/update.  This allows
+	## custom versions of the mss_ovc_consistency_roots() method to 
+	## flag a record as being processed in cases where recursively
+	## following joins could result in looping.
+	##
+
+	.pending_insert_update_records.add(a_rec)
+	
+_endmethod
+$

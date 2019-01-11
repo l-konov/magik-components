@@ -1,0 +1,57 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+##
+## A subclass of jobs_list_plugin to add additional
+## functions to the GUI.
+##
+def_slotted_exemplar( :mclib_job_list_plugin,
+	{},
+	:job_list_plugin )
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_private _method mclib_job_list_plugin.new_viewer()
+	## 
+	## Returns a new mclib_job_list_gui_framework.
+	##
+	
+	>> mclib_jobs_list_gui_framework.new(
+		   :job_viewer,                        _self,
+		   :resource_module_name,              _self.resource_module_name,
+		   :gui_definition_module_name,        _self.gui_definition_module_name,
+		   :config_definition_file_name,       _self.config_definition_file_name,
+		   :gui_definition_file_name,          _self.gui_definition_file_name,
+		   :floating_gui_definition_file_name, _self.floating_gui_definition_file_name,
+		   :embedded_gui_definition_file_name, _self.embedded_gui_definition_file_name,
+		   :help_id, _self.help_id )
+	
+_endmethod
+$

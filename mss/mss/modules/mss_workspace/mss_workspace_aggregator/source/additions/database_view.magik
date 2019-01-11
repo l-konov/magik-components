@@ -1,0 +1,265 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method database_view.mss_aggregator_merge(parent_view, base_view,
+					   _optional ignore_pre_operator_intervention?,
+					   ignore_post_operator_intervention?)
+	## 
+	## Perform an aggregation merge to transfer data changes in
+	## PARENT_VIEW relative to BASE_VIEW, into self.
+	##
+	## All other behavior and arguments are as for database_view.merge().
+	##
+
+	_self.assert(:already_at_the_top, _self.alternative_level ~= 0)
+
+	c << mss_aggregator_conflict_detector.new(_self, parent_view, base_view)
+	
+	conflict_mode << .params[:mss_aggregator_conflict_mode].default(:operator_intervention)
+	internal_force <<
+		_if conflict_mode _is :force_parent
+		_then >> :parent
+		_elif conflict_mode _is :force_base
+		_then >> :base
+		_endif 
+	
+	_if conflict_mode _is :force_child
+	_then (ignore_pre_operator_intervention?,
+	       ignore_post_operator_intervention?) << (_true, _true)
+
+	_elif internal_force _isnt _unset
+	_then (ignore_pre_operator_intervention?,
+	       ignore_post_operator_intervention?) << (_true, _false)
+	_endif
+
+	ok? << _false
+	
+	_protect 
+		(changed?, roots) <<
+			c.do_complete_merge(ignore_pre_operator_intervention?,
+					    ignore_post_operator_intervention?)
+		
+		#
+		# if conflict_mode is :force_parent, then iterate around until
+		# all replaced
+		#
+		_if roots _isnt _unset _andif internal_force _isnt _unset
+		_then
+			_loop
+				(something_done??, roots) <<
+					c.replace_structures_from_view(roots,
+								       internal_force)
+				
+				_if something_done?? _isnt _maybe
+				_then 
+					_self.commit() # not done implicitly by detector
+					c.complete_operator_intervention(_false)
+					c.terminate()
+					roots << _unset
+					_leave
+				_endif
+			_endloop
+		_endif
+
+		ok? << _true 
+	_protection
+		_if _not ok?
+		_then c.terminate()
+		_endif
+	_endprotect 
+		
+	_if roots _is _unset
+	_then
+		_return changed?
+	_else
+		_return changed?, roots, c
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method database_view.mss_aggregator_merge_with_manifold_interaction(parent_view, base_view)
+	## 
+	## Perform an aggregation merge to transfer data changes in
+	## PARENT_VIEW relative to BASE_VIEW, into self.  Upon
+	## completion, all conflicts are resolved in favor of the 
+	## parent, and manifold interactions are rerun on all geometry
+	## that may be in conflict.
+	##
+
+	internal_force << :parent
+	check_list << rope.new()
+	old_cm << .params[:mss_aggregator_conflict_mode]
+	c << _unset
+	ok? << _false 
+	_protect
+		.params[:mss_aggregator_conflict_mode] << :operator_intervention
+		(changed?, roots, c) << _self.mss_aggregator_merge(parent_view, base_view, _false, _false)
+
+		_if roots _isnt _unset
+		_then
+			_loop
+				check_list.add_all_last(roots)
+				(something_done??, roots) <<
+					c.replace_structures_from_view(roots, internal_force)
+				
+				_if something_done?? _isnt _maybe
+				_then 
+					_self.commit() # not done implicitly by detector
+					c.complete_operator_intervention(_false)
+					c.terminate()
+					roots << _unset
+					_leave
+				_endif
+			_endloop
+		_endif
+		
+		ok? << _true 
+	_protection
+		.params[:mss_aggregator_conflict_mode] << old_cm
+		_if _not ok? _andif
+		    c _isnt _unset
+		_then
+			c.undo_merge()
+			c.terminate()
+		_endif 
+	_endprotect
+
+	_self.do_mss_aggregator_merge_manifold_interaction(check_list)
+	_self.commit()
+	
+	# N.B.: roots should always be unset at this point.
+	_if roots _is _unset
+	_then
+		_return changed?
+	_else
+		_return changed?, roots, c
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method database_view.do_mss_aggregator_merge_manifold_interaction(check_list)
+	## 
+	## Perform manifold interactions for CHECK_LIST, which is a
+	## rope of roots from a mss_aggregator_merge() process.
+	##
+	
+	_dynamic !current_dsview! << _self
+	_dynamic !current_world!
+	
+	# Build a set of RWOs to process.
+	to_do << equality_set.new()
+	_for i _over check_list.fast_elements()
+	_loop
+		_if (test_rec << i.corresponding_record(_self, _false)) _isnt _unset _andif
+		    test_rec.responds_to?(:|all_geometry()|)
+		_then
+			to_do.add(test_rec)
+		_endif
+	_endloop
+
+	# Process each RWO located above.
+	_for rec _over to_do.fast_elements()
+	_loop
+		# Just in case triggers have caused something to get deleted...
+		_if _not rec.is_valid? _then _continue _endif
+
+		# Process each geometry of this record.
+		_for geom _over rec.all_geometry()
+		_loop
+			!current_world! << geom.world
+			ok? << _self.start_lwt()
+			_protect 
+				geom.do_manifold_interaction()
+				ok? << _true
+			_protection
+				_self.end_lwt(ok?)
+			_endprotect
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method database_view.int!mss_aggregator_merge(pre_merge_checkpoint_name, parent_view, base_view)
+	##
+	## Wrapper for internal merge functionality which transfers
+	## data from PARENT_VIEW, based on incremental changes in that
+	## view compared to BASE_VIEW.
+	##
+	## PRE_MERGE_CHECKPOINT_NAME, if set, should be the name of a
+	## checkpoint put down immediately before merging starts. If
+	## set, it will be left in place. If not, this method creates
+	## its own, and then drops it again.
+	##
+
+	# not allowed to aggregate if my datamodel has changed.
+	_self.int!mss_aggregator_check_versions(parent_view)
+	_self.int!mss_aggregator_check_versions(base_view)
+	
+	# checkpoint before merge.
+	_if pre_merge_checkpoint_name _is _unset
+	_then 
+		checkpoint_name << "sw!pre_merge"
+		_self.checkpoint(checkpoint_name)
+	_else
+		checkpoint_name << pre_merge_checkpoint_name
+	_endif
+	
+	# use protection to make sure remove checkpoint
+	_protect
+		result << _super.mss_aggregator_merge(parent_view, base_view)
+	_protection
+		_if pre_merge_checkpoint_name _is _unset
+		_then
+			_self.remove_checkpoint(checkpoint_name)
+		_endif 
+	_endprotect
+	
+	_return result
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method database_view.mss_aggregator_merge_refresh_all_tables(ref_view, updated_table_names)
+	## 
+	## Simulate behavior of refresh_all_tables() method, without
+	## prim support.
+	##
+
+	tbl_changes << _self.table_changes_to(ref_view)
+	_self.notify_collections(:changes, tbl_changes, updated_table_names, set.new())
+	_return tbl_changes
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method database_view.int!mss_aggregator_check_versions(ref_view)
+	## 
+	## Raise a condition if DD version is different between self
+	## and REF_VIEW.
+	##
+
+	_if (my_ver <<_self.current_dd_version) ~= (ref_ver << ref_view.current_dd_version)
+	_then
+		condition.raise(:db_version_changed,
+				:view, _self,
+				:operation, :aggregate,
+				:old_version, ref_ver)
+	_endif
+	
+_endmethod
+$

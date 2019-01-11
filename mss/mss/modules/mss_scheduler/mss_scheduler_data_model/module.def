@@ -1,0 +1,8 @@
+mss_scheduler_data_model	1
+
+description
+	MSS scheduler data model
+end
+
+requires
+end

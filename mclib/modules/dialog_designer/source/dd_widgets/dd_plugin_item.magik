@@ -1,0 +1,285 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_PLUGIN_ITEM - widget to encapsulate the embedding of
+## whole plugins or actions from some plugin into the design.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_plugin_item,{},:image_button_item)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_plugin_item.define_shared_constant(:dd_properties,
+					property_list.new_with(
+						:dialog_description,:string,
+						:plugin_name,:string,
+						:has_border?,:boolean,
+						:action_name,:string),
+					:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_plugin_item.define_shared_constant(:operation_for_type,
+					equality_property_list.new_with(
+						"File - Open",:open,
+						"File - Save",:save,
+						"File - Save As ...",:save_as,
+						"Directory - Select",:select_directory),
+					:public)
+$
+
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	>> _self.dd_properties
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	img << smallworld_product.get_raster_image(:plugin_item,:dialog_designer)
+	new_rec << _self.new(rc,"image_button",_unset,:|plugin_item()|,
+			     :row,row,:col,col,
+			     :col_alignment,:left,
+			     :row_alignment,:top,
+			     :has_border?,_false,
+			     :image,img)
+	new_rec.set_property(:image_file_name,:plugin_item)
+	new_rec.set_property(:image_module_name,:dialog_designer)
+	new_rec.set_property(:insert,:action)
+	>> new_rec
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	rec << _self.new_dialog_default(parent,props[:row].as_number(),props[:col].as_number())
+
+	rec.action_name << props[:action_name].default("")
+	rec.plugin_name << props[:plugin_name]
+	rec.has_border? << props[:has_border?]
+	rec.dialog_description << props[:dialog_description]
+
+	_if rec.action_name.empty?
+	_then
+		rec.set_property(:insert,:plugin)	
+	_endif
+
+	>> rec
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF, an action control placement.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	msg_key << :dd_insert_external_ + _self.insert.as_symbol()
+
+	_if _self.plugin_name _is _unset _then _return _endif 
+
+	txt.write(%tab,
+		  dialog_designer.message(msg_key,
+					  parent_id,
+					  _self.plugin_name,
+					  _self.action_name,
+					  _self.has_border?.write_string.lowercase,
+					  _self.row,
+					  _self.col),
+		  %newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.hidden_xml_properties(txt,n_tabs)
+	## 
+	## If set, write id of the driven window_stack to the XML
+	## stream txt.
+
+	ins << _if _self.action_name.default("").empty?
+	       _then
+		       >> "plugin"
+	       _else
+		       >> "action"
+	       _endif
+	
+	txt.write((n_tabs+1)*%tab,%<,
+		  "property name=",%","insert",%",
+		  " value=",%",ins,%",
+		  "/>",%newline)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_plugin_item.define_shared_variable(
+	:hot_icon,_unset,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.hot_icon()
+	## 
+	## Return an icon showing that the plugin/action values of self
+	## are valid.
+	
+	_if _self.hot_icon _is _unset 
+	_then
+		_self.hot_icon << smallworld_product.get_raster_image(:plugin_item_hot,:dialog_designer)
+	_endif
+
+	>> _self.hot_icon
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.raster_image
+	## 
+	## Return the raster image for SELF.
+
+	do_nothing << _proc()
+			      # ignore
+		      _endproc
+	_block
+		_handling component_no_such_action _with do_nothing
+
+		_for app _over smallworld_product.applications.fast_elements()
+		_loop
+			_if (pn << _self.plugin_name.default("").as_symbol()) _isnt :|| _andif
+			    (pi << app.plugin(pn)) _isnt _unset _andif
+			    (an << _self.action_name.default("").as_symbol()) _isnt :|| _andif
+			    (a << pi.action(an)) _isnt _unset _andif
+			    (ri << a.image) _isnt _unset 
+			_then
+				_return ri
+			_endif
+			
+			_if (pn << _self.plugin_name.default("").as_symbol()) _isnt :|| _andif
+			    (pi << app.plugin(pn)) _isnt _unset 
+			_then
+				_return _self.hot_icon()
+			_endif
+		_endloop
+
+	_endblock 
+	
+	>> _super.raster_image
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	canv.render_raster(_self.raster_image,pbb.xmin+1,pbb.ymin+1,_false )
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+
+	# Handle odd sized rasters
+	(w2,h2) << _self.raster_image.size()
+
+	w << w.max(w2)
+	h << h.max(h2)
+	
+	pbb << pixel_bounding_box.new(x0,y0,x0+w,y0+h)
+	
+	!dialog_element_footprints![pbb] << _self
+
+	_if _self.has_border?.default(_true)
+	_then 
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+		canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+		canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+		
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+		canv.draw_segment(ls,x0,y0,x0+w,y0)
+		canv.draw_segment(ls,x0,y0+h,x0,y0)
+		
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+		canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+		canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+		
+		ls.destroy()
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.action_name 
+	## 
+	## Return the ACTION_NAME property.
+	>> .properties[:action_name]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.action_name << new_val
+	## 
+	## Set the ACTION_NAME property.
+	.properties[:action_name] << new_val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.plugin_name 
+	## 
+	## Return the PLUGIN_NAME property.
+	>> .properties[:plugin_name]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.plugin_name << new_val
+	## 
+	## Set the PLUGIN_NAME property.
+	.properties[:plugin_name] << new_val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.insert 
+	## 
+	## Return the INSERT property.
+	>> .properties[:insert]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_plugin_item.insert << new_val
+	## 
+	## Set the INSERT property.
+	.properties[:insert] << new_val
+_endmethod
+$

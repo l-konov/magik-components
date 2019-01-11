@@ -1,0 +1,104 @@
+_package sw
+$
+_global graphviz_module_dependencies <<
+_proc@graphviz_module_dependencies(output_format,output_filename,_optional filter_type)
+
+	## Usage:
+	##
+	## graphviz_module_dependencies(:svg,"c:\temp\graphviz_module_dependencies.svg",:dot)
+	
+	_global dg
+
+	dg << dot_graph.new("ModuleDependencies")
+
+	_for a_module _over sw_module_manager.loaded_modules.fast_elements()
+	_loop
+		_local my_mod_name << a_module.name
+		
+		_for a_prereq _over a_module.prerequisites.fast_elements()
+		_loop
+			_local (req_name, req_version) << (_scatter a_prereq)
+
+			dg.create_edge({my_mod_name,req_name})
+		_endloop
+	_endloop 
+
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+_endproc
+$
+_pragma(classify_level=basic)
+_method sw_module.graphviz_module_dependencies(output_format,output_filename,_optional filter_type)
+	## Usage:
+	##
+	## sw_module.graphviz_module_dependencies(:png,"c:\temp\graphviz_module_dependencies.png",:dot)
+
+	_global dg
+
+	dg << dot_graph.new("ModuleDependencies")
+
+	_local modules << equality_set.new()
+
+	_self.prerequisite_modules(modules,_true)
+
+	_local my_mod_name << _self.name
+
+	_local a_node << dg.create_node(my_mod_name)
+	a_node.set_attribute(:style,"filled")
+	a_node.set_attribute(:color,"red")
+	
+	_for i_mod _over _self.prerequisite_modules(equality_set.new(),_false).fast_elements()
+	_loop
+		dg.create_edge({my_mod_name,i_mod.name})
+	_endloop
+
+	modules.remove(_self)
+
+	_local products << equality_hash_table.new()
+	_local a_product , product_module_list
+	_local a_edge
+	
+	_for i_mod _over modules.fast_elements()
+	_loop
+		i_mod_name << i_mod.name
+		
+		_for j_mod _over i_mod.prerequisite_modules(equality_set.new(),_false).fast_elements()
+		_loop
+			a_edge << dg.create_edge({i_mod_name,j_mod.name})
+
+			_if i_mod.product.name _is :sw_electric_office _orif
+			    j_mod.product.name _is :sw_electric_office
+			_then
+				a_edge.set_attribute(:color,"red")
+			_endif
+		_endloop
+	_endloop
+
+	_for i_mod _over modules.fast_elements()
+	_loop
+		a_product << i_mod.product
+		
+		_if (product_module_list << products[a_product]) _is _unset 
+		_then
+			product_module_list << products[a_product] << rope.new()
+		_endif
+
+		product_module_list.add_last(i_mod)
+	_endloop
+
+	_local cluster_count << -1
+	
+	_for i_product,i_module_list _over products.fast_keys_and_elements()
+	_loop
+		_local sg << dg.create_subgraph(write_string("cluster",cluster_count +<< 1))
+		sg.set_attribute(:label,write_string(%",i_product.name,%"))
+		
+		_for i_mod _over i_module_list.fast_elements()
+		_loop
+			sg.create_node(i_mod.name)
+		_endloop
+	_endloop
+	
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+	
+_endmethod
+$

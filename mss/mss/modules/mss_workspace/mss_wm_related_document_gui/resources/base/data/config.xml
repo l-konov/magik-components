@@ -1,0 +1,5 @@
+<config>
+  <plugins>
+    <plugin name="mss_wm_related_document_plugin" class_name="mss_wm_related_document_plugin"/>
+  </plugins>
+</config>

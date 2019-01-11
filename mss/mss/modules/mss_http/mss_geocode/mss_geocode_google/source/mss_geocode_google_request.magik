@@ -1,0 +1,333 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2010 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_geocode})
+##
+## mss_geocode_google_request
+##
+## Class to invoke a geocode request using Google Geocoding API V3.
+## (See http://code.google.com/apis/maps/documentation/geocoding
+## for details).
+##
+## This is intended as a demonstration of implementing Google
+## Geocoding API V3 in Magik - it does not implement URL
+## signing required for use by Google Maps API Premier customers.
+## Users of this code are responsible for complying with the
+## Google Maps API Terms of Service.
+##
+## Example usage:
+## - z99 << mss_geocode_google_request.new(property_list.new_with(
+##          :address, "535 Nicola Street, Vancouver, BC"))
+## - z99.execute()
+##
+## After executing a request, results are as follows:
+## - The result_status slot will be one of the status codes defined
+##   by the API ("OK", "ZERO_RESULTS", "OVER_QUERY_LIMIT",
+##   "REQUEST_DENIED", "INVALID_REQUEST"), and may also be "ERROR"
+##   if a web service communication error occurs.  In that case,
+##   the result_error_string slot will provide additional details.
+## - The results slot will be a rope of property_lists which contain
+##   data parsed from the web service results.  This may include
+##   the following keys: :address_components, :type, :formatted_address,
+##   :location, :location_type, :viewport, :bounds, :partial_match.
+##   Refer to the Google Geocoding API V3 documentation for detauls.
+##
+
+def_slotted_exemplar(:mss_geocode_google_request,
+{
+	{:query_parms, _unset, :readable},
+	{:http_request, _unset, :readable},
+	{:result_status, _unset, :readable},
+	{:result_error_string, _unset, :readable},
+	{:results, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_geocode})
+_method mss_geocode_google_request.new(query_parms)
+	## 
+	## Generate a new request using QUERY_PARMS, which is a property_list
+	## containing the following keys and values:
+	## - :address (optional): the address to geocode.
+	## - :latlng (optional): the lat-long coordinate to reverse-geocode,
+	##   in the form "<LAT>,<LONG>".
+	##     - Note: one of :address or :latlng is required.
+	## - :bounds (optional): a bounding box in the form "<LAT1>,<LONG1>|<LAT2>,<LONG2>"
+	##   which will bias results in favor of locations within this box.
+	## - :region (optional): a region code (a two character top-level
+	##   domain value) which will bias results in favor of this region.
+	##
+	## Refer to the Google Geocoding API V3 for further details on
+	## these parameters.
+	##
+
+	_return _clone.init(query_parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_google_request.init(query_parms)
+	## 
+	## 
+
+	.query_parms << query_parms
+	.http_request << _unset
+	.result_status << ""
+	.result_error_string << ""
+	.results << rope.new()
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_geocode})
+_method mss_geocode_google_request.execute()
+	## 
+	## Execute the given request.  Upon completion, the
+	## result_status slot will be set to the status returned
+	## by the web service, and the results slot will be a rope
+	## of property_lists that describe each result returned by the
+	## web service.
+	##
+
+	.result_status << ""
+	.result_error_string << ""
+	.results.empty()
+	
+	_self.set_http_request()
+	ok? << _false
+	_local error_cond << _unset 
+	_catch :any_error
+	       _handling error _with
+	       _proc(cond)
+		       _import error_cond
+		       error_cond << cond
+		       _throw :any_error
+	       _endproc 
+	       .http_request.execute(30000)
+	       ok? << _true
+	_endcatch
+
+	_if _not ok?
+	_then
+		_if error_cond _isnt _unset
+		_then
+			.result_status << "ERROR"
+			.result_error_string << error_cond.report_contents_string
+		_endif
+	_endif
+
+	_if ok?
+	_then
+		# If the HTTP status code is anything but 200, treat this as an
+		# error.
+		_if (resp << .http_request.response) _isnt _unset _andif
+		    resp.status_code ~= 200
+		_then
+			.result_status << "ERROR"
+			.result_error_string << write_string("HTTP CODE = ", resp.status_code,
+							     ", REASON = ", resp.reason_phrase)
+		_else 
+			_self.parse_response()
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_google_request.set_http_request()
+	## 
+	## Build the http_request for the web service to be executed.
+	##
+
+	s << internal_text_output_stream.new()
+	s.write("http://maps.google.com/maps/api/geocode/xml?")
+	sep << ""
+	_for pname _over {:address,
+			  :latlng,
+			  :bounds,
+			  :region}.fast_elements()
+	_loop
+		_if (pval << .query_parms[pname]) _isnt _unset
+		_then 
+			s.write(sep, pname, "=", mss_http_url_parser.uri_encode(pval))
+			sep << "&"
+		_endif
+	_endloop
+	s.write(sep, "sensor=false")
+
+	.http_request << mss_http_client_request.new(:url, s.string)
+	_return .http_request
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_google_request.parse_response()
+	## 
+	## Parse the response returned by the web service.
+	##
+
+	.result_status << "CANNOT PARSE RESPONSE"
+	.results.empty()
+
+	xml << _unset 
+	_try
+		xml << .http_request.response.response_body_as_xml()
+	_when error
+	_endtry
+
+	_if xml _is _unset _orif
+	    xml.elements.size = 0
+	_then
+		_return .results
+	_endif
+
+	top_elem << xml.elements[1]
+	_for i _over top_elem.elements.fast_elements()
+	_loop
+		_if (t << i.type) = "status"
+		_then
+			.result_status << i.xml_contents
+		_elif t = "result"
+		_then
+			.results.add_last(_self.int!parse_single_result(i))
+		_endif 
+	_endloop
+
+	_return .results
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_google_request.int!parse_single_result(xml)
+	## 
+	## Parse a single result from simple_xml_thing XML.
+	##
+
+	res << property_list.new()
+	res[:address_components] << rope.new()
+	
+	_for i _over xml.elements.fast_elements()
+	_loop
+		str << i.xml_contents
+		_if (t << i.type) = "type"
+		_then
+			res[:type] << str
+		_elif t = "formatted_address"
+		_then
+			res[:formatted_address] << str
+		_elif t = "address_component"
+		_then
+			pl2 << property_list.new()
+			res[:address_components].add_last(pl2)
+			pl2[:types] << rope.new()
+			_for j _over i.elements.fast_elements()
+			_loop
+				str << j.xml_contents
+				_if (t2 << j.type) = "long_name"
+				_then
+					pl2[:long_name] << str
+				_elif t2 = "short_name"
+				_then
+					pl2[:short_name] << str
+				_elif t2 = "type"
+				_then
+					# If there are multiple types returned, use the first one as
+					# the primary type.
+					_if pl2[:primary_type] _is _unset
+					_then
+						pl2[:primary_type] << str
+					_endif 
+					pl2[:types].add_last(str)
+				_endif
+			_endloop
+			
+		_elif t = "geometry"
+		_then
+			_for j _over i.elements.fast_elements()
+			_loop
+				str << j.xml_contents
+				_if (t2 << j.type) = "location"
+				_then
+					_if (c << _self.int!parse_single_coordinate(j)) _isnt _unset
+					_then
+						res[:location] << c
+					_endif
+				_elif t2 = "location_type"
+				_then
+					res[:location_type] << str
+				_elif t2 = "viewport" _orif
+				      t2 = "bounds"
+				_then
+					ll_c << _unset
+					ur_c << _unset 
+					_for k _over j.elements.fast_elements()
+					_loop
+						_if (t3 << k.type) = "southwest"
+						_then
+							ll_c << _self.int!parse_single_coordinate(k)
+						_elif t3 = "northeast"
+						_then
+							ur_c << _self.int!parse_single_coordinate(k)
+						_endif
+					_endloop
+					_if ll_c _isnt _unset _andif
+					    ur_c _isnt _unset
+					_then
+						res[t2.as_symbol()] << bounding_box.new(ll_c.x, ll_c.y, ur_c.x, ur_c.y)
+					_endif 
+				_endif
+			_endloop
+			
+		_elif t = "partial_match"
+		_then
+			res[:partial_match] << str
+		_endif
+	_endloop
+	
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_google_request.int!parse_single_coordinate(xml)
+	## 
+	## Parse a single long-lat coordinate from simple_xml_thing XML.
+	## 
+
+	lat << _unset
+	lng << _unset
+	
+	_for i _over xml.elements.fast_elements()
+	_loop
+		str << i.xml_contents.default("")
+		_if (t << i.type) = "lat"
+		_then
+			lat << str.as_number()
+		_elif t = "lng"
+		_then
+			lng << str.as_number()
+		_endif
+	_endloop
+
+	_if lat _isnt _unset _andif
+	    lng _isnt _unset
+	_then
+		_return coordinate.new(lng, lat)
+	_endif
+	
+_endmethod
+$

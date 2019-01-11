@@ -1,0 +1,10 @@
+<config base="explorer_plugin.explorer_model_config">
+  <plugins>
+
+    <plugin name="datasets_plugin"  class_name="mclib:explorer_model_auth_plugin">
+    </plugin>
+  </plugins>
+
+</config>
+
+

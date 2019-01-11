@@ -1,0 +1,2 @@
+layout_plugin.magik
+map_trail.magik

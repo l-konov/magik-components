@@ -1,0 +1,19 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-10 19:11:03 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 08-10-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+condition.define_condition(:kml_record_error,:warning,{:record,:condition},"Failed to export #1 due to #2")
+$

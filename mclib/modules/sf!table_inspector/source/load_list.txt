@@ -1,0 +1,5 @@
+tools/
+editor/
+components/
+sf!table_inspector_plugin
+message_usages

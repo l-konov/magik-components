@@ -1,0 +1,222 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+
+_pragma(classify_level=restricted)
+## Class which represents an XMI Foundation.Core.Class element
+def_slotted_exemplar(:uml_package,
+{
+   {:package, _unset},
+   {:owner, _unset},
+   {:generalizations, _unset},
+   {:classes, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=basic)
+## The owner of this package
+uml_package.define_slot_access(:owner, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## The magik package which self represents
+uml_package.define_slot_access(:package, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## The classes in this package
+uml_package.define_slot_access(:classes, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## the generalizations relationships in this package
+uml_package.define_slot_access(:generalizations, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_method uml_package.new(owner, package)
+   ## Creates a new XMI (empty) package
+   ##
+   ## name : string
+   ## package : package -- the package the new instance of self
+   ##   should represent.
+   ##
+   ## returns : uml_package
+   
+   _return _clone.init(owner, package)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_private _method uml_package.init(owner, package)
+   ## Inits self
+   ##
+   ## name : string
+   ## package : package -- the package the new instance of self
+   ##   should represent.
+   ##
+   ## returns uml_package -- self, but inited
+
+   _self.owner << owner
+   _self.package << package
+   _self.generalizations << rope.new()
+   _self.classes << hash_table.new()
+   
+   _return _self 
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_iter _method uml_package.owned_elements()
+   ## iterates of the elements this package owns
+   ## 
+
+   _for a_class _over _self.classes.fast_elements()
+   _loop
+      _loopbody(a_class)
+   _endloop
+
+   _for a_gen _over _self.generalizations.fast_elements()
+   _loop
+      _loopbody(a_gen)
+   _endloop
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method uml_package.number_of_classes_and_interfaces
+   ## returns : integer -- the number of classes and interfaces
+   ##   this package owns
+   ## 
+
+   _return _self.classes.size
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.model
+   ## Returns the xmi_model to which self belongs
+   ## 
+
+   _return _self.owner.model
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.name
+   ## returns : string -- the name of this package
+   ## 
+
+   _return _self.package.name
+   
+_endmethod
+$
+_pragma(classify_level=basic)
+_method uml_package.abstract? 
+   ## returns : boolean -- is this package abstract?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.private?
+   ## returns : boolean -- is this package private? 
+   ## 
+   
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.get_class(an_mt)
+   ## Get a particular uml_interface
+   ##
+   ## an_mt : method_table -- the method table which is
+   ##   represented by the uml_class you would like.
+   ##
+   ## returns : uml_class
+
+   _return _self.classes[an_mt]
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.include_class(an_mt, _optional levels_to_go)
+   ## Directive to include a class in this package
+   ##
+   ## an_mt : method_table -- the class to add to this package
+   ## levels_to_go : integer -- the number of levels to descend
+   ##   the inheritance tree before stoping.  Default: all
+   ##
+   ## returns : unset
+ 
+   _if _not _self.classes.includes_key?(an_mt)
+   _then
+      _if an_mt.for_mixin?
+      _then
+	 uc << uml_interface.new(_self, an_mt, levels_to_go)
+      _else
+	 uc << uml_class.new(_self, an_mt, levels_to_go)      
+      _endif
+      
+      _self.classes[an_mt] << uc
+   _endif
+
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.add_generalization(parent_xmi_class, child_xmi_class)
+   ## adds a generalization relationship to this package.
+   ##
+   ## parent_xmi_class : uml_interface -- the superclass
+   ## child_xmi_class : uml_interface -- the subclass
+   ##
+   ## returns : uml_generalization
+
+   _return _self.generalizations.add_last(uml_generalization.new(
+					     _self, 
+					     parent_xmi_class,
+					     child_xmi_class))
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_package.export_on(an_uml_output_stream)
+   ## export self
+   ## 
+
+   an_uml_output_stream.write_uml_package(_self)
+_endmethod
+$

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<template>
+      <files>
+        <file name="users">
+           <file_name>users.html</file_name>
+	   <stylesheet_name>auth_dump_users.xsl</stylesheet_name>
+         </file>
+	 <file name="groups">
+           <file_name>groups.html</file_name>
+	   <stylesheet_name>auth_dump_groups.xsl</stylesheet_name>
+         </file>
+	 <file name="rights">
+           <file_name>rights.html</file_name>
+	   <stylesheet_name>auth_dump_rights.xsl</stylesheet_name>
+         </file>
+	 <file name="metadata">
+           <file_name>report_metadata.html</file_name>
+	   <stylesheet_name>auth_dump_metadata.xsl</stylesheet_name>
+         </file>
+	 <file name="group">
+	   <stylesheet_name>auth_dump_group.xsl</stylesheet_name>
+	   <collection name="auth!group" prefix="group_" file_name_property="name"/>
+	 </file>
+       </files>
+       <collections>
+         <collection name="auth!alternative_group_access"/>
+         <collection name="auth!group_table_flist"/>
+         <collection name="auth!group_table"/>
+         <collection name="auth!alternative"/>
+         <collection name="auth!params"/>
+         <collection name="auth!group_right"/>
+         <collection name="auth!group">
+	   <fields>
+	     <field name="name"/>
+	     <field name="description"/>
+	     <field name="alternative_access_records"/>
+	     <field name="flists"/>
+	     <field name="rights"/>
+	     <field name="table_access_records"/>
+	     <field name="users"/>
+	   </fields>
+	 </collection>
+         <collection name="auth!user">
+	   <fields>
+	     <field name="name"/>
+	     <field name="fullname"/>
+	     <field name="refuser_name"/>
+	     <field name="status"/>
+	     <field name="bad_logins"/>
+	     <field name="password_time"/>
+	     <field name="groups"/>
+	     <field name="reference_user"/>
+	   </fields>
+	 </collection>
+         <collection name="auth!right">
+	   <fields>
+	     <field name="name"/>
+	     <field name="description"/>
+	     <field name="groups"/>
+	   </fields>
+	 </collection>
+       </collections>
+</template>

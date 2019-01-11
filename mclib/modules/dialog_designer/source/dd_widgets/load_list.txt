@@ -1,0 +1,21 @@
+dd_paned_window
+dd_group_box
+dd_radio_group
+dd_tab_box
+dd_window_stack   # MUST follow dd_tab_box
+dd_element
+dd_tabular_list
+dd_tree_list
+dd_open_file_dir
+dd_style_choice_item
+dd_plugin_item
+dd_date_time_item
+dd_outlook_bar
+dd_recordset_gui_component
+dd_number_input
+menubar_element
+statusbar_element
+statusbar_progress_element
+outlookbar_element
+toolbar_action_element
+toolbar_pulldown_element

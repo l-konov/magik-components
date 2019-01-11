@@ -1,0 +1,43 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_block
+	#
+	# If the code is loaded in a pre CST 4.0 image, load the
+	# patch for class component_framework, which allows to
+	# use package-prefixed class names in the class constant
+	# :component_installation_data.
+	#
+	_if sw:smallworld_product.sw!version.first < 4
+	_then
+		_dynamic !source_file! 
+
+		_local file, dir
+
+		( file, dir ) << sw:system.pathname_components( !source_file! )
+
+		file << system.pathname_from_components(
+				"code_from_cst40.magik", dir )
+		sw:load_file( file )
+	_endif
+_endblock
+$

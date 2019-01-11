@@ -1,0 +1,9 @@
+xmi_exportable
+uml_attribute
+uml_parameter
+uml_operation
+uml_generalization
+uml_interface
+uml_class
+uml_package
+uml_model

@@ -1,0 +1,165 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_insert_ptrule.prompt_dialog_class_name
+	## 
+	## Choose an appropriate dialog class depending on whether CUs
+	## are enabled.
+	## 
+
+	_if .manager _is _unset _orif
+	    .manager.enable_cus?
+	_then
+		_return :mss_cu_ptrule_attribute_dialog
+	_else
+		_return :mss_ptrule_attribute_dialog
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.init_cu_references(a_mss_ptdef)
+	## 
+	## Initialize CU references associated with the mss_ptdef
+	## record A_MSS_PTDEF.
+	##
+
+	_if .manager _isnt _unset _andif
+	    _not .manager.enable_cus?
+	_then
+		_return
+	_endif
+	
+	sc << sorted_collection.new(5, _proc(a, b)
+					       _return a.cu_code.default("") _cf
+						       b.cu_code.default("")
+				    _endproc)
+	_for i _over a_mss_ptdef.cu_references.fast_elements()
+	_loop
+		pl << property_list.new_with(
+			      :cu_code, i.cu_code,
+			      :operation, i.operation,
+			      :work_point_number, "",
+			      :quantity, i.quantity.default(1),
+			      :unit_multiplier, i.unit_multiplier)
+		cu_holder << mss_cu_holder.new(pl)
+		sc.add_all(cu_holder.expand_for_macro_units())
+	_endloop
+	.cu_references.empty()
+	.cu_references.add_all_last(sc)
+
+	# Set attribute values on the detached record appropriate to
+	# this CU.
+	_self.update_detached_rec_for_cu_references()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.maintain_cu_references(mode)
+	## 
+	## Attempt to set the work_point_number for all CUs based on
+	## MODE (either :release or :complete).
+	##
+
+	_if .manager _isnt _unset _andif
+	    _not .manager.enable_cus?
+	_then
+		_return
+	_endif
+	
+	_if _not _self.insert_enabled?(mode)
+	_then
+		_return
+	_endif
+
+	_if .cu_references _isnt _unset _andif
+	    .cu_references.size > 0 _andif
+	    (wp << _self.mss_cu_work_point_candidate(mode)) _isnt _unset
+	_then
+		attr_pl << property_list.new_with(:work_point_number,
+						  wp.work_point_number.default("").as_charvec())
+		_for i _over .cu_references.fast_elements()
+		_loop
+			i.update_attributes_from(attr_pl)
+		_endloop
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.update_detached_rec_for_cu_references()
+	## 
+	## Update the detached record based on the attributes defined
+	## in self's cu_references.
+	##
+
+	_if .manager _isnt _unset _andif
+	    _not .manager.enable_cus?
+	_then
+		_return
+	_endif
+	
+	_if .detached_record _is _unset
+	_then
+		_return
+	_endif
+
+	_for cu_holder _over .cu_references.fast_elements()
+	_loop
+		_if (cu_def << cu_holder.cu_definition) _is _unset
+		_then
+			_continue
+		_endif
+		_if (mu_holder << cu_holder.mu_parent) _isnt _unset _andif
+		    (mu_def << mu_holder.cu_definition) _isnt _unset
+		_then
+			mu_prop_vals << .detached_record.mss_proposed_values_for_cu_definition(mu_def, mu_holder.operation)
+			_for attr_name, attr_value _over mu_prop_vals.fast_keys_and_elements()
+			_loop
+				.detached_record.perform(attr_name.with_chevron, attr_value)
+			_endloop
+		_endif
+
+		cu_prop_vals << .detached_record.mss_proposed_values_for_cu_definition(cu_def, cu_holder.operation)
+		_for attr_name, attr_value _over cu_prop_vals.fast_keys_and_elements()
+		_loop
+			.detached_record.perform(attr_name.with_chevron, attr_value)
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.insert_cu_references()
+	##
+	## Create CU references for the current record.
+	##
+
+	_if .manager _isnt _unset _andif
+	    _not .manager.enable_cus?
+	_then
+		_return
+	_endif
+	
+	_if .current_record _is _unset _orif
+	    _not .current_record.is_valid?
+	_then
+		_return
+	_endif
+
+	mss_cu_engine.maintain_cus_for_record(.current_record, .cu_references,
+					      mss_cu_engine.active_design)
+	
+_endmethod
+$

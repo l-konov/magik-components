@@ -1,0 +1,302 @@
+_pragma(classify_level=basic, topic={rose})
+##
+## an editor to view and change the dump settings of a rr_dumper
+##
+def_slotted_exemplar(:rr_dumper_settings_menu,{{:items,_unset,:readable},
+                                               {:controller,_unset,:readable}},:model)
+$
+
+_method rr_dumper_settings_menu.new(an_rr_dumper)
+	## 
+	##
+
+	_return _clone.init(an_rr_dumper)
+	
+_endmethod
+$
+
+_method rr_dumper_settings_menu.init(an_rr_dumper)
+	## 
+	##
+
+	_super.init()
+
+	.items << hash_table.new()
+	.controller << an_rr_dumper
+	
+	_return _self 
+	
+_endmethod
+$
+
+rr_dumper_settings_menu.define_shared_constant(:field_types,
+		## define a hash table with all the settings keys and the
+		## corresponding type - if the list of settings gets updated in
+		## the rr_dumper class then this should be updated to correspond
+
+		hash_table.new_with(:make_load_lists? ,:boolean,
+				    :recursive? ,:boolean,
+				    :make_sub_dirs? ,:boolean,
+				    :make_pragmas? ,:boolean,
+				    :pragma_classify_level ,:string,
+				    :pragma_topic ,:vec,             #vector of strings
+				    :pragma_usage ,:vec,
+				    :file_header ,:rope,             #rope of strings
+				    :file_footer ,:rope,             #rope of strings
+				    :package,:string,
+				    :class_notice ,:rope,
+				    :method_notice ,:rope,
+				    :slot_access_mapping ,:hash,     #hash_table
+				    :shared_const_label ,:string,
+				    :shared_var_label ,:string,
+				    :include_class_stereos ,:set,    #equality_set of strings
+				    :show_param_types? ,:boolean),
+		_false)
+$
+
+_method rr_dumper_settings_menu.activate_in(a_frame)
+	## 
+	##
+
+	a_frame.title << "Dumper Settings"
+	
+	p << panel.new(a_frame)
+
+	num_rows << _self.field_types.size
+
+	rc << rowcol.new(p, num_rows, 2)
+
+	_self.setup_settings_display(rc)
+
+	p.start_row()
+
+	button_item.new_safe(p,"Ok",_self,:|do_ok()|)
+	button_item.new_safe(p,"Cancel",_self,:|do_cancel()|)
+			     
+_endmethod
+$
+
+_method rr_dumper_settings_menu.setup_settings_display(a_rc)
+	## 
+	## set up the display of the current settings in the rowcol
+	##
+
+	rowcount << 1
+	tw_cols << 40
+	tw_rows << 3
+	
+	_for i_key,i_val _over .controller.settings.keys_and_elements()
+	_loop
+		_if (i_type << _self.field_types[i_key]) _is _unset 
+		_then
+			#ignore unknown type
+			_continue 
+		_endif
+		
+		#create the label in the first col
+		l_string << i_key.write_string.substitute_character(%_,% ).capitalise
+		l << label_item.new(a_rc,l_string)
+		l.row << rowcount
+		l.col << 1
+
+
+		#create the value lister/setter and populate with the current value
+		_if i_type _is :string
+		_then
+			l_holder << .items[i_key] << text_item.new(a_rc,_unset)
+			l_holder.value << i_val
+
+		_elif i_type _is :vec _orif
+		      i_type _is :rope _orif
+		      i_type _is :set
+		_then
+			l_holder << .items[i_key] << text_window.new(a_rc,tw_rows,tw_cols)
+			l_holder.contents << _self.format_data_for_window(i_val)
+				
+
+		_elif i_type _is :boolean
+		_then
+			l_holder << .items[i_key] << toggle_item.new(a_rc,_unset)
+			l_holder.value << i_val
+
+		_elif i_type _is :hash
+		_then
+			#only show these settings for now
+			l_holder << .items[i_key] << text_window.new(a_rc,tw_rows,tw_cols)
+			l_holder.contents << _self.format_data_for_window(i_val,_true )
+			l_holder.editable? << _false 
+		_endif
+		
+		l_holder.row << rowcount
+		l_holder.col << 2
+		
+		rowcount +<< 1
+	_endloop
+_endmethod
+$
+
+_method rr_dumper_settings_menu.format_data_for_window(p_data, _optional show_keys?)
+	## 
+	## p_data is some sort of set/rope
+	##
+	## loops the elements of p_data and creates a string with
+	## newline_chars, optionally shows keys then a tab_char
+	##
+
+	str << ""
+	show_keys? << show_keys?.default(_false)
+
+	_if p_data _is _unset 
+	_then
+		_return str
+	_endif
+
+	first? << _true
+
+	_if p_data.responds_to?(:|fast_keys_and_elements()|)
+	_then
+		
+	
+		_for i,j _over p_data.fast_keys_and_elements()
+		_loop
+			_if _not first? 
+			_then
+				str +<< newline_char
+			_else
+				first? << _false 
+			_endif
+			
+			_if show_keys?
+			_then
+				str +<< i.write_string
+				str +<< tab_char
+			_endif
+			
+			str +<< j
+		_endloop
+	_else
+		_for j _over p_data.fast_elements()
+		_loop
+			_if _not first? 
+			_then
+				str +<< newline_char
+			_else
+				first? << _false 
+			_endif
+
+			str +<< j
+		_endloop
+	_endif 
+
+
+	_return str
+	
+_endmethod
+$
+
+_method rr_dumper_settings_menu.get_data_from_window(a_text_win,_optional a_format)
+	## 
+	## extract strings from the window's contents into the relevant format
+	## - each line is an element an object of the specified format
+	##
+	## a_format - :rope, :set (equality_set), :vec (default to rope
+	## if unknown)
+	##
+
+	l_con << a_text_win.value.trim_spaces()
+
+	_if l_con.empty?
+	_then
+		_return _unset 
+	_endif
+	
+	l_result << rope.new()
+	
+	l_nl_char << newline_char.write_string
+
+	_loop
+		_if (l_pos << l_con.index_of_seq(l_nl_char)) _is _unset 
+		_then
+			#last/only item
+			l_result.add(l_con)
+			_leave 
+		_endif
+
+		l_line << l_con.slice(1,l_pos - 1).trim_spaces()
+		l_con << l_con.slice_to_end(l_pos).trim_spaces()
+
+		l_result.add(l_line)
+	_endloop
+
+	_if a_format _is :vec
+	_then
+		l_result << l_result.as_simple_vector()
+
+	_elif  a_format _is :set
+	_then
+		l_result << equality_set.new_from(l_result)
+	_endif
+
+	_return l_result
+	
+_endmethod
+$
+
+
+_method rr_dumper_settings_menu.save_settings()
+	## 
+	## save the current settings from the interface into the
+	## settings slot of the controller
+
+	_for i_key _over .controller.settings.keys()
+	_loop
+		_if (i_type << _self.field_types[i_key]) _is _unset _orif
+		    (l_holder << .items[i_key]) _is _unset _orif
+		    i_type _is :hash
+		_then
+			#ignore unknown type or non-existent value setter
+			# NB also does not update HASH types at present
+			_continue 
+		_endif
+
+		_if l_holder.is_kind_of?(text_window)
+		_then 
+			l_val << _self.get_data_from_window(l_holder,i_type)
+
+		_elif i_type _is :string
+		_then
+			_if (l_val << l_holder.value).empty?
+			_then
+				l_val << _unset 
+			_endif
+			
+		_else
+			l_val << l_holder.value
+		_endif
+
+		.controller.set(i_key, l_val)
+		
+	_endloop 
+	
+_endmethod
+$
+
+_method rr_dumper_settings_menu.do_ok()
+	## 
+	## method for the ok button
+	
+	_self.save_settings()
+
+	_self.quit()
+_endmethod
+$
+
+
+_method rr_dumper_settings_menu.do_cancel()
+	## 
+	## method for the cancel button
+
+	_self.quit()
+	
+_endmethod
+$

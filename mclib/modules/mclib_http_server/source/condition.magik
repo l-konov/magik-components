@@ -1,0 +1,19 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-07-12 21:37:03 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-12-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+condition.define_condition(:mclib_http_requires_restart,:warning,{:name},"Changing #1 requires a server retsart to take effect")
+$

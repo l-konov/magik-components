@@ -1,0 +1,34 @@
+#% text_encoding = iso8859_1
+_package sw
+
+
+_pragma(classify_level=restricted)
+_method	text.write_as_json(a_stream, _gather field_names)
+	##
+	##
+	s << a_stream
+	s.write(%{)
+	field_names << {:coord_1,
+			:coord_2,
+			:orientation,
+			:just,
+			:string_buffer}
+			
+	first? << _true 
+	_for name _over field_names.fast_elements()
+	_loop
+		
+		_if ~first?
+		_then s.write(%,)
+		_else first? << _false
+		_endif
+				
+		_local value << _self.perform(name)
+		
+		s.write(%", name.write_string, %", %:)
+		value.write_as_json(a_stream)
+	_endloop
+	s.write(%})
+_endmethod
+$
+	

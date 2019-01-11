@@ -1,0 +1,10 @@
+mclib_explorer_models	4000
+
+description
+	Additional explorer modelers
+end
+
+
+requires
+	explorer_plugin
+end

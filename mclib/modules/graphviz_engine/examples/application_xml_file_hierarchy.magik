@@ -1,0 +1,641 @@
+_package sw
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method smallworld_product.graphviz_application_def_xml_file_hierarchy(output_format,output_directory,_optional filter_type,xml_file_name)
+	## 
+	## smallworld_product.graphviz_application_def_xml_file_hierarchy("png","C:\temp\xml_hierarchy_graphs",:dot)
+
+	_local file_root_name
+	_local module_name_list << equality_set.new()
+	_local file_to_module_lut << equality_hash_table.new()
+	_local module_file_list
+	
+	_for app_def _over _self.application_definitions.fast_elements()
+	_loop
+		module_name_list.add(app_def.resource_module_name)
+	_endloop
+
+	_for prod _over _self.customisation_products.fast_elements()
+	#_for prod _over _self.products.fast_elements()
+	_loop
+		_for a_module _over prod.defined_modules.fast_elements()
+		_loop
+			module_name_list.add(a_module.name)
+		_endloop
+	_endloop 		
+
+	_for module_name _over module_name_list.fast_elements()
+	_loop 
+		_local files
+
+		_try _with cond 
+			files << sw_module_manager.module(module_name).resource_files(:data)
+			
+		_when error
+			write(cond.report_string)
+			write("module name: ",module_name)
+			_continue 
+		_endtry 
+
+		_for a_file _over files.fast_elements()
+		_loop
+			_if a_file.matches?("*.xml") _andif
+			    _not a_file.includes?(space_char) _andif
+			    (xml_file_name _is _unset _orif
+			     a_file.canonical.matches?(xml_file_name.canonical))
+			_then
+				file_root_name << a_file.split_by(%.).first
+				_if (file_module_list << file_to_module_lut[file_root_name]) _is _unset 
+				_then
+					file_module_list << file_to_module_lut[file_root_name] << equality_set.new()
+				_endif
+
+				file_module_list.add(module_name)
+			_endif
+		_endloop
+	_endloop 
+
+	_local output_filenames << rope.new()
+	
+	_for a_xml_file , i_module_name_list _over file_to_module_lut.fast_keys_and_elements()
+	_loop
+		_local full_xml_file_name , a_framework_config , framework_node_tooltip , framework_node_id
+		_local framework_configs << equality_hash_table.new()
+
+		_for i_module_name _over i_module_name_list.fast_elements()
+		_loop
+			_try _with cond	
+				full_xml_file_name << smallworld_product.get_data_file(write_string(a_xml_file,".xml"),i_module_name)
+				a_framework_config << framework_configuration.new_from_file(full_xml_file_name)
+							
+			_when resource_not_found_in_module_error
+				_continue
+				
+			_when xml_parser_error
+				write(cond.report_string)
+				write(full_xml_file_name)
+			_endtry
+			
+write(%:,i_module_name,%space,full_xml_file_name)
+			framework_node_tooltip << full_xml_file_name
+			framework_node_id      << write_string(i_module_name,".",a_xml_file)
+
+			framework_configs[framework_node_id] << {a_framework_config,framework_node_tooltip,a_xml_file}
+		_endloop
+
+		_local output_filename << system.pathname_down(output_directory,write_string(a_xml_file,"_xml.",output_format))
+		output_filename << _self.graphviz_xml_file_hierarchy(framework_configs,output_format,output_filename,filter_type)
+		output_filenames.add_last(output_filename)
+	_endloop
+	
+	# once we have created all the individual files, then create a
+	# summary SVG file.
+	_global dg
+	dg << dot_graph.new("XMLFileHierarchySummary")
+	
+	_local fs
+	_local nodes_info << equality_hash_table.new()
+	_local node_info
+	_local min_size << bignum
+	_local max_size << 0
+	
+	_for i_filename _over output_filenames.fast_elements()
+	_loop
+		node_info << property_list.new()
+		node_info[:id] << system.pathname_components(i_filename).split_by(%+).last.split_by(%.).first
+		_local idx << node_info[:id].rindex_of_seq("_xml")
+		node_info[:id] << node_info[:id].slice(1,idx-1)
+		node_info[:filesize] << file_status.new(i_filename).size
+		node_info[:filename] << i_filename
+
+		nodes_info[node_info[:id]] << node_info
+
+		min_size << node_info[:filesize].min(min_size)
+		max_size << node_info[:filesize].max(max_size)
+	_endloop
+
+	_local a_node
+	_local max_columns << 5 #nodes_info.size.sqrt.truncated + 1
+	_local rank_group << rope.new()
+	_local column_count << 0
+	_local previous_id << _unset
+
+	_local node_size << _proc@node_size(filesize)
+				    _local min_node_size << 1.5
+				    _local max_node_size << 4.0
+
+				    _import min_size , max_size
+
+				    >> ((filesize - min_size)*(max_node_size - min_node_size)/(max_size-min_size)) + min_node_size
+			    _endproc
+
+	_local sorted_names << sorted_collection.new()
+
+	_for i _over nodes_info.fast_elements()
+	_loop
+		sorted_names.add(i[:id])
+	_endloop
+
+	_local rowcount << 1
+	_local subgraph << dg.create_subgraph(rowcount.write_string)
+	subgraph.set_attribute(:rank,"same")
+	subgraph.create_node(rowcount).set_attribute(:shape,"none").set_attribute(:label,'""')
+	
+	_for id _over sorted_names.fast_elements()
+	_loop
+		_local i << nodes_info[id]
+		column_count +<< 1
+
+		a_node << subgraph.create_node(i[:id])
+		a_node.set_attribute(:label,i[:id])
+		a_node.set_attribute("URL",write_string("file:///",i[:filename]))
+		a_node.set_attribute(:shape,"circle")
+		a_node.set_attribute(:height,node_size(i[:filesize]).write_string)
+		a_node.set_attribute(:fixedsize,"true")
+		a_node.set_attribute(:fontsize,"8")
+
+		_if i[:filename].canonical.index_of_seq("++SOMETHING_WORTH_LOOKING_AT++".canonical) _isnt _unset 
+		_then
+			a_node.set_attribute(:style,"filled")
+			a_node.set_attribute(:color,"pink")
+		_endif 
+		
+		_if column_count >= max_columns
+		_then
+			column_count << 0
+			rowcount +<< 1
+			subgraph << dg.create_subgraph(rowcount.write_string)
+			subgraph.set_attribute(:rank,"same")
+			subgraph.create_node(rowcount).set_attribute(:shape,"none").set_attribute(:label,'""')
+			dg.create_edge({rowcount-1,rowcount}).set_attribute(:color,"white")
+		_endif
+	_endloop
+
+	_local summary_filename << system.pathname_down(output_directory,"summary.svg")
+	graphviz_filter.run(:dot,dg,"svg",summary_filename)
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method smallworld_product.graphviz_xml_file_hierarchy(framework_configs,output_format,output_filename,_optional filter_type)
+	## 
+	
+	_global dg
+
+	dg << dot_graph.new("XMLFileHierarchy")
+
+	_local module_name
+	_local full_xml_file_name
+	_local a_framework_config , base_framework_config
+	_local framework_node_tooltip , framework_node_id
+	_local base , base_framework_node_tooltip , base_framework_node_id
+	_local plugin_node_label , plugin_node_id
+	_local a_node , an_edge
+	_local framework_type
+
+	# we would like to color-code those XML elements that are part
+	# superseding the same-named XML element from a parent XML
+	# file.  To do that, we have to first take a pass at all the
+	# framework_configs and their child defs to group by checksum.
+	_local checksums << equality_bag.new()
+	_local supersede_types << bag.new()
+	
+	_local cell_styles << property_list.new_with(:none,
+						     property_list.new(),
+
+						     :material_difference,
+						     property_list.new_with(
+							     :border,"5",
+							     :bgcolor,"green"),
+
+						     :unnecessary,
+						     property_list.new_with(
+							     :border,"5",
+							     :bgcolor,"red"),
+
+						     :material_difference_with_duplicate,
+						     property_list.new_with(
+							     :border,"5",
+							     :bgcolor,"yellow"))
+	
+	_dynamic !current_package!
+
+	# use this internal stream to write simple_xml_thing to a
+	# string. 
+	_local int_str << internal_text_output_stream.new()
+
+
+	# create a legend element
+	_local legend_node
+	_block
+		_local table , tr , td
+		
+		table << simple_xml_thing.new("table")
+		table.attributes[:border] << "0"
+		table.attributes[:cellborder] << "0"
+		table.attributes[:cellspacing] << "0"
+		table.attributes[:cellpadding] << "1"
+		table.elements.add_last(tr << simple_xml_thing.new("tr"))
+		tr.elements.add_last(td << simple_xml_thing.new("td"))
+		td.elements.add_last("Legend")
+
+		table.elements.add_last(tr << simple_xml_thing.new("tr"))
+		tr.elements.add_last(td << simple_xml_thing.new("td"))
+		td.elements.add_last("Superseded Element with no material change. May be removed")
+		td.attributes.add_all(cell_styles[:unnecessary])
+
+		table.elements.add_last(tr << simple_xml_thing.new("tr"))
+		tr.elements.add_last(td << simple_xml_thing.new("td"))
+		td.elements.add_last("Superseded Element with duplicate material changes.  Check to see if it can be superclassed.")
+		td.attributes.add_all(cell_styles[:material_difference_with_duplicate])
+
+		table.elements.add_last(tr << simple_xml_thing.new("tr"))
+		tr.elements.add_last(td << simple_xml_thing.new("td"))
+		td.elements.add_last("Superseded Element with material change.  Should be kept.")
+		td.attributes.add_all(cell_styles[:material_difference])
+
+
+		int_str.reset()
+		
+		simple_xml.write_element_on(int_str,table)
+		
+		legend_node << dg.create_node("legend")
+		_local html_string << int_str.string
+		_local idx << html_string.index_of(%>)
+		legend_node.set_attribute(:label,write_string(%<,html_string.slice_to_end(idx+1),%>))
+		legend_node.set_attribute(:shape,"none")
+
+	_endblock
+	
+	# use the Magik object inheritance model to model XML element
+	# inheritance, etc.  We use def_mixin() instead of
+	# def_slotted_exemplar() because mixins are easier to parent to
+	# other mixins after the fact.
+	_local top_level_helper_mixin << def_mixin(:graphviz_top_level_helper_mixin)
+	_local fc_node_mixin , base_fc_node_mixin
+	
+	_protect
+		
+		# make sure we find each unique reference to a
+		# framework_configuration.  Because multiple applications XML
+		# files might inherit from as single base configuration file,
+		# we need to do this first step to find single unique instances
+		# of each.
+		_loop
+			# keeps scanning over the framework_configs and asking each for
+			# a .base.  At some point we will reach an iteration where
+			# framework_configs does not increase in size and at that point
+			# we leave the outside loop.  This might not be the most
+			# efficient, but I cannot find a method like :all_bases() which
+			# would recursively return all parent bases.
+
+			_local pre_scan_count << framework_configs.size
+
+			# need to do a .copy() here so that we don't get strange
+			# results because we are actually adding now keys/elements to
+			# framework_configs. 
+			_for fc_node_id , fc_info _over framework_configs.copy().fast_keys_and_elements()
+			_loop
+				(a_framework_config,framework_node_tooltip,framework_type) << (_scatter fc_info)
+				
+				_if (base << a_framework_config.attributes[:base]) _isnt _unset
+				_then
+					(module_name,a_xml_file) << (_scatter base.split_by(%.))
+					_if a_xml_file = "xml"
+					_then
+						# this might happen, if the referenced file is in the same
+						# module
+						a_xml_file << module_name
+						module_name << fc_node_id.split_by(%.).first
+					_endif 
+					_try _with cond	
+						full_xml_file_name << smallworld_product.get_data_file(write_string(a_xml_file,".xml"),module_name)
+					_when resource_not_found_in_module_error
+						write(cond.report_string)
+						_continue
+					_endtry 
+
+					base_framework_config << framework_configuration.new_from_file(full_xml_file_name)
+					
+					base_framework_node_tooltip << full_xml_file_name
+					base_framework_node_id      << write_string(module_name,".",a_xml_file)
+					
+					framework_configs[base_framework_node_id] << {base_framework_config,base_framework_node_tooltip,a_xml_file}
+				_endif 
+			_endloop
+
+			_if framework_configs.size = pre_scan_count
+			_then
+				_leave 
+			_endif
+		_endloop
+
+		_for fc_node_id , fc_info _over framework_configs.fast_keys_and_elements()
+		_loop
+			(a_framework_config) << (_scatter fc_info)
+
+			_local defs << rope.new_from_iter(a_framework_config,:local_plugin_definitions|()|)
+
+			_local label_proc
+			
+			_if _not defs.empty?
+			_then
+				# if we have actual plugin definitions, then we treat this as a
+				# "config" type configuration and report plugins.
+				label_proc << _proc(a)
+						      _local class_name
+						      _local name << a.attributes[:name]
+
+						      >> _if (class_name << a.attributes[:class_name]) _isnt _unset
+							 _then
+								 >> write_string(name," (",class_name,")")
+							 _else
+								 >> name
+							 _endif 
+					      _endproc
+
+			_else
+				# if we do not have any plugin definitions, then treat it like
+				# a "gui" type configuration and report XML elements.
+				defs << a_framework_config.xml_elements
+
+				label_proc << _proc(a)
+						      >> _if a.attributes[:name] _isnt _unset
+							 _then
+								 >> write_string(a.type," (",a.attributes[:name],")")
+							 _elif a.attributes[:collection_name] _isnt _unset
+							 _then 
+								 >> write_string(a.type," (",a.attributes[:collection_name],")")
+							 _else
+								 >> write_string(a.type)
+							 _endif
+					      _endproc 
+			_endif
+
+			_if (fc_node_mixin << !current_package![fc_node_id.as_symbol()]) _is _unset
+			_then 
+				fc_node_mixin << def_mixin(fc_node_id.as_symbol())
+			_endif 
+
+			
+			_for a_def _over defs.fast_elements()
+			_loop
+				_local a_checksum
+
+				_try _with cond
+					a_checksum << a_def.checksum
+				_when error
+					write(cond.report_string)
+					_continue 
+				_endtry 
+					
+				checksums.add(a_checksum)
+
+				_local fc_node_mixin_method_name << label_proc(a_def).as_symbol()
+				fc_node_mixin.define_method(fc_node_mixin_method_name,
+							    _proc()
+								    _import a_checksum
+								    >> a_checksum
+							    _endproc,
+							    _false)
+			_endloop
+		_endloop 
+
+		
+		# now make suitable edges between each framework_configuration
+		# and its base (if it exists) and all of its local
+		# plugin_configuration children.
+		_for fc_node_id , fc_info _over framework_configs.fast_keys_and_elements()
+		_loop
+			(a_framework_config,framework_node_tooltip,framework_type) << (_scatter fc_info)
+
+			# get the mixin class that represents FC_NODE_ID.
+			fc_node_mixin << !current_package![fc_node_id.as_symbol()]
+
+			_if (base << a_framework_config.attributes[:base]) _isnt _unset
+			_then
+				(module_name,a_xml_file) << (_scatter base.split_by(%.))
+
+				base_framework_node_id << write_string(module_name,".",a_xml_file)
+
+				# using the mixin hierarchy allows us to set up inheritances
+				# and we can use that to our advantage later to ask about
+				# whether or not a particular XML element is unnecessarily
+				# superseding another element (ie they have the same
+				# contents). 
+				base_fc_node_mixin << !current_package![base_framework_node_id.as_symbol()]
+				_if base_fc_node_mixin _is _unset _then
+					base_fc_node_mixin << def_mixin(base_framework_node_id.as_symbol())
+				_endif 
+				base_fc_node_mixin.add_child(fc_node_mixin)
+				
+				an_edge << dg.create_edge({base_framework_node_id,fc_node_id})
+			_else
+				an_edge << dg.create_edge({legend_node.id,fc_node_id})
+				an_edge.set_attribute(:color,"white")
+			_endif 
+
+			
+			_local defs << rope.new_from_iter(a_framework_config,:local_plugin_definitions|()|)
+			_local label_proc
+			
+			_if _not defs.empty?
+			_then
+				# if we have actual plugin definitions, then we treat this as a
+				# "config" type configuration and report plugins.
+				label_proc << _proc(a)
+						      _local class_name
+						      _local name << a.attributes[:name]
+
+						      >> _if (class_name << a.attributes[:class_name]) _isnt _unset
+							 _then
+								 >> write_string(name," (",class_name,")")
+							 _else
+								 >> name
+							 _endif 
+					      _endproc
+
+			_else
+				# if we do not have any plugin definitions, then treat it like
+				# a "gui" type configuration and report XML elements.
+				defs << a_framework_config.xml_elements
+
+				label_proc << _proc(a)
+						      >> _if a.attributes[:name] _isnt _unset
+							 _then
+								 >> write_string(a.type," (",a.attributes[:name],")")
+							 _elif a.attributes[:collection_name] _isnt _unset
+							 _then 
+								 >> write_string(a.type," (",a.attributes[:collection_name],")")
+							 _else
+								 >> write_string(a.type)
+							 _endif
+					      _endproc 
+			_endif
+
+
+			_local width << (defs.size.sqrt / 2.0).truncated.max(1)
+
+			_local sc << sorted_collection.new(_unset,
+							   _proc(a,b)
+								   _import label_proc
+								   
+								   >> label_proc(a) _cf label_proc(b)
+							   _endproc)
+
+			_for a_def _over defs.fast_elements()
+			_loop
+				# tried to use sorted_collection.new_from() but this caused
+				# problems when we had a corrupt XML file.
+				_if a_def.is_kind_of?(simple_xml_thing)
+				_then
+					sc.add(a_def)
+				_endif
+			_endloop
+
+			defs << sc
+			
+			_local previous_node_id << fc_node_id
+
+			_local table , tr , td , a_font
+
+			table << simple_xml_thing.new("table")
+			table.attributes[:border] << "0"
+			table.attributes[:cellborder] << "1"
+			table.attributes[:cellspacing] << "0"
+			table.attributes[:cellpadding] << "1"
+			table.elements.add_last(tr << simple_xml_thing.new("tr"))
+			tr.elements.add_last(td << simple_xml_thing.new("td"))
+			td.attributes[:colspan] << width.max(1)
+			td.attributes[:bgcolor] << "black"
+			td.elements.add_last(a_font << simple_xml_thing.new("font"))
+			a_font.elements.add_last(fc_node_id)
+			a_font.attributes[:color] << "white"
+			
+			table.elements.add_last(tr << simple_xml_thing.new("tr"))
+			tr.elements.add_last(td << simple_xml_thing.new("td"))
+			td.attributes[:colspan] << width.max(1)
+			td.elements.add_last(framework_node_tooltip)
+			td.attributes[:bgcolor] << "lightgray"
+
+
+			_for count , x _over defs.fast_keys_and_elements()
+			_loop
+				_local fc_node_mixin_method_name << label_proc(x).as_symbol()
+
+				# declare this as local so that the _import in the
+				# define_method() below will not get confused about which
+				# A_CHECKSUM to use.
+				_local local_method << !current_package![fc_node_id.as_symbol()].method(fc_node_mixin_method_name)
+				_local local_checksum << _unset 
+
+				_if local_method _isnt _unset
+				_then
+					local_checksum << local_method.value.invoke()
+				_endif 
+
+				# temporarily remove the local method definition so that we can
+				# get the inherited checksum value (if it exists)
+				!current_package![fc_node_id.as_symbol()].remove_method(fc_node_mixin_method_name)
+				_local inherited_method << !current_package![fc_node_id.as_symbol()].method(fc_node_mixin_method_name)
+				_local inherited_checksum << _unset
+
+				_if inherited_method _isnt _unset 
+				_then
+					inherited_checksum << inherited_method.value.invoke()
+				_endif
+
+				# now that we have both the local_checksum and the
+				# inherited_checksum, we can redefine the method we removed to
+				# make sure that it is available for future inheritance
+				# checks. 
+				fc_node_mixin.define_method(fc_node_mixin_method_name,
+							    _proc()
+								    _import local_checksum
+								    >> local_checksum
+							    _endproc,
+							    _false)
+
+				# now that we have all the parent/child checksums sorted out,
+				# we can do some logic to figure out how to color this cell.
+				_local supersede_type << :none
+				
+				_if inherited_checksum _isnt _unset _andif
+				    local_checksum _isnt _unset 
+				_then 
+					_if inherited_checksum = local_checksum
+					_then
+						# supersedes unnecessarily
+						supersede_type << :unnecessary
+					_else
+						_if checksums.occurrences_of(local_checksum) > 1
+						_then
+							# supersedes with a material difference AND there is another
+							# duplicate of this element somewhere else in the diagram.
+							# This is a good candidate for superclassing.
+							supersede_type << :material_difference_with_duplicate
+						_else 
+							# supersedes with a material difference
+							supersede_type << :material_difference
+						_endif
+					_endif
+				_endif
+
+				supersede_types.add(supersede_type)
+				
+				_if ((count-1) _mod width) _is 0
+				_then
+					# start a new row
+					table.elements.add_last(tr << simple_xml_thing.new("tr"))
+				_endif
+
+				tr.elements.add_last(td << simple_xml_thing.new("td"))
+
+				td.elements.add_last(label_proc(x))
+
+				td.attributes.add_all(cell_styles[supersede_type].default({}))
+
+			_endloop
+			
+			int_str.reset()
+
+			simple_xml.write_element_on(int_str,table)
+
+			a_node << dg.create_node(fc_node_id)
+			_local html_string << int_str.string
+			_local idx << html_string.index_of(%>)
+			a_node.set_attribute(:label,write_string(%<,html_string.slice_to_end(idx+1),%>))
+			a_node.set_attribute("URL",write_string("file:///",framework_node_tooltip))
+			a_node.set_attribute(:shape,"none")
+
+		_endloop 
+	_protection
+		remove_mixin(top_level_helper_mixin.name,_true)
+	_endprotect
+
+	_local something_worth_looking_at? << _false 
+	_for e,o _over supersede_types.elements_and_occurrences()
+	_loop
+		_if e _isnt :none
+		_then
+			# if there is something interesting in this file, then we want
+			# to flag the filename with "+++" so that we can identify it
+			# quickly in a list. 
+			something_worth_looking_at? << _true
+			_continue 
+		_endif
+	_endloop
+
+	_if something_worth_looking_at?
+	_then
+		_local (filepart,dirpart) << system.pathname_components(output_filename)
+		filepart << write_string("++SOMETHING_WORTH_LOOKING_AT++",filepart)
+		output_filename << system.pathname_down(dirpart,filepart)
+	_endif
+	# then continuously loop to find parent/child relationships. 
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+
+	_return output_filename
+	#system.do_command(write_string("START ",output_filename))
+_endmethod
+$

@@ -1,0 +1,14 @@
+#% text_encoding = iso8859_1
+_package sw
+
+_global !json_max_collection_query_depth! << _unset 
+$
+
+_global !json_max_records! << _unset 
+$
+
+_global !json_passed_collection_set! << _unset 
+$
+
+_global !json_current_collection_query_depth! << _unset 
+$

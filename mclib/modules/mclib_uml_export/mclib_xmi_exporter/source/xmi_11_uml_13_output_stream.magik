@@ -1,0 +1,674 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+
+_pragma(classify_level=advanced)
+## Stream for outputing XMI
+def_slotted_exemplar(:xmi_11_uml_13_output_stream,
+{
+   {:model_ids, _unset},
+   {:class_ids, _unset},
+   {:lcd_names?, _false}
+},
+{@sw:xml_output_stream})
+$
+
+_pragma(classify_level=advanced)
+xmi_11_uml_13_output_stream.define_slot_access(:model_ids, :write, :private)
+$
+
+_pragma(classify_level=advanced)
+xmi_11_uml_13_output_stream.define_slot_access(:class_ids, :write, :private)
+$
+
+_pragma(classify_level=advanced)
+xmi_11_uml_13_output_stream.define_slot_access(:lcd_names?, :write, :readonly)
+$
+
+_pragma(classify_level=restricted)
+_method xmi_11_uml_13_output_stream.init(a_stream, _gather keys_and_args)
+   ## 
+   ## 
+
+   _self.model_ids << stack.new()
+   _self.class_ids << hash_table.new()
+
+   _super.init(a_stream, _scatter keys_and_args)
+
+   _self.set_properties(_scatter keys_and_args)
+
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method xmi_11_uml_13_output_stream.set_properties(
+		    _gather keys_and_args)
+   ##  Override default properties for the stream.
+   ## 
+   ##  Legitimate values for KEYS_AND_ARGS comprise:
+   ## 
+   ##    :acp, xml_output_acp
+   ##      - specifies an acp instance to use. If not specified,
+   ##        the exemplar acp will be used.
+   ## 
+   ##    :max_elements, n
+   ##      - the maximum number of elements to cache before
+   ##        automatically flushing. The default is unset, which
+   ##        means never auto flush. This setting is ignored unless
+   ##        the :stream parameter is also supplied.
+   ## 
+   ##    :minimise_whitespace?, _true/_false
+   ##      - if _true (default _false) then no indentation
+   ##        whitespace is output. Note that it is not possible to
+   ##        suppress newlines, because much software behaves badly
+   ##        when given a massive lump of text with no line
+   ##        breaks.
+   ##
+   ##    :lcd_names?, _true/_false
+   ##      - if _true (default _false) then names which include
+   ##        characters not allowed in names by most languages
+   ##        will be mangled.  This allows the output to be read
+   ##        into tools which inforce languages specific naming
+   ##        rules.  
+   ## 
+
+   _local props << property_list.new_from_gathered(keys_and_args)
+
+   _if props.includes_key?(:lcd_names?)
+   _then
+      _self.lcd_names? << props[:lcd_names?]
+   _endif
+
+   _return _super.set_properties(_scatter props)
+
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.start_xmi_doc(exporter, version,
+					_optional metamode_name,
+					metamode_ver)
+   ## Write the header part of the XMI document and prepare for
+   ## content 
+   ##
+   ## exporter : string -- the name of the export tool
+   ## version : string -- the version of the export tool
+   ## metamodel_name : string -- which XMI metamodel to use.
+   ##   Default: UML
+   ## metamodel_ver : strin g -- which version of the XMI
+   ##   metamodel to use. Default: 1.3
+   ##
+   ## returns : unset
+
+   metamodel_name << metamodel_name.default("UML")
+   metamodel_ver << metamodel_ver.default("1.3")
+
+   _self.write_external_doctype_ref("XMI",
+				    system.pathname_down(
+				       sw_module_manager.module(_self.module_name).
+					  resource_list[:base],
+				       "uml13.dtd"))
+   
+   _self.start_element("XMI", "xmi.version", "1.0")
+   _self.start_element("XMI.header")
+   _self.start_element("XMI.documentation")
+   _self.write_element("XMI.exporter", exporter)
+   _self.write_element("XMI.exporterVersion", version)
+   _self.end_element()
+
+   _self.write_empty_element("XMI.metamodel", "xmi.name", metamodel_name,
+				    "xmi.version", metamodel_ver)
+   _self.end_element()
+
+   _self.start_element("XMI.content")
+
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.end_xmi_doc()
+   ## Ends the XMI document
+   ## 
+
+   _self.end_element("XMI.content")
+   _self.end_element("XMI")
+   _self.close()
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_model(an_xmi_model)
+   ## exports a uml model.
+   ## 
+
+   _self.start_element("Model_Management.Model",
+			       "xmi.id", an_xmi_model.xmi_id)
+   _self.write_element("Foundation.Core.ModelElement.name",
+			       an_xmi_model.name)
+
+   _self.start_element("Foundation.Core.Namespace.ownedElement")
+
+   _for an_owned_element _over an_xmi_model.owned_elements()
+   _loop
+      an_owned_element.export_on(_self)
+   _endloop
+   _self.end_element()
+
+   _self.end_element()
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_package(an_xmi_package)
+   ## exports a uml package
+   ## 
+
+   _self.start_element("Model_Management.Package", "xmi.id",
+		       an_xmi_package.xmi_id)
+   _self.write_name(an_xmi_package.name)
+   _self.write_visibility(an_xmi_package.private?)
+
+   _self.write_is_abstract(an_xmi_package.abstract?)
+
+   _self.write_namespace(an_xmi_package.owner)
+
+   _self.start_element("Foundation.Core.Namespace.ownedElement")
+   _for an_owned_element _over an_xmi_package.owned_elements()
+   _loop
+
+      an_owned_element.export_on(_self)
+   _endloop
+   _self.end_element()
+   
+   _self.end_element()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_class(an_xmi_class) 
+   ## exports a uml class
+   ## 
+
+   _self.start_element("Foundation.Core.Class", "xmi.id", an_xmi_class.xmi_id)
+   _self.write_name(an_xmi_class.name)
+   _self.write_visibility(an_xmi_class.private?)
+
+   _self.write_is_specification(_false)
+   _self.write_is_root(_false)
+   _self.write_is_leaf(_false)
+
+   _self.write_is_abstract(an_xmi_class.abstract?)
+
+   _self.write_is_active(_false)
+
+
+   _self.write_namespace(an_xmi_class.owner)
+
+   _for a_gen _over an_xmi_class.generalizations.fast_elements()
+   _loop
+      _self.start_element(
+	 "Foundation.Core.GeneralizableElement.generalization")
+      _self.write_empty_element("Foundation.Core.Generalization",
+				"xmi.idref", a_gen.xmi_id)
+      _self.end_element()
+         
+   _endloop
+
+   _for a_spec _over an_xmi_class.specializations.fast_elements()
+   _loop
+      _self.start_element(
+	 "Foundation.Core.GeneralizableElement.specialization")
+      _self.write_empty_element("Foundation.Core.Generalization",
+				"xmi.idref", a_spec.xmi_id)
+      _self.end_element()
+         
+   _endloop
+
+   
+   _self.start_element("Foundation.Core.Classifier.feature")
+   _for an_xmi_feature _over an_xmi_class.features()
+   _loop
+      an_xmi_feature.export_on(_self)
+   _endloop
+   _self.end_element()
+
+   _self.end_element()
+
+   _self.changed(:class_exported, an_xmi_class.name)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_interface(a_uml_interface) 
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.Interface", "xmi.id",
+		       a_uml_interface.xmi_id)
+   _self.write_name(a_uml_interface.name)
+   _self.write_visibility(a_uml_interface.private?)
+
+   _self.write_is_specification(_false)
+   _self.write_is_root(_false)
+   _self.write_is_leaf(_false)
+
+   _self.write_is_abstract(a_uml_interface.abstract?)
+
+   _self.write_namespace(a_uml_interface.owner)
+
+   _for a_gen _over a_uml_interface.generalizations.fast_elements()
+   _loop
+      _self.start_element(
+	 "Foundation.Core.GeneralizableElement.generalization")
+      _self.write_empty_element("Foundation.Core.Generalization",
+				"xmi.idref", a_gen.xmi_id)
+      _self.end_element()
+         
+   _endloop
+
+   _for a_spec _over a_uml_interface.specializations.fast_elements()
+   _loop
+      _self.start_element(
+	 "Foundation.Core.GeneralizableElement.specialization")
+      _self.write_empty_element("Foundation.Core.Generalization",
+				"xmi.idref", a_spec.xmi_id)
+      _self.end_element()
+         
+   _endloop
+
+   
+   _self.start_element("Foundation.Core.Classifier.feature")
+   _for a_uml_feature _over a_uml_interface.features()
+   _loop
+      a_uml_feature.export_on(_self)
+   _endloop
+   _self.end_element()
+
+   _self.end_element()
+
+   _self.changed(:interface_exported, a_uml_interface.name)
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_attribute(an_xmi_attribute)
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.Attribute", "xmi.id",
+		       an_xmi_attribute.xmi_id)
+   _self.write_name(an_xmi_attribute.name)
+   #_self.write_generalizable_element_is_abstract(an_xmi_attribute.abstract?)
+   _self.write_visibility(an_xmi_attribute.private?)      
+
+   _self.write_is_specification(_false)
+   _self.write_owner_scope(:classifier)
+
+   _self.write_multiplicity(1, 1)
+   _self.write_empty_element("Foundation.Core.StructuralFeature.changeability",
+			     "xmi.value", "changeable")
+   _self.write_empty_element("Foundation.Core.StructuralFeature.targetScope",
+			     "xmi.value", an_xmi_attribute.scope)
+
+
+   _self.start_element("Foundation.Core.Attribute.initialValue")
+   _self.start_element("Foundation.Data_Types.Expression")
+   _self.write_empty_element("Foundation.Data_Types.Expression.language")
+   _self.write_empty_element("Foundation.Data_Types.Expression.body")
+   _self.end_element()
+   _self.end_element()
+      
+
+   _self.write_type(an_xmi_attribute.type.xmi_id)
+
+   _self.end_element()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_operation(a_uml_operation)
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.Operation", "xmi.id",
+		       a_uml_operation.xmi_id)
+
+   _self.write_name(a_uml_operation.name)
+   _self.write_visibility(a_uml_operation.private?)
+   _self.write_is_specification(_false)
+   _self.write_owner_scope(:instance)
+   _self.write_empty_element("Foundation.Core.BehavioralFeature.isQuery",
+			     "xmi.value", "false")
+   _self.write_empty_element("Foundation.Core.Operation.concurrency",
+			     "xmi.value", "sequential")
+
+   _self.start_element("Foundation.Core.BehavioralFeature.parameter")
+
+   _for a_param _over a_uml_operation.parameters()
+   _loop
+      a_param.export_on(_self)
+   _endloop
+   
+   _self.end_element()
+
+   _self.end_element()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_parameter(a_uml_parameter)
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.Parameter", "xmi.id",
+		       a_uml_parameter.xmi_id)
+   _self.write_name(a_uml_parameter.name)
+   _self.write_visibility(a_uml_parameter.private?)
+   _self.write_is_specification(_false)
+   _self.write_empty_element("Foundation.Core.Parameter.kind", "xmi.value",
+			     a_uml_parameter.kind)
+   _self.start_element("Foundation.Core.Parameter.type")
+   _self.write_empty_element("Foundation.Core.Class", "xmi.idref",
+			     a_uml_parameter.type.xmi_id)
+   _self.end_element()
+   
+   _self.end_element()
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_11_uml_13_output_stream.write_uml_generalization(an_xmi_generalization)
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.Generalization", "xmi.id",
+		       an_xmi_generalization.xmi_id)
+   _self.start_element("Foundation.Core.Generalization.child")
+   _self.write_empty_element("Foundation.Core.Class",
+			     "xmi.idref", an_xmi_generalization.child.xmi_id)
+   _self.end_element()
+   _self.start_element("Foundation.Core.Generalization.parent")
+   _self.write_empty_element("Foundation.Core.Class",
+			     "xmi.idref", an_xmi_generalization.parent.xmi_id)
+   _self.end_element()
+
+   _self.end_element()
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_generalizable_element_generalization(
+	   generalization_id)
+   ## 
+   ##
+
+   _self.start_element("Foundation.Core.GeneralizableElement.generalization")
+   _self.write_empty_element("Foundation.Core.Generalization",
+			     "xmi.idref", generalization_id)
+   _self.end_element()
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_generalizable_element_specialization(
+	   generalization_id)
+   ## 
+   ##
+
+   _self.start_element("Foundation.Core.GeneralizableElement.specialization")
+   _self.write_empty_element("Foundation.Core.Generalization",
+			     "xmi.idref", generalization_id)
+   _self.end_element()
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_type(xmi_id)
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.StructuralFeature.type")
+   _self.write_empty_element("Foundation.Core.DataType", "xmi.idref",
+			     xmi_id)
+   _self.end_element()
+
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_owner_scope(scope)
+   ## 
+   ## 
+
+   _self.write_empty_element("Foundation.Core.Feature.ownerScope",
+			     "xmi.value", scope)
+
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_is_abstract(abstract?)
+   ## 
+   ##
+   
+   _self.write_empty_element("Foundation.Core.GeneralizableElement.isAbstract",
+			     "xmi.value", _self.boolean_to_xmi_str(abstract?))
+
+   
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method xmi_11_uml_13_output_stream.replace_substr(a_string, old_sub,
+							    new_sub)
+   ## 
+   ## 
+   
+   seq_start << 1
+   _loop
+      r_idx << a_string.index_of_seq(old_sub, seq_start)
+      _if r_idx _is _unset 
+      _then
+	 _leave
+      _endif
+
+      # we have a bit to replace
+      a_string.replace_subseq(r_idx, old_sub.size, new_sub)
+      seq_start << r_idx + old_sub.size
+   _endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method xmi_11_uml_13_output_stream.mangle_name_to_lcd(name)
+   ## 
+   ## 
+
+   name << char16_string.new_from(name)
+   
+   _self.replace_substr(name, "^<<", "_boot")
+   _self.replace_substr(name, "<<", "_becomes")
+   _self.replace_substr(name, "()", "")
+   _self.replace_substr(name, "!", "_bang_")
+   _self.replace_substr(name, "?", "_question")
+   _self.replace_substr(name, "[]", "_subscript")
+
+   _if name = "new"
+   _then
+      name << "new_"
+   _endif
+   
+   _return name.as_charvec()
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_name(name)
+   ## 
+   ##
+
+   _if _self.lcd_names?
+   _then
+      name << _self.mangle_name_to_lcd(name.as_charvec())
+   _endif
+   
+   _self.write_element("Foundation.Core.ModelElement.name", name)
+
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_visibility(private?)
+   ## 
+   ## private? : boolean 
+   ##
+   ## returns : unset
+
+   _local vis << "public"
+
+   _if private?
+   _then
+      vis << "private"
+   _endif
+   
+   _self.write_empty_element("Foundation.Core.ModelElement.visibility",
+			     "xmi.value", vis)
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_is_leaf(leaf?)
+   ## 
+   ## 
+
+   _self.write_empty_element("Foundation.Core.GeneralizableElement.isLeaf",
+			     "xmi.value", _self.boolean_to_xmi_str(leaf?))
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_is_root(root?)
+   ## 
+   ## 
+
+   _self.write_empty_element("Foundation.Core.GeneralizableElement.isRoot",
+			     "xmi.value", _self.boolean_to_xmi_str(root?))
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_is_specification(spec?)
+   ## 
+   ## 
+
+   _self.write_empty_element("Foundation.Core.ModelElement.isSpecification",
+			     "xmi.value", _self.boolean_to_xmi_str(spec?))
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_is_active(active?)
+   ## 
+   ## 
+
+   _self.write_empty_element("Foundation.Core.Class.isActive", "xmi.value",
+			     _self.boolean_to_xmi_str(active?))
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_namespace(owner)
+   ## 
+   ## 
+
+   _self.start_element("Foundation.Core.ModelElement.namespace")
+
+   _if owner.is_class_of?(uml_model)
+   _then
+      _self.write_empty_element("Model_Management.Model", "xmi.idref",
+				owner.xmi_id)
+   _elif owner.is_class_of?(uml_package)
+   _then
+      _self.write_empty_element("Model_Management.Package", "xmi.idref",
+				owner.xmi_id)
+   _else
+      condition.raise(:error, :string, "unsupported namespace type.")
+   _endif
+
+   _self.end_element()
+
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_11_uml_13_output_stream.write_multiplicity(lower_lim, upper_lim)
+   ## 
+   ## 
+   _self.start_element("Foundation.Core.StructuralFeature.multiplicity")
+   _self.start_element("Foundation.Data_Types.Multiplicity")
+   _self.start_element("Foundation.Data_Types.Multiplicity.range")
+   _self.start_element("Foundation.Data_Types.MultiplicityRange")
+   _self.write_element("Foundation.Data_Types.MultiplicityRange.lower",
+		       lower_lim)
+   _self.write_element("Foundation.Data_Types.MultiplicityRange.upper",
+		       upper_lim)
+   _self.end_element()
+   _self.end_element()
+   _self.end_element()
+   _self.end_element()
+   
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method xmi_11_uml_13_output_stream.boolean_to_xmi_str(a_bool)
+   ## 
+   ## 
+   _if a_bool
+   _then
+      _return "true"
+   _else
+      _return "false"
+   _endif
+   
+_endmethod
+$
+

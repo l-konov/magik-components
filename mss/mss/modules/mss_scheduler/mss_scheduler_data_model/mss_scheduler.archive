@@ -1,0 +1,308 @@
+#% text_encoding = utf8
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"outcome_code_type", 
+				       :ds_byte, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(1, "OK")
+enum.add_archive_values(2, "Fail")
+enum.add_archive_values(3, "Pending")
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1,
+                                  "mss_scheduled_task",
+                                  write_string("Scheduled Task"),
+                                  "mss_scheduled_task",
+                                  _unset,{0,0,0},0} ,0.00000000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("type", "Type", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+
+
+an_f << o.add_field("submitter", "Submitter", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+
+
+an_f << o.add_field("priority", "Priority", :physical)
+an_f.archive_set_field_type_to(:|ds_byte|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("scheduled_start_time", "Scheduled Start Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+
+
+an_f << o.add_field("schedule_interval", "Schedule Interval", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+an_f.archive_stored_unit << "sec"
+
+
+an_f << o.add_field("parameter_text_id", "parameter_text_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("parameter_text", "Parameter Text", :text)
+an_f.archive_text_join_field(:parameter_text_id)
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {17,
+                                  "mss_scheduled_task_result",
+                                  write_string("Scheduled Task Result"),
+                                  "mss_scheduled_task_result",
+                                  _unset,{0,0,0},0} ,0.00000000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "ID", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("scheduled_task_id", "Scheduled Task ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "readonly_field_editor"
+
+
+an_f << o.add_field("type", "Type", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("submitter", "Submitter", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("processor_id", "Processor ID", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,24)
+an_f.print_width << 24
+an_f.editor_name << "readonly_field_editor"
+
+
+an_f << o.add_field("priority", "Priority", :physical)
+an_f.archive_set_field_type_to(:|ds_byte|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("scheduled_start_time", "Scheduled Start Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("schedule_interval", "Schedule Interval", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+an_f.archive_stored_unit << "sec"
+
+
+an_f << o.add_field("actual_start_time", "Actual Start Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("actual_end_time", "Actual End Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << False
+an_f.archive_unset_value << date_time
+
+
+an_f << o.add_field("outcome_code", "Outcome Code", :physical)
+an_f.archive_set_field_type_to(:|outcome_code_type|,_unset)
+an_f.print_width << 9
+
+
+an_f << o.add_field("failure_code", "Failure Code", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,48)
+an_f.print_width << 48
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("parameter_text_id", "parameter_text_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("process_description_id", "process_description_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("error_description_id", "error_description_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("parameter_text", "Parameter Text", :text)
+an_f.archive_text_join_field(:parameter_text_id)
+
+
+an_f << o.add_field("process_description", "Process Description", :text)
+an_f.editor_name << "readonly_field_editor"
+an_f.archive_text_join_field(:process_description_id)
+
+
+an_f << o.add_field("error_description", "Error Description", :text)
+an_f.editor_name << "readonly_field_editor"
+an_f.archive_text_join_field(:error_description_id)
+
+
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_scheduled_task,
+                                            {"id",
+                                            "type",
+                                            "submitter",
+                                            "priority",
+                                            "scheduled_start_time",
+                                            "schedule_interval"})
+case_object.archived_indices(:mss_scheduled_task, {"scheduled_start_time"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_scheduled_task_result,
+                                            {"id",
+                                            "scheduled_task_id",
+                                            "type",
+                                            "submitter",
+                                            "processor_id",
+                                            "priority",
+                                            "scheduled_start_time",
+                                            "schedule_interval",
+                                            "actual_start_time",
+                                            "actual_end_time",
+                                            "outcome_code",
+                                            "failure_code",
+                                            "process_description",
+                                            "error_description"})
+case_object.archived_indices(:mss_scheduled_task_result, {"scheduled_start_time"}, {})
+case_object.archived_indices(:mss_scheduled_task_result, {"actual_end_time"}, {})
+case_object.archived_indices(:mss_scheduled_task_result, {"scheduled_task_id"}, {})
+
+_endblock
+$
+
+
+$
+
+$

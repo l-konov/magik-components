@@ -1,0 +1,9 @@
+mclib_kml_import	4100
+
+description
+	provides behavior for working with KML from Magik when reading the files
+end
+
+requires
+	mclib_package
+end

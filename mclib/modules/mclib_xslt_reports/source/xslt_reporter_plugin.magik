@@ -1,0 +1,1064 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-10-24 13:04:33 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## provides support for using XML configuration to dump some
+## set of tables and then processing them with the XSLT
+## language to produce final results.
+##
+##  You can use this plugin directly by configuring appropriate
+## XML files for use with it. To do so, you should create a new
+## report module. In that module, you will need to create the
+## following structure:
+##    resources
+##          ----base
+##                -- templates
+##                      templates_info.xml
+##                    --- tenplate_a
+##                    --- template_b
+##
+##  template_info.xml is used to define the templates found in
+## the subdirectories. It should contain XML like this:
+##     <?xml version="1.0" encoding="UTF-8" ?>
+##     <case_template_info>
+##        <template name="default" module="mclib_xslt_reports" file_name="template.xml" directory="default">
+##        </template>
+##     </case_template_info>
+## -- You can include any number of template elements
+## -- The directory attribute is optional and the name is used
+##         if not provided
+##
+## in each template directory, you must provide the referenced
+## template definition file, such as template.xml.  Note that you can have many
+## different template defitnition files in a single directory,
+## effectivly reusing the structure with different sets of
+## collections, fields, and stylesheets.
+##
+## The template definition file is shown and documented in this
+## module in resources/base/templates/default/template.xml. It
+## is used to select the collections and fields to be output
+## and also to specify the specific XSLT transforms to run
+## against the template.
+##
+## During processing ALL of the files int he tmeplate directory
+## are copied to the target path. This allows other useful
+## things, like pictures, static HTML, javascript, etc. to be
+## included in the template and thus include din the resulting
+## output directory. 
+##
+
+
+
+
+def_slotted_exemplar(:xslt_reporter_plugin,
+                     {
+			     {:thread_engines,_unset}
+		     },
+		     {:plugin,@mclib:plugin_threading_mixin,@mclib:action_property_mixin})
+$
+
+_pragma(classify_level=basic)
+xslt_reporter_plugin.define_slot_externally_readable(:thread_engines,_false)
+$
+xslt_reporter_plugin.define_property(:dump_path,:directory,
+				  "The full path to the directory where I will dump.",
+				  _true,_true,_unset)
+$
+xslt_reporter_plugin.define_property(:dump_index_file_name,:string,
+				  "The name of my index file.",
+				  _true,_true,"index.html")
+$
+xslt_reporter_plugin.define_property(:dump_xml_file_name,:string,
+				  "The name of my XML dump file.",
+				  _true,_true,"xsl_report.xml")
+$
+
+xslt_reporter_plugin.define_property(:output_url,:string,
+				  "The URL that will be used to reference my output files internally.",
+				  _true,_true,"")
+$
+xslt_reporter_plugin.define_property(:template_name,:string,
+				  "The name of the template to be located under my templates module.",
+				  _true,_true,"default")
+$
+xslt_reporter_plugin.define_property(:template_module_name,:symbol,
+				  "The name of the module with my template in it.",
+				  _true,_true,:mclib_xslt_reports)
+$
+
+xslt_reporter_plugin.define_property(:default_soc_name,:symbol,
+				  "The name of the SOC to dump.",
+				  _true,_true,_unset)
+$
+xslt_reporter_plugin.define_property(:default_dataset_name,:symbol,
+				  "The name of the dataset to dump from.",
+				  _true,_true,_unset)
+$
+
+xslt_reporter_plugin.define_property(:data_root_element,:string,
+				  "The tag name for the root element in my XML output",
+				  _true,_true,"mclib_xsl_report")
+$
+
+_pragma(classify_level=basic)
+## Configures automatic parsing of the XML/XSL into HTML files
+## for the data. This provides static HTMl files and improves
+## performance. It currently requires access to the MSXSL.exe
+## executable to do this parsing since OLE processing from
+## within Magik seems to choke on handling the MS XML objects
+xslt_reporter_plugin.define_property(:preparse_data,:booelean,
+				  "If this is true, we try to parse to HTML here with MSXSL and output complete XML files.",
+				  _true,_true,_true)
+$
+
+_pragma(classify_level=basic)
+_method xslt_reporter_plugin.init(_gather args)
+	## Setup my slots and call the super.  ARGS are as for plugin.
+	## 
+	##
+
+	# (07-01-2005 Brad Sileo): created.
+	.thread_engines << property_list.new()
+	>> _super.init(_scatter args)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.init_actions()
+	## Create my file selector and dump start actions
+	## 
+	##
+
+	# (03-16-2005 Brad Sileo): created.
+	_super.init_actions()
+	_self.build_threading_actions()
+	_self.add_property_action(:dump_path)
+	_self.add_action(sw_action.new(:template,
+				       :engine,_self,
+				       :value,_self.template_name,
+				       :value_change_message,:|template_name<<|,
+				       :toolbar_control,:choice_item,
+				       :items,_self.get_template_names(),
+				       :caption,_self.message(:template ),
+				       :short_help_text,_self.message(:template_sh  ),
+				       :tooltip,_self.message(:template_tt)  )
+	      )
+	_self.add_action(sw_action.new(:start_dump,
+				       :engine,_self,
+				       :action_message,:dump_report|()| ,
+				       :toolbar_control,:image_button_item ,
+				       :image,:start,
+				       :enabled?,_true,
+				       :caption,_self.message(:start_dump  ),
+				       :short_help_text,_self.message(:start_dump_sh  ),
+				       :tooltip,_self.message(:start_dump_tt)  )
+	      )
+	_self.add_action(sw_action.new(:dump_and_launch,
+				       :engine,_self,
+				       :action_message,{:dump_report|()|,_true},
+				       :toolbar_control,:image_button_item ,
+				       :image,:start,
+				       :enabled?,_true,
+				       :caption,_self.message(:start_dump  ),
+				       :short_help_text,_self.message(:start_dump_sh  ),
+				       :tooltip,_self.message(:start_dump_tt)  )
+	      )
+	_self.add_action(sw_action.new(:prompt_dump_and_launch,
+				       :engine,_self,
+				       :action_message,{:prompt_and_dump_report|()|,_true},
+				       :toolbar_control,:image_button_item ,
+				       :image,:start,
+				       :enabled?,_true,
+				       :caption,_self.message(:start_dump  ),
+				       :short_help_text,_self.message(:start_dump_sh  ),
+				       :tooltip,_self.message(:start_dump_tt)  )
+	      ) 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.build_gui(a_container)
+	## Creates my GUI on A_CONTAINER
+	## 
+	##
+
+	# (03-21-2005 Brad Sileo): created.
+	rc << rowcol.new(a_container,_unset,1,_unset,:style,:top_level)
+	rc2 << rowcol.new(rc,1,_unset,_unset,:style,:nexted)
+	_self.action(:dump_path).place_control_on(rc2,:dialog)
+	_self.action(:dump_and_launch).place_control_on(rc,:dialog)
+	rc.tab_label << _self.message(:tab_label)
+	>> rc
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.prompt_and_dump_report(_optional launch?)
+	## prompt for the directory and then dump the report. If LAUNCH?
+	## is true, then start the output results.
+	## 
+	##
+
+	# (03-21-2005 Brad Sileo): created.
+	
+	>> _self.dump_report(launch?, _true )
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.dump_report(_optional launch?, always_prompt?)
+	## Dumps the current REPORT view to the file specified
+	## in my dump_file action
+	## LAUNCH will activate the dump when finished
+	## ALWAYS_PROMPT? if true will force a prompt even if we have a directory
+
+	# (03-16-2005 Brad Sileo): created.
+	_self.run_engine(:|int!dump_report()|,launch?,always_prompt?)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.int!dump_report(_optional launch?, always_prompt?)
+	## Internal method to do the work for dump_report in a background
+	## thread - see it for details.
+	##
+	# (03-23-2005 Brad Sileo): created.
+	_self.busy? << _true
+	# This check is not done in the core class...too bad.
+	_if _self.framework _isnt _unset 
+	_then
+		_self.install_progress_indicator(_self.message(:publish_report),
+						 _self,
+						 :indicator, busy_progress_indicator,
+						 :interrupt_message, :|interrupt_engine()|,
+						 :progress_aspect, :progress,
+						 :stop_aspect, :end_publish )
+	_endif 
+	ok? << _false 
+	_protect
+		_self.setup_dump_path(always_prompt?)
+		_self.changed( :progress)
+		_self.databus_make_data_available(:status_info, _self.message(:starting_dump))
+		_self.copy_template()
+		_self.changed( :progress)
+		_self.databus_make_data_available(:status_info, _self.message(:exporting_xml))
+		_self.create_dump_xml()
+		_self.changed( :progress)
+		_self.databus_make_data_available(:status_info, _self.message(:exporting_html))
+		_self.write_dump_index()
+		_self.changed( :progress)
+		_self.process_pages()
+		_self.changed( :progress)
+		_if launch? _is _true 
+		_then
+			path << write_string(_self.defaulted_output_url(),%/,"index.html")
+			cmd << write_string("start ",%",path,%")
+			system.do_command(cmd,system.temp_directory_name)
+		_endif
+		_self.changed( :progress)
+		ok? << _true 
+	_protection
+		_if ok? _isnt _true 
+		_then
+			data << _self.message(:export_failed)
+		_endif
+		_self.changed( :end_publish)
+		_self.databus_make_data_available(:status_info,data)
+		_self.busy? << _false
+	_endprotect
+_endmethod	
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.create_dump_xml()
+	## Create the actual XML dump of the REPORT database
+	## 
+	##
+
+	# (03-18-2005 Brad Sileo): created.
+		
+	a_stream << _self.startup_dump_stream()
+	_protect
+		a_stream.start_element(_self.data_root_element,
+				       _scatter _self.root_element_attributes())
+		_self.dump_template_collections(a_stream)
+		_self.subclass_dump_xml(a_stream)
+		a_stream.end_element()
+		
+	_protection
+		a_stream.close()
+	_endprotect
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.root_element_attributes()
+	## Returns a property_list to be included as
+	## attributes of the report XML files root element.
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+	>> property_list.new_with(:writer,system.user_name,
+				  :write_time,date_time_now())
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.subclass_dump_xml(a_stream)
+	## Provides a hook for a sibclass to add elements to A_STREAM,
+	## the XML data stream. This version does nothing. This method
+	## is called within the root element of the XML document output
+	## to A_STREAM
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.dump_template_collections(a_stream)
+	## Dump all collections configured in my template info to A_STREAM.
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+	todo << hash_table.new()
+	# first gtt them from all base tmeplates and the root one,
+	# suing a property list to weed out duplicates.
+	_for temp _over _self.get_all_template_details().fast_elements()
+	_loop
+		_if (colls << temp.element_matching_name("collections")) _is _unset _then _continue _endif
+		_for a_coll_elem _over colls.elements_matching_name("collection")
+		_loop
+			todo[_self.get_collection_for_xml(a_coll_elem).name] << a_coll_elem
+		_endloop
+	_endloop
+	_for a_coll_elem _over todo.fast_elements()
+	_loop
+		_self.changed( :progress)
+		_self.dump_collection_for_xml(a_coll_elem, a_stream)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_fields_for_collection(coll, a_collection_elem)
+	## Returns the field to output for the XML dump of COLL based
+	## on A_COLLECTION_ELEM. returns unset if there are no fields
+	## configured in A_COLLECTION_ELEM
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+	_if (fields_elem << a_collection_elem.element_matching_name("fields")) _is _unset _then _return _endif
+	fields << rope.new()
+	_for a_field_elem _over fields_elem.elements_matching_name("field")
+	_loop
+		fields.add_last(a_field_elem.attribute(:name).as_symbol())
+	_endloop
+	>> fields
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.dump_collection_for_xml(a_collection_elem, a_stream)
+	## Output the table described in A_COLLECTION_ELEM onto A_STREAM
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+	coll << _self.get_collection_for_xml(a_collection_elem)
+	field_names << _self.get_fields_for_collection(coll, a_collection_elem)
+	#debug show("Dumping ",coll, field_names)
+	_self.dump_collection(a_stream,coll,field_names)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_collection_for_xml(a_collection_elem)
+	## Locate the table for this collection element, using the SOC
+	## and dataset attributes in it if specified, or using my
+	## defaults otherwise.
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+	soc_name << a_collection_elem.attribute(:soc)
+	dataset << _self.get_soc(soc_name)
+	coll_name << a_collection_elem.attribute(:name).as_symbol()
+	_if dataset.is_kind_of?(database_view)
+	_then
+		base_coll << dataset.collection(coll_name)
+	_else
+		dataset_name << _self.get_dataset_name(dataset)
+		base_coll << dataset.collection(dataset_name,coll_name)
+	_endif
+	>> _if (pred_text << a_collection_elem.attribute(:predicate)) _isnt _unset
+	_then
+		pred << pred_text.evaluate()
+		>> base_coll.select(pred)
+	_else
+		>> base_coll
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_dataset_name(a_soc, _optional a_collection_elem)
+	## returns the dataset name to used for me with A_SOC. If
+	## a_collection_elem is provided, it is an XML object which
+	## might specify the dataset name. Otherwise, we use my
+	## default_dataset_name or the main dataset in A_SOC as a last resort.
+	## 
+	##
+
+	# (07-18-2005 Brad Sileo): created.
+	_if a_collection_elem _isnt _unset 
+	_then
+		dataset_name << a_collection_elem.attribute(:dataset)
+	_endif
+	dataset_name << dataset_name.default(_self.default_dataset_name).default(a_soc.main_dataset_manager.name)
+	#debug show(dataset, dataset_name, coll_name)
+	>> dataset_name
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.process_pages()
+	## Builds any other specific HTML pages. This can be subclassed
+	## if needed. This version does nothing.
+	## 
+	##
+
+	# (07-06-2005 Brad Sileo): created.
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.named_file_for_object(a_object, _optional name_message, prefix, suffix)
+	## Returns the name of the HTML file for A_OBJECT, derived by
+	## appending prefix onto the front of the result of
+	## a_object.perfornm(name_message). The default message is
+	## :name. The default prefix is object.class_name
+	## 
+	##
+
+	# (07-07-2005 Brad Sileo): created.
+	name_message << name_message.default(:name)
+	file_name << a_object.perform(name_message).write_string.substitute_character(%/,%_).substitute_character(%\,%_).substitute_character(%?,%_).substitute_character(%*,%_)	
+	>> write_string(prefix.default(a_object.class_name),file_name,suffix.default(".html"))
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.startup_dump_stream()
+	## Creates a new XML document to represent the tables required
+	## for this report and returns it.
+	## 
+	##
+
+	# (03-16-2005 Brad Sileo): created.
+	xs << xml_output_stream.new_file(_self.dump_xml_path)
+	_protect
+		xs.write_prolog()
+		ok? << _true 
+	_protection
+		_if ok? _isnt _true _andif
+		    xs _isnt _unset 
+		_then
+			xs.close()
+		_endif
+	_endprotect
+	>> xs
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.msxsl_path
+	## Returns the full path to msxsl.exe in my resources/bin directory
+	## 
+	##
+
+	# (04-01-2005 Brad Sileo): created.
+	dir << sw_module_manager.module(:mclib_xslt_reports).full_directory
+	dir.substitute_character(%/,%\)
+	>> system.pathname_down(dir,"resources","base","bin","msxsl.exe")
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.parse_xml_file_to(a_file, xsl_file, xml_file, _optional params)
+	## Parse XML_FILE using XSL_FILE and write the output to A_FILE
+	## PARMS is a property list of parameters names and values
+	##
+	## This requires access to msxsl in my resources directory as
+	## which then requires the MS XML 3.0 libraries be installed.
+	##	
+	# (03-22-2005 Brad Sileo): created.
+	_self.databus_make_data_available(:status_info, _self.message(:parsing_file,xsl_file,a_file))
+	#debug write("Parsing ",xsl_file," to ",a_file)
+	cmd << write_string(_self.msxsl_path," -u 3.0 -xw ",
+		     "-o ",%",a_file,%",%space,
+		     %",xml_file,%",%space,
+		     %",xsl_file,%"
+	       )
+	_for a_name, a_param _over params.default(property_list.new()).fast_keys_and_elements()
+	_loop
+		cmd << write_string(cmd,%space,a_name,%=,%',a_param,%')
+	_endloop
+	#debug write(cmd)
+	system.do_command(cmd,system.temp_directory_name)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.ole_parse_xml_file_to(a_stream, xsl_file, xml_file, _optional params)
+	## Parse XML_FILE using XSL_FILE and write the output to A_STREAM
+	## PARMS is a list of parameters
+	## This method os not current working!!!
+
+	# (04-01-2005 Brad Sileo): created.
+	_protect
+		xsldoc << ole_client.create_object("Msxml2.FreeThreadedDOMDocument")
+		xslDoc.async << _false
+		xslDoc.load(xsl_file)
+		xslt << ole_client.create_object("Msxml2.XSLTemplate")
+		xslt.stylesheet << xslDoc;
+		
+		xmlDoc << ole_client.create_object("Msxml2.DOMDocument")
+		xmlDoc.async << _false 
+		xmlDoc.load(xml_file)
+		xslProc << xslt.createProcessor()
+		xslProc.input << xmlDoc
+		_for a_name, a_param _over params.default(property_list.new()).fast_keys_and_elements()
+		_loop
+			xslProc.addParameter(a_name, a_param);
+		_endloop 
+		xslProc.transform()
+		# Seems to work up to here but it doesn't know what to do with
+		# this stream object
+		a_stream.write(	xslProc.output)
+	_protection
+		_if xsldoc _isnt _unset _then xsldoc.release_object() _endif 
+		_if xslt _isnt _unset _then xslt.release_object() _endif 
+		_if xmldoc _isnt _unset _then xmldoc.release_object() _endif 
+		_if xslproc _isnt _unset _then xslproc.release_object() _endif 
+	_endprotect 
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.write_dump_index()
+	## Creates my dump files based on the instructions in the
+	## template XML file. 
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	files << _self.get_template_file_data()
+	_for a_name,props _over files.fast_keys_and_elements()
+	_loop
+		a_xsl << props[:stylesheet]
+		a_file << props[:file_name]
+		_if (coll_data << props[:collection]) _is _unset 
+		_then
+			_self.write_single_dump_index(a_file, a_xsl)
+		_else
+			_self.write_collection_dump_files(a_xsl,coll_data)
+		_endif
+	_endloop 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.write_single_dump_index(a_file, a_xsl)
+	## Generate A_FILE using A_XSL
+	## 
+	##
+
+	# (07-08-2005 Brad Sileo): created.
+	_self.changed( :progress)
+	_self.databus_make_data_available(:status_info, _self.message(:exporting_html_file,a_file))
+	full_file << _self.dump_index_path(a_file)
+	_if _self.preparse_data _is _true 
+	_then
+		xsl << write_string(_self.dump_path,%\,a_xsl)
+		_self.parse_xml_file_to(full_file,xsl,_self.dump_xml_path)
+	_else
+		xs << xml_output_stream.new_file(full_file)
+		_protect
+			xs.start_element("html")
+			xs.start_element("body")
+			xs.write_element("script",_unset,:type,"text/javascript",:src,_self.script_url())
+			xs.start_element("script",:type,"text/javascript")
+			xsl << write_string(_self.defaulted_output_url(),%/,a_xsl)
+			xs.write_unescaped_content(write_string("parseXML(",%",_self.xml_url(),%",%, ,%" ,
+								xsl,%",%)
+						   )
+			   )
+			xs.end_element()
+			xs.end_element()
+			xs.end_element()
+		_protection
+			xs.close()
+		_endprotect
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.write_collection_dump_files(a_xsl, collection_xml_data)
+	## Called A_XSL to parse A_FILE for each element in the
+	## collection called COLLECTION_NAME.  The URN for each object
+	## is passed in to the XSL as the identifier parameter.
+	## 
+	##
+
+	# (07-08-2005 Brad Sileo): created.
+	collection_name << collection_xml_data.attribute(:name).as_symbol()
+	prefix << collection_xml_data.attribute(:prefix,collection_name).as_symbol()
+	suffix << collection_xml_data.attribute(:suffix,".html")
+	f_method << collection_xml_data.attribute(:file_name_property).as_symbol()
+	_for a_object _over _self.get_collection_for_xml(collection_xml_data).fast_elements()
+	_loop
+		urn << urn_manager.get_urn_from_object(a_object)
+		a_file << _self.named_file_for_object(a_object, f_method, prefix, suffix)
+		full_file << _self.dump_index_path(a_file)
+		_if _self.preparse_data _is _true
+		_then
+			xsl << write_string(_self.dump_path,%\,a_xsl)
+			_self.parse_xml_file_to(full_file,xsl,_self.dump_xml_path,
+						property_list.new_with(:identifier,urn)
+			      )
+		_else
+			xs << xml_output_stream.new_file(full_file)
+			_protect
+				xs.start_element("html")
+				xs.start_element("body")
+				xs.write_element("script",_unset,:type,"text/javascript",:src,_self.script_url())
+				xs.start_element("script",:type,"text/javascript")
+				xsl << write_string(_self.defaulted_output_url(),%/,a_xsl)
+				xs.write_unescaped_content(write_string("parseTaggedXML(",%",_self.xml_url(),%",%, ,%" ,
+									xsl,%", %, ,
+									%", urn , %" , 
+									%)
+							   )
+				   )
+				xs.end_element()
+				xs.end_element()
+				xs.end_element()
+			_protection
+				xs.close()
+			_endprotect
+		_endif
+		_self.changed( :progress)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_template_file_data()
+	## returns an equality_hash_table keyed on HTML file name
+	## where each element is the stylesheet that goes with it. This
+	## is derived from the template details XML file configured for me
+	## 
+	##
+
+	# (03-18-2005 Brad Sileo): created.
+	res << equality_hash_table.new()
+	_for a_xml _over _self.get_all_template_details().fast_elements()
+	_loop
+		_if (files << a_xml.element_matching_name("files")) _isnt _unset
+		_then 
+			_for a_file _over files.elements_matching_name("file")
+			_loop
+				props << res[a_file.attribute(:name)] <<
+					property_list.new_with(
+						:xml_data, a_file,
+						:stylesheet, a_file.element_matching_name("stylesheet_name").xml_contents)
+				_if (elem << a_file.element_matching_name("file_name")) _isnt _unset 
+				_then
+					props[:file_name] << elem.xml_contents
+				_endif 
+				
+				_if (elem << a_file.element_matching_name("collection")) _isnt _unset 
+				_then
+					props[:collection] << elem
+				_endif
+			_endloop
+		_endif 
+	_endloop 
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_template_names()
+	## returns all available template names for me as a set of keys
+	## and values - internal name, external name
+	## 
+	##
+
+	# (07-19-2005 Brad Sileo): created.
+	res << rope.new()
+	a_xml << _self.get_template_info_xml()
+	_for a_template _over a_xml.elements_matching_name("template")
+	_loop
+		name << a_template.attribute(:name)
+		res.add({name,a_template.attribute(:external_name).default(name)})
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_template_info_xml()
+	## Returns an xml element accessing my template_info.xml file. 
+	## 
+	##
+
+	# (07-19-2005 Brad Sileo): created.
+	root << _self.templates_root
+	file << system.pathname_down(root,"template_info.xml")
+	>> simple_xml.read_element_file(file)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_template_info()
+	## gets a new xml document for my template info file
+	## 
+	##
+
+	# (03-18-2005 Brad Sileo): created.
+	a_xml << _self.get_template_info_xml()
+	_for a_template _over a_xml.elements_matching_name("template")
+	_loop
+		_if a_template.attribute(:name) <> _self.template_name _then _continue _endif
+		_return a_template
+	_endloop 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_all_template_details(_optional a_template_info)
+	## returns a rope of XML documenst which are my template
+	## details files.  These are ordered form the top level base
+	## down to the actual tmeplate.
+	## 
+	##
+
+	# (07-22-2005 Brad Sileo): created.
+	res << rope.new()
+	td << _self.get_template_details(a_template_info)
+	_for elem _over td.elements_matching_name(:base)
+	_loop
+		res.add_all_first(_self.get_all_template_details(elem))
+	_endloop 
+	res.add_last(_self.get_template_details(a_template_info))
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_template_details(_optional a_template_info)
+	## Gets the template.xml XML element for the passed in template
+	## element and returns it.
+	## 
+	##
+
+	# (07-19-2005 Brad Sileo): created.
+	_if a_template_info _is _unset
+	_then
+		a_template_info << _self.get_template_info()
+	_endif
+	pa << _self.template_path(a_template_info)
+	file << system.pathname_down(pa,a_template_info.attribute(:file_name).default("template.xml"))
+	xm << simple_xml.read_element_file(file)
+	>> xm
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.copy_template()
+	## Copy my template directory from the template_souce to the
+	## target directory
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	_for a_path _over _self.ordered_template_paths().fast_elements()
+	_loop
+		cmd << write_string("xcopy /Y /E ",%",a_path,%","\*.*  ",%",_self.dump_path,%","\*.*")
+		system.do_command(cmd, system.temp_directory_name)
+	_endloop 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.templates_root
+	## returns the root templates directory for me. This is the
+	## first "language" resources directory found in my template
+	## module that has a templates directory in it. This is where
+	## the template_info.xml file is located.
+	## 
+	##
+
+	# (03-18-2005 Brad Sileo): created.
+	a_mod << sw_module_manager.module(_self.template_module_name)
+	dir << system.pathname_down(a_mod.full_directory,"resources")
+	_for lang_dir _over a_mod.resource_list.fast_elements()
+	_loop
+		temp_dir << system.pathname_down(dir,lang_dir,"templates")
+		_return temp_dir.substitute_character(%/,%\)
+	_endloop 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.ordered_template_paths(_optional a_template_info)
+	## Returns all the paths for my templates, starting at the top
+	## of any base tmneplates working to the real template, which
+	## is always last.
+	## 
+	##
+
+	# (07-22-2005 Brad Sileo): created.
+	res << rope.new()
+	td << _self.get_template_details(a_template_info)
+	_for elem _over td.elements_matching_name(:base)
+	_loop
+		res.add_all_first(_self.ordered_template_paths(elem))
+	_endloop 
+	res.add_last(_self.template_path(a_template_info))
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.template_path(_optional a_template_info)
+	## returns the full path to the top of my template directory
+	## for the currently selected template
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	_if a_template_info _is _unset 
+	_then
+		a_template_info << _self.get_template_info()
+	_endif 
+	mod_name << a_template_info.attribute("module_name").default(_self.template_module_name).default(_self.module_name).as_symbol()
+	a_mod << sw_module_manager.module(mod_name)
+	dir << system.pathname_down(a_mod.full_directory,"resources")
+	tdn << _self.template_directory_name(a_template_info)
+	_for lang_dir _over a_mod.resource_list.fast_elements()
+	_loop
+		temp_dir << system.pathname_down(dir,lang_dir,"templates",tdn)
+		_if system.file_exists?(temp_dir)
+		_then
+			_return temp_dir.substitute_character(%/,%\)
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.template_directory_name(_optional a_template_info)
+	## The name of the tmeplates directory, as specified in the
+	## tmeplate_info.xml file
+	## 
+	##
+
+	# (07-08-2005 Brad Sileo): created.
+	_if a_template_info _is _unset 
+	_then
+		a_template_info << _self.get_template_info()
+	_endif 
+	name << a_template_info.attribute("directory").default(_self.template_name)
+	>> name
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.dump_index_path(file)
+	## 
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	_if file.index_of_seq(".html") _is _unset 
+	_then
+		file << write_string(file,".html")
+	_endif
+	>> system.pathname_down(_self.dump_path,file).substitute_character(%/,%\)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.dump_xml_path
+	## 
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	>> system.pathname_down(_self.dump_path,_self.dump_xml_file_name).substitute_character(%/,%\)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.xml_url()
+	## returns the full URL where the XSL file can be located for a
+	## givern dump 
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	fname << _self.dump_xml_file_name
+	>> write_string(_self.defaulted_output_url(),%/,fname).substitute_character(%\,%/)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.defaulted_output_url()
+	## returns my output_url with support to default it to my
+	## dump_path if not set. in this case, file:// is added.
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	_if (base << _self.output_url) _is _unset _orif
+	    base = ""
+	_then
+		base << write_string("file://",_self.dump_path)
+	_endif
+	>> base.substitute_character(%\,%/)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.script_url()
+	## returns the URL where my scripts can be located
+	## 
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	fname << "xslt_reporter.js"
+	>> write_string(_self.defaulted_output_url(),%/,fname).substitute_character(%\,%/)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.dump_collection(a_stream,a_table, _optional fields, descriptor, want_urns?)
+	## Dumps the table called A_TABLE_NAME to A_STREAM. If
+	## specified, FIELDS are used, oherwise we include all fields.
+	## DESCRIPTOR is the xml_collection_descriptor to use. If not
+	##       provided, one is derived.
+	##       FIELD_LIST is ignored if this is provided
+	##
+
+	# (03-16-2005 Brad Sileo): created.
+	#debug write("Dumping ",a_table)
+	_if descriptor _is _unset 
+	_then
+		field_list << fields.default(a_table.descriptor.all_field_names)
+		descriptor << xml_collection_descriptor.new(a_table,
+						    :field_list,field_list,
+						    :want_urns?,want_urns?.default(_true) 
+						)
+		
+	_endif 
+	a_stream.write_collection(a_table,descriptor)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_soc(_optional soc_name)
+	## Returns the SOC called SOC_NAME, which defaults ot my
+	## soc_name property. makes sure this SOC is open first.
+	## 
+	##
+
+	# (07-01-2005 Brad Sileo): created.
+	soc_name << soc_name.default(_self.default_soc_name)
+	_if (a_soc << gis_program_manager.spatial_object_controller(soc_name)) _is _unset _orif
+	    a_soc.main_dataset_manager _is _unset 
+	_then
+		gis_program_manager.open_datasets(soc_name)
+		a_soc << gis_program_manager.spatial_object_controller(soc_name)
+	_endif
+	>> a_soc
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.setup_dump_path(_optional force?)
+	## prompt the user to select a dump_path if we don't have one.
+	## If we fail to get a path, just abort
+	##
+
+	# (03-17-2005 Brad Sileo): created.
+	_if _self.dump_path _is _unset  _orif
+	    force? _is _true 
+	_then
+		_self.get_dump_file()
+	_endif
+	_if _self.dump_path _is _unset 
+	_then
+		!abort!()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method xslt_reporter_plugin.get_dump_file()
+	## Promots the user to set the file location
+	## 
+	##
+
+	# (03-16-2005 Brad Sileo): created.
+	_self.dump_path << _unset
+	_if (top << _self.application.top_frame.actual) _is _unset
+	_then
+		_return
+	_endif 
+	filename << top.select_directory ( _self.dump_path.default(system.current_working_directory),_false)
+	_if filename _isnt _unset _andif 
+	    filename.size > 1 
+	_then
+		_self.dump_path << filename
+	_endif
+	_self.action(:dump_path).value << _self.dump_path
+_endmethod
+$

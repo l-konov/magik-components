@@ -1,0 +1,28 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-06-17 00:37:51 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_line_style.kml_style()
+	## returns a KML for me.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	als << _self.actual_line_style
+	>> als.kml_style()
+_endmethod
+$

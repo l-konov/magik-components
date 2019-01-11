@@ -1,0 +1,28 @@
+_package sw
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method simple_xml_thing.checksum
+	## checksum : integer
+	##
+	## returns an integer based on string created when writing out
+	## self.  The integer is an adler_checksum.  This method is
+	## intended to be used to compare simple_xml_thing objects to
+	## see if they are exactly the same or not.
+
+	_local cs << adler_checksum.new()
+
+	_local int_str << internal_text_output_stream.new()
+	
+	simple_xml.write_element_on(int_str,_self)
+
+	_local bv << byte_vector.new_from(rope.new_from(int_str.string).map(
+									       _proc(a)
+										       >> a.value
+									       _endproc)
+				 )
+	cs.process(bv)
+	
+	_return cs.checksum
+	
+_endmethod
+$

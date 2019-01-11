@@ -1,0 +1,10 @@
+mclib_sample_cambridge_swaf_application	4100
+
+description
+	Sample Cambridge Application with Mclib Additions
+end
+
+requires
+	mclib_kml_export_cambridge_glue
+	mclib_explorer_models
+end

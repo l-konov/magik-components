@@ -1,0 +1,3 @@
+additions/
+mss_qa_check_definition.magik
+mss_qa_engine.magik

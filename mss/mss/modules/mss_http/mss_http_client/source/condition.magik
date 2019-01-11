@@ -1,0 +1,11 @@
+#% text_encoding = iso8859_1
+
+condition.define_condition(:mss_timeout_expiry, :information,
+			   {:tag, :sender},
+			   "MSS Timeout #1: Time has expired")
+$
+
+condition.define_condition(:mss_http_information, :information,
+			   {:string, :priority, :sender},
+			   "#1")
+$

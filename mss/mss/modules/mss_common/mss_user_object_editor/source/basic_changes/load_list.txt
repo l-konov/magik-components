@@ -1,0 +1,2 @@
+editor_manager.magik
+join_field_value_viewer.magik

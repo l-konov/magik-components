@@ -1,0 +1,10 @@
+mclib_jobs_list_gui_framework
+mclib_job_list_plugin
+mclib_job_server_framework
+mclib_job_server_activation_plugin
+mclib_job_list_options_dialog
+mclib_job_information_dialog
+message_usages
+adds/
+changes/
+glue/

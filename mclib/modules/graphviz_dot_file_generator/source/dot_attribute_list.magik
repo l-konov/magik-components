@@ -1,0 +1,107 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+########################################################################
+
+_pragma(classify_level=basic)
+## a super-class to all dot_* objects that can store attribute
+## information. 
+def_slotted_exemplar(:dot_attribute_list,
+      {
+	      {:attributes,_unset}
+      },
+      {}
+)
+$
+_pragma(classify_level=restricted,usage={subclassable})
+_private _method dot_attribute_list.init()
+	## init() : subclass
+	##
+	## initializes the attributes list for self.  This init()
+	## method should only be called from the .init() methods of
+	## subclasses. 
+
+	.attributes << equality_property_list.new()
+	
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=restricted)
+_private _method dot_attribute_list.validate_attribute(attribute_name)
+	## validate_attribute(symbol ATTRIBUTE_NAME) : _unset
+	##
+	## for now does nothing.  Can be subclassed to ensure that
+	## ATTRIBUTE_NAME is valid for the subclass.  If it is not
+	## valid, then raise a condition explaining why. 
+	
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_attribute_list.set_attribute(attribute_name,attribute_value)
+	## set_attribute(symbol ATTRIBUTE_NAME,
+	##               string ATTRIBUTE_VALUE) : _unset
+	##
+	## set's ATTRIBUTE_NAME to be ATTRIBUTE_VALUE
+
+	_self.validate_attribute(attribute_name)
+
+	_if (attribute_value.includes?(space_char) _orif
+	     attribute_value.includes?(%/) _orif
+	     attribute_value.includes?(%\) _orif
+	     attribute_value.includes?(%.) _orif
+	     attribute_value.includes?(%-) _orif
+	     attribute_value.includes?(%!)) _andif
+	    attribute_value.first <> %<
+	_then
+		attribute_value << write_string(%",attribute_value,%")
+	_endif
+	
+	.attributes[attribute_name] << attribute_value
+
+	_return _self
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_attribute_list.get_attribute(attribute_name)
+	## get_attribute(symbol ATTRIBUTE_NAME) : string
+	##
+	## returns the value associated with ATTRIBUTE_NAME 
+
+	_return .attributes[attribute_name]
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_attribute_list.clear_attribute(attribute_name)
+	## clear_attribute(symbol ATTRIBUTE_NAME) : _unset
+	##
+	## removes ATTRIBUTE_NAME from the list of attributes on self. 
+
+	.attributes.remove_key(attribute_name)
+_endmethod
+$
+_pragma(classify_level=restricted,usage={subclassable})
+_method dot_attribute_list.write_on(a_stream)
+	## 
+	## 
+
+	_local style_info << rope.new()
+
+	_for k,v _over .attributes.fast_keys_and_elements()
+	_loop
+		style_info.add_last(write_string(k,"=",v))
+	_endloop
+	
+	a_stream.write(%[)
+	a_stream.write_list_with_separator(style_info,%,)
+	a_stream.write(%])
+	
+	
+
+_endmethod
+$

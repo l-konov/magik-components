@@ -1,0 +1,674 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+##
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+def_slotted_exemplar( :sf!record_lister,
+{
+	{ :collection,   _unset },
+	{ :widgets,      _unset },
+	{ :on_tab_page,  _unset },
+	{ :bucket_size,  _unset },
+	{ :data_stream,  _unset },
+	{ :data_chunk,   _unset },
+	{ :bucket_info,  _unset },
+	{ :bucket_cache, _unset },
+	{ :cache_keys,   _unset }
+},
+{ :plugin } )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :collection, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :widgets, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :on_tab_page, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :bucket_size, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :data_stream, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :data_chunk, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :bucket_info, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :bucket_cache, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_slot_access( :cache_keys, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines what action should be performed (if enabled)
+## when the user double-clicks on an entry in the record list.
+## The value can be changed at run-time.
+##
+sf!record_lister.def_property( :double_click_action,
+	:type,		:symbol,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, :|| )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines if the record list uses stripes
+## (e.g. the background color changes between white and
+## 'orange' on the display).
+## The value can't be changed at run-time.
+##
+sf!record_lister.def_property( :show_stripes?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _true )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines if the user is allowed to define
+## filter strings to narrow down the amount of displayed
+## data.
+## The value can't be changed at run-time.
+##
+sf!record_lister.def_property( :allow_filtering?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _true )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines if the user is allowed to define
+## filter strings to narrow down the amount of displayed
+## data.
+## The value can't be changed at run-time.
+##
+sf!record_lister.def_property( :list_label_font,
+	:type,		:object,
+	:readable?,	_true,
+	:writable?,	_false,
+	:default_value, sw:font.new_with_properties(
+				   :type, :logical,
+				   :name, :bold,
+				   :point_size, 12 ) )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines how many entries the cache
+## for sets of record can hold.
+## The value can't be changed at run-time.
+##
+sf!record_lister.def_property( :bucket_cache_size,
+	:type,		:integer,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, 20 )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_shared_constant( :databus_producer_data_types,
+	{ :status,
+	  :edit_object_actions,
+	  :tree_item_for_html_export
+	},
+	:public )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!record_lister.define_shared_constant( :databus_consumer_data_types,
+	{ :current_table,
+	  :lister_bucket_size,
+	  :refresh_record_list
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!record_lister.init( p_name, p_framework,
+					_optional p_properties )
+
+	_local l_rgc
+
+	_super.init( p_name, p_framework, p_properties )
+
+	l_rgc << sw:recordset_gui_component.new( :record_lister, p_framework )
+
+	l_rgc.add_event_handler( :records_selected,
+				 _self, :|manage_list_selection()| )
+	l_rgc.add_event_handler( :double_clicked,
+				 _self, :|manage_double_click()| )
+
+	.widgets      << sw:property_list.new_with( :record_list, l_rgc )
+	.collection   << _unset
+	.on_tab_page  << _unset
+	.bucket_info  << { 0, 0, 0 }
+	.bucket_cache << sw:hash_table.new()
+	.cache_keys   << sw:sorted_collection.new()
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!record_lister.init_actions()
+
+	_local l_fwk << _self.framework
+
+	_super.init_actions()
+
+	_for i_action_name _over { :get, :first, :last,
+				   :previous_one, :next_one
+				 }.fast_elements()
+	_loop
+	    _self.add_action(
+		    l_fwk.define_action( i_action_name, _self,
+					 :enabled?, _false,
+					 :image,    { i_action_name,
+						      :ui_resources } ) )
+	_endloop
+
+	_self.add_action(
+		l_fwk.define_action( :edit_object, _self,
+				     :enabled?, _false,
+				     :image,    { :edit_object,
+						  :ui_resources } ) )
+	_self.add_action(
+		l_fwk.define_action( :edit_object_floating, _self,
+				     :enabled?, _false,
+				     :image,    { :edit_object,
+						  :mclib_table_inspector } ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.build_gui( p_container, _optional p_xml_element )
+
+	_local l_rc << sw:rowcol.new( p_container, 3, 1, :pixel,
+				      :default_col_alignment, :fill,
+				      :default_row_alignment, :fill,
+				      :row_resize_values,     { 0, 0, 100 },
+				      :style,     :nested,
+				      :resize?,   _true,
+				      :tab_label, _self.message( :tab_label ) )
+	_local l_row << 0
+	_local l_rc2
+	#
+	# Create a label to display information about the current table...
+	#
+	.widgets[ :table_info ] <<
+	    sw:label_item.new( l_rc, "", :row, l_row +<< 1, :col, 1,
+			       :font, _self.list_label_font,
+			       :resize_x?, _true, :resize_y?, _false )
+	#
+	# Build the navigation buttons...
+	# 
+	l_rc2 << sw:rowcol.new( l_rc, 1, _unset, :pixel, :style, :nested,
+				:row, l_row +<< 1, :col, 1,
+				:default_row_alignment, :centre,
+				:resize_x?, _true, :resize_y?, _false )
+	_self.action( :first ).place_control_on( l_rc2, :dialog )
+	_self.action( :previous_one ).place_control_on( l_rc2, :dialog )
+	_self.action( :next_one ).place_control_on( l_rc2, :dialog )
+	_self.action( :last ).place_control_on( l_rc2, :dialog )
+
+	.widgets[ :recordset_number ] <<
+		sw:text_item.new( l_rc2, "",
+				  :model, _self,
+				  :display_length, 4,
+				  :incremental_change_selector,
+				      :|recordset_number_changed()| )
+	_self.action( :get ).place_control_on( l_rc2, :dialog )
+
+	.widgets[ :recordset_info ] << sw:label_item.new( l_rc2 )
+	#
+	# Create the actual list widget...
+	#
+	.widgets[ :record_list ].build_gui(
+		l_rc, :row, l_row +<< 1, :col, 1,
+		:resize?,		 _true,
+#		:distribute_spare_width, :always,
+		:stripes?,		 _self.show_stripes?,
+		:allow_filtering?,	 _self.allow_filtering? )
+
+	_self.add_actions_to_lister_popup_menu()
+	#
+	# This is quite a nasty trick to figure out on which tab page
+	# the plugin has been placed.
+	#
+	.widgets[ :container ] << p_container
+	_self.on_tab_page << p_container.pages.size
+
+	>> l_rc
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.sw_databus_data_available(
+		p_data_type_name, p_data )
+
+	_if p_data_type_name = :refresh_record_list
+	_then
+		_self.update_record_list( p_data )
+
+	_elif p_data_type_name = :lister_bucket_size
+	_then
+		_self.bucket_size << p_data
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.sw_databus_data_requested(
+		p_data_type_name, _gather p_args )
+
+	_if p_data_type_name = :edit_object_actions
+	_then
+		_if .widgets[ :container ].current_page = _self.on_tab_page
+		_then
+			_return { _self.action( :edit_object ),
+				  _self.action( :edit_object_floating ) }
+		_endif
+
+	_elif p_data_type_name = :tree_item_for_html_export
+	_then
+		_if .widgets[ :container ].current_page = _self.on_tab_page
+		_then
+			_return .widgets[ :record_list ].tree_item
+		_endif
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.manage_list_selection( p_tree_selection )
+
+	_self.action( :edit_object_floating ).enabled? <<
+	_self.action( :edit_object ).enabled?          <<
+		_not p_tree_selection.empty?
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.manage_double_click( p_display_tree )
+
+	_handling component_no_such_action _with sw:procedure
+
+	_local l_action << _self.action( _self.double_click_action )
+	
+	_if l_action _isnt _unset _andif
+	    l_action.enabled?
+	_then
+		l_action.execute_action()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.edit_object()
+
+	## Update the contents of an embedded editor for the current record.
+
+	_self.framework.edit_object(
+		.widgets[ :record_list ].selected_records.an_element(),
+		:|set_object_in_embedded_editor()|, _self, _true )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.edit_object_floating()
+
+	## Update the contents of a stand-alone editor for the current record.
+
+	_self.framework.edit_object_floating(
+		.widgets[ :record_list ].selected_records.an_element(),
+		:|activate_editor_for_object()|, _self, _true )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.add_actions_to_lister_popup_menu()
+
+	_local l_pm << .widgets[ :record_list ].tree_item.popup_menu
+
+	sw:separator_item.new( l_pm )
+	_self.action( :edit_object ).place_control_on( l_pm, :menu )
+	_self.action( :edit_object_floating ).place_control_on( l_pm, :menu )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.update_record_list( p_collection )
+
+	_local l_lister << .widgets[ :record_list ]
+	_local l_label  << .widgets[ :table_info ]
+	_local l_tb     << .widgets[ :container ]
+	_local l_records
+	_local l_info
+	_local l_set_info
+
+	_self.bucket_cache.empty()
+	_self.cache_keys.empty()
+
+	_self.bucket_size <<
+		_self.databus.request_data( :lister_bucket_size, _self )
+			     
+	l_lister.data_source << _unset
+	l_label.label        << ""
+	#
+	# Switch to the tab that hosts _self...
+	#
+	l_tb.actual.current_page<< _self.on_tab_page
+	_self.framework.tab_page_changed( l_tb, _self.on_tab_page )
+	#
+	# Try to convert A_COLLECTION to a read-stream that allows
+	# to step through the collection...
+	#
+	_self.collection << p_collection
+
+	l_records << p_collection.size
+	_if p_collection.responds_to?( :|read_stream()| ) _andif
+	    ( _self.data_stream << p_collection.read_stream() ) _isnt _unset _andif
+	    _self.data_stream.responds_to?( :|get_upto_n()| )
+	_then
+		_local l_d, l_r
+
+		( l_d, l_r ) << l_records.div_mod( _self.bucket_size )
+		_self.bucket_info <<
+			sw:integer_vector.new_with(
+				   1, 1,
+				   l_d + _if l_r > 0
+					 _then >> 1
+					 _else >> 0
+					 _endif,
+				   l_records )
+		_self.first()
+	_else
+		_self.data_stream << _unset
+		_self.data_chunk  << p_collection
+
+		_self.bucket_info << { 0, 1, 0, l_records }
+
+		.widgets[ :recordset_info ].label << 
+			_self.message( :no_set_pos_info )
+
+		_self.manage_actions()
+		#
+		# Refresh the data list...
+		#
+		l_lister.data_source << _self.data_chunk
+	_endif
+
+	_if p_collection _isnt _unset
+	_then
+		l_label.label << _self.message( :table_info,
+						p_collection.name,
+						p_collection.external_name,
+						_self.bucket_info.last )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.manage_actions()
+
+	_local l_info << _self.bucket_info
+	_local l_pos  << l_info[ 2 ]
+	_local l_last << l_info[ 3 ]
+
+	_self.action( :previous_one ).enabled? << l_pos > 1
+	_self.action( :next_one ).enabled?     << l_pos < l_last
+	_self.action( :first ).enabled? <<
+		l_pos <> 1 _andif l_last > 1
+	_self.action( :last ).enabled?  <<
+		l_pos <> l_last _andif l_last > 1
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.update_display_data()
+
+	_local l_info << _self.bucket_info
+	_local l_mult << _self.bucket_size
+	_local l_pos  << l_info[ 2 ]
+
+	.widgets[ :recordset_info ].label <<
+		_self.message( :set_pos_info,
+			       l_pos, l_info[ 3 ],
+			       ( l_pos - 1 ) * l_mult + 1,
+			       l_info.last.min( l_pos * l_mult ) )
+
+	_self.manage_actions()
+
+	.widgets[ :record_list ].data_source << _self.data_chunk
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.get_data_chunk()
+
+	_local l_cache << _self.bucket_cache
+	_local l_pos   << _self.bucket_info[ 2 ]
+	_local l_data  << l_cache[ l_pos ]
+	_local l_size  << _self.bucket_size
+	_local l_recs
+	_local l_count
+
+	#
+	# Take a look in the cache first...
+	#
+	_if l_data _isnt _unset
+	_then
+		_self.data_chunk << l_data
+		_return
+	_endif
+	#
+	# The get_upto_n() callback is a tad odd. For collections with
+	# "big records" it is unlikely that the call yields L_SIZE
+	# records but only 'a few'. So we have this look that tries to
+	# collect as many records as the bucket_size suggests...
+	#
+	l_data << sw:valid_record_set.new()
+	_loop
+		( l_recs, l_more? ) << _self.data_stream.get_upto_n( l_size )
+
+		_if l_recs.empty? _then l_recs << {} _endif
+		l_data.add_all( l_recs )
+		#
+		# Decide if we got all the data we needed or if we
+		# should try to read more data...
+		#
+		_if l_more? _is _false _orif
+		    l_recs.empty? _orif
+		    ( l_count << l_recs.size ) = l_size
+		_then
+			_leave
+		_else
+			l_size -<< l_count
+		_endif
+	_endloop
+
+	_self.update_bucket_cache( l_pos, l_data )
+
+	_self.data_chunk << l_data
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.update_bucket_cache( p_pos, p_data )
+
+	_local l_cache << _self.bucket_cache
+	_local l_keys  << _self.cache_keys
+	_local l_kf
+	_local l_kl
+
+	_if l_cache.size > _self.bucket_cache_size
+	_then
+		#
+		# Check if we are closer to the start or the end
+		# of the cache; remove an entry "at the other side".
+		#
+		_if ( p_pos - ( l_kf << l_keys.first ) ) <
+		    ( ( l_kl << l_keys.last ) - p_pos )
+		_then
+			l_cache.remove_key( l_kl )
+			l_keys.remove( l_kl )
+		_else
+			l_cache.remove_key( l_kf )
+			l_keys.remove( l_kf )
+		_endif
+	_endif
+
+	_if _not l_keys.includes?( p_pos ) _then l_keys.add( p_pos ) _endif
+
+	>> l_cache[ p_pos ] << p_data
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!record_lister.jump_to_record_set( p_set_no )
+
+	_local l_n << _self.bucket_size
+	_local l_data
+	_local l_more?
+
+	_self.data_stream.reset()
+	_for i _over range( 1, p_set_no )
+	_loop
+		( l_data, l_more? ) << _self.data_stream.get_upto_n( l_n )
+		_if _not l_more? _then _leave _endif
+
+		_self.update_bucket_cache( i, l_data )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.first()
+
+	_self.bucket_info[ 2 ] << 0
+
+	_self.data_stream.reset()
+	_self.next_one()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.last()
+
+	_local pos << _self.bucket_info[ 3 ]
+
+	_self.jump_to_record_set( pos - 1 )
+
+	_self.bucket_info[ 2 ] << pos
+	_self.get_data_chunk()
+	_self.update_display_data()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.previous_one()
+
+	_local l_pos << _self.bucket_info[ 2 ] -<< 1
+
+	_if _self.bucket_cache[ l_pos ] _is _unset
+	_then
+		_self.jump_to_record_set( l_pos - 1 )
+	_endif
+
+	_self.get_data_chunk()
+	_self.update_display_data()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.next_one()
+
+	_self.bucket_info[ 2 ] +<< 1
+
+	_self.get_data_chunk()
+	_self.update_display_data()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.get()
+
+	_local l_pos << .widgets[ :recordset_number ].value.as_number()
+
+	_self.jump_to_record_set( l_pos - 1 )
+
+	_self.bucket_info[ 2 ] << l_pos
+	_self.get_data_chunk()
+	_self.update_display_data()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!record_lister.recordset_number_changed( a_string )
+
+	_local l_num << a_string.as_number()
+
+	_self.action( :get ).enabled? <<
+		l_num _isnt _unset _andif
+		l_num > 0 _andif
+		l_num < _self.bucket_info[ 3 ]
+_endmethod
+$

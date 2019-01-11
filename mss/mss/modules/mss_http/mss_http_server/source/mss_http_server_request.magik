@@ -1,0 +1,525 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_server_request
+##
+## Wrapper to format information suitable for receiving a request
+## to an HTTP server.
+##
+
+def_slotted_exemplar(:mss_http_server_request,
+{
+	{:url, _unset},
+	{:http_request_method, _unset},
+	{:http_version, _unset},
+	{:response, _unset},
+	{:connection_manager, _unset}
+},
+{:mss_http_generic_request_response})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_request.define_slot_access(
+	:url,
+	## The URL being requested (i.e. "/index.html").
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_request.define_slot_access(
+	:http_request_method,
+	## The HTTP request method.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_request.define_slot_access(
+	:http_version,
+	## The HTTP protocol version.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_request.define_slot_access(
+	:response,
+	## A mss_http_server_response that describes the response to
+	## the request.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_request.define_slot_access(
+	:connection_manager,
+	## The mss_http_server_connection_manager that is initiating self.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+_method mss_http_server_request.new(a_connection, a_conn_mgr)
+	## 
+	## 
+
+	_return _clone.init(a_connection, a_conn_mgr)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_server_request.init(a_connection, a_conn_mgr)
+	## 
+	##
+
+	.connection << a_connection
+	.connection_manager << a_conn_mgr
+	.response << mss_http_server_response.new(a_connection, a_conn_mgr)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_request.server
+	## 
+	## Return the mss_http_server_engine initiating this.
+	##
+
+	_if .connection_manager _isnt _unset
+	_then
+		_return .connection_manager.server
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_request.local_heartbeat_manager()
+	## 
+	## Get this from the server if possible.
+	##
+
+	_if (svr << _self.server) _isnt _unset _andif
+	    (x << svr.shared_heartbeat_manager()) _isnt _unset
+	_then
+		_return x
+	_endif
+	_return _super.local_heartbeat_manager()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_request.process_request_header(_optional timeout)
+	## 
+	## Receive header data from the connection.  If TIMEOUT is
+	## provided, it is a timeout period in milliseconds.
+	##
+
+	_if timeout _isnt _unset
+	_then
+		_return _self.perform_with_timeout(timeout, _false, :|process_request_header()|)
+	_else
+		_return _self.int!process_request_header()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_request.send_response(_optional timeout)
+	##
+	## Send the response to this request.  If TIMEOUT is
+	## provided, it is a timeout period in milliseconds.
+	##
+
+	_if timeout _isnt _unset
+	_then
+		_return _self.perform_with_timeout(timeout, _false, :|send_response()|)
+	_else
+		_return _self.int!send_response()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_request.get_safe_request_body()
+	## 
+	## Get the request body as a string, as safely as possible.
+	## This is hairy, because getting data from a tcpip_connection
+	## input will hang indefinitely if there is nothing to get.
+	##
+
+	_local me << _self 
+	_if _self.get_header_field("Transfer-Encoding").default("").lowercase = "chunked"
+	_then
+		# The following is not documented, because it is not supported,
+		# and I don't have a way of properly testing it.  Use at your
+		# own risk.
+		_return _self.get_safe_request_body_chunked()
+	_endif
+	
+	_local wrk_pl, read_chars, s
+	_local tag << "get_safe_request_body()".copy()
+	s << internal_text_output_stream.new()
+	_protect 
+		new_hbm? << (.int!heartbeat_manager _is _unset)
+		hb_mgr << _self.local_heartbeat_manager()
+		tm << hb_mgr.timeout_manager
+		in << .connection.input
+
+		# N.B.: if max_to_read is unset, and if this is a persistent
+		# connection, then this WILL hang waiting for input until the
+		# timeout_manager interrupts me.  Maybe I should require
+		# Content-Length until/unless I support chunked transfer
+		# encoding. 
+		max_to_read << _self.get_header_field("Content-Length").default("").as_integer()
+		read_chars << 0
+		wrk_s << internal_text_output_stream.new()
+		_loop
+			# Set a relatively short timeout, and if no single line is
+			# received in that span, then give up.
+			wrk_pl << _unset 
+			l << _unset
+			tm.set_timeout(5000, _unset, tag, _self)
+			_catch :timeout
+			       _handling mss_timeout_expiry _with
+			       _proc(cond)
+				       _import me, tag, wrk_pl, read_chars, s
+				       _if cond[:tag] _is tag
+				       _then
+					       # This is my timeout.
+					       _if wrk_pl _isnt _unset
+					       _then
+						       # Salvage the partially-read data.
+						       read_chars +<< wrk_pl[:count].default(0)
+						       _if wrk_pl[:stream] _isnt _unset
+						       _then
+							       s.write(wrk_pl[:stream].string)
+						       _endif 
+						       _if wrk_pl[:last_nl?] _is _true
+						       _then
+							       s.write(newline_char)
+						       _endif 
+					       _endif
+					       condition.raise(:mss_http_information, :priority, 4,
+							       :string, me.message(:timeout_reading_request_body))
+					       _throw :timeout
+				       _else
+					       # This is a timeout placed on the heartbeat manager by
+					       # something else.
+					       cond.continue_handling()
+				       _endif 
+			       _endproc
+			       line_chars << 0
+			       last_nl? << _false
+			       _if max_to_read _isnt _unset
+			       _then
+				       remainder << max_to_read - read_chars
+			       _else
+				       remainder << 1024
+			       _endif
+			       wrk_s.reset()
+			       wrk_pl << property_list.new_with(
+						 :stream, wrk_s)
+			       (l, junk, line_chars, last_nl?) << in.mss_get_ascii_line(remainder.min(1024), wrk_pl)
+			_endcatch
+			tm.mss_clear_earliest_timeout_with_tag(tag)
+			_if l _is _unset _then _leave _endif
+			_if line_chars _is _unset _then line_chars << l.size _endif 
+			read_chars +<< line_chars
+			s.write(l)
+			_if last_nl? _is _true
+			_then
+				s.write(newline_char)
+			_endif 
+		_endloop 
+	_protection
+		_if new_hbm? _is _true
+		_then
+			_self.terminate_local_heartbeat_manager()
+		_endif 
+	_endprotect
+
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_request.get_safe_request_body_chunked()
+	## 
+	## Get the request body as a series of chunks, as safely as possible.
+	## This is hairy, because getting data from a tcpip_connection
+	## input will hang indefinitely if there is nothing to get.
+	##
+
+	# The following is not documented, because it is not supported,
+	# and I don't have a way of properly testing it.  Use at your
+	# own risk.
+
+	_local me << _self 
+	_local tag << "get_safe_request_body_chunked()".copy()
+	s << internal_text_output_stream.new()
+	_protect 
+		new_hbm? << (.int!heartbeat_manager _is _unset)
+		hb_mgr << _self.local_heartbeat_manager()
+		tm << hb_mgr.timeout_manager
+		in << .connection.input
+		chunk_count << 0
+		debug_stream << _self.server.log_stream(10)
+		do_debug? << debug_stream _isnt _unset
+		
+		_loop
+			# The next line is the number of chunked characters to follow
+			# (in hex), followed by an optional set of extra parameters and
+			# a CR-LF combination.
+			#
+			# Get this line (with a timeout).
+			l << _unset 
+			tm.set_timeout(5000, _unset, tag, _self)
+			_catch :timeout
+			       _handling mss_timeout_expiry _with
+			       _proc(cond)
+				       _import me, tag
+				       _if cond[:tag] _is tag
+				       _then
+					       # This is my timeout.
+					       condition.raise(:mss_http_information, :priority, 4,
+							       :string, me.message(:timeout_reading_chunk_length))
+					       _throw :timeout
+				       _else
+					       # This is a timeout placed on the heartbeat manager by
+					       # something else.
+					       cond.continue_handling()
+				       _endif 
+			       _endproc
+
+			       l << in.mss_get_ascii_line()
+			_endcatch
+			tm.mss_clear_earliest_timeout_with_tag(tag)
+			
+			_if l _is _unset _orif
+			    (data_len << l.as_radix_integer(16)) _is _unset 
+			_then
+				# Don't know what to do with this error right now.  Chunking is
+				# not yet officially supported by this tool, so just give up.
+				_if do_debug?
+				_then
+					debug_stream.write("DEBUG READ CHUNK ", chunk_count,
+							   " : unexpected unable to get chunk length", newline_char)
+				_endif 
+				_leave
+			_endif
+
+			chunk_count +<< 1
+			_if data_len = 0
+			_then
+				# The end of the data has been reached.  Officially, more
+				# footers can follow, but I'm not actually sure what I'd do
+				# with them at this point.  So, just leave.
+				_if do_debug?
+				_then
+					debug_stream.write("DEBUG READ CHUNK ", chunk_count,
+							   " : last zero-length chunk found.", newline_char)
+				_endif 
+				_leave
+			_endif
+			_if do_debug?
+			_then
+				debug_stream.write("DEBUG READ CHUNK ", chunk_count,
+						   " : next chunk length is ", data_len, newline_char)
+			_endif 
+
+			# The following DATA_LEN characters can now be appended.  Do
+			# this in a timeout block.
+			read_len << 0
+			tm.set_timeout(5000, _unset, tag, _self)
+			_catch :timeout
+			       _handling mss_timeout_expiry _with
+			       _proc(cond)
+				       _import me, tag
+				       _if cond[:tag] _is tag
+				       _then
+					       # This is my timeout.
+					       condition.raise(:mss_http_information, :priority, 4,
+							       :string, me.message(:timeout_reading_chunk_data))
+					       _throw :timeout
+				       _else
+					       # This is a timeout placed on the heartbeat manager by
+					       # something else.
+					       cond.continue_handling()
+				       _endif 
+			       _endproc
+
+			       _if do_debug?
+			       _then 
+				       debug_intstr << internal_text_output_stream.new()
+			       _endif 
+			       _for i _over 1.upto(data_len)
+			       _loop
+				       _if (c1 << in.get()) _is _unset
+				       _then
+					       # Shouldn't be so, but again, I don't know what to do with it
+					       # if the stream closes part-way through what was promised.
+					       _leave
+				       _endif
+				       read_len +<< 1
+				       my_char << c1.as_character()
+				       s.write(my_char)
+				       _if do_debug?
+				       _then
+					       debug_intstr.write(my_char)
+				       _endif 
+			       _endloop
+
+			       _if do_debug?
+			       _then 
+				       debug_stream.write("DEBUG READ CHUNK ", chunk_count,
+							  " : next chunk data is ", debug_intstr.string, newline_char)
+			       _endif
+			       
+			       # This should be followed by a CRLF.
+			       _if (c1 << in.get()) _isnt _unset
+			       _then
+				       _if c1 = 10
+				       _then
+					       # Just a LF.  OK.
+				       _elif c1 = 13
+				       _then
+					       # CR - expect an LF next.
+					       _if (c2 << in.get()) _isnt _unset
+					       _then
+						       _if c2 = 10
+						       _then
+							       # OK.
+						       _else
+							       # Something else - spit it back.
+							       in.unget(c2)
+						       _endif
+					       _endif
+				       _else
+					       # Somethine else - spit it back.
+					       debug_stream.write("DEBUG READ CHUNK ", chunk_count,
+								  " : unexpected character ID at end of chunk: ", c1, newline_char)
+					       in.unget(c1)
+				       _endif 
+			       _endif 
+			_endcatch
+			tm.mss_clear_earliest_timeout_with_tag(tag)
+
+			_if read_len < data_len
+			_then
+				# Don't know what to do with this error right now.  Chunking is
+				# not yet officially supported by this tool, so just give up.
+				_if do_debug?
+				_then
+					debug_stream.write("DEBUG READ CHUNK ", chunk_count,
+							   " : not enough chars read - expected ", data_len,
+							   ", got ", read_len, newline_char)
+				_endif 
+				_leave
+			_endif
+		_endloop 
+	_protection
+		_if new_hbm? _is _true
+		_then
+			_self.terminate_local_heartbeat_manager()
+		_endif 
+	_endprotect
+
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_private _method mss_http_server_request.int!process_request_header()
+	## 
+	##
+
+	_catch :any_error
+	       # N.B.: at this time, don't need error handling here; let
+	       # the caller will take care of it.
+
+	       pl << _self.header_fields
+	       in << .connection.input
+	       _if (l << in.mss_get_ascii_line()) _is _unset
+	       _then
+		       _return
+	       _endif
+	       
+	       l << l.trim_spaces()
+	       r << rope.new()
+	       _if (idx1 << l.index_of(% )) _isnt _unset
+	       _then
+		       r.add_last(l.slice(1, idx1 - 1).trim_spaces())
+		       l << l.slice_to_end(idx1 + 1).trim_spaces()
+	       _endif 
+	       _if (idx1 << l.index_of(% )) _isnt _unset
+	       _then
+		       r.add_last(l.slice(1, idx1 - 1).trim_spaces())
+		       l << l.slice_to_end(idx1 + 1).trim_spaces()
+	       _endif
+	       _if l.size > 0
+	       _then 
+		       r.add_last(l)
+	       _endif
+	       
+	       _if r.size >= 1
+	       _then
+		       .http_request_method << r[1]
+	       _endif
+	       _if r.size >= 2
+	       _then
+		       .url << r[2]
+	       _endif
+	       _if r.size >= 3 _andif
+		   r[3].index_of_seq("HTTP/") = 1
+	       _then
+		       .http_version << r[3].slice_to_end(6)
+	       _endif
+	       
+	       # Get header information.
+	       _loop
+		       _if (l << in.mss_get_ascii_line()) _is _unset _then _leave _endif
+		       l << l.trim_spaces()
+		       _if l = ""
+		       _then
+			       _leave
+		       _endif
+
+		       # For remaining lines, split result by :
+		       _if (idx << l.index_of(%:)) _isnt _unset
+		       _then
+			       pl[l.slice(1, idx - 1).trim_spaces()] << l.slice_to_end(idx + 1).trim_spaces()
+		       _endif 
+	       _endloop
+	_endcatch 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_private _method mss_http_server_request.int!send_response()
+	## 
+	## 
+
+	_if .connection.output _is _unset
+	_then
+		# If bent here, don't know what to do.
+		_return _false
+	_endif 
+
+	.response.write_response_on(.connection.output)
+	_return _true
+	
+_endmethod
+$

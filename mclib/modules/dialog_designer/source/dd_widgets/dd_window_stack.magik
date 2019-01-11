@@ -1,0 +1,225 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_WINDOW_STACK - object to represent a window_stack but still
+## acts like rowcol for rendering and analysis. 
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_window_stack,{},:dd_tab_box)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_window_stack.define_shared_constant(:dd_properties,
+			      property_list.new_with(
+				      :dialog_description,     :string,
+				      :dialog_element_id,      :string,
+				      :default_row_alignment,  {:fill,:top,:centre,:bottom},
+				      :default_col_alignment,  {:fill,:left,:centre,:right},
+				      :text_choice_item_driver, :string
+				      ),
+			      :public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	>> dd_window_stack.dd_properties
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.text_choice_item_driver
+	## 
+	## Return the key referencing the text_choice_item that will
+	## drive SELF.
+	>> _self.properties[:text_choice_item_driver]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.text_choice_item_driver << val
+	## Set the key referencing the text_choice_item that will
+	## drive SELF.
+
+	_self.properties[:text_choice_item_driver] << val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.window_strings_and_values()
+	## 
+	## Return the strings and values base on SELF's window names.
+	
+	strs << ""
+	vals << ""
+
+	_for w _over .items.fast_elements()
+	_loop
+		vals +<< "," + w.window_name.substitute_character(% ,%_)
+		strs +<< "," + w.window_name.write_string.substitute_character(%_,% ).capitalise
+	_endloop
+
+	vals << vals.slice_to_end(2)
+	strs << strs.slice_to_end(2)
+
+	>> strs,vals
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	w_name << _self.items.first.window_name
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id,"] << window_stack.new(",parent_id,%,,
+		  ":resize?,_true,:row,",_self.row,",:col,",_self.col,",:value,:",w_name,",",%newline,
+	           %tab*2,":col_alignment,:fill,:row_alignment,:fill)",%newline)
+	txt.write(%tab,_self.dialog_element_id," << .items[:",_self.dialog_element_id,%],%newline)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.render_on(canv,bb,_optional x0,y0)
+	## 
+	## Render SELF on the canvas CANV.
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+	
+	_dynamic !dialog_element_footprints!
+	!dialog_element_footprints![pbb] << _self 
+	
+	gb << pbb.deep_copy()
+
+	_if (nam << _self.active_page.window_name) _is _unset
+	_then
+		idx << _self.properties[:active_page_n]
+		 _self.active_page.window_name << write_string("win_",idx)
+	_endif 
+
+	txt << _self.active_page.window_name
+
+	ts  << text_style.new_with_properties(:colour,colour.called(:black))
+	vts << vtext_style.new(ts.font)
+	txtb  << vts.box_coordinates(txt,gb.xmin+10,gb.ymin,0).bounds
+	ptb << pixel_bounding_box.new_from(txtb)
+	
+	wb << pixel_bounding_box.new(bb.xmin+1,txtb.ymax+5,gb.xmax+1,gb.ymax+1)
+	ls << line_style.new(colour.called(:gray),1)
+
+	s << 3
+
+	# Top window
+	pcv << coords_vector.new_with_xy(
+		       pbb.xmin+s,ptb.ymax+4,
+		       pbb.xmax,ptb.ymax+4,
+		       pbb.xmax,pbb.ymax-s,
+		       pbb.xmin+s,pbb.ymax-s,
+		       pbb.xmin+s,ptb.ymax+4
+			     )
+	canv.draw(pcv,ls)
+
+	# next window
+	pcv << coords_vector.new_with_xy(
+		       pbb.xmin+s,ptb.ymax+4+s,
+		       pbb.xmin,ptb.ymax+4+s,
+		       pbb.xmin,pbb.ymax,
+		       pbb.xmax-s,pbb.ymax,
+		       pbb.xmax-s,pbb.ymax-s
+			     )
+	canv.draw(pcv,ls)
+
+	
+	canv.draw_text(ts,gb.xmin+5,gb.ymin+txtb.height.floor,txt)
+
+	tb_bb << pbb.expand(-5)
+	tb_bb.ymin +<< 20
+
+	txt << _self.tab_index_text()
+	txtb  << vts.box_coordinates(txt,0,0,0).bounds
+
+	x << tb_bb.xmax - 25 - txtb.width.floor
+	y << tb_bb.ymin - 26
+	
+	canv.draw_text(ts,x+16,y+13,txt)
+
+	_dynamic !dialog_pseudo_buttons!
+	_if _self.properties[:active_page_n] > 1
+	_then
+		canv.render_raster(slider_item.slider_raster(:left),x,y,_false)
+		lbb << pixel_bounding_box.new_with_size(x,y,15,15)
+		!dialog_pseudo_buttons![lbb] << {_self,:|change_tab()|,-1}		
+	_endif
+
+	_if _self.properties[:active_page_n] < .items.size
+	_then
+		canv.render_raster(slider_item.slider_raster(:right),x+txtb.width.floor+15,y,_false)
+		lbb << pixel_bounding_box.new_with_size(x+txtb.width.floor+15,y,15,15)
+		!dialog_pseudo_buttons![lbb] << {_self,:|change_tab()|,1}		
+	_endif
+	
+	_self.active_page.render_on(canv,tb_bb,x0,y0)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.dialog_design_footprint()
+	## 
+	## Return the footprint SELF will occupy when rendered.
+
+	tb_h << 0
+	tb_w << 0
+	
+	_for p _over _self.properties[:pages].fast_elements()
+	_loop
+		(row_h,col_w,total_h,total_w) << p.cell_sizes()
+
+		tb_h << tb_h.max(total_h)
+		tb_w << tb_w.max(total_w)
+	_endloop
+
+	>> _self.row,_self.col,tb_h+30,max(tb_w+10,_self.dialog_min_width)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_window_stack.new_with_xml_properties(parent,props)
+	## 
+	## Return a new instance of SELF is parent PARENT and
+	## properties PROPS.
+	
+	gb << window_stack.new_dialog_default(parent,props[:row],props[:col])
+
+	_for k,e _over props.fast_keys_and_elements()
+	_loop
+		_if e _isnt _unset 
+		_then
+			gb.perform(k.with_chevron,e)			
+		_endif
+	_endloop
+
+	>> gb
+_endmethod
+$

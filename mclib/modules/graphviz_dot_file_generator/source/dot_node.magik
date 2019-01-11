@@ -1,0 +1,79 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+########################################################################
+
+_pragma(classify_level=basic)
+## a node in the Graphviz DOT language.
+def_slotted_exemplar(:dot_node,
+      {
+	      {:id,_unset},
+	      {:parent,_unset}
+      },
+      {:dot_attribute_list}
+)
+$
+dot_node.define_slot_access(:id,:read,:public)
+$
+dot_node.define_slot_access(:parent,:read,:private)
+$
+_pragma(classify_level=basic)
+_method dot_node.new(id,parent)
+	## new(string ID,
+	##    dot_container PARENT) : dot_node
+	##
+	## creates a new clone of self
+
+	_return _clone.init(id,parent)
+_endmethod
+$
+_pragma(classify_level=restricted)
+_private _method dot_node.init(id,parent)
+	## init(string ID,
+	##      dot_container PARENT) : dot_node
+	##
+	## initialises self
+
+	_super.init()
+
+	id << id.write_string
+	
+	_if (id.includes?(space_char) _orif
+	     id.includes?(%/) _orif
+	     id.includes?(%\) _orif
+	     id.includes?(%.) _orif
+	     id.includes?(%-) _orif
+	     id.includes?(%!)) _andif
+	    id.first _isnt %"
+	_then
+		id << write_string(%",id,%")
+	_endif
+
+	.id             << id
+	.parent         << parent
+	
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=restricted)
+_method dot_node.write_on(a_stream,_optional indent_level)
+	## write_on(text_output_stream A_STREAM) : _unset
+	##
+	## writes the information for self on A_STREAM 
+
+	a_stream.write(space_char * indent_level.default(0))
+	a_stream.write(.id)
+	a_stream.write(" ")
+
+	# now write the attribute information
+	_super.write_on(a_stream)
+
+	a_stream.write(";")
+_endmethod
+$

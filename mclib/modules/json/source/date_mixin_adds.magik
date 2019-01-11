@@ -1,0 +1,14 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	date_mixin.write_as_json(a_stream)
+	##
+	##
+	
+	a_stream.write(%")
+	_self.format_to(a_stream, 
+			"#Y-#m-#d")
+	a_stream.write(%")
+_endmethod
+$

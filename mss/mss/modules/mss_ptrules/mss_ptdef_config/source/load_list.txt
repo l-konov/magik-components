@@ -1,0 +1,6 @@
+message_usages.magik
+
+mss_pfcp_folder_dialog.magik
+mss_ptdef_config_framework_plugin.magik
+mss_ptdef_config_menu.magik
+mss_ptdef_folder_config_plugin.magik

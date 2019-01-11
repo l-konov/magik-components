@@ -1,0 +1,13 @@
+<gui>
+ <toolbar name="framework">
+    <action name="framework_display.refresh"/>
+ </toolbar>
+<dock name="top">
+  <toolbar name="framework"/>
+</dock>
+<work_area>
+  <paned_window>
+  <plugin plugin_name="framework_display"/>
+  </paned_window>
+</work_area>
+</gui>

@@ -1,0 +1,214 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={trail})
+_method map_trail.probe_from ( a_coord, _optional hit_set, hit_radius, hit_types, last_geom_loc )
+	## 
+	## Get a PROBE from A_COORD
+	##
+	## HIT_SET must be some sort of geometry_set
+	##
+	## HIT_RADIUS
+	##
+	## HIT_TYPES is an integer_vector(11) (see hit_list)
+	##
+	## LAST_GEOM_LOC is used for the Perpendicular calculations and for
+	##                       Protractor Relative and Absolute
+	##
+
+	# 2004/10/14 TM  Consider additional providers of snappable geoms.
+	# 2005/04/21 TM  Core bug fix: allow snapping to a non-seg probe
+	#                in preference to seg probes.  This is consistent
+	#                with V3.3 core behavior, and it allows snapping
+	#                to a non-connected point geometry that exists on
+	#                a chain geometry (nearly impossible without
+	#                this fix when seg probes are turned on).
+	# 2006/10/27 TM  Integrated with CST V4.1 changes.
+	# 2008/05/14 TM  Integrated with CST V4.1.1 changes.  N.B.: non-seg
+	#                probe bug from 2005/04/21 is finally fixed in core.
+	# 2009/05/11 TM  Integrated with TSB 122, P100238_1.
+	# 2011/04/25 TM  Added comments for CST V4.2.
+	# 2013/07/10 RH  Updated for V4.3 compatibility.
+	
+	_if hit_set _is _unset
+	_then
+		_return probe.new ( a_coord )
+	_endif 
+	
+	# Initialise
+	probe_type  << _unset
+	new_coord   << a_coord
+	probed_geom << _unset
+	
+	hit_types  << hit_types.default ( _self.default_hit_types )
+	hit_radius << hit_radius.default ( 4 )
+	
+	_if .one_shot_probe _isnt _unset _and hit_types.includes?(1) _is _false 
+	_then
+		# free snap so return 
+		_return probe.new(a_coord)
+	_endif
+
+	geometric_types   << hit_types.subseq ( 1, 8 )
+	geometric_probes? << geometric_types.index_of(1) _isnt _unset
+
+	_if last_geom_loc _isnt _unset 
+	_then
+		last_xy << last_geom_loc.coord
+	_endif
+
+	_if ( geom_set << .self_hit_set ) _isnt _unset 
+	_then
+		our_geom_sets << composite_geometry_set.new_with ( .dynamic_probe_set, geom_set )
+	_else
+		our_geom_sets << .dynamic_probe_set
+	_endif
+
+	our_hit_set << composite_geometry_set.new_with ( hit_set, our_geom_sets )
+
+	# TM START CHANGE
+	# Implementation note: I would like to use the
+	# :additional_hit_geometry protocol here, rather than having a
+	# custom hook into restricted map trail protocols.  However,
+	# the :additional_hit_geometry protocol is insufficient, as it
+	# does not pass information about the coordinate being probed
+	# (which is needed to dynamically generate a hit list based on
+	# where a pointing occurs).
+	#
+	# Therefore, I will continue to use a custom hook into
+	# restricted map trail protocols, and see if the
+	# :additional_hit_geometry protocol improves in later
+	# versions.
+	mpgp << .mss_probe_geom_providers.default({})
+	_for a_provider _over mpgp.fast_elements()
+	_loop
+		_if (a_provider_set << a_provider.mss_probe_geoms_for(
+					       _self, hit_set, a_coord, hit_radius, hit_types, last_xy)) _isnt _unset
+		_then
+			our_hit_set << composite_geometry_set.new_with(our_hit_set, a_provider_set)
+		_endif
+	_endloop
+	# TM END CHANGE
+	
+	hit_list  << our_hit_set.hit_list ( a_coord, hit_radius, 10,
+					    hit_types, last_xy, probe.probe_priorities ).default ( {} )
+
+	# The above implements
+	# - Free            type  0 (not implemented here, do not call me)
+	# - Near            type  1
+	# - Control         type  2
+	# - Centre          type  3
+	# - Mid             type  4
+	# - Tangent         type  5    (need last point)
+	# - Perpendicular   type  6    (need last point)
+	# - Seg             type  7
+
+	# See if we can find an intersection first (type 8). We sort of
+	# have to do this, even if the first probe in the list has a
+	# higher priority, because if it's a near or seg which we've
+	# used just to find an intersection then we don't want to
+	# return it.
+	_if hit_types [ 8 ] _is 1 _andif hit_list.size > 1
+	_then
+		tol << _self.intersection_tolerance
+		max_distance << hit_radius
+		intersection_candidates << rope.new()
+		_for a_probe _over hit_list.fast_elements ()
+		_loop
+			(t_geom, t_coord, t_distance, t_type) << ( _scatter a_probe )
+			_if t_geom.responds_to? ( :intersection_near|()| )
+			_then
+				_for i_cand _over intersection_candidates.fast_elements ()
+				_loop
+					(i_geom, i_coord, i_distance, i_type) << (_scatter i_cand)
+
+					(p, r) << i_geom.intersection_near ( t_geom, a_coord, max_distance, tol )
+
+					_if p _isnt _unset
+					_then
+						_if probe_type _is _unset 
+						_then
+							probe_type   << 8
+							new_coord    << p
+							probed_geom  << t_geom
+							probed_int   << i_geom
+							max_distance << r
+						_elif r < max_distance
+						_then 
+							new_coord     << p
+							probed_geom   << t_geom
+							probed_int    << i_geom
+							max_distance  << r
+						_endif
+					_endif
+				_endloop
+
+				intersection_candidates.add ( a_probe )
+			_endif
+		_endloop
+
+		_if probe_type _isnt _unset 
+		_then hit_list.add({probed_geom, new_coord, max_distance, probe_type})
+		_endif
+	_endif
+
+	# Go for any of the other probes ...
+	_if hit_list.size > 0
+	_then
+		# ... but ignore those that were added to find an intersection probe
+		ignore_near_probe? << hit_types[8] _is 1 _andif hit_types[1] _is 0
+		ignore_seg_probe?  << hit_types[8] _is 1 _andif hit_types[7] _is 0
+		
+		_for a_probe _over hit_list.fast_elements()
+		_loop
+			probe_type << a_probe[4]
+			_if probe_type _is 1 _andif ignore_near_probe? _orif
+			    probe_type _is 7 _andif ignore_seg_probe?
+			_then
+				_continue
+			_endif
+
+			probed_geom << a_probe[1] 
+			new_coord   << a_probe[2]
+			_self.check_dynamic_style ( probed_geom )
+			_return probe.new ( new_coord, probe_type, probed_geom )
+		_endloop 
+	_endif
+
+	# If still not found anything then try a Protractor Relative
+	# (type 9) or Protractor Absolute (type 10)
+	_if last_geom_loc _isnt _unset _andif
+	    .dynamics_on_self? _is _false
+	_then
+		last_xy << last_geom_loc.coord
+		
+		_if ( prev_geom_loc << last_geom_loc.previous_vertex () ) _isnt _unset
+		_then
+			prev_xy << prev_geom_loc.coord
+		_endif 
+
+		_if ( new_probe << _self.protractor ( a_coord, last_xy, prev_xy, hit_types ) ) _isnt _unset 
+		_then
+			_return new_probe 
+		_endif
+	_endif
+
+	# Snap to display grid (type 11)
+	_if (new_probe << _self.probe_from_display_grid(a_coord, our_hit_set, hit_radius,
+							hit_types, last_xy)) _isnt _unset
+	_then
+		_return new_probe
+	_endif
+	
+	# When still nothing found, return a default probe
+	new_probe << probe.new ( new_coord )
+	
+	>> new_probe	
+_endmethod
+$

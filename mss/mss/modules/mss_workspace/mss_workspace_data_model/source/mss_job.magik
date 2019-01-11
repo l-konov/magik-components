@@ -1,0 +1,608 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_job
+##
+## A job is the top-level record to aggregate one or more
+## designs. 
+##
+
+def_slotted_exemplar(:mss_job,
+{},
+{:mss_workspace_ds_record})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_job.define_shared_constant(
+	:track_history_fields,
+	## A vector of field names for which history should be
+	## tracked.  If any of these fields change, a history record
+	## will be created.
+	{:name, :type, :status},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.general_validator()
+	##
+	## Ensure that self's name is unique.
+	##
+
+	recs << _self.source_collection.select(predicate.eq(:name, _self.name))
+	_for i _over recs.fast_elements()
+	_loop
+		_if i.id ~= _self.id
+		_then
+			_self.user_error(:duplicate_name, _self.name)
+		_endif
+	_endloop 
+	_return _super.general_validator()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.validate_delete()
+	## 
+	## A job cannot be deleted if it is in a state that cannot be
+	## deleted, or if not authorised to do so for any design. 
+	##
+
+	(ok?, subject) << _self.validate_delete_for_state?()
+	_if _not ok?
+	_then
+		subject.user_error(:cannot_delete_for_state, subject.short_description, subject.status)
+	_endif
+	_if _not _self.validate_delete_for_authorisation?()
+	_then
+		_self.user_error(:auth_job_delete_error, _self.short_description)
+	_endif
+	
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.validate_delete_for_state?()
+	## 
+	## A job cannot be deleted if it is in a state that
+	## cannot be deleted, or if any design is in such a state.
+	##
+
+	_if (st << _self.state(_true)) _isnt _unset _andif
+	    st.get_property(:can_delete_job?) _is _false
+	_then
+		_return _false, _self
+	_endif 
+	
+	_for a_design _over _self.mss_designs.fast_elements()
+	_loop 
+		_if (st << a_design.state(_true)) _isnt _unset _andif
+		    st.get_property(:can_delete_design?) _is _false
+		_then
+			_return _false, a_design
+		_endif 
+	_endloop
+
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.validate_delete_for_authorisation?()
+	## 
+	## A job cannot be deleted if not authorised to do so for any design.
+	##
+
+	_for a_design _over _self.mss_designs.fast_elements()
+	_loop 
+		_if _not a_design.validate_delete_for_authorisation?()
+		_then
+			_return _false 
+		_endif
+	_endloop
+
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.insert_trigger(_gather args)
+	## 
+	## 
+
+	_dynamic !mss_workspace_initiator!
+	_if !mss_workspace_initiator! _is _unset
+	_then
+		_self.user_error(:insert_no_initiator)
+	_endif
+	_super.insert_trigger(_scatter args)
+	_self.track_history(:insert)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.update_trigger(_gather args)
+	## 
+	## 
+
+	_dynamic !mss_workspace_initiator!
+	old_rec << args[2]
+
+	_if _self.type ~= old_rec.type
+	_then
+		_self.validate_type_change(old_rec)
+		
+	_elif _self.status ~= old_rec.status
+	_then
+		# N.B.: if the type changes, that can force a status change, so
+		# only do this check if the type does not change.
+		_if !mss_workspace_initiator! _is _unset
+		_then
+			_self.user_error(:update_status_no_initiator)
+		_endif
+	_endif 
+	_super.update_trigger(_scatter args)
+	_self.track_history(:update, old_rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.delete_trigger(_gather args)
+	## 
+	## 
+
+	_dynamic !mss_workspace_initiator!
+	_if !mss_workspace_initiator! _is _unset
+	_then
+		_self.user_error(:delete_no_initiator)
+	_endif
+	_super.delete_trigger(_scatter args)
+	_self.validate_delete()
+	_self.track_history(:delete)
+	_self.delete_related_documents()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.history_table
+	## 
+	## 
+
+	_return _self.source_view.collections[:mss_job_history]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.history_records
+	## 
+	## 
+
+	_return _self.history_table.select(predicate.eq(:mss_job_id, _self.id))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.track_history(operation, _optional old_rec)
+	## 
+	## Log additional information relating to insert/update/delete
+	## history.
+	##
+
+	upd_user << _self.last_update_user << gis_program_manager.login_name
+	upd_time << _self.last_update_time << date_time.now()
+	_if operation _is :update
+	_then
+		# No further tracking needs to be done, unless an essential
+		# field value has changed.
+		any_change? << _false 
+		_for fname _over _self.track_history_fields.fast_elements()
+		_loop
+			_if _self.perform(fname) ~= old_rec.perform(fname)
+			_then
+				any_change? << _true
+				_leave
+			_endif
+		_endloop
+		_if _not any_change?
+		_then
+			_return
+		_endif
+	_endif
+
+	ndr << _self.history_table.new_detached_record()
+	_if operation _is :insert _then ndr.operation << 1
+	_elif operation _is :delete _then ndr.operation << 3
+	_else ndr.operation << 2
+	_endif
+	ndr.mss_job_id << _self.id
+	ndr.last_update_user << upd_user
+	ndr.last_update_time << upd_time
+	_for fname _over _self.track_history_fields.fast_elements()
+	_loop
+		ndr.perform(fname.with_chevron, _self.perform(fname))
+	_endloop
+	ndr.source_collection.insert(ndr)
+
+	_if operation _is :delete
+	_then
+		_self.create_archive_record(:mss_job_archive)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.fire_pre_insert_actions(prop_values)
+	## 
+	##
+
+	_super.fire_pre_insert_actions(prop_values)
+	_if prop_values[:last_update_user] _is _unset
+	_then
+		prop_values[:last_update_user] << gis_program_manager.login_name
+	_endif 
+	_if prop_values[:last_update_time] _is _unset
+	_then
+		prop_values[:last_update_time] << date_time.now()
+	_endif 
+	_return prop_values
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job.validate_type_change(old_rec)
+	## 
+	## Validate that conditions are acceptable for changing the job type.
+	##
+
+	_if (old_jt << old_rec.job_type()) _is _unset _orif
+	    (new_jt << _self.job_type()) _is _unset _orif
+	    (old_wf << old_rec.workflow()) _is _unset _orif
+	    (new_wf << _self.workflow()) _is _unset 
+	_then
+		_return 
+	_endif
+
+	# If the job type has changed and if there are any designs,
+	# ensure that the datasets for each are still the same.
+	_if old_jt ~= new_jt _andif
+	    _self.mss_designs.size > 0
+	_then 
+		s1 << equality_set.new_from(old_jt.dataset_names)
+		s2 << equality_set.new_from(new_jt.dataset_names)
+		_if s1.size ~= s2.size _orif
+		    s1.intersection(s2).size ~= s2.size
+		_then
+			_self.user_error(:incompatible_job_types,
+					 _self.short_description,
+					 old_rec.type, _self.type)
+		_endif
+	_endif 
+
+	# If the workflow has changed, then all jobs and designs must
+	# still be in their initial state.
+	_if old_wf ~= new_wf
+	_then
+		old_job_init_name << old_wf.get_subsequent_state_names(old_rec, _unset).an_element()
+		new_job_init_name << new_wf.get_subsequent_state_names(_self, _unset).an_element()
+		_if old_rec.status = old_job_init_name
+		_then
+			# OK - silently update the new status to reflect the new
+			# initial state.
+			_self.status << new_job_init_name
+		_else
+			_self.user_error(:incompatible_workflows,
+					 _self.short_description,
+					 old_rec.type, _self.type)
+		_endif
+		
+		_for a_design _over _self.mss_designs.fast_elements()
+		_loop 
+			old_design_init_name << old_wf.get_subsequent_state_names(a_design, _unset).an_element()
+			new_design_init_name << new_wf.get_subsequent_state_names(a_design, _unset).an_element()
+			_if a_design.status = old_design_init_name
+			_then
+				# OK - silently update the new status to reflect the new
+				# initial state.
+				a_design.status << new_design_init_name
+			_else
+				_self.user_error(:incompatible_workflows,
+						 _self.short_description,
+						 old_rec.type, _self.type)
+			_endif
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_job.init_default_attributes(attr_pl, mode)
+	## 
+	## Initialize default values in the attribute property_list
+	## ATTR_PL when creating a new design as described by MODE (one
+	## of :job_and_design or :job).
+	##
+
+	attr_pl[:start_date] << date.now()
+	_return attr_pl
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_job.can_match?(fd)
+	## 
+	## Derive values for various fields from the actual data model.
+	##
+
+	_if {:type, :status}.includes?(fd.name)
+	_then
+		_return _true
+	_endif
+	_return _super.can_match?(fd)
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_job.match_string(fd, a_string, _optional record)
+	## 
+	## Derive values for various fields from the actual data model.
+	## 
+
+	_if (fdn << fd.name) _is :type
+	_then
+		_return mss_job_type.defined_job_types.keys.as_sorted_collection()
+	_elif fdn _is :status
+	_then
+		_return _self.get_subsequent_state_names(_false)
+	_endif
+	_return _super.match_string(fd, a_string, record)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.last_update_date
+	## 
+	## 
+
+	_if (t << _self.last_update_time) _isnt _unset
+	_then
+		_return date.new_from(t)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.job_type(_optional ignore_errors?)
+	## 
+	## Return self's job type.  If IGNORE_ERRORS? is true, then
+	## an error in the workflow configuration will simply be ingored.
+	##
+
+	retval << _unset 
+	_if (t << _self.type) _isnt _unset
+	_then
+		retval << mss_job_type.get_by_name(t.as_charvec())
+	_endif
+	_if retval _is _unset _andif
+	    ignore_errors? _isnt _true
+	_then
+		_self.user_error(:no_job_type_for_record, _self.short_description)
+	_endif 
+	_return retval 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.workflow(_optional ignore_errors?)
+	## 
+	## Return self's workflow, based on job type.  If
+	## IGNORE_ERRORS? is true, then an error in the workflow
+	## configuration will simply be ingored. 
+	##
+
+	retval << _unset 
+	_if (jt << _self.job_type(ignore_errors?)) _isnt _unset
+	_then
+		retval << jt.workflow
+	_endif
+	_if retval _is _unset _andif
+	    ignore_errors? _isnt _true
+	_then
+		_self.user_error(:no_workflow_for_record, _self.short_description)
+	_endif 
+	_return retval 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.state(_optional ignore_errors?)
+	## 
+	## Return self's state, based on job type and status.  If
+	## IGNORE_ERRORS? is true, then an error in the workflow
+	## configuration will simply be ingored. 
+	##
+
+	retval << _unset 
+	_if (wf << _self.workflow(ignore_errors?)) _isnt _unset _andif
+	    (st << _self.status) _isnt _unset 
+	_then
+		retval << wf.get_state(st.as_charvec())
+	_endif
+	_if retval _is _unset _andif
+	    ignore_errors? _isnt _true
+	_then
+		_self.user_error(:no_state_for_record, _self.short_description)
+	_endif 
+	_return retval 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.short_description
+	## 
+	## Use self's name for a short description.
+	##
+
+	_return _self.name
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.get_subsequent_state_names(strict?)
+	## 
+	## Return all state names that self can transition to.
+	## If STRICT? is false, then this is intended for a
+	## match_string() type of query, and it will include self's
+	## current state - and all states if self doesn't have a
+	## workflow defined.  If STRICT? is true, then this is intended
+	## for performing a state change operation, and only allowable
+	## transition names will be returned.
+	##
+
+	_if (wf << _self.workflow(_true)) _is _unset
+	_then
+		_if strict?
+		_then
+			_return {}
+		_else 
+			_return mss_workflow.all_state_names.as_sorted_collection()
+		_endif 
+	_endif
+
+	_if (st << _self.status) = ""
+	_then
+		st << _unset
+	_else
+		st << st.as_charvec()
+	_endif
+
+	_if st _is _unset _andif strict?
+	_then
+		_return {}
+	_endif
+	
+	eq << equality_set.new_from(wf.get_subsequent_state_names(_self, st))
+	_if st _isnt _unset _andif _not strict?
+	_then
+		eq.add(st)
+	_endif 
+	_return eq.as_sorted_collection()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.owned_by_current_user?(_optional uname)
+	## 
+	## Return true if any of self's designs is owned by the given
+	## user name (defaults to gis_program_manager.login_name)
+	##
+
+	_if uname _is _unset
+	_then 
+		uname << gis_program_manager.login_name
+	_endif
+	_for a_design _over _self.mss_designs.fast_elements()
+	_loop
+		_if a_design.owned_by_current_user?(uname)
+		_then
+			_return _true
+		_endif
+	_endloop
+	_return _false 
+			
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.top_level_designs()
+	## 
+	## Return all related designs that are top level designs.
+	##
+
+	r << rope.new()
+	_for i _over _self.mss_designs.fast_elements()
+	_loop
+		_if i.parent_design _is _unset
+		_then
+			r.add_last(i)
+		_endif
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job.ordered_sub_designs()
+	## 
+	## Return all related designs by performing a depth first
+	## traversal.
+	##
+
+	r << rope.new()
+	_for i _over _self.top_level_designs().fast_elements()
+	_loop
+		r.add_all_last(i.ordered_sub_designs(_true))
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_job.field_scores_for_index
+	##
+	## Returns a vector containing appropriate scores for each
+	## field to be used in index selection for a predicate
+	## selection.
+	##
+	## All other things being equal, prefer the index on name.
+	##
+	## This implementation defines a method on the actual class so
+	## that subsequent calls will use that.
+	##
+
+	v << _self.physical_fields.copy()
+	_for i,f _over v.keys_and_elements()
+	_loop
+		v[i] << _if f.name _is :name
+			_then >> 8
+			_elif f.type.enumerator _is _unset
+			_then >> 5
+			_else >> 3
+			_endif
+	_endloop
+	_self.define_shared_constant(:field_scores_for_index, v, _false)
+	_self.dd!add_derived_method(:field_scores_for_index)
+	
+	>> v
+_endmethod
+$

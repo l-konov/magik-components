@@ -1,0 +1,946 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef
+##
+## Pointing rule definition.
+##
+
+def_slotted_exemplar(:mss_ptdef,
+{},
+{:mss_ptdef_ds_record})
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable})
+mss_ptdef.define_shared_variable(
+	:ptrule_class_names,
+	## Sorted collection of pointing rule classes available.
+	sorted_collection.new_with(
+		:mss_action_ptrule,
+		:mss_simple_add_geometry_ptrule,
+		:mss_simple_insert_ptrule,
+		:mss_trail_insert_ptrule,
+		:mss_transform_ptrule,
+		:mss_transform_vertex_ptrule
+			  ),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable})
+mss_ptdef.define_shared_variable(
+	:auto_generate_attributes_on_insert?,
+	## If true, then mss_ptdef_attributes will be auto-generated
+	## for all visible fields when inserted.
+	_true,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef.general_validator()
+	## 
+	## Ensure that there are no duplicate internal_name values.
+	##
+
+	my_name << _self.internal_name
+	my_id << _self.id
+	_for rec _over _self.source_collection.select(predicate.eq(:internal_name, my_name)).fast_elements()
+	_loop
+		_if rec.id = my_id _then _continue _endif
+		condition.raise(:user_error, :string, _self.message(:duplicate_internal_name, my_name))
+	_endloop
+	
+	_return _super.general_validator()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef.insert_trigger(_gather args)
+	## 
+	## Optionally auto-generate attributes on insert.
+	##
+
+	_dynamic !mss_ptdef_auto_generate_attributes?!
+	
+	_super.insert_trigger(_scatter args)
+
+	_if !mss_ptdef_auto_generate_attributes?! _isnt _false _andif
+	    _self.auto_generate_attributes_on_insert? _is _true _andif
+	    (tbl << _self.actual_collection) _isnt _unset _andif
+	    (prex << _self.pointing_rule_exemplar) _isnt _unset _andif
+	    prex.is_kind_of?(mss_insert_ptrule) _andif
+	    _not prex.is_kind_of?(mss_simple_add_geometry_ptrule)
+	_then
+		attr_tbl << _self.source_view.collections[:mss_ptdef_attribute]
+		ndr << attr_tbl.new_detached_record()
+		ndr.mss_ptdef_id << _self.id
+		ndr.set_method << _unset
+		ndr.visible? << _true
+		
+		_for fd _over tbl.visible_fields.fast_elements()
+		_loop
+			_if fd.is_physical? _orif
+			    (fd.is_join? _andif
+			     fd.join_type _is :text)
+			_then
+				ndr.name << fd.name
+				_if fd.is_physical?
+				_then
+					def_val << fd.default_value
+					_if def_val.is_kind_of?(procedure)
+					_then
+						def_val << _unset
+					_endif
+				_else
+					def_val << _unset
+				_endif
+				_if def_val _isnt _unset
+				_then
+					def_val << def_val.write_string
+				_endif 
+				ndr.value << def_val
+				ndr.source_collection.insert(ndr)
+			_endif
+		_endloop
+	_endif 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef.delete_trigger(_gather args)
+	## 
+	## Delete all mss_ptdef_folder_relationship records that refer
+	## to self.
+	##
+
+	_for i _over _self.all_parent_folder_relationships().fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	_return _super.delete_trigger(_scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.can_match?(fd)
+	## 
+	## Derive values for various fields from the actual data model.
+	##
+
+	_if {:ptrule_class, :dataset_name, :table_name, :geometry_name}.includes?(fd.name)
+	_then
+		_return _true
+	_endif
+	_return _super.can_match?(fd)
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.match_string(fd, a_string, _optional record)
+	## 
+	## Derive values for various fields from the actual data model.
+	## 
+
+	_if (fdn << fd.name) _is :ptrule_class
+	_then
+		_return _self.ptrule_class_names
+	_elif fdn _is :dataset_name
+	_then
+		_return _self.ptrule_dataset_names()
+	_elif fdn _is :table_name
+	_then
+		_return _self.match_string_table_names(a_string, record)
+	_elif fdn _is :geometry_name
+	_then
+		_return _self.match_string_geometry_names(a_string, record)
+	_endif
+	_return _super.match_string(fd, a_string, record)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable})
+_method mss_ptdef.ptrule_dataset_names()
+	## 
+	## By default, this will return all dataset names in all
+	## spatial object controllers.
+	##
+
+	eq << equality_set.new()
+	sc << sorted_collection.new()
+	_for soc _over gis_program_manager.spatial_object_controllers()
+	_loop
+		_for dsm _over soc.dataset_managers()
+		_loop
+			i << dsm.actual_dataset
+			_if i.is_kind_of?(database_view)
+			_then
+				sc.add(i.name.write_string)
+			_endif
+		_endloop 
+	_endloop
+	sc.add_all(eq)
+	_return sc
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.actual_collection
+	## 
+	## Return the actual table associated with self, based on
+	## self's configuration information.
+	##
+
+	_if (v << gis_program_manager.cached_dataset(_self.dataset_name.default("").as_symbol())) _is _unset _orif
+	    (tbl << v.collections[_self.table_name.default("").as_symbol()]) _is _unset
+	_then
+		_return _unset 
+	_endif
+	_return tbl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef.match_string_table_names(a_string, _optional record)
+	## 
+	## Return table names based on querying the appropriate dataset.
+	##
+
+	a_string << a_string.default("")
+	len << a_string.size
+	record << record.default(_self)
+
+	r << rope.new()
+	_if (v << gis_program_manager.cached_dataset(record.dataset_name.default("").as_symbol())) _is _unset
+	_then
+		_return r
+	_endif
+	sc << sorted_collection.new(v.collections.size)
+	_for i _over v.user_tables()
+	_loop
+		n << i.name.as_charvec()
+		_if a_string.cf_subseq(n, 1, 1, len) _is _maybe
+		_then
+			sc.add(n)
+		_endif
+	_endloop
+	r.add_all_last(sc)
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef.match_string_geometry_names(a_string, _optional record)
+	## 
+	## Return geometry names based on querying the appropriate table.
+	##
+
+	a_string << a_string.default("")
+	len << a_string.size
+	record << record.default(_self)
+
+	r << rope.new()
+	# N.B.: basically cutting-and-pasting actual_collection, as
+	# record can be a template_record at this point.
+	_if (v << gis_program_manager.cached_dataset(record.dataset_name.default("").as_symbol())) _is _unset _orif
+	    (tbl << v.collections[record.table_name.default("").as_symbol()]) _is _unset _orif 
+	    _not tbl.record_exemplar.is_rwo?
+	_then
+		_return r
+	_endif
+
+	# Build a list of all geometry names, but exclude those which
+	# only exist in a mapping set.
+	sc << sorted_collection.new()
+	excl_set << set.new_with(:meatball)
+	_for gf _over tbl.geometry_fields.fast_elements()
+	_loop
+		_if gf.mapped? _is _true
+		_then
+			# Exclude things in the mapping set, but deal with geometries
+			# which map back to self.
+			_for sub_gf _over gf.mapped_geometry_fields.fast_elements()
+			_loop
+				_if sub_gf.mapped? _is _false
+				_then
+					excl_set.add(sub_gf.name)
+				_endif
+			_endloop
+		_endif
+	_endloop
+
+	_for gf _over tbl.geometry_fields.fast_elements()
+	_loop
+		_if _not excl_set.includes?(gf.name)
+		_then
+			n << gf.name.as_charvec()
+			_if a_string.cf_subseq(n, 1, 1, len) _is _maybe
+			_then
+				sc.add(n)
+			_endif
+		_endif
+	_endloop
+
+	r.add_all_last(sc)
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.as_pointing_rule(a_manager)
+	## 
+	## Return an appropriate instantiation of a mss_ptrule
+	## subclass, initialized with self.  A_MANAGER is an
+	## mss_ptrule_manager. 
+	##
+
+	_return _self.pointing_rule_exemplar.new_from_definition(_self, a_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.pointing_rule_exemplar
+	## 
+	## 
+
+	_dynamic !global_auto_declare?! << _false
+	_return _self.ptrule_class.evaluate()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.parent_folder_relationship(parent)
+	## 
+	## Return the mss_ptdef_folder_relationship record linking self
+	## to PARENT.
+	##
+
+	_if parent _is _unset _then _return _unset _endif 
+	_return _self.source_view.collections[:mss_ptdef_folder_relationship].
+		at(parent.id, _self.id)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.all_parent_folder_relationships()
+	## 
+	## Return the all mss_ptdef_folder_relationship records linking self
+	## to any parent.
+	##
+
+	_return _self.source_view.collections[:mss_ptdef_folder_relationship].
+		select(predicate.eq(:child_id, _self.id))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.set_parent_folder(parent, _optional old_parent)
+	## 
+	## Set self's parent folder to PARENT.  If OLD_PARENT is
+	## provided, then if there is an existing relationship to it,
+	## it is deleted.
+	##
+
+	seq << 0
+	_if old_parent _isnt _unset
+	_then 
+		_if (old_rel << _self.parent_folder_relationship(old_parent)) _isnt _unset
+		_then
+			# Just in case no changes are needed, take this opportunity to
+			# get out early.  If a relationship is already forged, and if
+			# the parentage isn't changing, nothing else needs to be done.
+			_if parent = old_parent
+			_then
+				_return
+			_endif
+
+			seq << old_rel.seq
+			old_rel.delete()
+		_endif 
+	_endif
+
+	rel_tbl << _self.source_view.collections[:mss_ptdef_folder_relationship]
+	_if (exist_rec << rel_tbl.at(parent.id, _self.id)) _isnt _unset
+	_then
+		ndr << exist_rec.detached()
+		ndr.seq << seq
+		_return ndr.source_collection.update(ndr)
+	_else
+		ndr << rel_tbl.new_detached_record()
+		ndr.parent_id << parent.id
+		ndr.child_id << _self.id
+		ndr.seq << seq
+		_return ndr.source_collection.insert(ndr)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.clone_to_parent_folder(parent, _optional old_parent)
+	##
+	## Add a reference to self in order to set the parent folder to
+	## PARENT.  If OLD_PARENT is provided, it is used only to set
+	## the seq attribute - that old relationship is preserved (so
+	## that self will now have two or more parent folders).
+	##
+
+	seq << 0
+	_if old_parent _isnt _unset
+	_then 
+		_if (old_rel << _self.parent_folder_relationship(old_parent)) _isnt _unset
+		_then
+			seq << old_rel.seq
+		_endif 
+	_endif
+	ndr << _self.source_view.collections[:mss_ptdef_folder_relationship].new_detached_record()
+	ndr.parent_id << parent.id
+	ndr.child_id << _self.id
+	ndr.seq << seq
+	_return ndr.source_collection.insert(ndr)
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef.mss_strict_enumeration?(fd)
+	## 
+	## Don't strictly enforce enumeration on the geometry_name field.
+	##
+
+	_if fd.name _is :geometry_name
+	_then
+		_return _false
+	_endif
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.ordered_attributes(_optional an_ace, tag_name)
+	## 
+	## Return self's attribute records, ordered either by the
+	## actual tables ordering for AN_ACE and TAG_NAME, or simply by
+	## default visibility in the CASE tool if those arguments are
+	## not provided.
+	##
+
+	_if (tbl << _self.actual_collection) _is _unset
+	_then
+		# Just use self's attributes
+		_return _self.attributes
+	_endif
+	
+	_if an_ace _isnt _unset
+	_then
+		vis_vec << an_ace.table_visible_field_names_with_defaults(tbl.source_view.name, tbl.name,
+									  tag_name.default(:default))
+	_else
+		vis_vec << tbl.visible_field_names
+	_endif
+	vis_lkp << hash_table.new()
+	_for i, j _over vis_vec.fast_keys_and_elements()
+	_loop
+		vis_lkp[j] << i
+	_endloop
+
+	sc << sorted_collection.new(10, _proc(a, b) _return a[1] _cf b[1] _endproc)
+	_for i _over _self.attributes.fast_elements()
+	_loop
+		attr_name << i.name.as_symbol()
+		order_val << vis_lkp[attr_name].default(bignum)
+		sc.add({order_val, i})
+	_endloop
+
+	r << rope.new()
+	_for i _over sc.fast_elements()
+	_loop
+		r.add_last(i[2])
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.clone_with_substructure()
+	## 
+	## Create and return a copy of self with all substructure
+	## cloned also.
+	##
+
+	tbl << _self.source_collection
+
+	# Figure a unique number to append to self's name (both
+	# internal and external).
+	n << 2
+	fld_size << tbl.all_fields[:internal_name].type.size
+	root_name << _self.internal_name.as_charvec()
+	_loop
+		n_str << write_string("_", n)
+		proposed_name << "".concatenation(root_name.truncate(fld_size - n_str.size), n_str)
+		_if tbl.select(predicate.eq(:internal_name, proposed_name)).an_element() _is _unset
+		_then
+			# Got a unique name
+			_leave
+		_endif
+
+		# Increment and try again.
+		n +<< 1
+	_endloop
+
+	ndr << _self.detached()
+	ndr.internal_name << proposed_name
+
+	# Similar munging for external name.
+	fld_size << tbl.all_fields[:name].type.size
+	root_name << _self.name.as_charvec()
+	n_str << write_string(" (", n, ")")
+	ndr.name << "".concatenation(root_name.truncate(fld_size - n_str.size), n_str)
+
+	old_autogen << _self.auto_generate_attributes_on_insert?
+	_protect
+		_self.auto_generate_attributes_on_insert? << _false 
+		new << tbl.insert(ndr)
+	_protection
+		_self.auto_generate_attributes_on_insert? << old_autogen
+	_endprotect 
+	new.help_text << _self.help_text
+
+	_for i _over _self.actions.fast_elements()
+	_loop
+		ndr << i.detached()
+		ndr.mss_ptdef_id << new.id
+		ndr.source_collection.insert(ndr)
+	_endloop
+	_for i _over _self.attributes.fast_elements()
+	_loop
+		ndr << i.detached()
+		ndr.mss_ptdef_id << new.id
+		ndr.source_collection.insert(ndr)
+	_endloop
+	_for i _over _self.properties.fast_elements()
+	_loop
+		ndr << i.detached()
+		ndr.mss_ptdef_id << new.id
+		ndr.source_collection.insert(ndr)
+	_endloop
+	_for i _over _self.cu_references.fast_elements()
+	_loop
+		ndr << i.detached()
+		ndr.mss_ptdef_id << new.id
+		ndr.source_collection.insert(ndr)
+	_endloop
+	_for i _over _self.child_ptdefs.fast_elements()
+	_loop
+		new.child_ptdefs.add(i)
+	_endloop
+
+	_return new
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef.all_child_ptdefs()
+	## 
+	## Return a rope of all child mss_ptdef records (including
+	## those that are two or more levels deep).
+	##
+
+	r << rope.new()
+	done_set << equality_set.new()
+	q << queue.new()
+	q.add(_self)
+	_loop
+		_if q.size = 0 _then _leave _endif
+		next << q.next()
+		_for child _over next.child_ptdefs.fast_elements()
+		_loop
+			_if done_set.includes?(child)
+			_then
+				_continue
+			_endif
+			done_set.add(child)
+			q.add(child)
+			r.add_last(child)
+		_endloop
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.copy_actions_by_name(from_ptdef_name, to_ptdef_name)
+	## 
+	## Copy all actions from the mss_ptdef record named
+	## FROM_PTDEF_NAME to TO_PTDEF_NAME. 
+	##
+
+	tbl << mss_ptrule_manager.dbview.collections[:mss_ptdef]
+	_if (r1 << tbl.select(predicate.eq(:internal_name, from_ptdef_name)).an_element()) _is _unset
+	_then
+		condition.raise(:user_error, :string,
+				_self.message(:no_ptdef_with_internal_name, from_ptdef_name))
+	_endif
+	_if (r2 << tbl.select(predicate.eq(:internal_name, to_ptdef_name)).an_element()) _is _unset
+	_then
+		condition.raise(:user_error, :string,
+				_self.message(:no_ptdef_with_internal_name, to_ptdef_name))
+	_endif
+
+	_for i _over r1.actions.fast_elements()
+	_loop
+		dr << i.detached()
+		dr.mss_ptdef_id << r2.id
+		dr.source_collection.insert(dr)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.prepare_for_serial(_optional include_id?, include_fk_join_fields?)
+	## 
+	## Return a property list of keys and values that describe self
+	## in a manner that can be written to an XML stream.
+	## If INCLUDE_ID? is true, then self's id field will be
+	## included.  If INCLUDE_FK_JOIN_FIELDS? is true, then foreign
+	## key join fields will be included.  The default for these is false.
+	##
+
+	_dynamic !mss_recursion!
+
+	_if !mss_recursion! _is _unset
+	_then
+		!mss_recursion! << equality_set.new()
+	_endif
+	
+	_if (pl << _super.prepare_for_serial(include_id?, include_fk_join_fields?)) _is _unset
+	_then
+		_return _unset
+	_endif 
+	
+	# Include all child join records.
+	_for jf_name _over {:actions, :attributes, :cu_references, :properties}.fast_elements()
+	_loop
+		r << rope.new()
+		_for join_rec _over _self.perform(jf_name).fast_elements()
+		_loop
+			_if (data << join_rec.prepare_for_serial(include_id?, include_fk_join_fields?)) _isnt _unset
+			_then 
+				r.add_last(data)
+			_endif 
+		_endloop
+		pl[jf_name] << r
+	_endloop
+
+	# Include the internal name of all child ptdefs.
+	r << rope.new()
+	_for join_rec _over _self.child_ptdefs.fast_elements()
+	_loop
+		r.add_last(join_rec.internal_name)
+	_endloop
+	pl[:child_ptdefs] << r
+
+	# Figure out all full folder paths that this resides in.
+	r << rope.new()
+	_for pfr _over _self.all_parent_folder_relationships().fast_elements()
+	_loop
+		# Looping references should be checked separately for each
+		# folder path.  It is OK if there are duplicate folder
+		# references within different folder paths.  So, reset the
+		# recursion equality set here (create a new one rather than
+		# emptying the old one, which could still be used by the
+		# calling method).
+		!mss_recursion! << equality_set.new()
+		
+		_if (pf << pfr.parent_folder) _is _unset
+		_then
+			_continue
+		_endif
+		r2 << rope.new_with(pfr.seq)
+		data_ok? << _true
+		_loop
+			_if (data << pf.prepare_for_serial(include_id?, include_fk_join_fields?)) _is _unset
+			_then
+				# Circular reference - ignore it.
+				data_ok? << _false 
+				_leave 
+			_endif 
+			r2.add_last(data)
+			_if (pf << pf.parent_folder) _is _unset
+			_then
+				_leave
+			_endif
+		_endloop 
+		_if data_ok?
+		_then
+			r.add_last(r2.reversed())
+		_endif
+	_endloop
+	pl[:folders] << r
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.create_from_serial(pl, dbv, overwrite_existing?, do_child_ptdefs?,
+				     _optional place_in_folders?, strict_folders?)
+	## 
+	## Create the database records that describe self, from the
+	## data in property list PL.  DBV is the database view to
+	## create self in.
+	##
+	## If OVERWRITE_EXISTING? is true, then if there is a matching
+	## record (based on internal name) that record will be replaced
+	## - if OVERWRITE_EXISTING? is false, then no insertion would
+	## take place.
+	##
+	## If DO_CHILD_PTDEFS? is true, then relationships will be
+	## forged to child pointing definitions.  This may be deferred
+	## - to allow all ptdefs to be created in one pass, and then
+	## forge relationships in another pass.
+	##
+	## If PLACE_IN_FOLDERS? is true, then the resulting mss_ptdef
+	## record will also be placed in the folders described in the
+	## XML file.  Otherwise, only the record itself will be created.
+	## Default is true.
+	##
+	## If STRICT_FOLDERS? is true, then the resulting mss_ptdef
+	## record will also be removed from folders that are not
+	## strictly specified in the XML file.  This parameter only
+	## matters if PLACE_IN_FOLDERS? is true.  Default is true.
+	##
+
+	_dynamic !mss_ptdef_auto_generate_attributes?! << _false 
+
+	place_in_folders? << place_in_folders?.default(_true)
+	strict_folders? << strict_folders?.default(_true)
+	
+	ptdef_tbl << dbv.collections[:mss_ptdef]
+	_if (exist_rec << ptdef_tbl.select(predicate.eq(:internal_name, pl[:internal_name])).an_element()) _is _unset
+	_then
+		dr << ptdef_tbl.new_detached_record()
+	_else
+		_if overwrite_existing? _is _true
+		_then
+			dr << exist_rec.detached()
+		_else
+			condition.raise(:mss_information, :string,
+					_self.message(:duplicate_internal_name, pl[:internal_name]))
+			_return
+		_endif
+	_endif
+
+	_for fld_name, fld_value _over pl.fast_keys_and_elements()
+	_loop
+		_if fld_name _is :ds!version _orif
+		    fld_name _is :id
+		_then
+			_continue
+		_endif
+		_if (fd << dr.all_fields[fld_name]) _isnt _unset _andif
+		    fd.is_physical?
+		_then 
+			dr.perform(fld_name.with_chevron, fld_value)
+		_endif
+	_endloop
+
+	_if exist_rec _is _unset
+	_then
+		exist_rec << ptdef_tbl.insert(dr)
+	_else
+		exist_rec << ptdef_tbl.update(dr)
+	_endif
+	_for fld_name, fld_value _over pl.fast_keys_and_elements()
+	_loop
+		_if (fd << dr.all_fields[fld_name]) _isnt _unset _andif 
+		    fd.is_join? _andif
+		    fd.join_type _is :text
+		_then
+			exist_rec.perform(fld_name.with_chevron, fld_value)
+		_endif
+	_endloop 
+		
+	# Deal with child join records.
+	_for jf_name _over {:actions, :attributes, :cu_references, :properties}.fast_elements()
+	_loop
+		# Minimal handling for different data model versions.
+		_if (jf << exist_rec.all_fields[jf_name]) _is _unset _orif
+		    (jf_data << pl[jf_name]) _is _unset
+		_then
+			_continue
+		_endif
+
+		# Delete all existing records (in case this is overwriting
+		# existing data).
+		_for del_rec _over exist_rec.perform(jf_name).fast_elements()
+		_loop
+			del_rec.delete()
+		_endloop
+
+		# Add child records back in.
+		_for jf_pl _over jf_data.fast_elements()
+		_loop
+			jf_dr << jf.result_table.new_detached_record()
+			jf_dr.ptdef << exist_rec
+			_for fld_name, fld_value _over jf_pl.fast_keys_and_elements()
+			_loop
+				_if fld_name _is :ds!version _orif
+				    fld_name _is :id
+				_then
+					_continue
+				_endif
+				_if (fd << jf_dr.all_fields[fld_name]) _isnt _unset _andif
+				    fd.is_physical?
+				_then 
+					jf_dr.perform(fld_name.with_chevron, fld_value)
+				_endif
+			_endloop
+			jf_rec << jf_dr.source_collection.insert(jf_dr)
+			_for fld_name, fld_value _over pl.fast_keys_and_elements()
+			_loop
+				_if (fd << jf_dr.all_fields[fld_name]) _isnt _unset _andif 
+				    fd.is_join? _andif
+				    fd.join_type _is :text
+				_then
+					jf_rec.perform(fld_name.with_chevron, fld_value)
+				_endif
+			_endloop
+		_endloop 
+	_endloop
+
+	# Deal with child ptdef relationship.
+	_if do_child_ptdefs? _is _true
+	_then
+		_self.create_child_ptdefs_from_serial(pl, dbv)
+	_endif
+	
+	_if place_in_folders? _is _false _orif
+	    (all_folder_data << pl[:folders]) _is _unset 
+	_then
+		# Not organizing into folders - just return the record created
+		# so far.
+		_return exist_rec
+	_endif
+
+	# If the record exists in folders already, remove them if the
+	# STRICT_FOLDERS? parameter is set.
+	_if strict_folders?
+	_then 
+		_for del_rec _over exist_rec.all_parent_folder_relationships().fast_elements()
+		_loop
+			del_rec.delete()
+		_endloop
+	_endif
+	
+	folder_tbl << dbv.collections[:mss_ptdef_folder]
+	_for folder_info_rope _over all_folder_data.fast_elements()
+	_loop
+		last_folder << _unset 
+		last_folder_id << _unset 
+		_for i, folder_pl _over folder_info_rope.fast_keys_and_elements()
+		_loop 
+			# The first record is the root folder.  The last record is an
+			# integer that is the sequence number for where to put the
+			# record in the leaf folder.  The intervening records are sub
+			# folders.
+			_if i < folder_info_rope.size
+			_then
+				pred << predicate.eq(:parent_id, last_folder_id) _and
+					predicate.eq(:name, folder_pl[:name])
+				_if (exist_folder << folder_tbl.select(pred).an_element()) _isnt _unset
+				_then
+					# Possibly update seq value.
+					_if overwrite_existing? _andif
+					    exist_folder.seq ~= folder_pl[:seq]
+					_then
+						exist_folder.seq << folder_pl[:seq]
+					_endif
+				_else
+					# Need to insert a folder.
+					folder_dr << folder_tbl.new_detached_record()
+					folder_dr.parent_id << last_folder_id
+					folder_dr.name << folder_pl[:name]
+					folder_dr.seq << folder_pl[:seq]
+					exist_folder << folder_tbl.insert(folder_dr)
+				_endif
+				last_folder << exist_folder
+				last_folder_id << exist_folder.id
+			_else
+				_if last_folder _isnt _unset
+				_then
+					folder_rel_rec << exist_rec.set_parent_folder(last_folder)
+					folder_rel_rec.seq << folder_pl   # Actually an integer.
+				_endif 
+			_endif
+		_endloop
+	_endloop 
+
+	_return exist_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef.create_child_ptdefs_from_serial(pl, dbv)
+	## 
+	## Create child pointing rule references from information
+	## encoded in the property list PL.
+	##
+
+	ptdef_tbl << dbv.collections[:mss_ptdef]
+	_if (exist_rec << ptdef_tbl.select(predicate.eq(:internal_name, pl[:internal_name])).an_element()) _is _unset
+	_then
+		condition.raise(:mss_information, :string,
+					_self.message(:no_ptdef_with_internal_name, pl[:internal_name]))
+		_return
+	_endif
+
+	# Delete all existing records (in case this is overwriting
+	# existing data).
+	_for del_rec _over rope.new_from(exist_rec.child_ptdefs).elements()
+	_loop
+		exist_rec.child_ptdefs.remove(del_rec)
+	_endloop
+	_for child_name _over pl[:child_ptdefs].fast_elements()
+	_loop 
+		_if (child_rec << ptdef_tbl.select(predicate.eq(:internal_name, child_name)).an_element()) _is _unset
+		_then
+			condition.raise(:mss_information, :string,
+					_self.message(:cannot_find_child_ptdef, exist_rec.name, child_name))
+			_continue
+		_endif
+		exist_rec.child_ptdefs.add(child_rec)
+	_endloop
+
+	_return exist_rec
+	
+_endmethod
+$

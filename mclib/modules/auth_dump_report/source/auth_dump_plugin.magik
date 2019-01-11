@@ -1,0 +1,59 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-07-15 10:34:33 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-10-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:auth_dump_plugin,
+                         {
+				 {:thread_engines,_unset}
+			 },
+			 {@mclib:xslt_reporter_plugin }
+)
+$
+
+auth_dump_plugin.define_property(:dump_xml_file_name,:string,
+				  "The name of my XML dump file.",
+				  _true,_true,"auth_dump.xml")
+$
+auth_dump_plugin.define_property(:template_module_name,:symbol,
+				  "The name of the module with my template in it.",
+				  _true,_true,:mclib_auth_dump_report)
+$
+auth_dump_plugin.define_property(:data_root_element,:string,
+				  "The tag name for the root element in my XML output",
+				  _true,_true,"swldy_auth_dump")
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method auth_dump_plugin.get_soc()
+	## 
+	## 
+	##
+
+	# (03-16-2005 Brad Sileo): created.
+	>> gis_program_manager.authorisation_view
+_endmethod
+$

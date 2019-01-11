@@ -1,0 +1,12 @@
+mclib_login_dialog_plugin	4000
+
+description
+	Provides access to Magik GUI for logging into an image with authorisation enabled
+end
+
+requires
+	login_panel
+	mclib_package
+end
+
+language en_gb

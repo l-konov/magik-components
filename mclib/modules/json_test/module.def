@@ -1,0 +1,23 @@
+json_test 400
+
+description
+        Tests the 'json' module.
+end
+
+tests_modules
+        json
+end
+
+requires
+        munit_base
+end
+
+test
+        name                 json_test
+        topics               json
+        framework            munit
+        args                 json_test
+end
+
+hidden
+language en_us

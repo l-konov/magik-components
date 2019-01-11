@@ -1,0 +1,3 @@
+additions/
+mss_cu_editor_transaction.magik
+mss_cu_editor_plugin.magik

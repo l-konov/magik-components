@@ -1,0 +1,313 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+## A subclass of the core editor_field_lister class. All fancy
+## grouping capabilities (from the super class) are not supported
+## by this class.
+##
+
+
+_pragma(classify_level=advanced, topic={editors})
+def_slotted_exemplar( :sf!table_inspector_field_lister,
+{
+	{ :sf!ti_databus,             _unset },
+	{ :field_collection_strategy, _unset },
+	{ :field_display_options,     _unset }
+},
+{ :editor_field_lister } )
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+sf!table_inspector_field_lister.define_slot_access( :sf!ti_databus, :write, :public )
+$
+_pragma(classify_level=restricted, topic={editors})
+sf!table_inspector_field_lister.define_slot_access( :field_collection_strategy, :write, :readonly )
+$
+_pragma(classify_level=restricted, topic={editors})
+sf!table_inspector_field_lister.define_slot_access( :field_display_options, :write, :readonly )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_field_lister.define_shared_constant(
+	:sf!ti_databus_consumer_data_types,
+	{ :editor_option_settings },
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_field_lister.sf!tree_item_for_html_export
+
+	## Provide the tree_item that displays the field data.
+
+	>> .gui_items[ :field_list_view ]
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_field_lister.sf!field_visibilities_changed()
+
+	## This method gets called from the (subclassed) editor manager
+	## when the user changed settings for field visibilties (in the
+	## options dialog).
+
+	_self.display_current_object()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_field_lister.rebuild_field_items()
+
+	## Rebuild my field items.
+	#
+	# Grouping and "fancy stuff" provided by the editor manager
+	# has been kicked out of this subclass. Only field filtering
+	# according to the 'editor option settings' is performed.
+
+	# Ideally we should only clear field_editor cache when the
+	# collection changes but, with current change notification,
+	# this is not possible.
+
+	.field_editors.empty()
+	
+	_self.reset_field_items()
+
+	_if ( l_collection << _self.collection ) _is _unset
+	_then
+		_self.changed( :field_item_list, :data, _self.field_item_list() )
+		_return
+	_endif
+
+	_self.update_editor_option_settings()
+
+	_local l_td     << l_collection.descriptor
+	_local l_object << _self.current_object
+	_local l_field_item
+
+	_for i_field_desc _over _self.all_visible_fields( l_collection )
+	_loop
+		l_field_item << _self.build_field_item( i_field_desc,
+							l_collection,
+							l_object )
+		.field_items[ i_field_desc.name ] << l_field_item
+		l_field_item.add_dependent( _self,
+				:display_value,     :proposed_value,
+				:proposed_geometry, :child_added )
+	_endloop
+	
+	_self.changed( :field_item_list, :data, _self.field_item_list() )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _iter _method sf!table_inspector_field_lister.all_visible_fields(
+			       p_collection )
+
+	## This method determines which fields from P_COLLECTION
+	## are considered 'visible' fields.
+
+	_local l_td << p_collection.descriptor
+	_local l_field_names
+
+	_if _self.field_collection_strategy = :visible_fields
+	_then
+		#
+		# See if there is any configuration in the ACE...
+		#
+		l_field_names <<
+		_if ( the_ace << _self.editor.ace ) _isnt _unset
+		_then
+			l_dataset_name << p_collection.dataset.name
+			l_table_name   << p_collection.name
+			l_tag << _self.property( :field_visibility_tag_name ).
+				 default(:default)
+			>> the_ace.table_visible_field_names_with_defaults(
+				   l_dataset_name, l_table_name, l_tag )
+		_else
+			>> l_td.visible_field_names
+		_endif
+	_else
+		l_field_names << _self.determine_visible_fields( l_td )
+	_endif
+
+	_for i_fn _over l_field_names.fast_elements()
+	_loop
+		_loopbody( i_fn )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_field_lister.update_editor_option_settings()
+
+	## This method retrieves the information which fields should be
+	## displayed by the field lister.
+
+	_local l_dbs << _self.sf!ti_databus
+
+	_if l_dbs _is _unset
+	_then
+		_local l_editor  << _self.framework
+		_local l_ed_mngr << l_editor.framework
+
+		l_ed_mngr.setup_databus_for_field_lister( l_editor )
+
+		l_dbs << _self.sf!ti_databus
+	_endif
+	
+	( .field_collection_strategy, .field_display_options ) <<
+		( _scatter l_dbs.request_data( :editor_option_settings ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_field_lister.determine_visible_fields(
+			 p_table_descriptor )
+
+	## This method determines which fields are considered visible
+	## for A_COLLECTION.
+	## The current visibility selections need to be applied
+	## to those fields that are considered visible in the DD.
+
+	_local l_field_options << _self.field_display_options
+	_local l_all_fields    << p_table_descriptor.all_fields
+	_local l_visi_fields   << sw:sorted_collection.new()
+	_local l_ed_fields     << sw:sorted_collection.new( l_all_fields.size,
+			  #
+			  # We sort first by field number (but the latter
+			  # is only set on physical fields!), then by
+			  # - logical,
+			  # - geometry, and
+			  # - join fields.
+			  # NB The type of a non-physical field is one
+			  #    of these values:
+			  #    - dd_derived_field,
+			  #    - dd_geom_field bzw.
+			  #    - dd_join_field ist - which is pretty much
+			  #    the sorting order we were looking for!
+			  #
+			  _proc @editor_field_sort_proc(p_e1, p_e2)
+				  l_val1 << p_e1.field_number.default( 9999 )
+				  l_val2 << p_e2.field_number.default( 9999 )
+				  _if _not ( l_val1 = 9999 _andif l_val2 = 9999 )
+				  _then
+					  _return l_val1 _cf l_val2
+				  _endif
+
+				  l_typ1 << p_e1.class_name
+				  l_typ2 << p_e2.class_name
+				  >> _if l_typ1 = l_typ2
+				     _then >> p_e1.name _cf p_e2.name
+				     _else >>    l_typ1 _cf l_typ2
+				     _endif
+			  _endproc)
+	_local l_name
+	_local l_type
+	_local l_patterns
+
+	_try
+		l_visi_fields.add_all(
+			p_table_descriptor.visible_fields.map(
+				_proc @map( p_rec ) >> p_rec.name _endproc ) )
+	_when error
+		l_visi_fields.add_all( p_table_descriptor.all_field_names )
+	_endtry
+
+	_for i_fd _over l_all_fields.fast_elements()
+	_loop
+		l_name << i_fd.name
+		l_type << i_fd.class_name
+		#
+		# If the field name contains a ! or ends with _id
+		# and is not a visible field, we consider this an
+		# internal field.
+		#
+		_if l_name.index_of( %! ) _isnt _unset _orif
+		    ( l_name.matches?( "*_id" ) _andif
+		      _not l_visi_fields.includes?( l_name ) )
+		_then
+			l_type << :internal_field
+
+		_elif l_type = :super_dd_join_field
+		_then
+			l_type << :dd_join_field
+		_endif
+
+		_if ( (	l_type _is :dd_view_field _orif
+			l_type _is :dd_join_view_field _orif
+			l_type _is :dd_geom_view_field ) _andif
+		      _not l_field_options[ :dd_derived_field? ] ) _orif
+		    ( _not l_field_options[ l_type + :|?| ] )
+		_then
+			_continue
+		_endif
+
+		l_patterns << l_field_options[ l_type + :|_pattern| ].
+			      default( { { "*" }, {} } )
+
+		_if _self.string_in_patterns?( l_name.as_charvec(),
+					       _scatter l_patterns )
+		_then
+			l_ed_fields.add( i_fd )
+		_endif
+	_endloop
+
+	>> l_ed_fields
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_private _method sf!table_inspector_field_lister.string_in_patterns?(
+			 p_string, p_pattern_list, p_ignore_pattern_list )
+
+	## See if P_STRING matches any of the given patterns in
+	## P_IGNORE_PATTERN_LIST or P_PATTERN_LIST.
+	## If P_STRING is in P_IGNORE_PATTERN_LIST _false is returned.
+	## If P_STRING is in P_PATTERN_LIST _true is returned.
+
+	_for i_pattern _over p_ignore_pattern_list.fast_elements()
+	_loop
+		_if p_string.matches?( i_pattern )
+		_then
+			_return _false
+		_endif
+	_endloop
+
+	>> _for i_pattern _over p_pattern_list.fast_elements()
+	   _loop
+		   _if p_string.matches?( i_pattern )
+		   _then
+			   _leave _with _true
+		   _endif
+	   _finally
+		   >> _false
+	   _endloop
+_endmethod
+$

@@ -1,0 +1,40 @@
+<config base="job_server_plugin.config_scheduled">
+    <framework_data>
+	<visible_fields>
+	    <field name="name"/>
+	    <field name="user"/>
+	    <field name="type_name"/>
+	    <field name="priority"/>
+	    <field name="status"/>
+	    <field name="summary"/>
+	    <field name="submitted"/>
+		<!-- MCLIB: show window start for repeating jobs that sit in the queue -->
+	    <field name="window_start"/>
+	    <field name="started"/>
+	    <field name="server"/>
+	    <field name="id"/>
+	    <field name="repeats?"/>
+	</visible_fields>
+	<visible_statuses>
+	    <status name="Pending"/>
+	    <status name="Running"/>
+	    <status name="Suspended"/>
+	    <status name="none"/>
+	</visible_statuses>
+	<filter_out_types>
+	   <!-- job_type type="multi_merge_scheme" default="true"/ -->
+	</filter_out_types>
+	<text_find>
+	  <categories>
+		<category name="name" default="yes" />
+		<category name="user" />
+		<category name="priority" />
+		<category name="summary" />
+		<category name="server" />
+		<category name="repeats?" />
+		<!-- <category name="id" /> -->
+	  </categories>
+	  <default_text id ="find_text"/>
+	</text_find>
+    </framework_data>
+</config>

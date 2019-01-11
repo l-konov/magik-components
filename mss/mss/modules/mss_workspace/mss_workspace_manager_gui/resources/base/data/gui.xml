@@ -1,0 +1,80 @@
+<gui>
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="mss_wm_job_design_plugin.new_job_and_design"/>
+      <action name="mss_wm_job_design_plugin.new_job"/>
+      <action name="mss_wm_job_design_plugin.new_top_level_design"/>
+      <action name="mss_wm_job_design_plugin.new_sub_design"/>
+      <separator/>
+      <action name="mss_wm_job_design_plugin.open_design"/>
+      <action name="mss_wm_job_design_plugin.close_design"/>
+      <separator/>
+      <action name="close"/>
+    </submenu>
+    <submenu name="search">
+      <action name="mss_wm_search_plugin.perform_search"/>
+      <action name="mss_wm_search_plugin.interrupt"/>
+      <separator/>
+      <action name="mss_wm_search_plugin.clear"/>
+    </submenu>
+    <submenu name="edit">
+      <action name="mss_wm_job_design_plugin.goto_selected_design"/>
+      <action name="mss_wm_job_design_plugin.highlight_selected_design"/>
+      <separator/>
+      <action name="mss_wm_job_design_plugin.edit_selected_job"/>
+      <action name="mss_wm_job_design_plugin.edit_selected_design"/>
+      <separator/>
+      <action name="mss_wm_job_design_plugin.delete_selected_jobs"/>
+      <action name="mss_wm_job_design_plugin.delete_selected_designs"/>
+    </submenu>
+    <submenu name="state_transitions">
+      <submenu name="st_selected_job" role="mss_selected_job_state_transitions"/>
+      <submenu name="st_selected_design" role="mss_selected_design_state_transitions"/>
+    </submenu>
+    <submenu name="tools">
+      <action name="mss_wm_job_design_plugin.overlay_selected_design"/>
+      <action name="mss_wm_job_design_plugin.clear_overlay_design"/>
+      <action name="mss_wm_job_design_plugin.copy_overlay_design_data"/>
+      <separator/>
+      <action name="mss_wm_job_design_plugin.aggregate_selected_designs"/>
+    </submenu>
+  </menu>
+
+  <menu name="results_list" type="popup">
+    <action name="mss_wm_job_design_plugin.open_design"/>
+    <separator/>
+    <submenu name="st_selected_design" role="mss_selected_design_state_transitions"/>
+    <separator/>
+    <action name="mss_wm_job_design_plugin.goto_selected_design"/>
+    <action name="mss_wm_job_design_plugin.highlight_selected_design"/>
+    <separator/>
+    <action name="mss_wm_job_design_plugin.edit_selected_job"/>
+    <action name="mss_wm_job_design_plugin.edit_selected_design"/>
+  </menu>
+
+  <toolbar name="edit">
+    <action name="mss_wm_job_design_plugin.goto_selected_design"/>
+    <action name="mss_wm_job_design_plugin.highlight_selected_design"/>
+    <action name="mss_wm_job_design_plugin.edit_selected_job"/>
+  </toolbar>
+
+  <toolbar name="search">
+    <action name="mss_wm_search_plugin.perform_search"/>
+    <action name="mss_wm_search_plugin.interrupt"/>
+    <action name="mss_wm_search_plugin.clear"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="search"/>
+    <toolbar name="edit"/>
+  </dock>
+ 
+  <work_area>
+    <plugin plugin_name="mss_wm_search_plugin"/>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

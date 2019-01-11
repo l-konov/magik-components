@@ -1,0 +1,10 @@
+mss_cu_user_object_editor	1
+
+description
+	MSS user object editor extensions for Compatible Units
+end
+
+requires
+	mss_cu_editor
+	mss_user_object_editor
+end

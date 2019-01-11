@@ -1,0 +1,9 @@
+additions/
+basic_changes/
+message_usages.magik
+mss_editor_transaction_context_provider.magik
+mss_user_editor_field_item_lister.magik
+mss_user_editor_field_lister.magik
+mss_user_editor_plugin.magik
+mss_user_object_editor.magik
+mss_user_rwo_specials_plugin.magik

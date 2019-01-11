@@ -1,0 +1,84 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-09-30 00:07:29 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_point_style.kml_style()
+	## returns a KML for me.
+	## !GEARTH_DIRECTORY! is the value expected in the KML file, which might
+	## be a URL or a full path
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic user:!GEARTH_DIRECTORY!
+	_self.create_kml_image()
+	path << write_string(user:!GEARTH_DIRECTORY!.default(""),"/",_self.kml_image_file_name())
+	#debug show(path)
+	>> simple_xml_thing.new("Style",
+		{
+			simple_xml_thing.new("IconStyle",
+					     {
+						     simple_xml_thing.new("Icon",
+									  {simple_xml_thing.new("href",
+												{path}
+											    ),
+									   simple_xml_thing.new("x",{"0"}),
+									   simple_xml_thing.new("y",{"0"}),
+									   simple_xml_thing.new("w",{"-1"}),
+									   simple_xml_thing.new("h",{"-1"})
+									  }
+								      )
+						     
+					     }
+					 )
+		}
+			    )
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_point_style.create_kml_image()
+	## Writes an image out for me.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic user:!GEARTH_TARGET_DIRECTORY!
+	a_file_name << system.pathname_from_components(_self.kml_image_file_name(),!GEARTH_TARGET_DIRECTORY!.default(""))
+	a_window << memory_canvas.new(50, 50)
+	_return _self.as_image_file(a_file_name,:png_transparent,a_window)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_point_style.kml_image_file_name(_optional name_suffix)
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_if name_suffix _is _unset 
+	_then
+		suffix << ".png"
+	_else
+		suffix << write_string(%.,name_suffix,".png")
+	_endif
+	res <<  write_string(_self.symbol_name,suffix)
+	>> res
+_endmethod
+$

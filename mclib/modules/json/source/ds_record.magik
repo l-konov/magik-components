@@ -1,0 +1,94 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method ds_record.convert_to_json()
+	## convert_to_json() : json_array
+	##
+	## converts self to a json_array
+	##
+	## have to do it this way to avoid all the crazy method
+	## conflicts. 
+
+	_local jo << json_object.new()
+	_local name
+	
+	_for i_fd _over _self.physical_fields()
+	_loop
+		name << i_fd.name
+		jo[name] << _self.perform(name).convert_to_json()
+	_endloop 
+
+	_return jo
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method ds_record.write_as_json(a_stream, _optional field_names)
+	##
+	## field_names argument allows specification of subset of
+	## records fields to output as json.
+	## 
+	_dynamic !json_passed_collection_set!
+	_dynamic !json_current_collection_query_depth!
+
+
+	_local s << a_stream
+	_if !json_passed_collection_set! _is _unset
+	_then
+		!json_passed_collection_set! << set.new_with()
+	_endif
+	_if !json_current_collection_query_depth! _is _unset
+	_then
+		!json_current_collection_query_depth! << 0
+	_else
+		!json_current_collection_query_depth! +<< 1
+	_endif
+	
+	s.write(%{)
+	
+	l_max_depth << !json_max_collection_query_depth!.default(0)
+
+	_if l_max_depth < !json_current_collection_query_depth! _orif
+	    !json_passed_collection_set!.includes?(_self.source_collection.name)
+	_then
+		field_names << _self.key_field_names
+	_endif
+	!json_passed_collection_set!.add(_self.source_collection.name)
+	_local first? << _true
+	_if field_names _is _unset _orif
+	    field_names.empty?
+	_then
+		field_names << _self.visible_field_names
+		_for i_key_field_name _over _self.key_field_names.fast_elements()
+		_loop
+			_if _not field_names.includes?(i_key_field_name)
+			_then
+				_if field_names.class_name _is :simple_vector
+				_then
+					field_names << rope.new_from(field_names)
+				_endif 
+				field_names.add(i_key_field_name)
+			_endif
+		_endloop 
+	_endif
+
+	_for name _over field_names.fast_elements()
+	_loop
+		
+		_if ~first?
+		_then s.write(%,)
+		_else first? << _false
+		_endif
+		_local value << _self.perform(name)
+		
+		s.write(%", name.write_string, %", %:)
+		value.write_as_json(a_stream)
+	_endloop
+	s.write(%})
+_endmethod
+$
+
+
+

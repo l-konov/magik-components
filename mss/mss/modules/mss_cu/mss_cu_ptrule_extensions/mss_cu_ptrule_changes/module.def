@@ -1,0 +1,10 @@
+mss_cu_ptrule_changes	1
+
+description
+	Changes to mss_ptrule modules to enable Compatible Units
+end
+
+requires
+	mss_cu
+	mss_ptrules
+end

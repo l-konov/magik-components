@@ -1,0 +1,29 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	area.write_as_json(a_stream)
+	##
+	##
+	  _local s << a_stream
+
+	  s.write("{", %", "type", %", ": ", %", "Polygon", %", ", ")
+	  s.write(%", "coordinates", %", ": [")
+	  
+	  _local a_polygon <<  _self.a_polygon
+	  
+	  _local first_coord? << _true
+	  
+	  a_polygon.write_as_json(s)
+	  
+	  _local first_hole? << _true
+	  
+	  _for a_hole _over a_polygon.holes()
+	  _loop
+		  s.write(",")
+		  a_hole.write_as_json(s)
+	  _endloop
+	  
+	  s.write("]}")
+_endmethod
+$

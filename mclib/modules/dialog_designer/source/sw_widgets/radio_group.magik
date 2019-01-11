@@ -1,0 +1,36 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## RADIO_GROUP - added functionality specific to the dialog_designer.
+## Sets link between this class and the class actually used by the
+## dialog_designer (dd_radio_group).
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_group.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	pw <<  dd_radio_group.new(rc,1,1,:pixel,:style,:nested,
+				  :resize?,_true,
+				  :default_col_alignment,:left,
+				  :default_row_alignment,:top,
+				  :row_spacing,5,
+				  :col_spacing,5,
+				  :row,row,:col,col)
+	>> pw
+_endmethod
+$

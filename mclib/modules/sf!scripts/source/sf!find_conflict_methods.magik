@@ -1,0 +1,368 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+_package mclib
+$
+
+########################################################################
+##
+## Description:
+## This class allows to find conflict methods in the current image.
+## If a package has sub-packages (like package sw) subpackges are
+## currently ignored. If you also want to report conflicts in subpackages
+## you have to redefine the Boolean class varaible include_sub_packages?.
+##
+## To check the complete image for conflicts, just call
+## Magik2> sf!find_conflict_methods.check_packages()
+##
+## If you just want to check a specific package (or packages),
+## pass the name of the package(s) - a symbol - to the above method.
+##
+## Examples:
+## Magik2> sf!find_conflict_methods.check_packages()
+## Magik2> sf!find_conflict_methods.check_packages( :sw, :user )
+##
+## If you should only be interested in conflict checks for a specfic
+## class (or classes) within a package, you can call
+## Magik2> sf!find_conflict_methods.check_classes_in_package(
+##                <pkg>, <list of string patterns> )
+## <pkg> can be _unset (defaults to !current_package!) and
+## <list of string patterns> can be a list of string patterns
+## (including wildcards * and ?) that are used to find a matching
+## class name.
+##
+## Examples:
+## Magik2> sf!find_conflict_methods.check_classes_in_package(
+##		_unset, "*pseudo*", "sf!*" )
+## Magik2> sf!find_conflict_methods.check_classes_in_package(
+##		sw:package( :user ), "*dist* )
+##
+##
+## An example output looks like this:
+## Checking package: user
+## ======================
+## a sf!edist_rwo_record
+##	phase_count_str --> sf!edist_mixin, sf!elec_rwo_record
+##
+## a sf!object_template
+##	double_click_handler() --> sf!world_owner_mixin, rwo_record
+##	handle_double_click_event() --> sf!world_owner_mixin, rwo_record
+##
+## sf!pseudo_link - check method write_on()! ***
+##	attributes_to_print() --> object, pseudo_link
+##
+## sf!pseudo_node - check method write_on()! ***
+##	attributes_to_print() --> object, pseudo_node
+##
+## a sf!thematic_fill_style
+##	actual_custom_style_method --> sf!thematic_style_mixin, gis_style
+##
+## A non-indented line is a class name
+## If you see there a "check method write_on()! ***" the write_on()
+## method in the class caused a traceback.
+## Following indented lines shall all conflict methods and the super
+## classes that provide that method.
+##
+########################################################################
+
+condition.define_condition( :sf!package_not_known, :information,
+			    { :package_name } )
+$
+
+read_message_patch( :condition, "<RMP-EOT>", :en_gb )
+$
+:sf!package_not_known		Package #1 not used/known in the image.
+<RMP-EOT>
+$
+
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+def_slotted_exemplar( :sf!find_conflict_methods, {} )
+$
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+sf!find_conflict_methods.define_shared_variable( :include_sub_packages?,
+	_false,
+	:private )
+$
+
+
+##
+##	P U B L I C   I N T E R F A C E
+##	_______________________________
+##
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_method sf!find_conflict_methods.check_packages( _gather package_names )
+
+	## Perform the check on all items found in the packages
+	## identified by PACKAGE_NAMES (which must be symbols).
+	## If no package names are specified all existing packages
+	## will be inspected.
+
+	_local conflicts << 0
+	_local a_package
+	_local str
+
+	_if package_names.empty?
+	_then
+		package_names << sorted_collection.new_from(
+					 !current_package!.all_packages.keys )
+	_endif
+
+	_for a_pkg_name _over package_names.fast_elements()
+	_loop
+		_if ( a_package << sw:package( a_pkg_name ) ) _is _unset
+		_then
+			condition.raise( :sf!package_not_known,
+					 :package_name, a_pkg_name )
+			_continue
+		_endif
+
+		_if conflicts > 0 _then write( newline_char ) _endif
+		str << _self.sf!message( :sf!checking_package, a_pkg_name )
+		write( str, newline_char, %=.repeated( str.size ) )
+		conflicts << _self.check_classes_in_package( a_package )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_method sf!find_conflict_methods.check_classes_in_package(
+		_optional a_package, _gather class_name_patterns )
+
+	## Check for conflict methods on classes that have anmes that
+	## match any names given in CLASS_NAME_PATTERNS. Those patterns
+	## should be strings and may contains wildcard patterns % and *.
+	## If A_PACKAGE is not specified, the currently active package
+	## will be inspected.
+
+	_dynamic !current_package!
+
+	_local total << 0
+	_local cnt
+
+	_if a_package _is _unset
+	_then
+		a_package << !current_package!
+	_endif
+
+	_for a_class_obj _over _self.all_matching_classes_from_package(
+				       a_package, class_name_patterns )
+	_loop
+		cnt << _self.analyze_methods_for( a_class_obj )
+
+		_if cnt > 0
+		_then 
+			total +<< cnt
+			write()
+		_endif
+	_endloop
+
+	>> total
+_endmethod
+$
+
+
+##
+##	I N T E R N A L   C O C D E
+##	___________________________
+##
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_private _method sf!find_conflict_methods.sf!message( a_msg_id, _gather msg_args )
+
+	## Returns a message from the message system.
+
+	>> message_handler( :sf!find_conflict_methods ).
+		human_string( a_msg_id, _unset, _scatter msg_args )
+_endmethod
+$
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_private _iter _method sf!find_conflict_methods.all_matching_classes_from_package( a_package, class_name_patterns_vec )
+
+	## Yields all class names from the package A_PACKAGE that match
+	## CLASS_NAME_PATTERNS.
+
+	_local list   << sorted_collection.new()
+	_local match? << _not class_name_patterns_vec.empty?
+	_local last   << :|_no_such_class_name_exists_|
+	_local ok?
+	_local name
+
+	list.sort_by( :class_name )
+
+	_for a_cl_obj _over _self.all_classes_from_package( a_package )
+	_loop
+	    _if match?
+	    _then
+		    name << a_cl_obj.class_name.as_charvec()
+		    ok?  << _false
+		    _for a_pattern _over class_name_patterns_vec.fast_elements()
+		    _loop
+			    _if name.matches?( a_pattern )
+			    _then
+				    list.add( a_cl_obj ) ; _leave
+			    _endif
+		    _endloop
+	    _else
+		    list.add( a_cl_obj )
+	    _endif
+	_endloop
+
+	_for a_cl_obj _over list.fast_elements()
+	_loop
+		_if last.class_name <> a_cl_obj.class_name
+		_then
+			_loopbody( last << a_cl_obj )
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_private _iter _method sf!find_conflict_methods.all_classes_from_package(
+			       a_package )
+
+	## Yields all class names matching any pattern in class_name_patterns
+	## in alphabetical (ascending) order.
+
+	_local pkg_name << a_package.name
+	_local no_subs? << _not _self.include_sub_packages?
+
+	_for a_cl_obj _over a_package.fast_elements()
+	_loop
+		_if a_cl_obj _is _unset _then _continue _endif
+
+		#
+		# Make sure only items from the current package are returned
+		# and not also items in sub-packages.
+		#
+		_if no_subs?
+		_then
+		    _try
+		        _if a_cl_obj.define_method_target.metadata[
+				:exemplar_global ].package.name <> pkg_name
+			_then
+				_continue
+			_endif
+		    _when error
+			_continue
+		    _endtry
+		_endif
+
+		_loopbody( a_cl_obj )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_private _method sf!find_conflict_methods.analyze_methods_for( a_class_object )
+
+	## Inspects all methods on A_CLASS_OBJECTS for conflicts and
+	## prints out any of those methods.
+	## Returns the number of conflict methods on A_CLASS_OBJECT.
+
+	_local methods   << sorted_collection.new()
+	_local parents   << sorted_collection.new()
+	_local conflicts << 0
+	_local first?    << _true
+	_local str       << internal_text_output_stream.new()
+	_local cnt
+	_local m_name
+
+	methods.sort_by( :name )
+	
+	_for a_m _over a_class_object.define_method_target.local_methods(_true)
+	_loop
+		_if _not ( m_name << a_m.key ).is_kind_of?( symbol ) _orif
+		    m_name _is :exemplar
+		_then
+			_continue
+		_endif
+
+		methods.add( a_m )
+	_endloop
+
+	_for a_m _over methods.fast_elements()
+	_loop
+		#
+		# Soemtimes classes redefine the write_on() method
+		# and for some record exemplars that are not instantiated
+		# the write() might fail (e.g. if the class uses values
+		# of slots that are not set)
+		#
+		_if a_m.conflict?
+		_then
+			conflicts +<< 1
+
+			_try _with cond
+				_if first?
+				_then
+					write( a_class_object )
+					first? << _false
+				_endif
+			_when error
+			        write( a_class_object.class_name,
+				       _self.sf!message( :sf!check_write_on_method ) )
+			_endtry
+
+			str.reset()
+			str.write( tab_char, a_m.name, " --> " )
+
+			cnt << 0
+			parents.empty()
+			_for a_parent _over a_m.shadowed.fast_elements()
+			_loop
+				parents.add( a_parent.owner.
+					     metadata[ :class_name ] )
+			_endloop
+
+			_for a_parent _over parents.fast_elements()
+			_loop
+				_if ( cnt +<< 1 ) > 1
+				_then
+					str.write( ", " )
+				_endif
+				str.write( a_parent )
+			_endloop
+
+			write( str.string )
+		_endif
+	_endloop
+
+	>> conflicts
+_endmethod
+$
+
+
+read_message_patch( :sf!find_conflict_methods, "<RMP-EOT>", :en_gb )
+$
+:sf!checking_package		Checking package: #1
+:sf!check_write_on_method	#s- check method write_on()! ***
+<RMP-EOT>
+$

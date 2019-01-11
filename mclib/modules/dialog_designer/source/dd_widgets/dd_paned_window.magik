@@ -1,0 +1,412 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_PANED_WINDOW - object to represent a paned_window but still
+## acts like rowcol for rendering and analysis
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_paned_window,{},:rowcol)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_paned_window.define_shared_constant(:dd_properties,
+			      property_list.new_with(
+				      :col_resize_values,:vector,
+				      :row_resize_values,:vector,
+				      :row_alignment,  {:fill,:top,:centre,:bottom},
+				      :col_alignment,  {:fill,:left,:centre,:right},
+				      :side_by_side?, :boolean
+				      ),
+			      :public)
+$
+  
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_paned_window.define_shared_variable(
+	:interior_cell_line_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:red),
+		:width,1,
+		:dash_pattern,dash_pattern.short_dash),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_paned_window.define_shared_variable(
+	:rc_outline_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:green),
+		:width,1,
+		:dash_pattern,dash_pattern.short_dash),:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_paned_window.define_shared_variable(
+	:sep0_line_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:white),
+		:width,1),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_paned_window.define_shared_variable(
+	:sep1_line_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:grey),
+		:width,1),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_paned_window.define_shared_variable(
+	:sep2_line_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.new_rgb(0.7,0.7,0.7),
+		:width,1),:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.dd_properties()
+	## Return the editable properties for SELF.
+	## 
+
+	props << property_list.new()
+
+	_for k,e _over dd_paned_window.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.side_by_side?
+	## 
+	## Return the boolean value.
+	## 
+	>> _self.get_property(:side_by_side?)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.allow_lr_insertion?
+	## 
+	## Return true if SELF allows insertions on the Left or Right.
+	## 
+	>> _not _self.items.empty? _andif _self.side_by_side?.default(_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.allow_tb_insertion?
+	## 
+	##  Return true if SELF allows insertions on the Top or Bottom.
+	## 
+	>> _not _self.items.empty? _andif _not _self.side_by_side?.default(_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.side_by_side? << new_val
+	## 
+	## Change the stored value.
+	##
+	_self.set_property(:side_by_side?,new_val)
+
+	(.nrows,.ncols) << (.ncols,.nrows)
+
+	_for i _over .items.fast_elements()
+	_loop
+		(i.row,i.col) << (i.col,i.row)
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.post_render(canv,cbb,i,j)
+	## 
+	## Render the inter-cell bars that are unique to Paned Windows.
+	## 
+	idx << i.max(j)
+
+	_local x0,x1,y0,y1
+	
+	_if idx < _self.items.size
+	_then
+		_if _self.side_by_side?.default(_false)
+		_then
+			x0 << cbb.xmax + _self.col_spacing _div 2
+			x1 << cbb.xmax + _self.col_spacing _div 2
+			y0 << cbb.ymin
+			y1 << cbb.ymax
+			canv.draw_segment(_self.sep0_line_style,x0,y0,x1,y1)
+			canv.draw_segment(_self.sep1_line_style,x0+1,y0,x1+1,y1)
+		_else			
+			x0 << cbb.xmin 
+			x1 << cbb.xmax
+			y0 << cbb.ymax + _self.row_spacing _div 2
+			y1 << cbb.ymax + _self.row_spacing _div 2
+			canv.draw_segment(_self.sep0_line_style,x0,y0,x1,y1)
+			canv.draw_segment(_self.sep1_line_style,x0,y0+1,x1,y1+1)
+			canv.draw_segment(_self.sep2_line_style,x0,y0+2,x1,y1+2)
+		_endif
+
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.gui_code(txt)
+	## 
+	## Write the GUI code for SELF to the stream TXT.
+	## 
+	
+	txt.write(%tab,"tmp_rc << rowcol.new(",
+		  %newline,%tab*2,_self.parent.dialog_element_id,%,,"_unset,1,:pixel,",
+		  %newline,%tab*2,":style, ",%tab,":nested,")
+	
+	_if _self.parent.dialog_element_id.index_of_seq("paned_window") _is _unset 
+	_then
+		txt.write(%newline,%tab*2,":default_col_alignment, ",%tab,":fill,",
+			  %newline,%tab*2,":default_row_alignment, ",%tab,":fill,",
+			  %newline,%tab*2,":row,",_self.row,",:col,",_self.col,%,)
+	_endif
+	
+	txt.write(%newline,%tab*2,":resize?,",%tab,"_true)",%newline)
+	
+	sbs? << _if _self.side_by_side?
+		_then
+			>> "_true"
+		_else
+			>> "_false"
+		_endif
+
+	txt.write(%newline,%tab,_self.dialog_element_id,
+		  " << paned_window.new(tmp_rc,:side_by_side?,",sbs?)
+	
+	props << equality_hash_table.new()
+
+	_for p _over _self.dd_properties().fast_keys()
+	_loop
+		_if (v << _self.perform(p)) _isnt _unset 
+		_then
+			props[p] << v
+		_endif
+	_endloop
+
+	props.remove_key(:side_by_side?)
+
+	sc << sorted_collection.new()
+	_for p _over props.fast_keys()
+	_loop
+		sc.add(p)
+	_endloop
+		
+	_for name _over sc.fast_elements()
+	_loop
+		value << props[name]
+
+		v << _if value.is_kind_of?(indexed_collection_mixin)
+		     _then
+			     >> value
+		     _else
+			     >> value.write_string
+		     _endif
+		
+		n << name.write_string.split_by(%!).last
+
+		_if value.default("") <> ""
+		_then
+			(n3,v3) << _self.gui_name_and_value(n,v)
+
+			txt.write(%,,%newline,2*%tab,":",n3,%,,%tab,v3)
+		_endif
+	_endloop
+	
+	txt.write(%),%newline)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.new_with_xml_properties(parent,props)
+	## 
+	## Return a new paned_window with properties PROPS.
+	##
+
+	pw << paned_window.new_dialog_default(parent,props[:row],props[:col])
+
+	_for k,e _over props.fast_keys_and_elements()
+	_loop
+		_if e _isnt _unset 
+		_then
+			pw.perform(k.with_chevron,e)			
+		_endif
+	_endloop
+	
+	>> pw
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.validate_rowcol_cnts()
+	## 
+	## Ensure the NROWS and NCOLS slots are correct.
+
+	_if _self.side_by_side?.default(_false)
+	_then
+		.nrows << 1
+		.ncols << .items.size
+	_else
+		.ncols << 1
+		.nrows << .items.size
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.empty_cell?(r,c)
+	## 
+	## Return FALSE if any of SELF's items have row=R and col=C,
+	## else return TRUE.
+
+	_if .items.size < 1 _orif
+	    .items[1] _is _unset _orif
+	    (r*c).class_name _is :float
+	_then
+		_return _true
+	_else
+		_return _false,.items[max(r,c)]
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.cell_sizes(_optional bb)
+	## 
+	## Return simple vectors of the heights/widths of all the cells
+	## of SELF.  This is called recursively through the
+	## :dialog_footprint() method to accommodate complex designs.
+
+	_self.validate_rowcol_cnts()
+
+	_if _self.side_by_side?.default(_false)
+	_then
+		row_h << {12}
+		col_w << {}.new(max(1,.items.size)).fill_with(12)
+	_else
+		row_h << {}.new(max(1,.items.size)).fill_with(12)
+		col_w << {12}
+	_endif
+
+	_for i _over 1.upto(.items.size)
+  	_loop
+		(r,c,h,w) << .items[i].dialog_footprint()
+
+		_if _self.side_by_side?.default(_false)
+		_then
+			(r,c) << (1,i)
+		_else
+			(r,c) << (i,1)
+		_endif
+
+		row_h[r] << max(row_h[r],h)
+		col_w[c] << max(col_w[c],w)
+	_endloop
+
+	total_w << max(4,.left_spacing) + max(4,.right_spacing) +
+		   (col_w.size-1) * max(.col_spacing,4)
+
+	_for cw _over col_w.fast_elements()
+	_loop
+		total_w +<< cw
+	_endloop
+
+	# Adjust the cell widths so they grow into available space
+	# depending on the 'col_resize_values'
+	_if bb _isnt _unset _andif bb.width > total_w _andif
+	    _self.col_resize_values _isnt _unset 
+	_then
+		crv << _if _self.col_resize_values.class_name _isnt :char16_vector
+		       _then
+			       >> _self.col_resize_values
+		       _else
+			       >> _self.col_resize_values.split_by(%,)
+		       _endif
+
+		extra << bb.width-total_w
+
+		_for i _over 1.upto(min(crv.size,col_w.size))
+		_loop
+			col_w[i] +<< (crv[i].as_number().default(0)*extra/100.0).floor
+		_endloop
+	_endif
+
+	total_h <<  max(4,.top_spacing) +  max(4,.bottom_spacing) +
+		   (row_h.size-1) * max(.row_spacing,4)
+
+	_for rh _over row_h.fast_elements()
+	_loop
+		total_h +<< rh
+	_endloop
+
+	# Adjust the cell widths so they grow into available space
+	# depending on the 'row_resize_values'
+	_if bb _isnt _unset _andif bb.height > total_h _andif
+	    _self.row_resize_values _isnt _unset 
+	_then
+		rrv << _if _self.row_resize_values.class_name _isnt :char16_vector
+		       _then
+			       >> _self.row_resize_values
+		       _else
+			       >> _self.row_resize_values.split_by(%,)
+		       _endif
+
+		extra << bb.height-total_h
+
+		_for i _over 1.upto(min(rrv.size,row_h.size))
+		_loop
+			row_h[i] +<< (rrv[i].as_number().default(0)*extra/100.0).floor
+		_endloop
+	_endif
+
+	# Make sure single cells or rows fill available space
+	_if bb _isnt _unset 
+	_then
+		_if col_w.size _is 1 _andif _self.col_alignment _is :fill
+		_then
+			col_w[1] << bb.width -  max(4,.left_spacing) -  max(4,.right_spacing)
+		_endif	
+
+		_if row_h.size _is 1 _andif _self.row_alignment _is :fill
+		_then
+			row_h[1] << bb.height - max(4,.top_spacing) -  max(4,.bottom_spacing)
+		_endif
+	_endif
+
+	>> row_h,col_w,max(total_h,30,row_h[1]),max(total_w,60,col_w[1])
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_paned_window.rc_item(r,c)
+	## 
+	## Return the ith item of SELF where i = max(r,c), else return
+	## unset. 
+	>> _if (m << max(r,c)) <= .items.size
+	_then
+		>> .items[m]
+	_endif
+_endmethod
+$

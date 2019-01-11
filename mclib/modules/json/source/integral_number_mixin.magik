@@ -1,0 +1,41 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable})
+_method integer.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	out_stream.write(_self)
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method integer.convert_to_json()
+	## convert_to_json() : integer
+	##
+	## returns self
+
+	_return _self 
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable})
+_method bignum.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	out_stream.write(_self)
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method bignum.convert_to_json()
+	## convert_to_json() : integer
+	##
+	## returns self
+
+	_return _self 
+_endmethod
+$

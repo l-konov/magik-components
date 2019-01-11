@@ -1,0 +1,55 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_record_tracking_ds_record
+##
+## Subclass of mss_record_tracking_mixin and user_ds_record,
+## used as a convenient place to manage conflict methods.
+##
+
+def_slotted_exemplar(:mss_record_tracking_ds_record,
+{},
+{:user_ds_record, :mss_record_tracking_mixin})
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_record_tracking_ds_record.source_rwo_records()
+	## 
+	## Conflict resolution.
+	##
+
+	_return _super(mss_record_tracking_mixin).source_rwo_records()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_record_tracking_ds_record.get_spatial_context_names()
+	## 
+	## Conflict resolution.
+	##
+
+	_return _super(mss_record_tracking_mixin).get_spatial_context_names()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_record_tracking_ds_record.get_spatial_context(context_name)
+	## 
+	## Conflict resolution.
+	##
+
+	_return _super(mss_record_tracking_mixin).get_spatial_context(context_name)
+	
+_endmethod
+$
+

@@ -1,0 +1,38 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_gui_plugin
+##
+## Generic superclass plugin to be used for all pointing
+## rule-specific GUI plugins managed by the
+## mss_ptrule_specials_plugin. 
+##
+
+def_slotted_exemplar(:mss_ptrule_gui_plugin,
+{
+	{:active_ptrule, _unset, :writable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={subclassable})
+_method mss_ptrule_gui_plugin.init_actions()
+	## 
+	## Do not include any debugging actions added in core at the
+	## plugin superclass, as these will automatically get added to
+	## the toolbox toolbar.
+	##
+
+	_super.init_actions()
+	.actions.remove_key(:clear_dialog_cache)
+	
+_endmethod
+$

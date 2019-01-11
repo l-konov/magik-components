@@ -1,0 +1,105 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:41:04 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:kml_polygon_element,{},:kml_element)
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_polygon_element.geometry_set()
+	## 
+	##
+	_local target_cs << coordinate_system.new_proj_long_lat(:wgs84,:degree)
+	_local wrld << pseudo_world.new(target_cs)
+	_local gs << geometry_set.new()
+
+	# Outer boundary
+	_if ( outer << _self.element_matching_name(:|outerBoundaryIs|) ) _isnt _unset 
+	_then
+		a_poly << _self.polygon_from( outer )
+		a_poly.world << wrld
+	_endif
+
+
+	# Inner boundary contains multiple holes
+	_for inner _over  _self.elements_matching_name(:|innerBoundaryIs|)
+	_loop
+	
+		a_hole << _self.polygon_from( inner )
+		a_hole.world << wrld
+		
+		_try _with cond 
+			a_poly.add_hole( a_hole )
+		_when geometry_hole_not_in_area
+			condition.raise(:warning, :string, cond.report_contents_string)
+			_continue 
+		_endtry 
+	_endloop 
+
+	_if a_poly _isnt _unset 
+	_then
+		an_area << pseudo_area.new_from_polygon( a_poly )
+		
+		an_area.world << wrld
+		gs.add( an_area )
+	_endif
+	>> gs
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_polygon_element.polygon_from( an_xml_element )
+	## Create a polygon from the Linear Ring element contained
+	## within AN_XML_ELEMENT, which can be 
+	## 
+
+	# Get the linear_ring
+	ring << an_xml_element.element_matching_name(:|LinearRing|)
+	
+	_if ring _isnt _unset 
+	_then
+		# Get the coordinates
+		coord_string << ring.element_matching_name(:coordinates).elements.an_element()
+		coord_tuples << coord_string.split_by(space_char)
+		s << sector_z.new()
+		
+		_for k, a_tuple _over coord_tuples.fast_keys_and_elements()
+		_loop
+			(x,y,z) << (_scatter a_tuple.split_by(%,) )
+			s.add( coordinate3d.new(x.as_number(),y.as_number(), z.as_number() ) )
+		_endloop
+		
+	
+		sr << sector_rope.new_with(s)
+		sr.close()
+		
+		a_poly << pseudo_polygon.new( sr )
+		_return a_poly
+	_endif
+	
+_endmethod
+$

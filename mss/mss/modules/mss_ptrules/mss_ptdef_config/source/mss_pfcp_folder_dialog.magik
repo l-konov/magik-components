@@ -1,0 +1,226 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_pfcp_folder_dialog
+##
+
+def_slotted_exemplar(:mss_pfcp_folder_dialog,
+{
+	{:owner, _unset, :readable},
+	{:items, _unset, :readable},
+	{:callback_data, _unset, :writable}
+},
+{:model})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.new(an_owner)
+	## 
+	## 
+
+	_return _clone.init(an_owner)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.init(an_owner)
+	## 
+	## 
+
+	_super.init()
+	.owner << an_owner
+	.items << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.activate_in(f)
+	## 
+	## 
+	
+	_if f.is_kind_of?(dialog_frame)
+	_then
+		f.modality << :primary_modal
+	_endif
+
+	p << panel.new(f)
+	p.resize_x? << _false
+	p.resize_y? << _true
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	tabs << {100}	
+	p.start_row()
+	label_item.new(p, _self.message(:folder_name))
+	ti << .items[:folder_name] <<
+		text_item.new(p, "",
+			      :max_length, 40,
+			      :model, _self,
+			      :incremental_change_selector, :|input_changed()|)
+	ti.set_left(tabs[1])
+
+	p.start_row()
+	label_item.new(p, _self.message(:sequence))
+	ti << .items[:sequence] <<
+		numeric_text_item.new(p, "",
+				      :model, _self,
+				      :change_selector, :|input_changed()|,
+				      :incremental_change_selector, {:|input_changed()|, _false})
+	ti.set_left(tabs[1])
+
+	p.start_row()
+	simple_panel.new(p).resize_x? << _true
+	.items[:ok] <<
+		button_item.new_safe(p, _self.message(:ok),
+				     _self, :|ok()|,
+				     :min_width, 75,
+				     :enabled?, _false)
+	.items[:cancel] <<
+		button_item.new_safe(p, _self.message(:cancel),
+				     _self, :|cancel()|,
+				     :min_width, 75)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.reset()
+	## 
+	## 
+
+	_if .items[:folder_name] _is _unset
+	_then
+		# Menu not realised.
+		_return
+	_endif
+	
+	_if .callback_data[:mode] _is :folder_properties
+	_then
+		# Editing the properties for an existing record.
+		exist_rec << .callback_data[:record]
+		.items[:folder_name].value << exist_rec.name.as_charvec()
+		.items[:folder_name].enabled? << _true 
+		.items[:sequence].value << exist_rec.seq
+		.items[:sequence].enabled? << exist_rec.parent_id _isnt _unset
+	_elif .callback_data[:mode] _is :contents_properties
+	_then
+		# Editing the properties for an existing record.
+		exist_rec << .callback_data[:record]
+		parent_rec << .callback_data[:parent_folder]
+		.items[:folder_name].value << exist_rec.name.as_charvec()
+		.items[:folder_name].enabled? << _false
+		_if (rel << exist_rec.parent_folder_relationship(parent_rec)) _is _unset
+		_then
+			seq << 0
+		_else
+			seq << rel.seq
+		_endif 
+		.items[:sequence].value << seq
+		.items[:sequence].enabled? << _true 
+	_else
+		.items[:folder_name].value << ""
+		.items[:folder_name].enabled? << _true 
+		.items[:sequence].value << ""
+		.items[:sequence].enabled? << _not (.callback_data[:mode] _is :new_root_folder)
+	_endif
+
+	_if (bi << .items[:ok]) _isnt _unset
+	_then
+		bi.enabled? << _false
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.input_changed(do_validation?)
+	## 
+	## 
+
+	_if do_validation? _is _false
+	_then
+		.items[:ok].enabled? << _true
+	_else 
+		(data, complete?) << _self.validate_input()
+		.items[:ok].enabled? << complete?
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.validate_input()
+	## 
+	## 
+
+	complete? << _true 
+	pl << property_list.new()
+	mand_fields << {:folder_name}
+	_for i _over {:folder_name, :sequence}.fast_elements()
+	_loop
+		_if (ti << .items[i]) _is _unset
+		_then
+			complete? << _false
+			_continue 
+		_endif
+		v << ti.value
+		_if mand_fields.includes?(i) _andif
+		    (v _is _unset _orif v = "")
+		_then
+			complete? << _false
+		_endif 
+		pl[i] << v
+	_endloop
+	_return pl, complete?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.ok()
+	## 
+	## 
+
+	(data, complete?) << _self.validate_input()
+	_if _not complete?
+	_then
+		_self.user_error(:input_incomplete)
+	_endif
+	data[:callback_data] << .callback_data
+	.owner.folder_dialog_ok(data)
+	_self.suspend()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.cancel()
+	## 
+	## 
+
+	_self.suspend()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_pfcp_folder_dialog.wm_close()
+	## 
+	## 
+
+	_self.cancel()
+	_return _true
+	
+_endmethod
+$

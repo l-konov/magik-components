@@ -1,0 +1,784 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_query_plugin
+##
+## Plugin to allow user to select CUs for insert/update/delete.
+##
+
+def_slotted_exemplar(:mss_cu_query_plugin,
+{
+	{:items, _unset, :readable},
+	{:attribute_list, _unset, :readable},
+	{:candidate_cu_list, _unset, :readable}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_query_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:current_object, :current_object_and_query_values, :cu_query_properties},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_query_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:candidate_cu_select, :candidate_cu_double_click},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	_self.set_option(:query_cu_code, "")
+	_self.set_option(:query_description, "")
+	_self.set_option(:use_job_type?, _false)
+	_self.set_option(:by_group?, _false)
+	_self.set_option(:by_facility?, _false)
+	_self.set_option(:query_max, 100)
+	.attribute_list << rope.new()
+	.candidate_cu_list << sorted_collection.new(10, mss_cu_holder.standard_sort_proc)
+
+	# Build a list of all operations.
+	all_ops << sorted_collection.new()
+	tbl << mss_cu_engine.view.collections[:mss_cu_operation_definition]
+	fd << tbl.all_fields[:operation]
+	_for op _over tbl.record_exemplar.match_string(fd, "").fast_elements()
+	_loop 
+		_if op.default("") ~= ""
+		_then
+			all_ops.add(op)
+		_endif
+	_endloop
+	def_op << _self.message(:default_operation)
+	_if _not equality_set.new_from(all_ops).includes?(def_op)
+	_then
+		def_op << all_ops.an_element()
+	_endif
+	_self.set_option(:all_operations, all_ops)
+	_self.set_option(:query_operation, def_op)
+
+	# Build a list of all groups.
+	sc << sorted_collection.new(10, _proc(a, b) _return a[2] _cf b[2] _endproc)
+	tbl << mss_cu_engine.view.collections[:mss_cu_group_definition]
+	_for i _over tbl.fast_elements()
+	_loop
+		sc.add({i.id, i.name.as_charvec()})
+	_endloop
+	all_groups << rope.new()
+	all_groups.add_last({_unset, ""})
+	_for i _over sc.fast_elements()
+	_loop
+		all_groups.add_last(i)
+	_endloop
+	_self.set_option(:all_groups, all_groups)
+
+	# Build a list of all facilities.
+	sc << sorted_collection.new(10, _proc(a, b) _return a[2] _cf b[2] _endproc)
+	_for i, j _over mss_cu_facility_definition.defined_facilities_by_id.fast_keys_and_elements()
+	_loop
+		_if (target_tbl << j.target_table) _is _unset _then _continue _endif 
+		sc.add({i, write_string(%[, target_tbl.source_view.view_name, %], % , target_tbl.external_name)})
+	_endloop
+	all_facilities << rope.new()
+	all_facilities.add_last({_unset, ""})
+	_for i _over sc.fast_elements()
+	_loop
+		all_facilities.add_last(i)
+	_endloop
+	_self.set_option(:all_facilities, all_facilities)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:perform_filter,
+				       :engine, _self,
+				       :action_message, :|perform_filter()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << _true
+	p.resize_y? << _true
+
+	tabs << {100}
+	ps << :|perform_safely()|
+	go << :|get_option()|
+	so << :|set_option()|
+
+	p.start_row()
+	label_item.new(p, _self.message(:panel_header))
+	
+	p.start_row()
+	label_item.new(p, _self.message(:query_operation))
+	.items[:query_operation] << ti <<
+		text_choice_item.new(p, "",
+				     :items, _self.get_option(:all_operations),
+				     :model, _self,
+				     :aspect, :query_operation,
+				     :value_selector, {go, :query_operation},
+				     :change_selector, {ps, so, :query_operation})
+	ti.set_left(tabs[1])
+	
+	p.start_row()
+	label_item.new(p, _self.message(:query_cu_code))
+	.items[:query_cu_code] << ti << 
+		text_item.new(p, "",
+			      :display_length, 20,
+			      :model, _self,
+			      :aspect, :query_cu_code,
+			      :value_selector, {go, :query_cu_code},
+			      :change_selector, {ps, so, :query_cu_code})
+	ti.set_left(tabs[1])
+	
+	p.start_row()
+	label_item.new(p, _self.message(:query_description))
+	.items[:query_description] << ti << 
+		text_item.new(p, "",
+			      :display_length, 20,
+			      :model, _self,
+			      :aspect, :query_description,
+			      :value_selector, {go, :query_description},
+			      :change_selector, {ps, so, :query_description})
+	ti.set_left(tabs[1])
+	
+	p.start_row()
+	.items[:use_job_type?] <<
+		toggle_item.new(p, _self.message(:query_use_job_type?),
+				:model, _self,
+				:aspect, :use_job_type?,
+				:value_selector, {go, :use_job_type?},
+				:change_selector, {ps, so, :use_job_type?})
+	
+	p.start_row()
+	.items[:by_group?] <<
+		toggle_item.new(p, "",
+				:model, _self,
+				:aspect, :by_group?,
+				:value_selector, {go, :by_group?},
+				:change_selector, {ps, :|by_group?<<|})
+	label_item.new(p, _self.message(:query_group))
+	.items[:query_group] << ti <<
+		text_choice_item.new(p, "",
+				     :items, _self.get_option(:all_groups),
+				     :enabled?, _self.get_option(:by_group?) _is _true,
+				     :model, _self,
+				     :aspect, :query_group,
+				     :value_selector, {go, :query_group},
+				     :change_selector, {ps, so, :query_group})
+	ti.set_left(tabs[1])
+	
+	p.start_row()
+	.items[:by_facility?] <<
+		toggle_item.new(p, "",
+				:model, _self,
+				:aspect, :by_facility?,
+				:value_selector, {go, :by_facility?},
+				:change_selector, {ps, :|by_facility?<<|})
+	label_item.new(p, _self.message(:query_facility))
+	.items[:query_facility] << ti <<
+		text_choice_item.new(p, "",
+				     :items, _self.get_option(:all_facilities),
+				     :enabled?, _self.get_option(:by_facility?) _is _true,
+				     :model, _self,
+				     :aspect, :query_facility,
+				     :value_selector, {go, :query_facility},
+				     :change_selector, {ps, :|query_facility<<|})
+	ti.set_left(tabs[1])
+
+	p.start_row()
+	.items[:attribute_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :attribute_list,
+			      :data_selector, :attribute_list,
+			      :select_notifier, :|attribute_list_selected()|,
+			      :editor_required_notifier, :|attribute_list_editor_required()|,
+			      :value_changed_notifier, :|attribute_list_value_changed()|,
+			      :column_widths, {60, 140, 140},
+			      :column_headings, {_self.message(:ch_enabled?),
+						 _self.message(:ch_attribute_name),
+						 _self.message(:ch_attribute_value)},
+			      :height_in_chars, 4,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _false)
+
+	p.start_row()
+	label_item.new(p, _self.message(:query_max))
+	mgr << numeric_value_manager.new_with_properties(:integer?, _true)
+	.items[:query_max] << ti << 
+		managed_value_text_item.new(p, "",
+					    :display_length, 10,
+					    :manager, mgr,
+					    :model, _self,
+					    :aspect, :query_max,
+					    :fail_selector, :|query_max_invalid_input()|,
+					    :value_selector, {go, :query_max},
+					    :change_selector, {ps, so, :query_max})
+	ti.set_left(tabs[1])
+	
+	simple_panel.new(p).resize_x? << _true 
+	x << _self.action(:perform_filter).place_control_on(p, :dialog)
+	x.min_width << 75
+	
+	p.start_row()
+	label_item.new(p, _self.message(:query_results))
+	
+	p.start_row()
+	.items[:candidate_cu_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :candidate_cu_list,
+			      :data_selector, :candidate_cu_list,
+			      :select_notifier, :|candidate_cu_list_selected()|,
+			      :double_click_notifier, :|candidate_cu_list_double_click()|,
+			      :column_widths, {100, 60, 180},
+			      :column_headings, {_self.message(:ch_cu_code),
+						 _self.message(:ch_operation),
+						 _self.message(:ch_description)},
+			      :height_in_chars, 6,
+			      :distribute_spare_width, :always,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.post_activation()
+	## 
+	## 
+
+	# Force a refresh of the background color for attribute_list.
+	_self.by_facility? << _self.get_option(:by_facility?)
+	_super.post_activation()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.query_max_invalid_input(cond, bad_value)
+	## 
+	## Redisplay the current value if invalid input is received.
+	##
+
+	# The following works around a bug in managed_value_text_item.handle_event()
+	# which raises this specific error when hitting the return key
+	# in the field being managed:
+	real_error << cond[:cond]
+	_if real_error _isnt _unset _andif
+	    real_error.name _is :does_not_understand _andif
+	    real_error[:selector] _is :|trim_spaces()|
+	_then
+		_return
+	_endif
+
+	# Except for the above case, re-display the current field value.
+	_self.changed(:query_max)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :current_object _andif
+	    data _isnt _unset _andif
+	    data.is_valid?
+	_then
+		_self.refresh_for_current_object(data)
+
+	_elif data_type_name _is :current_object_and_query_values _andif
+	      data[1] _isnt _unset _andif
+	      data[1].is_valid?
+	_then
+		_self.refresh_for_current_object(data[1], data[2])
+		
+	_elif data_type_name _is :cu_query_properties
+	_then
+		_for key, value _over data.fast_keys_and_elements()
+		_loop
+			_if {:query_operation, :query_cu_code, :query_description}.includes?(key)
+			_then
+				_self.set_option(key, value, _true)
+			_elif {:by_group?, :by_facility?}.includes?(key)
+			_then
+				mod_value << value.default(_false)
+				_if key _is :by_facility? _andif
+				    _self.get_option(:query_facility) _is _unset
+				_then
+					mod_value << _false
+				_endif 
+				_self.perform(key.with_chevron, mod_value)
+			_endif
+		_endloop 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.refresh_for_current_object(rec, _optional pvals)
+	## 
+	## If REC is a facility for which the "by facility" type of
+	## query is appropriate, then select that in the list (but do
+	## not automatically enable the "by facility" query).
+	##
+	## If property_list PVALS is given, then it is used to override
+	## the attributes of REC.
+	##
+
+	match? << _false 
+	_if rec _isnt _unset _andif
+	    (fac_def << mss_cu_facility_definition.get_for_target_table(rec.source_collection)) _isnt _unset _andif
+	    (available_facs << _self.get_option(:all_facilities)) _isnt _unset 
+	_then
+		# Double-check to be sure this is in self's picklist.
+		fac_id << fac_def.id
+		_for i _over available_facs.fast_elements()
+		_loop
+			_if i[1] = fac_id
+			_then
+				_self.query_facility << fac_id
+				match? << _true 
+				_leave
+			_endif
+		_endloop
+	_endif
+	
+	_if _not match?
+	_then
+		_self.query_facility << _unset
+		_self.by_facility? << _false
+	_else 
+		# Also populate attribute values.
+		_for attr_holder _over .attribute_list.fast_elements()
+		_loop
+			attr_data << attr_holder.value
+			_if attr_data[:table] _isnt rec.source_collection _then _continue _endif
+			attr_name << attr_data[:attribute_name]
+			attr_val << _unset 
+			_if pvals _isnt _unset _andif
+			    pvals.includes_key?(attr_name)
+			_then
+				attr_val << pvals[attr_name]
+			_endif 
+			_if attr_val _isnt _unset _orif
+			    (attr_val << rec.perform(attr_name)) _isnt _unset
+			_then
+				attr_val << attr_val.write_string
+			_endif 
+			attr_data[:attribute_value] << attr_val
+		_endloop
+		_self.changed(:attribute_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.by_group? << x
+	## 
+	## 
+
+	_self.set_option(:by_group?, x, _true)
+	_if (mi << .items[:query_group]) _isnt _unset _then mi.enabled? << x _endif 
+	_if x _is _true 
+	_then
+		_self.by_facility? << _false
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.by_facility? << x
+	## 
+	## 
+
+	_self.set_option(:by_facility?, x, _true)
+	_if (mi << .items[:query_facility]) _isnt _unset _then mi.enabled? << x _endif
+	_if (mi << .items[:attribute_list]) _isnt _unset
+	_then
+		_if x _isnt _true
+		_then
+			mi.background_colour << colour.called(:gainsboro).default(colour.called(:gray))
+		_else
+			mi.background_colour << colour.called(:white)
+		_endif
+		_self.changed(:attribute_list, :refresh)
+	_endif 
+	_if x _is _true 
+	_then
+		_self.by_group? << _false
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.query_facility << x
+	## 
+	##
+
+	old << _self.get_option(:query_facility)
+	_self.set_option(:query_facility, x, _true)
+	_if old ~= x
+	_then
+		_self.set_attribute_list()
+	_endif 
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.set_attribute_list()
+	## 
+	## Populate the contents of the attribute_list, based on the
+	## current query_facility.
+	##
+
+	attr_r << .attribute_list
+	attr_r.empty()
+	
+	qfac_id << _self.get_option(:query_facility)
+	_if (fac_def << mss_cu_facility_definition.defined_facilities_by_id[qfac_id]) _is _unset _orif
+	    (target_tbl << fac_def.target_table) _is _unset 
+	_then
+		_self.changed(:attribute_list, :renew)
+		_return 
+	_endif 
+
+	attr_sstr1 << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+					:value, :external_attribute_name, :tab,
+					:value, :attribute_value)
+	attr_sstr2 << styled_string.new(:gray, :align, :centre, :toggle, :enabled?, :tab,
+					:value, :external_attribute_name, :tab,
+					:value, :attribute_value)
+	
+	# Build a collection of all attributes for this facility.
+	_for i _over fac_def.attribute_names.fast_elements()
+	_loop
+		_if (fd << target_tbl.all_fields[i]) _is _unset
+		_then
+			# Configuration error - perhaps should dump something to the
+			# terminal to let the configurer know about it?
+			_continue
+		_endif
+		attr_val << property_list.new_with(
+				    :enabled?, _false,
+				    :table, target_tbl,
+				    :external_attribute_name, fd.external_name,
+				    :attribute_name, fd.name,
+				    :attribute_value, _unset)
+		attr_dt << display_tree.new(fd, attr_val)
+		attr_dt.styled_string << attr_sstr2
+		attr_r.add_last(attr_dt)
+	_endloop
+	_self.changed(:attribute_list, :renew)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.attribute_list_editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## 
+
+	_if a_tree.value[:enabled?] _is _false
+	_then
+		# Disallow editing disabled rows.
+		_return
+	_endif
+	
+	ed << _unset 
+	_if value_id _is :attribute_value
+	_then
+		# Provide a suitable editor.  Use a plain string-type editor
+		# for everything except for enumerated fields.  Note that the
+		# editor used is cached here, because there is a overhead
+		# involved in recreating an in_place_choice_editor.
+		_if (ed << a_tree.value[:in_place_editor]) _is _unset
+		_then 
+			tbl << a_tree.value[:table]
+			rec_ex << tbl.record_exemplar
+			fd << a_tree.key
+			_if rec_ex.can_match?(fd)
+			_then
+				items << rec_ex.match_string(fd, "")
+				ed << in_place_choice_editor.new(an_agent, :items, items)
+			_else 
+				ed << in_place_value_editor.new(an_agent)
+			_endif
+
+			a_tree.value[:in_place_editor] << ed
+		_endif
+	_endif
+	
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.attribute_list_value_changed(a_tree, value_id, new_value, old_value)
+	## 
+	## 
+
+	_if value_id _is :enabled?
+	_then
+		_if new_value _is _true
+		_then 
+			sstr << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+						  :value, :external_attribute_name, :tab,
+						  :value, :attribute_value)
+		_else
+			sstr << styled_string.new(:gray, :align, :centre, :toggle, :enabled?, :tab,
+						  :value, :external_attribute_name, :tab,
+						  :value, :attribute_value)
+		_endif
+		a_tree.styled_string << sstr
+
+	_elif value_id _is :attribute_value 
+	_then
+		# N.B.: the following handlers are explicitly provided, because
+		# something else internal to tree_item processing is causing my
+		# handlers to not be used if an in_place_choice_editor is used.
+		_handling user_error, db_bad_input, units_bad_string_input _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		
+		tbl << a_tree.value[:table]
+		rec_ex << tbl.record_exemplar
+		fd << a_tree.key
+		_if new_value _isnt _unset
+		_then
+			# This is a bit heavy handed, but try it once to see if any
+			# error occurs.  If it does, then reset to the old value, and
+			# invoke the condition so that the user gets the real error
+			# message. 
+			conv_ok? << _false
+			raised_error << _unset 
+			_try _with cond
+				test_conversion << rec_ex.value_from_string(fd, new_value.write_string)
+				conv_ok? << _true 
+			_when error
+				raised_error << cond
+			_endtry
+
+			_if raised_error _isnt _unset 
+			_then
+				a_tree.value[:attribute_value] << old_value
+				_self.changed(:attribute_list, :refresh)
+				raised_error.invoke()
+			_endif 
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.attribute_list_selected(selection)
+	## 
+	## Perform actions when a selection is made in the attribute_list.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.candidate_cu_list_selected(selection)
+	## 
+	## Enable/diable items as appropriate when a selection is
+	## made.
+	##
+
+	_self.manage_actions_for_candidate_cu_list_selection()
+	_if (single_sel << selection.an_element()) _isnt _unset
+	_then
+		data << property_list.new_with(:cu_code, single_sel.value[:cu_code],
+					       :operation, single_sel.value[:operation])
+	_else
+		data << property_list.new()
+	_endif
+	_self.databus_make_data_available(:candidate_cu_select, data)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.candidate_cu_list_double_click(selection)
+	## 
+	## 
+
+	data << property_list.new_with(:cu_code, selection.value[:cu_code],
+				       :operation, selection.value[:operation])
+	_self.databus_make_data_available(:candidate_cu_double_click, data)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.manage_actions_for_candidate_cu_list_selection()
+	## 
+	## 
+
+	# N.B.: at this time, no items need to be enabled/disabled here.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.selected_candidate_cu
+	## 
+	## 
+
+	_if (ti << .items[:candidate_cu_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		_return sel
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_plugin.perform_filter()
+	## 
+	## Do the work of querying, based on information entered by the user.
+	##
+
+	sc << .candidate_cu_list
+	sc.empty()
+	_self.changed(:candidate_cu_list, :renew)
+	
+	op << _self.get_option(:query_operation)
+	cu_data_pl << property_list.new_with(
+			      :operation, op,
+			      :cu_code, write_string(_self.get_option(:query_cu_code), %*),
+			      :description, write_string(_self.get_option(:query_description), %*),
+			      :max, _self.get_option(:query_max))
+	
+	# In order for job type filtering to be performed, the
+	# following three conditions must be met:
+	# - The user has selected the use_job_type? option.
+	# - A mss_cu_job_type record representing the current
+	#   job type exists.
+	# - That record has a non-empty set of mss_cu_definition records.
+	jt << _unset
+	_if _self.get_option(:use_job_type?)
+	_then 
+		jt << mss_cu_engine.active_job_type(_unset, :cu_query)
+	_endif 
+	_if jt _isnt _unset _andif
+	    jt.mss_cu_definitions.an_element() _is _unset
+	_then
+		jt << _unset
+	_endif
+	cu_data_pl[:job_type] << jt
+
+	_if _self.get_option(:by_group?)
+	_then
+		grp_id << _self.get_option(:query_group)
+		_if grp_id _is _unset _orif
+		    (grp_rec << mss_cu_engine.view.collections[:mss_cu_group_definition].at(grp_id)) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:invalid_group))
+		_endif 
+		cand_cus << mss_cu_engine.cus_for_group(grp_rec, cu_data_pl)
+		
+	_elif _self.get_option(:by_facility?)
+	_then
+		fac_id << _self.get_option(:query_facility)
+		_if fac_id _is _unset _orif
+		    (fac_def << mss_cu_facility_definition.defined_facilities_by_id[fac_id]) _is _unset _orif
+		    (target_tbl << fac_def.target_table) _is _unset 
+		_then
+			condition.raise(:user_error, :string, _self.message(:invalid_facility))
+		_endif
+		rec_ex << target_tbl.record_exemplar
+
+		# Parse out all attribute values.
+		attr_pl << property_list.new()
+		_for i _over .attribute_list.fast_elements()
+		_loop
+			_if i.value[:enabled?] _isnt _true _then _continue _endif
+			attr_rec_ex << i.value[:table].record_exemplar
+			attr_fd << i.key
+			_if (attr_val_string << i.value[:attribute_value].default("")) = ""
+			_then
+				attr_val << _unset
+			_else 
+				attr_val << attr_rec_ex.value_from_string(attr_fd, attr_val_string.write_string)
+			_endif 
+			attr_pl[attr_fd.name] << attr_val
+		_endloop
+		cand_cus << mss_cu_engine.cus_for_facility(rec_ex, cu_data_pl, attr_pl)
+		
+	_else
+		cand_cus << mss_cu_engine.cus_for_attributes(cu_data_pl)
+	_endif
+
+	sstr << {:value, :cu_code, :tab,
+		 :value, :operation, :tab,
+		 :value, :description}
+	_for i _over cand_cus.fast_elements()
+	_loop
+		pl << property_list.new_with(
+			      :sorter, {mss_cu_holder.cu_code_sort_key(i.cu_code.default(""))},
+			      :cu_code, i.cu_code.default("").as_charvec(),
+			      :operation, op,
+			      :description, i.description.default("").as_charvec(),
+			      :record, i)
+		dt << display_tree.new(i.id, pl)
+		dt.styled_string << sstr
+		sc.add(dt)
+	_endloop
+	_self.changed(:candidate_cu_list, :renew)
+	
+_endmethod
+$

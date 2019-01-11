@@ -1,0 +1,24 @@
+message_usages.magik
+
+mss_workspace_record_mixin.magik
+mss_workspace_ds_record.magik
+mss_workspace_rwo_record.magik
+
+# Objects in mss_workspace data model
+mss_job.magik
+mss_job_archive.magik
+mss_job_history.magik
+mss_design.magik
+mss_design_archive.magik
+mss_design_history.magik
+mss_ws_related_document.magik
+
+# Objects in client partitions
+mss_workspace_tracking_record.magik
+mss_wtr_complex_key.magik
+
+# Objects that are not datastore records, but essential to data model
+mss_workflow.magik
+mss_state.magik
+mss_state_transition.magik
+mss_job_type.magik

@@ -1,0 +1,125 @@
+<gui>
+  <accelerators>
+    <accelerator id="undo_a" name="undo"/>
+    <accelerator id="redo_a" name="redo"/>
+    <accelerator id="cut_a" name="cut"/>
+    <accelerator id="copy_a" name="copy"/>
+    <accelerator id="paste_a" name="paste"/>
+    <accelerator id="refresh_a" name="refresh"/>
+  </accelerators>
+  
+  <menu name="menubar" type="menubar">
+    <submenu name="file" mnemonic_id="file_m">
+      <action name="versions.activate_version_management" mnemonic_id="versions_m"/>
+      <action name="versions.commit" mnemonic_id="commit_m"/>
+      <action name="versions.rollback" mnemonic_id="rollback_m"/>
+      <separator/>
+      <action name="cu_import_export_config.import_cu_definitions"/>
+      <action name="cu_import_export_config.export_cu_definitions"/>
+      <separator/>
+      <action name="close" mnemonic_id="close_m"/>
+    </submenu>
+    <submenu name="edit" mnemonic_id="edit_m">
+      <action name="undo" mnemonic_id="undo_m"/>
+      <action name="redo" mnemonic_id="redo_m"/>
+      <separator/>
+      <!-- Remove cut/copy/paste until there is anything that requires their use...
+      <action name="cut" mnemonic_id="cut_m"/>
+      <action name="copy" mnemonic_id="copy_m"/>
+      <action name="paste" mnemonic_id="paste_m"/>
+      <separator/>
+      End remove cut/copy/paste -->
+      <action name="activate_cu_definition_editor"/>
+      <action name="activate_cu_group_definition_editor"/>
+      <action name="activate_cu_job_type_editor"/>
+      <action name="activate_cu_cost_group_editor"/>
+      <separator/>
+      <action name="edit_selected_cu_definition"/>
+      <action name="edit_selected_cu_properties"/>
+      <action name="edit_selected_cu_group_definition"/>
+      <action name="edit_selected_cu_job_type"/>
+      <action name="edit_selected_cu_cost_group"/>
+      <separator/>
+      <action name="clone_selected_cu_definition"/>
+    </submenu>
+    <submenu name="view" mnemonic_id="view_m">
+      <action name="refresh" mnemonic_id="refresh_m"/>
+    </submenu>
+    <submenu name="tools" mnemonic_id="tools_m">
+      <action name="explorer.start_explorer"/>
+    </submenu>
+  </menu>
+
+  <menu name="cu_property_config" type="popup">
+      <action name="cu_property_config.edit_selected_cu_definition"/>
+      <action name="cu_property_config.edit_selected_cu_properties"/>
+  </menu>
+
+  <menu name="cu_group_config_1" type="popup">
+      <action name="cu_group_config.edit_selected_cu_group_definition"/>
+  </menu>
+
+  <menu name="cu_group_config_2" type="popup">
+      <action name="cu_group_config.remove_cus_from_group"/>
+  </menu>
+
+  <menu name="cu_group_config_3" type="popup">
+      <action name="cu_group_config.add_cus_to_group"/>
+  </menu>
+
+  <menu name="cu_job_type_config_1" type="popup">
+      <action name="cu_job_type_config.edit_selected_cu_job_type"/>
+  </menu>
+
+  <menu name="cu_job_type_config_2" type="popup">
+      <action name="cu_job_type_config.remove_cus_from_job_type"/>
+  </menu>
+
+  <menu name="cu_job_type_config_3" type="popup">
+      <action name="cu_job_type_config.add_cus_to_job_type"/>
+  </menu>
+
+  <menu name="cu_cost_group_config" type="popup">
+      <action name="cu_cost_group_config.edit_selected_cu_cost_group_item"/>
+  </menu>
+
+  <menu name="cu_mu_config_1" type="popup">
+  </menu>
+
+  <menu name="cu_mu_config_2" type="popup">
+      <action name="cu_mu_config.edit_selected_cu_mu_relationship"/>
+      <separator/>
+      <action name="cu_mu_config.remove_cus_from_mu"/>
+  </menu>
+
+  <menu name="cu_mu_config_3" type="popup">
+      <action name="cu_mu_config.add_cus_to_mu"/>
+  </menu>
+
+  <toolbar name="database">
+    <action name="versions.commit"/>
+    <action name="versions.rollback"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="database"/>
+  </dock>
+
+  <work_area>
+    <tab_box role="main_tab_box">
+      <plugin plugin_name="cu_property_config"/>
+      <plugin plugin_name="cu_group_config"/>
+      <plugin plugin_name="cu_job_type_config"/>
+      <plugin plugin_name="cu_mu_config"/>
+      <plugin plugin_name="cu_cost_group_config"/>
+      <plugin plugin_name="cu_import_export_config"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar>
+    <pane id="status_string" springy="true" style="innie"/>
+  </statusbar>
+</gui>
+
+
+

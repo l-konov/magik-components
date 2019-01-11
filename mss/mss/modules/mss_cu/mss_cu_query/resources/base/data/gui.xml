@@ -1,0 +1,14 @@
+<gui>
+  <work_area>
+    <paned_window side_by_side="no" dynamic="no">
+      <paned_window side_by_side="no" dynamic="yes" stretch="100">
+        <plugin plugin_name="mss_cu_lister_plugin" stretch="35"/>
+        <plugin plugin_name="mss_cu_query_plugin" stretch="65"/>
+      </paned_window>
+      <self stretch="0"/>
+    </paned_window>
+  </work_area>
+</gui>
+
+
+

@@ -1,0 +1,49 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:41:26 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:kml_multigeometry_element,
+                             {},
+			     {:kml_element})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_multigeometry_element.geometry_set()
+	## 
+	## 
+	##
+
+	# (08-08-2007 Brad Sileo): created.
+	gs << geometry_set.new()
+	_for a_elem _over _self.elements()
+	_loop
+		gs.add_all(a_elem.geometry_set())
+	_endloop
+	>> gs
+_endmethod
+$

@@ -1,0 +1,112 @@
+#% text_encoding = cp1252
+########################################################################
+##
+##
+## Created By: Brad Sileo
+## Date: 08-08-2007
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+
+_pragma(classify_level=restricted)
+## provides something like and rwo for use with KML placemark data.
+## mYou can set fields field a_kml[:field_name] << a_value
+## and can access them as a_kml.field_name
+##
+## Limited behaviopr like RWOs is provided to help make these
+## useful in the application
+##
+def_slotted_exemplar(:kml_rwo_record,
+                    {
+		    },
+		    {:uds_rwo_record})
+$
+
+
+
+
+_pragma(classify_level=restricted, topic={mclib})
+_method kml_rwo_record.next_id()
+	## 
+	## 
+	##
+
+	# (08-09-2007 Brad Sileo): created.
+	>> _self.source_collection.size + 1
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_method kml_rwo_record.default_collection(a_dataset)
+	## Returns the default collectyion to use for placemarks
+	## 
+	##
+
+	# (08-10-2007 Brad Sileo): created.
+	name << :|placemark|
+	_if (a_coll << a_dataset.collections[name]) _is _unset 
+	_then
+		a_coll << _self.make_collection(a_dataset,name)
+	_endif
+	>> a_coll
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_method kml_rwo_record.make_collection(a_dataset,name)
+	## 
+	## 
+	##
+	
+	# (08-10-2007 Brad Sileo): created.
+
+	f_id << uds_phys_field.new(:id,
+				   uds_field_type.new_scalar(a_dataset,:id,:ds_int))
+	f_name << uds_phys_field.new(:name,
+				     uds_field_type.new_scalar(a_dataset,:name,:extdb_string),_false)
+	f_name.external_name << "Name"
+	f_snip << uds_phys_field.new(:snippet,
+				     uds_field_type.new_scalar(a_dataset,:snippet,:extdb_string),_false)
+	f_snip.external_name << "Snippet"
+	f_desc << uds_phys_field.new(:description,
+				     uds_field_type.new_scalar(a_dataset,:description,:extdb_string),_false)
+	f_desc.external_name << "Description"
+
+	f_style << uds_phys_field.new(:style_name,
+				     uds_field_type.new_scalar(a_dataset,:style_name,:extdb_string),_false)
+	f_style.external_name << "Style Name"
+
+	
+	#f_pt << uds_geom_field.new(:point,uds_simple_point_set)
+	#f_line << uds_geom_field.new(:line,uds_simple_chain_set)
+	#f_area << uds_geom_field.new(:area,uds_simple_area_set)
+
+	f_pt << uds_geom_field.new(:point, uds_simple_point)
+	f_line << uds_geom_field.new(:line,uds_simple_chain)
+	f_area << uds_geom_field.new(:area,uds_simple_area)
+
+	
+	fields << {f_id,f_name,f_snip,f_desc,f_style,f_pt,f_line,f_area}
+	e_name << name
+	int_name << name.write_string.lowercase.convert_to_non_escape_string().as_symbol()
+	desc << uds_table_descriptor.new(a_dataset,
+					 int_name,
+					 fields,
+					 {1},
+					 _false)
+	desc.external_name << e_name
+	desc.dd!record_exemplar << kml_rwo_record
+	
+	a_collection << kml_collection.new(a_dataset,int_name,
+					   desc)
+	a_dataset.add_collection(int_name,a_collection)
+	f_id.generator << :|next_id()|
+	>> a_collection
+_endmethod
+$

@@ -1,0 +1,5 @@
+<gui base="explorer_plugin.embedded_explorer_view_gui">
+  <!-- Remove the top dock -->
+  <dock name="top">
+  </dock>
+</gui>

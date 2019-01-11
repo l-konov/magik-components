@@ -1,0 +1,263 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_tree_list - object to represent a tree_list.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_tree_list,{},:tree_item)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_tree_list.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :mode,                  {:none,:one,:many},
+					  :aspect,                :string,
+					  :allow_dragging_notifier,   :string,
+					  :release_dragging_notifier, :string,
+					  :double_click_notifier,     :string,
+					  :select_notifier,           :string,
+					  :resize?,                   :boolean
+						),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_tree_list.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.init(_gather args)
+	## 
+	## Initialise SELF.
+	
+	.properties << property_list.new()
+	_super.init(_scatter args)
+	>> _self 
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.resize?
+	## 
+	## Return the RESIZE? property.
+	
+	>> _self.properties[:resize?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.resize? << val
+	## 
+	## Set the RESIZE? property.
+	_self.properties[:resize?] << val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.double_click_notifier
+	## 
+	## Retrieve the property.
+	>> .properties[:double_click_notifier]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.double_click_notifier << new_val
+	## 
+	## Set the property.
+	.properties[:double_click_notifier] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	>> max(40,_self.height.default(40))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.new_with_xml_properties(parent,props)
+	## 
+	## Return a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	desc << props[:dialog_description]
+	allow << props[:allow_dragging_notifier]
+	relea << props[:release_dragging_notifier]
+	dbl_not << props[:double_click_notifier]
+	sel_not << props[:select_notifier]
+
+	props.remove_key(:dialog_description)
+	props.remove_key(:allow_dragging_notifier)
+	props.remove_key(:release_dragging_notifier)
+	props.remove_key(:double_click_notifier)
+	props.remove_key(:select_notifier)
+
+	res <<  _self.new(parent,_scatter props)
+
+	res.aspect << props[:aspect]
+	res.dialog_description << desc
+	res.allow_dragging_notifier << allow
+	res.release_dragging_notifier << relea
+	res.double_click_notifier << dbl_not
+	res.select_notifier << sel_not
+	
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	>> _self.new(rc,
+		     :mode,                  :one,
+		     :column_headings,       {"Column A", "Column B"},
+		     :column_alignments,     {:left,:left},
+		     :column_widths ,        {50,50},
+		     :col_alignment,         :fill,
+		     :row_alignment,         :fill,
+		     :grid_lines?,           _true,
+		     :column_allow_groupby?, _false,
+		     :resize?,               _true,
+		     :height,120,
+		     :row,row,:col,col)
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+
+	_dynamic !dialog_element_footprints!
+	
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![pbb] << _self
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	ras << smallworld_product.get_raster_image(:tree_item,_self.module_name)
+	canv.render_raster(ras,pbb.centre.x-8,pbb.centre.y-8,_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,".items[:",_self.dialog_element_id, 
+		  "] << tree_item.new(",parent_id)
+	txt.write(%,,%newline,%tab*2,":model,",%tab,"_self")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*2,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	txt.write(" )",%newline)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_tree_list.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.set_logical_properties(_optional all?)
+	##
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_if all?.default(_false)
+	_then
+		_self.aspect << _self.dialog_element_id + "_aspect"
+		_self.allow_dragging_notifier << _self.dialog_element_id + "_allow_dragging?()"
+		_self.release_dragging_notifier << _self.dialog_element_id + "_release_dragging()"
+		_self.double_click_notifier << _self.dialog_element_id + "_double_clicked()"
+		_self.select_notifier << _self.dialog_element_id + "_selected()"
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.double_click_notifier
+	## 
+	## Retrieve the property.
+	>> .properties[:double_click_notifier]
+	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.double_click_notifier << new_val
+	## 
+	## Set the property.
+	.properties[:double_click_notifier] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.select_notifier
+	## 
+	## Return the SELECT_NOTIFIER property.
+	
+	>> _self.properties[:select_notifier]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tree_list.select_notifier << val
+	## 
+	## Set the SELECT_NOTIFIER property.
+	_self.properties[:select_notifier] << val
+_endmethod
+$

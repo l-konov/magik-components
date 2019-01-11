@@ -1,0 +1,6 @@
+additions/
+basic_changes/
+mss_delete_alternatives_task_handler.magik
+mss_delete_designs_task_handler.magik
+mss_post_design_task_handler.magik
+mss_state_transition_task_handler.magik

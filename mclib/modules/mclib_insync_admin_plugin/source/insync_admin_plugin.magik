@@ -1,0 +1,119 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-06-07 21:53:11 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 06-07-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## A plugin that provides action to startup the insync GUIs.
+def_slotted_exemplar(:insync_admin_plugin,
+                     {},
+		     {:plugin})
+$
+
+insync_admin_plugin.define_property(:soc_name,:symbol,
+				    "The name of the SOC to use for my applications",
+				    _true,_true,:gis)
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method insync_admin_plugin.init_actions()
+	## Create my actions - start_insync_mapping_editor and 
+	##    start_basic_replication_editor
+	##
+
+	# (06-07-2005 Brad Sileo): created.
+	_self.add_action(sw_action.new(:start_insync_mapping_editor,
+				       :engine,_self,
+				       :enabled?,_self.insync_mapping_enabled?,
+				       :action_message,:|start_insync_mapping_editor()| ,
+				       :toolbar_control,:image_button_item ,
+				       :image,{:insync_editor,_self.module_name},
+				       :caption,_self.message(:insync_mapping_editor  ),
+				       :short_help_text,_self.message(:insync_mapping_editor_sh  ),
+				       :tooltip,_self.message(:insync_mapping_editor_tt)  )
+	      )
+	_self.add_action(sw_action.new(:start_basic_replication_editor,
+				       :engine,_self,
+				       :enabled?,_self.basic_replication_enabled?,
+				       :action_message,:|start_basic_replication_editor()|,
+				       :toolbar_control,:image_button_item ,
+				       :image,{:replication_editor,_self.module_name},
+				       :caption,_self.message(:basic_replication_editor  ),
+				       :short_help_text,_self.message(:basic_replication_editor_sh  ),
+				       :tooltip,_self.message(:basic_replication_editor_tt)  )
+	      )
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method insync_admin_plugin.start_insync_mapping_editor()
+	## Launch the insync_mapping_editor
+	## 
+	##
+
+	# (06-07-2005 Brad Sileo): created.
+	_if (d << _self.get_dialog(:insync_mapping_editor)) _is _unset 
+	_then
+		d << sw:insync_mapping_editor.new(gis_program_manager.spatial_object_controller(_self.soc_name))
+		_self.cache_dialog(:insync_mapping_editor,d)
+		d.activate()
+	_else
+		d.activate()
+	_endif
+	>> d
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method insync_admin_plugin.start_basic_replication_editor()
+	## launch the basic_replication_editor dialog
+	## 
+	##
+
+	# (06-07-2005 Brad Sileo): created.
+	_if (d << _self.get_dialog(:basic_replication_editor)) _is _unset 
+	_then
+		d << sw:basic_replication_editor.new(gis_program_manager.spatial_object_controller(_self.soc_name))
+		_self.cache_dialog(:basic_replication_editor,d)
+		d.activate()
+	_else
+		d.activate()
+	_endif
+	>> d
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method insync_admin_plugin.insync_mapping_enabled?
+	## true if sw:insync_mapping_editor is in the image
+	## 
+	##
+
+	# (06-07-2005 Brad Sileo): created.
+	>> sw:insync_mapping_editor _isnt _unset 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method insync_admin_plugin.basic_replication_enabled?
+	## true if  sw:basic_replication_editor is in the image
+	## 
+	##
+
+	# (06-07-2005 Brad Sileo): created.
+	>> sw:basic_replication_editor _isnt _unset 
+_endmethod
+$

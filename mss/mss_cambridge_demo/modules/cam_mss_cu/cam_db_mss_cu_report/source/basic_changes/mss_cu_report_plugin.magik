@@ -1,0 +1,33 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_report_plugin.excel_filename_for_design(ad)
+	## 
+	## Return a filename to use for saving an Excel workbook for
+	## the design AD.  If this returns unset, no file saving will
+	## be performed.  This may be redefined to automatically save
+	## the resulting files.
+	##
+
+	_if ad _is _unset _orif
+	    _not ad.is_valid?
+	_then
+		_return _unset
+	_endif 
+
+	# N.B.: not using job_and_design_full_name method here, just
+	# because it introduces a couple extra spaces.
+	leaf_fname << write_string(ad.mss_job.name, "_", ad.full_name, ".xls").mss_as_safe_filename()
+	fname << system.pathname_down(smallworld_product.products[:mss_cambridge_demo].directory,
+				      "data", leaf_fname)
+	_return fname
+	
+_endmethod
+$

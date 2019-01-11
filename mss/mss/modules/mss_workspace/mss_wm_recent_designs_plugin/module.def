@@ -1,0 +1,9 @@
+mss_wm_recent_designs_plugin	1
+
+description
+	Plugin for managing recently accessed designs
+end
+
+requires
+	mss_workspace_manager
+end

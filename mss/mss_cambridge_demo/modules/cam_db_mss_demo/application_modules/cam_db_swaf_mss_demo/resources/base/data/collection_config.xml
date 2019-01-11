@@ -1,0 +1,34 @@
+<!-- This file is used to defines field grouping, ordering, and visibilty and
+      takes precedence over values stored in the ace or the data dictionary.
+      It can also be used to specify that a non default editor class,
+      configuration, or gui be used for a particular collection.
+
+      It is referred to in the applications config file in the
+      configuration_file_name property of the editor_manager.
+-->
+<editors>
+    <!-- Define the xml files for specific collections -->
+    <collection dataset_name = "gis" 
+                collection_name = "pl_of_interest"
+                gui_file_name = "cam_db_swaf_mss_demo.poi_editor_gui" >
+<!-- The followeing two properties have been commented out put would allow
+     the specification of a non standard editor class and an xml config file
+     for the editor. -->
+<!--            editor_exemplar_name = "poi_editor" -->
+<!--            config_file_name = "pni_application.hotel_editor_config"-->
+         <!-- Define field grouping and ordering -->
+        <field name = "type_of_place" />
+        <group name = "details">
+            <field name = "name" />
+            <field name = "address1" />
+            <field name = "address2" />
+            <field name = "nearest_town" />
+        </group>
+        <group name = "geometry">
+            <field name = "location" />
+            <field name = "annotation" />
+            <field name = "coverage" />
+        </group>
+        <field name = "drawing" />
+    </collection>
+</editors>

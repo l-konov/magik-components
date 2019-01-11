@@ -1,0 +1,81 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-07-22 12:10:23 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:case_html_report_application_plugin,
+                     {
+		     },
+		     {:plugin})
+$
+
+case_html_report_application_plugin.define_property(:config_definition_module_name,:symbol,
+				  "The name of my XML dump file.",
+				  _true,_true,:mclib_case_html_reporter)
+$
+case_html_report_application_plugin.define_property(:gui_definition_module_name,:symbol,
+				  "The name of my XML dump file.",
+				  _true,_true,:mclib_case_html_reporter)
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method case_html_report_application_plugin.init_actions()
+	## Setup my soc-selection action
+	## 
+	##
+
+	# (07-15-2005 Brad Sileo): created.
+	_self.add_action(sw_action.new(:activate_dump_dialog,
+				       :engine,_self,
+				       :action_message,:activate_dump_dialog|()| ,
+				       :toolbar_control,:button_item ,
+				       :caption,_self.message(:activate_dump_dialog  ),
+				       :short_help_text,_self.message(:activate_dump_dialog_sh  ),
+				       :tooltip,_self.message(:activate_dump_dialog_tt)  )
+	      ) 
+	_super.init_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method case_html_report_application_plugin.activate_dump_dialog()
+	## Starts a dialog with me in it for dumping a given CASE.
+	## 
+	##
+
+	# (07-18-2005 Brad Sileo): created.
+	_if (gf << _self.get_dialog(:dump_dialog)) _is _unset 
+	_then
+		gf << gui_framework.new(:dump_dialog,_self,
+					:title, _self.message(:title),
+				    :config_definition_module_name,_self.config_definition_module_name,
+				    :gui_definition_module_name,_self.gui_definition_module_name)
+		_self.cache_dialog(:dump_dialog,gf)
+	_endif
+	gf.activate()
+_endmethod
+$

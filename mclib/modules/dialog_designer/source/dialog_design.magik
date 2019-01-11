@@ -1,0 +1,4176 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## Dialog Design - the central object for the Dialog Designer.
+## Holds and manipulates general aspects of a dialog design.
+##
+##########################################################################################
+_package user
+$
+
+def_slotted_exemplar(:dialog_design,
+		     {
+			     {:dialog_class,_unset,:writable},			  
+			     {:dialog_package,_unset,:writable},			  
+			     {:dialog_language,_unset,:writable},			  
+			     {:dialog_extra_slots,_unset,:writable},			  
+			     {:dialog_description,_unset,:writable},			  
+			     {:build_module_dir,_unset,:writable},			  
+			     {:build_module_name,_unset,:writable},			  
+			     {:build_module_description,_unset,:writable},			  
+			     {:build_module_requires,_unset,:writable},			  
+			     {:pragma_classify_level,_unset,:writable},			  
+			     {:pragma_usage,_unset,:writable},			  
+			     {:pragma_topic,_unset,:writable},			  
+			     {:frame,_unset,:writable},
+			     {:menubar,_unset,:writable},
+			     {:statusbar,_unset,:writable},
+			     {:docks,_unset,:writable},
+			     {:databus,_unset,:writable},
+			     {:use_menubar?,_unset,:writable},
+			     {:use_statusbar?,_unset,:writable},
+			     {:use_docks?,_unset,:writable},
+			     {:use_databus?,_unset,:writable},
+			     {:outlookbar,_unset,:writable},
+			     {:save_filename,_unset,:writable},
+			     {:built?,_unset,:writable},
+			     {:gui_layout,_unset,:writable},
+			     {:open_file_dir_method_names,_unset,:writable},
+			     {:dd_date_time_aspect_method_names,_unset,:writable},
+			     {:class_messages,_unset,:writable},
+			     {:plugin_messages,_unset,:writable},
+			     {:table_aspect_method_names,_unset,:writable},
+			     {:tree_aspect_method_names,_unset,:writable}
+		     })
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.new(_gather args)
+	## 
+	## Return a new instance of SELF.
+	
+	>> _clone.init(_scatter args)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.message(_gather args)
+	## 
+	## Use the dialog_designer for all messaging, keeps all the
+	## message centralize.  May have to break it up if the message
+	## file gets too big.
+	
+	>> dialog_designer.message(_scatter args)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init(dialog_class)
+	## 
+	## Initialize an instance of SELF.
+	
+	.dialog_class << dialog_class.default(_self.message(:dialog_class_default))
+	.dialog_package << "user"
+	.dialog_extra_slots << ""
+	.dialog_description << _self.message(:dialog_description_default)
+
+	.pragma_classify_level << "restricted"
+	.pragma_usage << ""
+	.pragma_topic << dialog_class.default(_self.message(:dialog_class_default))
+
+	.build_module_name << .dialog_class + " 1"
+	.build_module_description << _self.message(:build_module_description_default)
+	
+	.frame << frame.new("")
+	.frame.x << 10
+	.frame.y << 25
+	.frame.width << 200
+	.frame.height << 200
+	.frame.set_property(:dialog_element_id,"a_frame")
+	.frame.minimizable? << _true
+	.frame.maximizable? << _true
+	.frame.resizable? << _true 
+
+	.gui_layout << property_list.new()
+	.docks   << property_list.new()
+	.gui_layout[:top_rc] << rowcol.new(.frame,1,1,:pixel,:style,:top_level,
+					:resize?,_true,
+					:rowcol_style,:top_level,
+					:default_col_alignment,:fill,
+					:default_row_alignment,:fill)
+
+	.gui_layout[:top_rc].set_property(:dialog_element_id,:rowcol_01)
+	
+	.use_docks? << _false 
+	.use_databus? << _false 
+	.use_menubar? << _false 
+	.use_statusbar? << _false
+
+	.build_module_requires << ""
+	.class_messages << ""
+	.plugin_messages << ""
+
+	_self.init_menubar()
+	_self.init_statusbar()
+	_self.init_docks()
+	_self.init_databus()
+
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.databus()
+	## 
+	## Return the databus information, a simple property list
+	## grouping consumer and producer datatypes.
+	
+	_if .databus _is _unset 
+	_then
+		.databus << property_list.new()
+	_endif
+
+	_return .databus
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_on(canv,xoffset,yoffset)
+	## 
+	## Render SELF on the canvas CANV.
+
+	_dynamic !current_dialog! << _self 
+
+	(h,w) << _self.render_frame(canv,xoffset,yoffset)
+	_self.render_menubar(canv,h,w)
+	_self.render_docks(canv,h,w)
+	_self.render_statusbar(canv,w,.frame.x,.frame.y+h+1)
+	_self.render_frame_outline(canv,h,w,xoffset,yoffset)
+	_self.render_gui_layout(canv)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_frame_outline(c,h,w,xoff,yoff)
+	## 
+	## Render the frame outline, shading is used to give a little
+	## depth to the render.  The frame resizable? indicator chevrons
+	## are drawn if warranted.
+
+	_dynamic !dialog_element_footprints!	
+
+	h +<< 18
+	w +<< 3
+	
+	_if .use_menubar?
+	_then
+		h +<< 15
+	_endif
+	
+	_if .use_statusbar?
+	_then
+		h +<< 17
+	_endif
+
+	bb << pixel_bounding_box.new(9+xoff,7+yoff,8+w+xoff,7+h+yoff)
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,3)
+	c.draw(bb.boundary,ls)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	c.draw(bb.boundary,ls)
+	
+	bb << bb.expand(1)
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:gray),:width,1)
+	c.draw_segment(ls,bb.xmin+1,bb.ymax,bb.xmax,bb.ymax)
+	c.draw_segment(ls,bb.xmax,bb.ymax,bb.xmax,bb.ymin)
+
+	# Show Frame expandable
+	_if .frame.resizable?
+	_then
+		w << 10
+		_for i _over range(4,8,3)
+		_loop
+			c.draw_segment(ls,bb.xmax+i,bb.ymax+i,bb.xmax+i,bb.ymax-w+i)
+			c.draw_segment(ls,bb.xmax-w+i,bb.ymax+i,bb.xmax+i,bb.ymax+i)	
+		_endloop
+
+		pbb << pixel_bounding_box.new(bb.xmax-w+8,bb.ymax+8,bb.xmax+8,bb.ymax-w+8)
+
+		!dialog_element_footprints![pbb] << :resize_chevron
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_gui_layout(canv)
+	## 
+	## Render the gui_layout widgets.  This is the top of the
+	## recursive rendering logic.
+
+	dwh << _self.dock_widths_and_heights()
+
+	.gui_layout[:top_rc].render_on(canv,_unset,.frame.x + dwh[:left],.frame.y + dwh[:top])
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_frame(canv,_optional xoffset,yoffset)
+	## 
+	## Render the title frame with icon, title and title bar buttons.
+
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w) << .gui_layout[:top_rc].dialog_footprint()
+
+	mb_height << _if .use_menubar?
+		     _then
+			     >> 15
+		     _else
+			     >> 0
+		     _endif
+
+	mbw << _self.menubar_display_width()
+	sbw << _self.statusbar_display_width()
+	tbw << _self.titlebar_display_width()
+	dwh << _self.dock_widths_and_heights()
+	mdl << _self.max_dock_lengths()
+
+	max_dock_w << max(mdl[:top],mdl[:bottom])
+	max_dock_h << max(mdl[:left],mdl[:right])
+
+	.frame.y << 24 + mb_height + yoffset.default(0)
+	.frame.x << 10 + xoffset.default(0)
+	
+	w << .frame.width  << max(w, mbw, sbw, tbw, max_dock_w) 
+	h << .frame.height << max(h, max_dock_h)
+
+	dw << w + dwh[:left] + dwh[:right]
+	dh << h + dwh[:top] + dwh[:bottom] 
+
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	bb << pixel_bounding_box.new(.frame.x,.frame.y,.frame.x+dw,.frame.y+dh)
+	pp << pseudo_polygon.new_with_sectors(bb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:gray),:width,1)
+
+	# Title Bar bounds
+	tbb << pixel_bounding_box.new(.frame.x,.frame.y-mb_height,
+				     .frame.x+dw,.frame.y-16-mb_height)
+	fs << fill_style.new_solid(colour.called(:lightblue))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(tbb.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![tbb] << .frame
+	_self.drag_outline << pixel_bounding_box.new(.frame.x-2,.frame.y-mb_height-18,.frame.x+dw+3,.frame.y+dh+3)
+	
+	# Frame buttons
+	offset << 3 - dwh[:left] - dwh[:right]
+	_for b _over {:wm_closable?,:maximizable?,:minimizable?}.fast_elements()
+	_loop
+		_if .frame.perform(b)
+		_then
+			_self.render_frame_button(b,offset,ls,canv,mb_height)
+			offset +<< 13
+		_endif
+	_endloop
+
+	_self.render_frame_icon(canv,tbb)
+	_self.render_title(canv,tbb)
+
+	>> dh,dw
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_frame_icon(canv,tbb)
+	## 
+	##  Render the frame icon onto the title bar
+	
+	_if (icon << .frame.icon) _is _unset 
+	_then
+		icon << smallworld_product.get_raster_image(:sw_target,:ui_resources)
+	_endif
+
+	canv.render_raster(icon,tbb.xmin+1,tbb.ymin+1,_false )
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_title(canv,tbb)
+	## 
+	## Render the title on the titlebar.
+	
+	txt << .frame.title.default("")
+	lab << button_item.message_from_keyed_message(txt)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	canv.draw_text(ts,tbb.xmin+20,tbb.ymin+12,lab)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_frame_button(which,offset,ls,canv,mb_height)
+	## 
+	## Render WHICH frame button on CANV.
+
+	bb << pixel_bounding_box.new(.frame.x+.frame.width-offset-10,.frame.y-13-mb_height,
+				     .frame.x+.frame.width-offset,.frame.y-3-mb_height)
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(bb.sectors)
+	pp.draw_filled_on(canv,fs)
+	canv.draw(bb.boundary,ls)
+
+	ls2 << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,2)
+
+	_if which _is :wm_closable?
+	_then
+		canv.draw_segment(ls2,bb.xmin+2,bb.ymin+2,bb.xmax-1,bb.ymax-1)
+		canv.draw_segment(ls2,bb.xmin+2,bb.ymax-1,bb.xmax-1,bb.ymin+2)
+		
+		ls3 << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+		canv.draw_segment(ls3,bb.xmax-1,bb.ymin+2,bb.xmax-1,bb.ymin+3)
+		canv.draw_segment(ls3,bb.xmax-1,bb.ymax-1,bb.xmax-1,bb.ymax)
+
+		ls3.destroy()
+		
+	_elif which _is :maximizable?
+	_then
+		bb << bb.expand(-2)
+		canv.draw(bb.boundary,ls)
+		canv.draw_segment(ls2,bb.xmin,bb.ymin+1,bb.xmax+2,bb.ymin+1)
+		
+	_elif which _is :minimizable?
+	_then
+		canv.draw_segment(ls2,bb.xmin+3,bb.ymax-1,bb.xmax-1,bb.ymax-1)
+	_endif
+
+	ls2.destroy()
+	fs.destroy()
+_endmethod
+$
+
+##########################################################################################
+#
+#  MENU BAR
+#
+##########################################################################################
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init_menubar()
+	## 
+	## Initialise the menubar.  This creates a basic menubar ready
+	## for modifications.
+
+	.menubar << rope.new()
+	
+	.gui_layout[:tree_counter] << 0
+	
+	dt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,"file",:type,:menu))
+	dt.styled_string << {:image, {:use_menubar,_self.module_name}, :value, :name}
+	st << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,"quit",
+						      :type,:button,
+						      :action_message,"quit()",
+						      :control_type,:button_item),dt)
+	st.styled_string << {:image, {:menubar_button,_self.module_name}, :value, :name}
+	
+	.menubar.add(dt)
+	
+	dt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,"help",:type,:menu))
+	dt.styled_string << {:image, {:use_menubar,_self.module_name}, :value, :name}
+	st << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,"about",
+						      :type,:button,
+						      :action_message,"about()",
+						      :control_type,:button_item),dt)
+	st.styled_string << {:image, {:menubar_button,_self.module_name}, :value, :name}
+	
+	.menubar.add(dt)
+
+	.frame.y +<< 15
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.menubar_display_text()
+	## 
+	## Return the concatenated menubar text.
+
+	txt << ""
+	_for m _over .menubar.default({}).fast_elements()
+	_loop
+		txt +<< m.value[:name].default("") + "  "
+	_endloop
+
+	>> txt
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.menubar_display_width()
+	## 
+	## Return the width needed to render the menubar.
+	
+	_if .use_menubar?
+	_then
+		txt << _self.menubar_display_text()
+		_return  (4.5 * txt.size).floor
+	_else
+		_return 0
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.menubar_element_list()
+	## 
+	## Return a rope of all the menubar elements.
+
+	rp << rope.new()
+	
+	_for m _over .menubar.default({}).fast_elements()
+	_loop
+		_for l _over m.fast_depth_first()
+		_loop
+			_if l.value[:name] = 30*"-" _then _continue _endif 
+
+			rp.add(menubar_element.new(l.value))
+		_endloop
+	_endloop
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_menu(dt)
+	## 
+	## Add a menu to SELFs menubar,  relative to the display_tree DT.
+	
+	ndt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+				property_list.new_with(:name,"new",
+						       :type,:menu))
+	ndt.styled_string << {:image, {:use_menubar,_self.module_name}, :value, :name}
+
+	st << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,"button",
+						      :type,:button,
+						      :action_message,"button_doit()",
+						      :control_type,:image_button_item),ndt)
+	st.styled_string << {:image, {:menubar_button,_self.module_name}, :value, :name}
+
+	i << .menubar.index_equal_of(dt)
+
+	.menubar.add_nth(ndt,i)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.move_menu(which,before)
+	## 
+	## Move WHICH menu to a jus before BEFORE menubar element.
+	
+	which_i <<  .menubar.index_equal_of(which)
+	before_i << .menubar.index_equal_of(before)
+
+	dt << which.deep_copy()
+
+	.menubar.remove_nth(which_i)
+
+	_if which_i > before_i
+	_then 
+		.menubar.add_nth(dt,before_i)
+	_else
+		.menubar.add_nth(dt,before_i-1)
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_submenu(dt)
+	## 
+	## Add a submenu to menu element DT.
+	
+	par <<
+		_if dt.value[:type] _is :pullout
+		_then
+			>> dt
+		_else
+			>> dt.parent
+		_endif
+	
+	ndt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+				property_list.new_with(:name,"submenu",:type,:pullout),par)
+	ndt.styled_string << {:image, {:menubar_pullout,_self.module_name}, :value, :name}
+
+	# Add button to the pullout immediately.
+	bdt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,"button",
+						      :type,:button,
+						      :action_message,"button_doit()",
+						      :control_type,:button_item),ndt)
+	
+	bdt.styled_string << {:image, {:menubar_button,_self.module_name}, :value, :name}
+
+	ndt.expanded? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_button(dt)
+	## 
+	## Add a menu button to the menubar element DT.
+
+	par <<
+		_if dt.value[:type] _is :pullout _orif
+		    dt.level _is 2
+		_then
+			>> dt
+		_else
+			>> dt.parent
+		_endif
+	
+	ndt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+				property_list.new_with(:name,"button",
+						       :type,:button,
+						       :action_message,"button_doit()",
+						       :control_type,:button_item),par)
+	ndt.styled_string << {:image, {:menubar_button,_self.module_name}, :value, :name}
+
+	par.expanded? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_separator(dt)
+	## 
+	## Add a separator to the menubar element DT.
+	
+	ndt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+				property_list.new_with(:name,"-"*30,:type,:separator),dt.parent)
+	ndt.styled_string << {:value, :name}
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_menu(dt)
+	## 
+	## Delete the menubar element DT.
+
+	_if dt.level _is 2
+	_then
+		i << .menubar.index_equal_of(dt)
+
+		.menubar.remove_nth(i)
+	_else
+		dt.parent.remove_child(dt)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_menubar()
+	## 
+	## Delete the whole menubar, deprecated?
+	
+	_if _not .menubar.default({}).empty?
+	_then
+		.menubar << rope.new()
+		.frame.y -<< 15
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_menubar(canv,h,w)
+	## 
+	## Render the menubar on CANVas of height H and width W, only
+	## the width is used at this moment.
+
+	_dynamic !dialog_pseudo_buttons!
+
+	_if _not .use_menubar? _then _return _endif
+
+	_if .menubar.empty?
+	_then
+		_self.init_menubar()
+	_endif 
+
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	bb << pixel_bounding_box.new(.frame.x,.frame.y-14,.frame.x+w,.frame.y)
+	pp << pseudo_polygon.new_with_sectors(bb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	txt << ""
+	
+	_for i _over 1.upto(.menubar.size)
+	_loop
+		txt +<< "  " + .menubar[i].value[:name].capitalise
+	_endloop
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	canv.draw_text(ts,.frame.x,.frame.y-2,txt)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,bb.xmin+1,bb.ymax+2,bb.xmax,bb.ymax+2)
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:gray),:width,1)
+	canv.draw_segment(ls,bb.xmin+1,bb.ymax+1,bb.xmax,bb.ymax+1)
+
+	!dialog_pseudo_buttons![bb] << {_unset ,:|use_menubar()|,_true}
+_endmethod
+$
+
+
+##########################################################################################
+#
+#  STATUS BAR
+#
+##########################################################################################
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init_statusbar()
+	## 
+	## Initialize the statusbar to the default state.
+	
+	.statusbar << rope.new()
+
+	.statusbar.add(
+		statusbar_element.new(
+			property_list.new_with(:id,"info",
+					       :type,"status",
+					       :style,"innie",
+					       :springy,_false,
+					       :width,80)))
+	
+	.statusbar.add(
+		statusbar_element.new(
+			property_list.new_with(:id,"status",
+					       :type,"status",
+					       :style,"innie",
+					       :springy,_true,
+					       :width,20)))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.statusbar_width()
+	## 
+	## Return the statusbar width.
+	
+	w << 0
+	_for i _over 1.upto(.statusbar.default({}).size)
+	_loop
+		sb << .statusbar[i]
+		w +<< sb.width
+	_endloop
+
+	>> w
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.statusbar_display_width()
+	## 
+	## Return the statusbar display width.
+
+	>> _if .use_statusbar?
+	   _then
+		   >> _self.statusbar_width() + 3*.statusbar.default({}).size + 1
+	   _else
+		   >> 0
+	   _endif
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.statusbar_element_list()
+	## 
+	## Return a rope of statusbar elements.
+	
+	rp << rope.new()
+	
+	_for m _over .statusbar.default({}).fast_elements()
+	_loop
+		rp.add(m)
+	_endloop
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.progress_bar_element()
+	## 
+	## Return the progress_bar elements of SELF's statusbar, or UNSET.
+
+	_for e _over .statusbar.fast_elements()
+	_loop
+		_if e.class_name _is :statusbar_progress_element
+		_then
+			_return e
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.element_at(x,y)
+	## 
+	## Return the element selected at position X,Y.
+
+	x -<< 12
+
+	sb_x << 0
+	_for i _over 1.upto(.statusbar.size)
+	_loop
+		sb << .statusbar[i]
+		pw << sb.width
+
+		sb_x +<< pw + 2
+
+		_if sb_x > x
+		_then
+			_return i
+		_endif
+	_endloop
+
+	_return _unset 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_statusbar(canv,fw,x,y,_optional css)
+	## 
+	## Render the statusbar of SELF on canvas CANV (frame width FW)
+	## at position X,Y.  CSS is the optionally passed index of the
+	## currently selected statusbar element.
+
+	_dynamic !dialog_pseudo_buttons!
+	
+	_if _not .use_statusbar? _then _return _endif
+
+	_if .statusbar _is _unset
+	_then
+		_self.init_statusbar()
+	_endif 
+
+	w << _self.statusbar_width() + 3*.statusbar.size + 1
+	w << w.max(fw)
+
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+
+	h << 12
+	
+	bb << pixel_bounding_box.new(x,y,x+w,y+h+4)
+	pp << pseudo_polygon.new_with_sectors(bb.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	_if !dialog_pseudo_buttons! _isnt _unset
+	_then 
+		!dialog_pseudo_buttons![bb] << {_unset ,:|use_statusbar()|,_true}
+	_endif
+	
+	x +<< 2
+	y +<< 3
+
+	ils << line_style.new(colour.called(:blue),3)
+
+	# Count all springy panes and the base width of the statusbar
+	# so we can expand status panes.
+	springy_pane_cnt << 0
+	base_w << 0
+	_for i _over 1.upto(.statusbar.size)
+	_loop
+		sb << .statusbar[i]
+		base_w +<< sb.width
+		
+		_if (sb.springy = "Yes" _orif sb.springy _is _true)
+		_then
+			springy_pane_cnt +<< 1
+		_endif
+	_endloop
+
+	_for i _over 1.upto(.statusbar.size)
+	_loop
+		sb << .statusbar[i]
+		pw << sb.width
+
+		_if sb.springy = "Yes" _orif sb.springy _is _true
+		_then
+			pw << sb.width + (w-base_w-.statusbar.size*3) _div springy_pane_cnt
+		_endif
+
+		_if css _isnt _unset _andif
+		    css.key _is i
+		_then
+			canv.draw_segment(ils,x,y+h+5,x+pw,y+h+5)
+		_endif
+		
+		_if sb.style = "innie"
+		_then
+			gls << line_style.new(colour.called(:gray),1)
+			wls << line_style.new(colour.called(:white),1)			
+		_elif sb.style = "outie"
+		_then 
+			wls << line_style.new(colour.called(:gray),1)
+			gls << line_style.new(colour.called(:white),1)
+		_else
+			x +<< 3 + pw
+			_continue 
+		_endif
+
+		canv.draw_segment(gls,x,y,x+pw,y)
+		canv.draw_segment(gls,x,y,x,y+h)
+		canv.draw_segment(wls,x,y+h,x+pw,y+h)
+		canv.draw_segment(wls,x+pw,y,x+pw,y+h)
+
+		x +<< 3 + pw
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_pane(pos)
+	## 
+	## Add a pane to SELF's statusbar.
+
+	base_id << "new_status"
+	id << base_id
+	cnt << 0
+
+	_loop
+		found? << _false 
+		_for sb _over .statusbar.fast_elements()
+		_loop
+			_if sb.id = id
+			_then
+				found? << _true 
+			_endif
+		_endloop
+
+		_if found?
+		_then
+			cnt +<< 1
+			id << write_string(base_id,%_,cnt)
+		_else
+			_leave 
+		_endif
+	_endloop
+	
+	.statusbar.add_nth(
+		statusbar_element.new(
+			property_list.new_with(:id,id,
+					       :type,"status",
+					       :style,"innie",
+					       :springy,_false,
+					       :width,30)
+				  ), pos)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_progressbar_pane(pos)
+	## 
+	## Add a PROGRESS pane to SELF's statusbar.
+
+	base_id << "progress"
+	id << base_id
+	cnt << 0
+
+	.statusbar.add_nth(
+		statusbar_progress_element.new(
+			property_list.new_with(:id,id,
+					       :type,"progress",
+					       :style,"innie",
+					       :width,200,
+					       :max_count,100)
+				  ), pos)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_popup_action_to_pane(dt)
+	## 
+	## Add a popup action to SELF's statusbar pane DT.
+
+	#debug show(dt)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_pane(which)
+	## 
+	## Delete WHICH (an integer index) pane from SELF's statusbar.
+	
+	.statusbar.remove_nth(which)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_statusbar()
+	## 
+	## Delete the whole statusbar.
+	
+	.statusbar << _unset 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.titlebar_display_width()
+	## 
+	## Return the width needed to render the titlebar title without
+	## overwriting the buttons.
+	f << font.new_with_properties(:type,:logical,
+				      :name,"fixed",
+				      :point_size,12)
+	vts << vtext_style.new(f)
+	fw << vts.box_coordinates(.frame.title.default("")).bounds.width.rounded 
+
+	>> 15 + fw + 45
+_endmethod
+$
+
+
+
+##########################################################################################
+#
+#  DOCKS
+#
+##########################################################################################
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init_docks(_optional which)
+	## 
+	## Initialise the docks for SELF, if WHICH is supplied then
+	## either init ALL or just one of the docks.  Default to ALL.
+
+	new_docks << {}.new(4)
+	which << which.default(:all)
+
+	.gui_layout[:dock_tree_counter] << 0
+
+	cnt << 0
+
+	_for d _over {:top,:bottom,:left,:right}.fast_elements()
+	_loop
+		cnt +<< 1
+		
+		_if which _is cnt _orif .docks[cnt] _is _unset _orif which _is :all
+		_then
+			dt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+					       property_list.new_with(:name,dialog_designer.message(:dock_ + d),
+							      :type,:dock_base))
+			dt.styled_string << {:image, {:use_docks,_self.module_name},
+					     :value, :name}
+			new_docks[cnt] << dt
+		_else
+			new_docks[cnt] << .docks[cnt]
+		_endif
+	_endloop
+
+	.docks << new_docks
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_docks()
+	## 
+	## Delete the docks of SELF. (unused?)
+	
+	_if _not .docks.default({}).empty?
+	_then
+		.docks << rope.new()
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.docks_element_list()
+	## 
+	## Return a rope of elements in SELF's docks.
+
+	rp << rope.new()
+	
+	_for d _over .docks.default({}).fast_elements()
+	_loop
+		_for l _over d.fast_depth_first()
+		_loop
+			_if (el << l.value[:element]) _is _unset 
+			_then
+				el << _if l.value[:type] _is :pulldown
+				      _then
+					      >> toolbar_pulldown_element.new(l.value)
+				      _else 
+					      >> toolbar_action_element.new(l.value)
+				      _endif
+
+				l.value[:element] << el 
+			_endif
+
+			rp.add(el)
+		_endloop
+	_endloop
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.validate_dock_list()
+	##
+	## Set the style string of the dock listing from the underlying
+	## toolbar_action_element.
+	
+	_for d _over .docks.fast_elements()
+	_loop
+		_for l _over d.fast_leaves()
+		_loop
+			_if (el << l.value[:element]) _isnt _unset
+			_then
+				l.styled_string << {:image, {el.image_file_name,el.image_module_name}, :value, :name}
+			_endif 
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.next_dock_name(type)
+	## 
+	## Figure the next unique name to give an action of type TYPE.
+	
+	base_name << dialog_designer.message(:dock_ + type)
+
+	cnt << 1
+
+	_loop
+		try_name << write_string(base_name," ",cnt)
+
+		_if _self.dock_name_unique?(try_name)
+		_then
+			_return try_name
+		_endif
+
+		cnt +<< 1
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dock_name_unique?(name)
+	## 
+	## Return FALSE if a dock element called NAME already exists.
+	
+	_for d _over .docks.default({}).fast_elements()
+	_loop
+		_for l _over d.fast_depth_first()
+		_loop
+			_if l.value[:name] = name
+			_then
+				_return _false 
+			_endif
+		_endloop
+	_endloop
+
+	_return _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_section(dock,_optional pulldown?)
+	## 
+	## Add a section to DOCK.
+	
+	ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+				property_list.new_with(:image, {:dock_section,_self.module_name},
+						       :name,_self.next_dock_name(:section),
+						       :type,:pullout),dock)
+	ndt.styled_string << {:image, {:dock_section,_self.module_name},
+			      :value, :name}
+
+	_self.add_toolbar(ndt,pulldown?)
+	
+	dock.expanded? << _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_toolbar(section,_optional pulldown?)
+	## 
+	## Add a toolbar to the dock SECTION.
+	
+	tb << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+				property_list.new_with(:name,_self.next_dock_name(:toolbar),
+						       :type,:pullout),section)
+	tb.styled_string << {:image, {:dock_toolbar,_self.module_name},
+			      :value, :name}
+
+	_self.add_action(tb,pulldown?)
+
+	section.expanded? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_action(tb_or_dock,_optional pulldown?)
+	## 
+	## Add an action or pulldown to a toolbar or dock.
+
+	_if tb_or_dock.level _is 2 
+	_then
+		_self.add_section(tb_or_dock,pulldown?)
+	_elif pulldown?.default(_false)
+	_then
+		vals << property_list.new_with(
+				:name,_self.next_dock_name(:pulldown),
+				:type,:pulldown,
+				:mode,:switch,
+				:execute,"Yes",
+				:style,:image)
+		ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,vals,tb_or_dock)
+		ndt.styled_string << {:image, {:dock_pulldown,_self.module_name}, :value, :name}
+
+		_self.add_action(ndt)
+	_else 
+		ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+					property_list.new_with(:name,_self.next_dock_name(:action),
+							       :type,:button),tb_or_dock)
+		ndt.styled_string << {:image, {:image_button,_self.module_name}, :value, :name}		
+	_endif
+
+	tb_or_dock.expanded? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_pulldown(tb_or_dock)
+	## 
+	## Add a pulldown for actions to a toolbar or dock.  
+
+	_if tb_or_dock.level _is 2 
+	_then
+		_self.add_section(tb_or_dock,_true)
+	_else
+		_self.add_action(tb_or_dock,_true)
+	_endif
+
+	tb_or_dock.expanded? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.delete_dock_element(dt)
+	## 
+	## Delete a dock element.
+
+	p << dt.parent
+	dt.parent.remove_child_with_key(dt.key)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.dock_widths_and_heights()
+	## 
+	## Return the spacing necessary for rendering the dock buttons/widgets.
+	
+	wh << property_list.new_with(:top,0,:bottom,0,:left,0,:right,0)
+	tblr << {:top,:bottom,:left,:right}
+	
+	_if .docks _isnt _unset _andif .use_docks?
+	_then
+		_for i _over 1.upto(4)
+		_loop
+			s << .docks[i].children.size
+			wh[tblr[i]] << s*(_self.section_spacing+_self.section_height)
+		_endloop
+	_endif
+	>> wh
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.max_dock_lengths()
+	##
+	## Return a list of maximum dock section lengths.  This is
+	## used when rendering the GUI.
+	
+	wh << property_list.new_with(:top,0,:bottom,0,:left,0,:right,0)
+	tblr << {:top,:bottom,:left,:right}
+	
+	_if .docks _isnt _unset _andif .use_docks?
+	_then
+		_for i _over 1.upto(4)
+		_loop
+			max_cnt << 0
+			_for sec _over .docks[i].children()
+			_loop
+				cnt << 0
+				_for tb _over sec.children()
+				_loop
+					cnt +<< tb.children.size
+				_endloop
+
+				max_cnt << max(max_cnt,cnt)
+			_endloop
+			
+			wh[tblr[i]] << max_cnt*(_self.section_spacing+_self.section_height)
+		_endloop
+	_endif
+	>> wh
+	
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:toolbar_line_styles,
+	{
+		line_style.new_with_properties(:foreground_colour,colour.called(:gray),:width,1),
+		line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)},:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:section_spacing,3,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:section_height,20,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:toolbar_height,19,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:dock_names,{:top,:bottom,:left,:right},:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:toolbar_action_spacings,
+	{pixel_coordinate(2,0),
+	 pixel_coordinate(2,0),
+	 pixel_coordinate(0,2),
+	 pixel_coordinate(0,2)},:public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.render_docks(c)
+	## 
+	## Render the dock actions on the canvas C.
+	
+	dwh << _self.dock_widths_and_heights()
+
+	tblr << _self.dock_names
+	a_s  << _self.toolbar_action_spacings
+
+	action_width << 20
+	
+	_if .docks _isnt _unset _andif .use_docks?
+	_then
+		_for i _over 1.upto(4)
+		_loop
+			(sx,sy,dsx,dsy) << _self.render_docks_location(tblr[i],dwh[tblr[i]])
+
+			dock << .docks[i]
+
+			_for sec _over dock.children()
+			_loop
+				tx << sx
+				ty << sy
+
+				_for tb _over sec.children()
+				_loop
+					ax << tx
+					ay << ty
+					
+					_for act _over tb.children()
+					_loop
+						#debug show(i,dock.value[:name],sec.value[:name],tb.value[:name],act.value[:name],ax,ay,tx,ty,sx,sy)
+
+						_self.render_dock_action(act,ax,ay,c)
+
+						_if i < 3
+						_then
+							ax +<< a_s[i].x + action_width
+						_else 
+							ay +<< a_s[i].y + action_width
+						_endif
+					_endloop
+
+					_self.render_toolbar_boundary(c,i,tx,ty,ax,ay)
+					
+					_if i < 3
+					_then
+						tx << ax
+					_else 						
+						ty << ay
+					_endif
+
+				_endloop
+
+				_if i < 3 
+				_then
+					sy +<< dsy
+				_else 						
+					sx +<< dsx
+				_endif
+			_endloop 
+		_endloop
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.render_toolbar_boundary(c,i,sx,sy,tx,ty)
+	##
+	## Render a boundary line on dock I (1-4) to show a toolbar
+	## grouping on that docks current section.
+	
+	sbx << sx-2
+	sby << sy-2
+	tbx << tx-5
+	tby << ty-2
+
+	_if i < 3
+	_then
+		ls << _self.toolbar_line_styles[1]
+		c.draw_segment(ls,sbx,sby+_self.toolbar_height,tbx,tby+_self.toolbar_height)
+		c.draw_segment(ls,tbx,sby,tbx,sby+_self.toolbar_height+1)
+		ls << _self.toolbar_line_styles[2]
+		c.draw_segment(ls,sbx,sby,tbx,tby)
+		c.draw_segment(ls,sbx,sby,sbx,sby+_self.toolbar_height)
+	_else
+		sby -<< 2
+		tby -<< 2
+		ls << _self.toolbar_line_styles[1]
+		c.draw_segment(ls,sbx+_self.toolbar_height,sby,sbx+_self.toolbar_height,tby)
+		c.draw_segment(ls,sbx,tby,sbx+_self.toolbar_height+1,tby)
+		ls << _self.toolbar_line_styles[2]
+		c.draw_segment(ls,sbx,sby,sbx,tby)
+		c.draw_segment(ls,sbx,sby,sbx+_self.toolbar_height,sby)		
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_variable(:image_cache,_unset,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_variable(:drag_outline,_unset,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_design.define_shared_constant(:icon_name_for_dock_action_type,
+	property_list.new_with( :combo_box_item, :text_choice_item,
+				:choice_item, :text_choice_item,
+				:text_display, :label_item),:public)
+$
+				
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.render_dock_action(act,x,y,c)
+	##
+	## Render the action ACT at coordinate X,Y of canvas C.  The
+	## raster image is cached.
+
+	_if _self.image_cache _is _unset 
+	_then
+		_self.image_cache << hash_table.new()
+	_endif
+
+	_if (el << act.value[:element]) _isnt _unset 
+	_then
+		img_src << act.value[:image].default({:dock_action,:dialog_designer})
+		type << act.value[:element].control_type.default(:image_button_item)
+		
+		# try to use the selected resource 
+		i_name << act.value[:element].image_file_name.default(:dock_action)
+		i_mod  << act.value[:element].image_module_name.default(:dialog_designer)
+
+		# Handle 'pulldown' items
+		_if el.mode _isnt _unset 
+		_then
+			i_name << :dock_pulldown
+		_endif
+		
+		i_key << i_name+i_mod
+
+	_else
+		img_src << {:dock_action,:dialog_designer}
+		i_key << :dock_actiondialog_designer
+	_endif
+
+	_if (img << _self.image_cache[i_key]) _is _unset 
+	_then
+		_self.image_cache[i_key] << img << raster_image.new_from_module_file(i_name,i_mod)
+
+		# Default to use the icon for the 'control type'
+		_if img _is _unset _orif i_name.write_string = "dock_action"
+		_then
+			img_src[1] << _self.icon_name_for_dock_action_type[type].default(type)
+			
+			i_key << img_src[1]+img_src[2]
+			
+			_if (img << _self.image_cache[i_key]) _is _unset 
+			_then
+				_self.image_cache[i_key] << img << raster_image.new_from_module_file(_scatter img_src)
+
+				# Still non luck, so use the 'missing_image' icon, do not cache.
+				_if img _is _unset 
+				_then
+					img << raster_image.new_from_module_file(:missing_image,:ui_resources)
+				_endif
+			_endif 
+		_endif	
+	_endif
+
+	c.render_raster(img,x,y,_true)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.dock_action_icon(type,def_image_name)
+	##
+	## Return the icon file name for a toolbar_action TYPE.
+	## Defaults to DEF_IMAGE_NAME.
+
+	img_file_name << _self.icon_name_for_dock_action_type[type].default(type)
+	
+	>> def_image_name
+_endmethod
+$
+
+
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_design.render_docks_location(which,offset)
+	## 
+	## Returns the rendering location of WHICH dock.  The OFFSET
+	## value is used for RIGHT and BOTTOM docks only.
+	
+	dwh << _self.dock_widths_and_heights()
+	
+	fx << .frame.x + 3
+	fy << .frame.y + 3
+	fw << .frame.width + dwh[:left] + dwh[:right]
+	fh << .frame.height + dwh[:top] + dwh[:bottom]
+
+	# Set the spacing between toolbar sections
+	spacing << _self.section_height
+	>> _if which _is :left
+	   _then
+		   >> fx,fy+dwh[:top]+3,spacing,spacing
+		   
+	   _elif  which _is :right
+	   _then 
+		   >> fx+fw-offset+2,fy+dwh[:top]+3,spacing,spacing
+	   _elif  which _is :top
+	   _then 
+		   >> fx,fy+3,spacing,spacing
+	   _elif  which _is :bottom
+	   _then 
+		   >> fx,fy+fh-offset+3,spacing,spacing
+	   _endif
+_endmethod
+$
+
+
+
+
+##########################################################################################
+#
+#  DATABUS
+#
+##########################################################################################
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init_databus()
+	##
+	## Initialise the databus (a property list holding consumers
+	## and producers for this dialog.
+	
+	.databus << property_list.new()
+	.databus[:produce] << ""
+	.databus[:consume] << ""
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_databus()
+	## 
+	## Delete the databus for SELF. (unused?)
+	.databus << _unset 
+_endmethod
+$
+
+
+
+##########################################################################################
+#
+#  XML
+#
+##########################################################################################
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.xml_description()
+	## 
+	## Return the XML description of SELF.
+	
+	bb << %<
+	es << %/
+	eb << %>
+	qq << %" #"
+	sp << % 
+	nl << %newline
+
+	txt << internal_text_output_stream.new()
+
+	txt.write(_self.message(:xml_version_header),nl)
+	txt.write(_self.message(:xml_creation_header,system.user_name,date_time.now()),nl)
+
+	txt.write(bb,"dialog class=",qq,.dialog_class.default("dialog_class"),qq,
+		  sp,"extra_slots=",qq,.dialog_extra_slots.default(""),qq,%>,nl)
+
+	_self.module_xml(txt)
+	_self.menubar_xml(txt)
+	_self.statusbar_xml(txt)
+	_self.docks_xml(txt)
+	_self.databus_xml(txt)
+	_self.messages_xml(txt)
+
+	txt.write(.frame.xml_description(1))
+
+	_dynamic !print_float_precision! << 8
+	
+	_for el _over _self.gui_elements(:all).fast_elements()
+	_loop
+		txt.write(nl)
+		txt.write(el.xml_description(1))
+	_endloop
+	
+	txt.write("</dialog>",nl)
+
+	>> txt.string
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_elements(_optional which)
+	## 
+	## Return a rope list of the GUI elements.
+
+	rp << rope.new()
+
+	rp.add(.gui_layout[:top_rc])
+
+	_for el _over .gui_layout[:top_rc].gui_elements(which)
+	_loop
+		rp.add(el)
+	_endloop
+
+	>> rp	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.module_xml(txt)
+	## 
+	## Write the module XML to the stream TXT.
+	
+	bb << %<
+	es << %/
+	eb << %>
+	qq << %" #"
+	sp << " "
+	nl << %newline
+	tb << %tab
+
+	sp << _self.build_module_name.default("").split_by(% )
+
+	_if _not sp.empty?
+	_then
+		name << sp[1]
+	_else
+		name << "new_module_name"
+	_endif
+	
+	_if sp.size > 1
+	_then
+		vers << sp[2]
+	_else
+		vers << 410
+	_endif
+
+	txt.write(tb,"<module name=",qq,name,qq,eb,nl)
+	txt.write(tb*2,"<property name=",qq,"version",qq," value=",qq,vers,qq,es,eb,nl)
+
+	_if (desc << _self.build_module_description.default("")) <> ""
+	_then
+		txt.write(tb*2,"<property name=",qq,"description",qq," value=",qq,desc,qq,es,eb,nl)		
+	_endif
+
+	_if (val << .dialog_package.default("")) <> ""
+	_then
+		txt.write(tb*2,"<property name=",qq,"package",qq," value=",qq,val,qq,es,eb,nl)		
+	_endif
+
+	txt.write(tb*2,"<property name=",qq,"pragma_classify_level",qq," value=",qq,.pragma_classify_level,qq,es,eb,nl)
+	
+	_if (val << .pragma_usage.default("")) <> ""
+	_then
+		txt.write(tb*2,"<property name=",qq,"pragma_usage",qq," value=",qq,val,qq,es,eb,nl)		
+	_endif
+
+	_if (val << .pragma_topic.default("")) <> ""
+	_then
+		txt.write(tb*2,"<property name=",qq,"pragma_topic",qq," value=",qq,val,qq,es,eb,nl)		
+	_endif
+
+	_if (req << _self.build_module_requires.default("")) <> ""
+	_then
+		new_txt << req.write_string
+		new_txt.substitute_character(%newline,%,)
+		txt.write(tb*2,"<property name=",qq,"build_module_requires",qq," value=",qq,new_txt,qq,es,eb,nl)		
+	_endif
+
+	txt.write(tb*2,"<property name=",qq,"build_module_dir",qq," value=",qq,.build_module_dir,qq,es,eb,nl)
+
+	txt.write(tb,"</module>",nl*2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.write_xml_files(xml_dir)
+	## 
+	## Write the XML files to the directory XML_DIR.
+	
+	# config.xml
+	filename << system.pathname_down( xml_dir, "config.xml" )
+	_self.config_xml(filename)
+
+	# gui.xml
+	filename << system.pathname_down( xml_dir, "gui.xml" )
+	_self.gui_xml(filename)
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.config_xml(filename)
+	## 
+	## Write the config.xml file for SELF.
+	
+	stream << external_text_output_stream.new( filename )
+
+	stream.write(_self.int!config_xml())
+
+	stream.close()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.int!config_xml()
+	## 
+	## Return the string for config.xml for SELF.
+	
+	_local txt << internal_text_output_stream.new()
+
+	nl << %newline
+	tb << %tab
+	qq << %" #"
+
+	dc << _self.dialog_class.default("dialog_class")
+	
+	txt.write(_self.message(:xml_version_header),nl)
+	txt.write("<config>",nl,
+		     tb,"<plugins>",nl,
+		     tb*2,"<plugin name=",qq,dc,qq," class_name=",qq,dc,qq,"/>",nl,
+		     tb,"</plugins>",nl,
+		     "</config>",nl)
+	>> txt.string
+	
+_endmethod
+$
+	
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_xml(filename)
+	## 
+	## Write the gui.xml file for SELF.
+
+	_local nl << %newline
+	
+	stream << external_text_output_stream.new( filename )
+
+	stream.write(_self.int!gui_xml())
+
+	stream.close()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.int!gui_xml()
+	## 
+	## Return the gui.xml text for SELF.
+
+	_local txt << internal_text_output_stream.new()
+	_local nl << %newline
+
+	txt.write(_self.message(:xml_version_header),nl)
+	txt.write("<gui>",nl)
+
+	_self.menubar_xml(txt)
+	_self.statusbar_xml(txt)
+	_self.docks_xml(txt)
+	_self.gui_layout_xml(txt)
+	
+	txt.write("</gui>",nl)
+
+	>> txt.string
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.menubar_xml(txt)
+	## 
+	## Write the menubar XML to the stream TXT.
+	
+	_if _not .use_menubar?
+	_then
+		_return 
+	_endif
+
+	bb << %<
+	es << %/
+	eb << %>
+	qq << %" #"
+	sp << " "
+	nl << %newline
+	tb << %tab
+
+	txt.write(tb,"<menu name=",qq,"menubar",qq," type=",qq,"menubar",qq,eb)
+
+	_for m _over .menubar.fast_elements()
+	_loop
+		_self.submenu_xml(m,txt)
+	_endloop
+
+	txt.write(tb,"</menu>",nl*2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_layout_xml(txt)
+	## 
+	## Write the layout XML to the stream TXT.
+	
+	qq << %" #"
+	nl << %newline
+	tb << %tab
+	dc << _self.dialog_class.default("dialog_class")
+	
+	txt.write(tb,"<work_area>",nl,
+		  tb*2,"<plugin plugin_name=",qq,dc,qq,"/>",nl,
+		  tb,"</work_area>",nl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.submenu_xml(m,txt)
+	## 
+	## Write the XML for submenu M to the stream TXT.
+
+	bb << %<
+	es << %/
+	eb << %>
+	qq << %" #"
+	sp << " "
+	nl << %newline
+	tb << %tab
+
+	txt.write(nl,tb*m.level,"<submenu name=",qq,m.value[:name].lowercase,qq,eb,nl)
+
+	_for t _over m.children()
+	_loop
+		type << t.value[:type]
+		
+		_if type _is :button
+		_then
+			txt.write(tb*t.level,"<action name=",qq,
+				  _self.dialog_class.default("dialog_class"),%.,
+				  t.value[:name].lowercase,qq)
+
+			_if t.value[:action_message].default("") <> ""
+			_then
+				txt.write(" action_message=",qq,
+					  t.value[:action_message].lowercase,qq)
+			_endif 
+			
+			_if t.value[:control_type].default("") <> ""
+			_then
+				txt.write(" control_type=",qq,t.value[:control_type],qq)
+			_endif 
+			
+			txt.write(es,eb,nl)
+		_elif type _is :separator
+		_then
+			txt.write(tb*t.level,"<separator/>",nl)
+		_elif type _is :pullout
+		_then
+			_self.submenu_xml(t,txt)
+		_else
+			condition.raise(:warning,:string,write_string("unknown type = ",type))	
+		_endif
+	_endloop
+
+	txt.write(tb*m.level,"</submenu>",nl)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.statusbar_xml(txt)
+	## 
+	## Write the statusbar XML to the stream TXT.
+	
+	_if _not .use_statusbar?
+	_then
+		_return 
+	_endif
+
+	bb << %<
+	es << %/
+	eb << %>
+	qq << %" #"
+	sp << " "
+	nl << %newline
+	tb << %tab
+	
+	txt.write(tb,"<statusbar name=",qq,"default",qq,eb,nl)
+
+	_for p _over .statusbar.fast_elements()
+	_loop
+		_if p.type = "status"
+		_then
+			txt.write(tb*2,
+				  "<pane id=",qq,p.id,qq,
+				  " style=",  qq,p.style,qq,
+				  " width=",  qq,p.width,qq,
+				  " springy=",qq,p.springy.write_string.lowercase,qq,
+				  es,eb,nl)
+		_elif p.type = "progress"
+		_then 
+			txt.write(tb*2,
+				  "<progress_bar id=",qq,p.id,qq,
+				  " style=",  qq,p.style,qq,
+				  " width=",  qq,p.width,qq,
+				  " max_count=",  qq,p.max_count,qq,
+				  " indicator=",  qq,p.indicator,qq,
+				  es,eb,nl)
+			
+		_endif
+	_endloop
+
+	txt.write(tb,"</statusbar>",nl*2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.docks_xml(txt)
+	## 
+	## Write the docks XML to the stream TXT.
+
+	_if _not .use_docks?
+	_then
+		_return 
+	_endif
+
+	_for di _over 1.upto(.docks.size)
+	_loop
+		_self.do_dock_xml(di,txt)
+	_endloop	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.do_dock_xml(di,txt)
+	## 
+	## Write the XML for dock D to the stream TXT.
+
+	eb << %>
+	qq << %" #"
+	nl << %newline
+	tb << %tab
+
+	# Generate supporting XML (ie. toolbars)
+	dock_xml << _self.dock_xml(.docks[di],txt)
+
+	# Docks MUST be referenced as 'top','bottom','left' or 'right'
+	dock_names << {"top","bottom","left","right"}
+
+	# Write out the dock definition (if not empty)
+	_if _not dock_xml.empty?
+	_then
+		txt.write(tb,"<dock name=",qq,dock_names[di],qq,eb,nl)
+		txt.write(dock_xml)
+		txt.write(tb,"</dock>",nl*2)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dock_xml(d,txt)
+	## 
+	## Write the XML for the elements of dock D to the text steam TXT.
+
+	eb << %>
+	qq << %" #"
+	nl << %newline
+	tb << %tab
+
+	d_xml << internal_text_output_stream.new()
+	
+	_for si _over 1.upto(d.children.size)
+	_loop
+		s << d.children[si]
+
+		_if si > 1
+		_then
+			d_xml.write(tb*2,"<section/>",nl)
+		_endif
+
+		_for ti _over 1.upto(s.children.size)
+		_loop
+			t << s.children[ti]
+			n << t.value[:name].lowercase.substitute_character(% ,%_)
+			d_xml.write(%tab*2,"<toolbar name=",qq,n,qq,"/>",nl)
+
+			_self.toolbar_xml(t,txt)
+		_endloop
+	_endloop
+
+	>> d_xml.string
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.databus_xml(txt)
+	## 
+	## Write the XML for the SELF databus datatypes.
+	
+	_if _not .use_databus?
+	_then
+		_return 
+	_endif
+
+	eb << %>
+	es << %/
+	qq << %" #"
+	nl << %newline
+	tb << %tab
+	
+	pros << .databus[:produce].split_by(%,)
+	cons << .databus[:consume].split_by(%,)
+	
+	txt.write(%tab,"<databus>",%newline)
+	_for p _over pros.fast_elements()
+	_loop
+		_if p.default("") <> ""
+		_then
+			txt.write(%tab*2,"<property name=",qq,"producer_datatype",qq," value=",qq,p,qq,es,eb,nl)
+		_endif
+	_endloop
+
+	_for c _over cons.fast_elements()
+	_loop
+		_if c.default("") <> ""
+		_then
+			txt.write(%tab*2,"<property name=",qq,"consumer_datatype",qq," value=",qq,c,qq,es,eb,nl)
+		_endif
+	_endloop
+
+	txt.write(%tab,"</databus>",nl*2)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.toolbar_xml(t,txt)
+	## 
+	## Write the toolbar XML for toolbar T to stream TXT.
+	
+	eb << %>
+	es << %/
+	qq << %" #"
+	nl << %newline
+	tb << %tab
+
+	n << t.value[:name].lowercase.substitute_character(% ,%_)
+	txt.write(%tab,"<toolbar name=",qq,n,qq,eb,nl)
+
+	_for ai _over 1.upto(t.children.size)
+	_loop
+		a << t.children[ai]
+		n << a.value[:name].lowercase.substitute_character(% ,%_)
+		an << write_string(.dialog_class,%.,n)
+
+		_if a.value[:type] _is :pulldown
+		_then
+			txt.write(%tab*2,"<pulldown mode=",qq,a.value[:mode],qq,
+				  " execute=",qq,a.value[:execute].lowercase,qq,
+				  " style=",qq,a.value[:style],qq,eb,nl)
+
+			_for ci _over 1.upto(a.children.size)
+			_loop
+				c << a.children[ci]
+				n << c.value[:name].lowercase.substitute_character(% ,%_)
+				cn << write_string(.dialog_class,%.,n)
+				txt.write(%tab*3,"<action name=",qq,cn,qq)
+				
+				_if (img << c.value[:image].default("")) <> ""
+				_then
+					txt.write(" image=",qq,img.last,%.,img.first,qq)
+				_endif 
+				txt.write(es,eb,nl)
+			_endloop
+
+			txt.write(%tab*2,"</pulldown>",nl)
+		_else 
+			txt.write(%tab*2,"<action name=",qq,an,qq)
+			
+			_if (img << a.value[:image].default("")) <> ""
+			_then
+				txt.write(" image=",qq,img.last,%.,img.first,qq)
+			_endif 
+			txt.write(es,eb,nl)
+		_endif
+
+	_endloop
+
+	txt.write(%tab,"</toolbar>",nl*2)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.messages_xml(txt)
+	## 
+	## Write the XML for SELF custom messages.
+	
+	eb << %>
+	es << %/
+	qq << %" #"
+	nl << %newline
+	tb << %tab
+
+	# Class Messages
+	msgs << .class_messages.default("").split_by(%newline, _true)
+
+	txt.write(%tab,"<messages>",%newline)
+	cnt << 0
+	_for msg _over msgs.fast_elements()
+	_loop
+		msg_txt << _if msg.empty?
+			   _then
+				   >> " "
+			   _else
+				   >> msg
+			   _endif
+
+		# Encode characters that may trip up the XML syntax
+		msg_txt << basic_wgt_geometry.replace_xml_tags(msg_txt)
+		
+		txt.write(%tab*2,"<property message=",qq,msg_txt.substitute_character(%",%'),qq,es,eb,nl) #"
+	_endloop
+
+	# Plugin Messages
+	msgs << .plugin_messages.default("").split_by(%newline, _true)
+
+	cnt << 0
+	_for msg _over msgs.fast_elements()
+	_loop
+		msg_txt << _if msg.empty?
+			   _then
+				   >> " "
+			   _else
+				   >> msg
+			   _endif
+
+		# Encode characters that may trip up the XML syntax
+		msg_txt << basic_wgt_geometry.replace_xml_tags(msg_txt)
+		
+		txt.write(%tab*2,"<property plugin_message=",qq,msg_txt.substitute_character(%",%'),qq,es,eb,nl) #"
+	_endloop
+
+	# Close the 'messages' block
+	txt.write(%tab,"</messages>",nl*2)
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.write_source_files(source_dir)
+	## 
+	## Write source magik file to the directory SOURCE_DIR.
+	
+	dc << _self.dialog_class.default("dialog_class")
+
+	ll_filename << system.pathname_down( source_dir, "load_list.txt" )
+	load_list << external_text_output_stream.new( ll_filename )
+
+	# Prepare to load code that adds to or changes other required classes.
+	load_list.write("additions/",%newline)
+	load_list.write("changes/",%newline)
+	
+	_dynamic window_stack_driver_methods << _self.window_stack_driver_methods()
+
+	_for c _over {dc,dc+"_framework",dc+"_plugin"}.fast_elements()
+	_loop
+		filename << system.pathname_down( source_dir, c+".magik" )
+
+		load_list.write(c,%newline)
+		
+		_local txt << external_text_output_stream.new( filename )
+
+		pkg << _if .dialog_package.default("") = ""
+		       _then
+			       >> "user"
+		       _else
+			       >> .dialog_package.write_string.canonical
+		       _endif
+		
+		txt.write(_self.message(:auto_generated_magik_file_header,
+					_self.date(),
+					system.user_name,
+					pkg,
+					dialog_designer.dd_version),%newline)
+
+		mc << c.as_symbol()
+
+		_for m _over _self.class_methods(mc).fast_elements()
+		_loop
+			txt.write(_self.dialog_method(mc,m))
+		_endloop
+
+		txt.close()
+
+		# Create file for supplimentary "gui_class" code.
+		filename << system.pathname_down( source_dir, mc + "_2.magik" )
+		
+		_if _not system.file_exists?(filename)
+		_then
+			txt << external_text_output_stream.new( filename )
+			txt.write(dialog_designer.message(:supplimentary_gui_class_file_header,
+							  _self.date(),system.user_name,mc,
+							  dialog_designer.dd_version),%newline*2)
+
+			pkg << _if .dialog_package.default("") = ""
+			       _then
+				       >> "user"
+			       _else
+				       >> .dialog_package.write_string.canonical
+			       _endif
+
+			txt.write("_package ",pkg,%newline,%$,%newline)
+		
+			# Add the 'post_activation()' method stub to the <base_class>_2 file.
+			_if c = dc
+			_then 
+				txt.write(_self.dialog_method(mc,"custom_build_gui()"))
+				txt.write(_self.dialog_method(mc,"post_activation()"))
+			_else
+				_self.dialog_pragma(txt)
+			_endif
+			
+			txt.close()
+		_endif
+		
+		load_list.write(mc+"_2",%newline)
+	_endloop
+
+	# Prepare to load glue code that modifies the design class for the
+	# specific installation.
+	load_list.write("glue/",%newline)
+	load_list.close()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.window_stack_driver_methods()
+	## 
+	## Return the list of class.methods that are to drive window stacks.
+
+	p << equality_property_list.new()
+
+	_for e _over .gui_layout[:top_rc].gui_elements(:all)
+	_loop
+		_if (ws_id << e.properties[:driven_ws]) _isnt _unset
+		_then
+			p[e.change_selector] << ws_id
+		_endif
+	_endloop
+
+	>> p
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.class_methods(a_class)
+	## 
+	## Return a list of the methods for class A_CLASS.
+
+	rp << rope.new()
+
+	_if a_class = "XML"
+	_then
+		rp.add_all_last(_self.xml_filenames)
+	_elif _self.gui_class?(a_class)
+	_then
+		rp.add_all_last(_self.gui_class_method_names())
+	_elif _self.framework_class?(a_class)
+	_then
+		rp.add_all_last(_self.framework_class_method_names)
+	_else
+		rp.add_all_last(_self.plugin_class_method_names)	
+	_endif
+
+	pros << _self.prepare_pro_con_list(.databus[:produce])
+	cons << _self.prepare_pro_con_list(.databus[:consume])
+	
+	_if .use_databus? _andif
+	    (_not pros.empty? _orif _not cons.empty?) _andif
+	    (_self.gui_class?(a_class) _orif _self.plugin_class?(a_class))
+	_then
+		rp.add_last(:|databus_code()|)
+	_endif
+
+	_if _self.gui_class?(a_class)
+	_then 
+		rp.add_all_last(_self.store_open_file_dir_method_names(a_class).default({}))
+		rp.add_all_last(_self.store_aspect_method_names(a_class).default({}))
+	_endif
+	
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.style_choice_support_methods()
+	## 
+	## Return a set of method names that support the
+	## style_choice_items included in SELF.
+	
+	meths << set.new()
+	
+	_for ge _over _self.gui_elements(:all).fast_elements()
+	_loop
+		_if ge.class_name _is :dd_style_choice_item
+		_then
+			meths.add(:|set_style_value()|)
+
+			_if ge.style_type _is :point_style
+			_then
+				meths.add(:|drafting_point_style_items()|)
+			_endif
+		_endif
+	_endloop
+
+	>> meths
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.store_open_file_dir_method_names()
+	## 
+	## Store the method names associated with open_file (or
+	## directory) elements so the code can be generated.
+
+	.open_file_dir_method_names << rope.new()
+
+	meth_list << rope.new()
+	
+	_for i _over _self.gui_elements(:all).fast_elements()
+	_loop
+		_if i.is_class_of?(dd_open_file_dir)
+		_then
+			.open_file_dir_method_names.add_last(i.selector)
+			.open_file_dir_method_names.add_last(i.operation)			
+			.open_file_dir_method_names.add_last(i.filter.default("*.*"))
+
+			meth_list.add(i.selector)
+		_endif
+	_endloop
+
+	>> meth_list
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.store_aspect_method_names()
+	## 
+	## Store the aspect method names for various element types so
+	## their supporting code can be generated.
+
+	.table_aspect_method_names << equality_property_list.new()
+	.tree_aspect_method_names << equality_property_list.new()
+	.dd_date_time_aspect_method_names << equality_property_list.new()
+
+	_for i _over _self.gui_elements(:all).fast_elements()
+	_loop
+		_if i.class_name _is :dd_tabular_list _orif
+		    i.class_name _is :simple_list_item
+		_then
+			_if i.aspect.default("") <> ""
+			_then
+				.table_aspect_method_names[i.aspect] << i
+			_endif 
+		_elif i.class_name _is :dd_tree_list
+		_then
+			_if i.aspect.default("") <> ""
+			_then
+				.tree_aspect_method_names[i.aspect] << i
+			_endif 
+		_elif i.class_name _is :dd_date_time_item
+		_then
+			_if i.aspect.default("") <> ""
+			_then
+				.dd_date_time_aspect_method_names[i.aspect] << i
+			_endif 
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_class_method_names()
+	## 
+	## Return the GUI class method names for SELF.
+	
+	names << set.new_with(_scatter _self.gui_class_method_names)
+
+	names.add_all(_self.gui_element_methods())
+	names.add_all(_self.dock_element_methods())
+	names.add_all(_self.menubar_element_methods())
+	names.add_all(_self.statusbar_element_methods())
+
+	meths <<  _self.style_choice_support_methods()	
+	names.add_all(meths)
+
+	# Add the default method if any gui, dock or menubar methods
+	# were added.
+	_if names.size > _self.gui_class_method_names.size
+	_then
+		names.add(:|dd_default_method()|)
+	_endif 
+
+	# Sort secondary methods 
+	names << sorted_collection.new_from_iter(names,:fast_elements|()|)
+
+	# Move primary methods to top of list
+	names << rope.new_from_iter(names,:fast_elements|()|)
+
+	_for m _over _self.gui_class_method_names.fast_elements()
+	_loop
+		names.remove(m)
+	_endloop
+
+	names.add_all_first(_self.gui_class_method_names)
+
+	>> names
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_element_methods()
+	## 
+	## Return all the GUI element methods for SELF.
+	
+	>> .gui_layout[:top_rc].gui_element_methods()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_iter _method dialog_design.menubar_elements(types)
+	## 
+	## Return all the menubar elements of type TYPE, one of
+	## :button,:pullout,:separator,:menu
+	
+	_for m _over .menubar.default({}).fast_elements()
+	_loop
+		_for t _over m.fast_trees()
+		_loop
+			_if types.includes?(t.value[:type])
+			_then
+				_loopbody(t)
+			_endif
+		_endloop
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.menubar_element_methods()
+	## 
+	## Return all them methods needed by menubar elements.
+	
+	meths << set.new()
+	
+	_if _not .use_menubar? _then _return meths _endif 
+	
+	_for m _over .menubar.default({}).fast_elements()
+	_loop
+		_for t _over m.fast_trees()
+		_loop
+			_if t.value[:type] _is :button
+			_then
+				_if  (meth << t.value[:action_message]) _isnt _unset 
+				_then
+					meths.add(meth.as_symbol())
+				_else
+					meths.add((t.value[:name] + "()").as_symbol())
+				_endif
+			_endif
+		_endloop
+	_endloop
+
+	>> meths
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.statusbar_element_methods()
+	## 
+	## Return all them methods needed by menubar elements.
+	
+	meths << set.new()
+	
+	_if _not .use_statusbar? _then _return meths _endif 
+	
+	_for p _over .statusbar.default({}).fast_elements()
+	_loop
+		_if p.type = "progress"
+		_then
+			meths.add(:progress_indicator_init|()|)
+			meths.add(:progress_indicator_change|()|)
+			meths.add(:progress_indicator_stop|()|)
+		_endif
+	_endloop
+
+	>> meths
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dock_element_methods()
+	## 
+	## Return a list of all the methods needed by dock element methods.
+	
+	meths << set.new()
+
+	_if _not .use_docks? _then _return meths _endif 
+	
+	_for d _over .docks.default({}).fast_elements()
+	_loop
+		_for t _over d.fast_leaves()
+		_loop
+			_if t.value[:type] _is :button
+			_then
+				_if  (meth << t.value[:action_message]) _isnt _unset 
+				_then
+					meths.add(meth.as_symbol())
+				_else
+					name << t.value[:name].lowercase.substitute_character(% ,%_)
+					meths.add((name + "()").as_symbol())
+				_endif
+			_endif
+		_endloop
+	_endloop
+
+	>> meths
+
+_endmethod
+$
+
+dialog_design.define_shared_variable(:xml_filenames,
+				    {:config,:gui},:public)
+$
+dialog_design.define_shared_variable(:framework_class_method_names,
+				    {:exemplar},:public)
+$
+dialog_design.define_shared_variable(:plugin_class_method_names,
+				    {:exemplar,
+				     :init_actions|()|,
+				     :build_gui|()|,
+				     :activate_dialog|()|},
+				    :public)
+$
+dialog_design.define_shared_variable(:base_gui_class_method_names,
+				    {:exemplar,
+				     :init_actions|()|,
+				     :build_gui|()|,
+				     :quit|()|
+				    },:public)
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+dialog_design.define_shared_variable(:dd_symbols,"~`!@#$%^&*+={}[]|\<>?/'" + %".write_string,:public) #"
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_class_method_names
+	## 
+	## Return all the basic GUI class method nams.
+	
+	>> _self.base_gui_class_method_names
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dialog_method(a_class,a_meth)
+	## 
+	## Return the text for the method A_METH written for class A_CLASS.
+
+	_dynamic !current_design! << _self
+
+	_if a_class = "XML"
+	_then
+		_return _self.perform(:int! + a_meth + :|_xml()|)
+	_elif a_meth.write_string.index_of_seq("databus_") _isnt _unset 
+	_then
+		_return _self.perform(a_meth,a_class)
+	_endif
+
+	_local txt << internal_text_output_stream.new()
+
+	_self.dialog_pragma(txt)
+
+	_if a_meth _isnt :exemplar
+	_then
+		_self.method_header(txt,a_class,a_meth)
+		_self.method_public_comments(txt,a_class,a_meth)
+		_self.method_body(txt,a_class,a_meth)
+		_self.method_end(txt)
+	_else
+		_self.dialog_class_exemplar(txt,a_class)
+	_endif
+
+	>> txt.string
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.prepare_pro_con_list(data_types)
+	## 
+	## Prepare the producer consumers comma delimated lists for all
+	## the DATA_TYPES.
+	
+	txt << ""
+
+	_for t _over data_types.split_by(%,).fast_elements()
+	_loop
+		txt +<< write_string(",:",t.lowercase)
+	_endloop
+
+	_if _not txt.empty?
+	_then
+		txt << txt.slice_to_end(2)
+	_endif
+
+	>> txt
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.databus_code(a_class)
+	## 
+	## Return the magik code needed by the databus data_types for A_CLASS.
+
+	txt << internal_text_output_stream.new()
+
+	pros << _self.prepare_pro_con_list(.databus[:produce])
+	cons << _self.prepare_pro_con_list(.databus[:consume])
+
+	_if _self.plugin_class?(a_class)
+	_then
+		base_class << a_class.slice(1,a_class.size-7)
+		
+		_if _not pros.empty?
+		_then
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:plugin_pro_database_code_1,base_class,pros),%newline)		
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:plugin_pro_database_code_2,base_class,pros),%newline)		
+		_endif
+
+		_if _not cons.empty?
+		_then
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:plugin_con_database_code_1,base_class,cons),%newline)		
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:plugin_con_database_code_2,base_class,cons),%newline)		
+		_endif
+	_else
+		_if _not pros.split_by(%,).empty?
+		_then
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:gui_pro_database_code_1,a_class,pros),%newline)		
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:gui_pro_database_code_2,a_class,pros),%newline)		
+		_endif
+
+		_if _not cons.split_by(%,).empty?
+		_then
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:gui_con_database_code_1,a_class,cons),%newline)		
+			_self.dialog_pragma(txt)
+			txt.write(_self.message(:gui_con_database_code_2,a_class,cons),%newline)		
+		_endif
+	_endif
+
+	>> txt.string
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dialog_pragma(txt)
+	## 
+	## Write the pragma statement to the stream TXT.
+	
+	txt.write(%newline)
+	txt.write("_pragma(classify_level=",_self.pragma_classify_level.default("restricted"))
+
+	_if (usage << _self.pragma_usage.default("")) <> ""
+	_then 
+		  txt.write(", usage={",usage,"}")
+	_endif
+
+	_if (topic << _self.pragma_topic.default(.dialog_class).write_string) <> ""
+	_then
+		txt.write(", topic={",topic,"}")
+	_endif
+	
+	txt.write(")",%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dialog_class_exemplar(txt,a_class)
+	## 
+	## Write the exemplar definition for A_CLASS to the stream TXT.
+
+	parent << 
+		_if _self.framework_class?(a_class)
+		_then
+			>> ":gui_framework"
+		_else
+			>> ":plugin"
+		_endif
+	
+	txt.write("def_slotted_exemplar(:",a_class,%,,%newline)
+
+	_if _self.gui_class?(a_class)
+	_then
+		txt.write(%tab,%{,%newline,
+			  %tab*2,"{:items, _unset, :writable}",
+			  _self.extra_slot_text(),%newline,
+			  %tab,"},",%newline)
+	_else
+		txt.write(%tab,"{},",%newline)
+	_endif
+
+	txt.write(%tab,parent,%),%newline,%$,%newline)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.extra_slot_text()
+	## 
+	## Return the text defining the extra slots entered by the user.
+
+	slots << .dialog_extra_slots.default("").substitute_character(%:,% ).split_by(%,)
+
+	txt << ""
+	_for s _over slots.fast_elements()
+	_loop
+		s_name << _if s.as_number() _isnt _unset
+			  _then
+				  >> "n"+s
+			  _else
+				  >> s
+			  _endif 
+		txt +<< write_string(%,,%newline,%tab*2,"{:",s_name,", _unset, :writable}")
+	_endloop
+
+	>> txt
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.method_header(txt,a_class,a_meth)
+	## 
+	## Write the header for A_METH written on A_CLASS to the stream TXT.
+
+	_if a_meth _isnt :|build_gui()| _andif
+	    a_meth _isnt :|init_actions()| _andif
+	    a_meth _isnt :|quit()| 
+	_then
+		m1 << a_meth.write_string
+
+		_if m1.index_of_seq("()") _isnt _unset 
+		_then
+			m2 << m1.slice(1,m1.size-1)
+			txt.write("_method ",a_class,".",m2,"_gather args)",%newline)
+		_else			
+			txt.write("_method ",a_class,".",m1,%newline)
+		_endif
+
+		_return _true 
+	_elif a_meth _isnt :|build_gui()|
+	_then
+		txt.write("_method ",a_class,".",a_meth,%newline)
+	_else
+		txt.write("_method ",a_class,".",a_meth.write_string.slice(1,a_meth.size-1))
+		txt.write("a_frame,_optional xml_element)",%newline)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.date()
+	## 
+	## Return todays date or 'Use File Date' depending on the
+	## state of the 'auto_date_code?'.
+
+	>> _if dialog_designer.auto_date_code? _is _true 
+	   _then
+		   >> date.now()
+	   _else
+		   >> _self.message(:auto_date_suppressed)
+	   _endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.method_public_comments(txt,a_class,a_meth)
+	## 
+	## Write the default public comments of A_CLASS.A_METH to the
+	## stream TXT.
+
+	txt.write(%tab,_self.message(:auto_generated,_self.date(),dialog_designer.dd_version),%newline)
+
+	_if _self.responds_to?(:gui_ + a_meth)
+	_then
+		pc << _self.message(:public_comments_ + a_meth.as_symbol(),.dialog_class)
+		sp << pc.split_by(%newline)
+		
+		_for lin _over sp.fast_elements()
+		_loop
+			txt.write(%tab,"#",lin,%newline)
+		_endloop
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.framework_class?(a_class)
+	## 
+	## Returns TRUE if A_CLASS is a 'framework' class.
+	
+	>> a_class.index_of_seq("_framework") _is a_class.size-9
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.plugin_class?(a_class)
+	## 
+	## Returns TRUS if A_CLASS is a 'plugin' class
+	>> a_class.index_of_seq("_plugin") _is a_class.size-6
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_class?(a_class)
+	## 
+	## Returns true if A_CLASS does not end with 'framework' or 'plugin'.
+	
+	>> _not _self.framework_class?(a_class) _andif
+		_not _self.plugin_class?(a_class) _andif
+		a_class <> "XML"
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.method_body(txt,a_class,a_meth)
+	## 
+	## Write the magik code for A_CLASS.A_METH to the stream TXT.
+
+	_dynamic window_stack_driver_methods
+
+	_if _self.plugin_class?(a_class)
+	_then
+		tf_str << property_list.new_with(_true,"_true",_false,"_false")
+		max? << tf_str[.frame.maximizable?.default(_true)]
+		min? << tf_str[.frame.minimizable?.default(_true)]
+		resize? << tf_str[.frame.resizable?.default(_true)]
+
+		txt.write(%tab,
+			  _self.message(:body_plugin_+a_meth.as_symbol(),.dialog_class,max?,min?,resize?),
+			  %newline)
+	_elif a_meth = :|failed_value()| 
+	_then
+		txt.write(%tab,_self.message(:dd_failed_value_method,.dialog_class,_self.date()),%newline)
+	_elif a_meth.index_of_seq(:progress_indicator) _isnt _unset
+	_then
+		pbe << _self.progress_bar_element()
+
+		pb_type_init << %tab + _self.message(pbe.indicator.as_symbol(),pbe.indicator,pbe.max_count)
+		txt.write(%newline,%tab,_self.message(a_meth,pb_type_init),%newline)
+	_elif a_meth = :|drafting_point_style_items()| 
+	_then
+		txt.write(%tab,_self.message(:dd_drafting_point_style_items,.dialog_class,_self.date()),%newline)
+	_elif a_meth = "custom_build_gui()"
+	_then
+		# Blank backstop method.
+	_elif a_meth = "dd_default_method()"
+	_then 
+		_self.dd_default_method(a_class,txt)
+	_elif a_meth = "post_activation()"
+	_then
+		_self.post_activation_code(txt)
+	_elif _self.responds_to?(:gui_+a_meth)
+	_then
+		_self.perform(:gui_+a_meth,txt).default("")
+	_elif (i << .open_file_dir_method_names.default({}).index_of(a_meth)) _isnt _unset 
+	_then
+		# Handle lack of directory selection dialog in SW4
+		_if _self.sw40? _andif  .open_file_dir_method_names[i+1] _is :select_directory
+		_then
+			txt.write(%tab,_self.message(:dd_select_directory,
+						     .open_file_dir_method_names[i+2],
+						     .dialog_class,
+						     _self.date(),
+						     a_meth
+					     ),%newline)
+		_else
+			a_meth << a_meth.slice(1,a_meth.size-2)
+			txt.write(%tab,_self.message(:dd_open_file,
+						     .dialog_class,
+						     a_meth,
+						     _self.date(),
+						     .open_file_dir_method_names[i+1],
+						     .open_file_dir_method_names[i+2],
+						     dialog_designer.dd_version
+					     ),%newline)
+		_endif 
+	_elif (el << .dd_date_time_aspect_method_names[a_meth]) _isnt _unset 
+	_then
+		txt.write(%tab,_self.message(:dd_date_time_default_aspect_method,
+					     el.data_type,el.dialog_element_id),%newline)
+		_self.method_end(txt)
+		_self.dialog_pragma(txt)
+		meth << el.dialog_element_id + :_value
+		txt.write("_method ",.dialog_class,%.,meth,%newline)
+		_self.method_public_comments(txt,!current_design!.dialog_class,meth)
+		txt.write(%tab,dialog_designer.message(:dd_date_time_value_code,el.dialog_element_id),%newline)
+
+		_self.method_end(txt)
+		_self.dialog_pragma(txt)
+		meth << el.dialog_element_id + :|_value << new_val|
+		txt.write("_method ",.dialog_class,%.,meth,%newline)
+		_self.method_public_comments(txt,!current_design!.dialog_class,meth)
+		txt.write(%tab,dialog_designer.message(:dd_date_time_set_value_code,el.dialog_element_id),%newline)
+
+		_if _not el.value_changed_notifier.default("").empty?
+		_then
+			_self.method_end(txt)
+			_self.dialog_pragma(txt)
+			meth << el.value_changed_notifier.slice(1,el.value_changed_notifier.size-2) + "(_gather args)"
+			txt.write("_method ",.dialog_class,%.,meth,%newline)
+			_self.method_public_comments(txt,!current_design!.dialog_class,meth)
+			txt.write(%tab,dialog_designer.message(:dd_date_time_value_changed_code,el.dialog_element_id),%newline)
+		_endif
+	_elif (el << .table_aspect_method_names[a_meth]) _isnt _unset 
+	_then
+		txt.write(%tab,_self.dd_tabular_list_default_aspect_method(el),%newline)
+	_elif (el << .tree_aspect_method_names[a_meth]) _isnt _unset 
+	_then
+		txt.write(%tab,_self.message(:dd_tree_list_default_aspect_method),%newline)
+	_else
+		_if (ws_id << window_stack_driver_methods[a_meth]) _is _unset 
+		_then
+			_self.default_method(a_meth,txt)
+		_else
+			_self.ws_driver_method(a_meth,txt,ws_id)			
+		_endif
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.sw40?
+	## 
+	## Return TRUE if the current image is SW4.0, FALSE otherwise.
+	
+	(v1,v2) << smallworld_product.release_version
+	>> v2 < 1
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dd_tabular_list_default_aspect_method(el)
+	## 
+	## Return sample code for a tabular_list_item aspect.
+
+	_if el.class_name _isnt :dd_tabular_list
+	_then
+		_return dialog_designer.message(:simple_list_default_aspect_method)
+	_endif 
+
+	_local cols << el.column_headings.split_by(%,).size
+
+	ss_txt << "{"
+
+	_for j _over 1.upto(cols)
+	_loop
+		ss_txt +<< write_string(":value,",j,",:tab,")
+	_endloop
+
+	ss_txt << ss_txt.slice(1,ss_txt.size-6) + "}"
+
+	>> dialog_designer.message(:dd_tabular_list_default_aspect_method,
+				   cols,
+				   ss_txt)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dd_default_method(a_meth,txt)
+	## 
+	## Write the Dialog Designer default method that either writes
+	## what method was invoked to the magik prompt or into an
+	## alert_box depending on the dynamic !dd_show_alerts?!
+
+	_dynamic !dd_show_alerts?!
+	
+	# Generate code that shows an alert or just outputs to the
+	# Magik> prompt, depending on the state !dd_show_alerts?!
+	_if !dd_show_alerts?!.default(_false)
+	_then
+		txt.write(%tab,_self.message(:dd_default_method_code_alert,a_meth),%newline)
+	_else 
+		txt.write(%tab,_self.message(:dd_default_method_code_no_alert,a_meth),%newline)
+	_endif
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.ws_driver_method(a_meth,txt,ws_id)
+	## 
+	## Write the method which modifies the value of a window stack.
+	## 
+	txt.write(%newline,%tab,".items[:",ws_id,"].value << args[1].as_symbol()",%newline)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.default_method(a_meth,txt)
+	## 
+	## Write the default magik method A_METH to the stream TXT.
+	
+	_if a_meth.index_of_seq("()") _is _unset 
+	_then
+		txt.write(%tab,_self.message(:dd_default_method_code,.dialog_class,a_meth),%newline)
+	_else 
+		txt.write(%newline,%tab,_self.message(:default_method_code,.dialog_class,a_meth),%newline)
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.method_end(txt)
+	## 
+	## Write the method completion to the stream TXT.
+	
+	txt.write("_endmethod",%newline,%$,%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_build_gui(txt,_optional rc,top?)
+	## 
+	## Write SELF's "build_gui()" method code to the stream TXT.
+
+	rc << rc.default(.gui_layout[:top_rc])
+	top? << top?.default(_true)
+
+	# Set the .items slot for storing GUI elements.
+	_if top?
+	_then
+		txt.write(%newline,%tab,".items << property_list.new()",%newline)
+	_endif
+
+	# Just in case the user puts the design in a tab_box.
+	_if .frame.title.default("").empty?
+	_then
+		tab_label << .dialog_class.write_string.make_non_escape_string_pretty()
+	_else
+		tab_label << .frame.title
+	_endif
+
+	rc.descriptive_text(txt)
+	rc.gui_code(txt,_unset,_unset,tab_label)
+	
+	# Recursively loop over the gui_elements, writing the gui_code
+	# for each to the text stream TXT.  For rowcol-like elements,
+	# check the number of sub-elements and if it is greater than MAX_SUBS
+	# then reference a sub-build_gui method.  These sub-build_gui
+	# methods will be generated after the main gui_code() method is completed.
+
+	# TODO : move the max_subs parameter out to a configuraton XML file.
+
+	max_subs << 10
+	_local sub_rcs << rope.new()
+
+	rc_id << rc.dialog_element_id
+
+	cnt << 0
+	brk << 0
+	_for ge _over rc.row_ordered_items()
+	_loop
+		cnt +<< 1
+		
+		_if (its << ge.all_sub_elements()).size > max_subs
+		_then
+			id << ge.dialog_element_id
+			txt.write(%newline,%tab,"_self.build_",id,"(",rc_id,")",%newline)
+			sub_rcs.add(ge)
+		_else
+			# Further break long methods apart if the number of widgets
+			# exceeds the 'MAX_SUBS' value.
+			_if cnt > max_subs
+			_then
+				id << ge.dialog_element_id
+				# Call next method piece
+				txt.write(%newline,%tab,"_self.build_",id,"_",brk+<<1,"(",rc_id,")",%newline)
+				
+				# Finish off the previous method
+				_self.method_end(txt)
+
+				# Start a new sub method
+				_self.dialog_pragma(txt)
+				sub_meth << write_string("build_",id,"_",brk)
+				txt.write("_method ",.dialog_class,".build_",id,"_",brk,"(",rc_id,")",%newline)
+				_self.method_public_comments(txt,.dialog_class,sub_meth+"()")
+
+				cnt << 0
+			_endif
+			
+			ge.descriptive_text(txt)
+			ge.gui_code(txt,_unset,_unset,tab_label)
+			
+			_for se _over its.fast_elements()
+			_loop
+				se.descriptive_text(txt)
+				se.gui_code(txt)
+			_endloop
+		_endif 
+	_endloop
+
+	# Return the top_rc so the GUI will build properly.
+	_if top?
+	_then
+		txt.write(%newline,%tab,"_self.custom_build_gui()",%newline)
+		txt.write(%newline,%tab,">> ",.gui_layout[:top_rc].dialog_element_id,%newline)
+	_endif
+
+	# Recursively build methods for sub_rcs
+	_for sub_rc _over sub_rcs.fast_elements()
+	_loop
+		# Finish off the previous method
+		_self.method_end(txt)
+
+		id << sub_rc.dialog_element_id
+		sub_meth << "build_"+id
+		
+		# Start a new sub method
+		_self.dialog_pragma(txt)
+		txt.write("_method ",.dialog_class,%.,sub_meth,"(",rc_id,")",%newline)
+		_self.method_public_comments(txt,.dialog_class,sub_meth+"()")
+
+		# Recursively call this method for sub_rc
+		_self.gui_build_gui(txt,sub_rc,_false)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.post_activation_code(txt)
+	## 
+	## Write the post_activation() code to the text stream TXT.
+
+	pac << ""
+
+	_for e _over _self.gui_elements(:all).fast_elements()
+	_loop
+		pac +<< e.post_activation_code()
+	_endloop
+
+	txt.write(%newline,pac,%newline)
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.update_ws_driver(ws,new_driver_id,old_driver_id)
+	## 
+	## Update the strings and values fields of the
+	## text_choice_items with id DRIVER_ID based on the
+	## window_stack WS.
+	
+	new_dr_id << new_driver_id.default("").as_symbol()
+	old_dr_id << old_driver_id.default("").as_symbol()
+	
+	_for e _over _self.gui_elements(:all).fast_elements()
+	_loop
+		_if e.dialog_element_id _is old_dr_id
+		_then
+			e.set_property(:driven_ws,_unset)
+		_elif e.dialog_element_id _is new_dr_id
+		_then
+			(strs,vals) << ws.window_strings_and_values()
+			
+			e.strings << strs
+			e.values << vals
+			
+			e.change_selector << e.change_selector.default(new_dr_id + :_changed|()|)
+			e.set_property(:driven_ws,ws.dialog_element_id)
+		_endif
+	_endloop	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_init_actions(txt)
+	## 
+	## Write SELF's "init_actions()" method to the stream TXT.
+
+	gui_actions << set.new()
+
+	gui_txt << internal_text_output_stream.new()
+	a_class << _self.dialog_class
+
+	cnt << 0
+	file_cnt << 0
+	_for ge _over _self.gui_elements().fast_elements()
+	_loop
+		gui_actions.add(ge.action_code(gui_txt))
+
+		_if (cnt +<< 1) > 30
+		_then
+			file_cnt +<< 1
+			meth << write_string("init_actions_",file_cnt,"()")
+
+			# Finish this file (so we don't pass the 256 line limit)
+			gui_txt.write(%newline)
+			gui_txt.write(%tab,"_self.",meth,%newline)
+			_self.method_end(gui_txt)
+
+			# Start the next init file
+			_self.method_header(gui_txt,a_class,meth)
+			_self.method_public_comments(gui_txt,a_class,meth)
+			
+			cnt << 0
+		_endif 
+	_endloop
+
+	_if _not gui_txt.string.empty?
+	_then
+		txt.write(%newline,%tab, _self.message(:gui_action_definitions))
+		txt.write(gui_txt.string)
+	_endif
+
+	gui_actions.remove(_unset)
+	
+	_self.init_menubar_actions(txt,gui_actions)
+	_self.init_toolbar_actions(txt,gui_actions)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_quit(txt)
+	## 
+	## Write the standard quit() method to the stream TXT.
+	
+	txt.write(%tab,_self.message(:gui_quit|()|),%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init_menubar_actions(txt,gui_actions)
+	## 
+	## Write the actions definitons for the menubar actions to the
+	## stream TXT.  GUI_ACTIONS is a list of actions that are
+	## already defined elsewhere, used to avoid repeats.
+
+	_if .menubar.default({}).empty?
+	_then
+		_return 
+	_endif
+
+	first? << _true 
+	_for m _over .menubar.fast_elements()
+	_loop
+		_for dt _over m.fast_leaves()
+		_loop
+			a_name << dt.value[:name].as_symbol()
+			_if (a_msg << dt.value[:action_message].default("")) = ""
+			_then
+				a_msg  << a_name.write_string.lowercase +"()"
+			_endif 
+
+			_if dt.value[:type] _is :button _andif
+			    _not gui_actions.includes?(a_name)
+			_then
+				_if first? 
+				_then
+					txt.write(%newline,%tab,
+						  _self.message(:menubar_action_definitions))
+					first? << _false 
+				_endif
+				
+				txt.write(%newline,%tab,"_self.add_action( sw_action.new( :",a_name,%,,%newline)
+				txt.write(%tab*2,":menubar_control,        :",
+					 dt.value[:control_type].default(:button_item),%,,%newline)
+				txt.write(%tab*2,":engine,                 _self,",%newline)
+				txt.write(%tab*2,":action_message,         :|",a_msg,"| ) )",%newline)
+			_endif
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.init_toolbar_actions(txt,gui_actions)
+	## 
+	## Write the actions definitons for the toolbar actions to the
+	## stream TXT.  GUI_ACTIONS is a list of actions that are
+	## already defined elsewhere, used to avoid repeats.
+
+	_if _not .use_docks?
+	_then
+		_return 
+	_endif
+
+	first? << _true 
+	_for m _over .docks.fast_elements()
+	_loop
+		_for dt _over m.fast_leaves()
+		_loop
+			a_name << dt.value[:name].lowercase.substitute_character(% ,%_).as_symbol()
+			a_msg  << dt.value[:action_message].default(a_name.write_string.lowercase +"()")
+
+			_if dt.value[:type] _is :button _andif
+			    _not gui_actions.includes?(a_name)
+			_then
+				_if first? 
+				_then
+					txt.write(%newline,%tab,
+						  _self.message(:toolbar_action_definitions))
+					first? << _false 
+				_endif
+				
+				txt.write(%newline,%tab,"_self.add_action( sw_action.new( :",a_name,%,,%newline)
+				txt.write(%tab*2,":toolbar_control,        :",
+					  dt.value[:control_type].default(:image_button_item),%,,%newline)
+
+				ifn << _if (n << (dt.value[:element].image_file_name)).default("") = ""
+				       _then
+					       >> "image_button_item"
+				       _else
+					       >> n
+				       _endif
+				
+				imn << _if (n << (dt.value[:element].image_module_name)).default("") = ""
+				       _then
+					       >> "_self.module_name"
+				       _else
+					       >> ":"+n
+				       _endif
+				
+				txt.write(%tab*2,":image,                  {:",ifn,",",imn,"},",%newline)
+				txt.write(%tab*2,":engine,                 _self,",%newline)
+				txt.write(%tab*2,":action_message,         :|",a_msg,"| ) )",%newline)
+			_endif
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.write_msg_files(msg_dir)
+	## 
+	## Write the message files to the directory MSG_DIR.
+	
+	dc << .dialog_class.default("dialog_class")
+
+	# Create the target message directory if missing...
+	_if _not system.file_exists?(msg_dir)
+	_then
+		lang_dir << msg_dir.slice(1,msg_dir.size-9)
+		system.mkdir(lang_dir)
+		system.mkdir(msg_dir)
+	_endif 
+
+	_for c _over {dc,dc+"_framework",dc+"_plugin"}.fast_elements()
+	_loop
+		filename << system.pathname_down( msg_dir, c+".msg" )
+		txt << external_text_output_stream.new( filename )
+
+		mc << c.as_symbol()
+
+		_self.gui_messages(txt,mc)
+
+		# Add the custom messages to the end of the dialog_class.msg
+		_if c = dc
+		_then
+			cust_msgs << _self.replace_custom_tags(.class_messages.default(" "))
+			txt.write(%newline,cust_msgs,%newline)
+		_elif c = dc+"_plugin"
+		_then
+			cust_msgs << _self.replace_custom_tags(.plugin_messages.default(" "))
+			txt.write(%newline,cust_msgs,%newline)
+		_endif 
+
+		txt.close()
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.replace_custom_tags(tagged_msgs)
+	## 
+	## Replace custom tags with appropriate text before outputing
+	## to the msg file.
+	##
+	##  "%nl" = blank line
+	
+	_local new_msgs << internal_text_output_stream.new()
+	_local txt
+
+	_for lin _over tagged_msgs.split_by(%newline,_true).fast_elements()
+	_loop
+		txt << _if lin.size _is 3 _andif
+			   lin.index_of_seq("%nl") _is 1
+		       _then
+			       >> ""
+		       _else
+			       >> lin
+		       _endif
+		
+		new_msgs.write(txt,%newline)
+	_endloop
+
+	>> new_msgs.string
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.write_message(txt,key,str)
+	## 
+	## Write the message definition KEY --> STR to the text stream
+	## TXT if KEY is not included in the dynamic defined_messages.
+
+	_dynamic defined_messages
+
+	_if _not defined_messages.includes?(key)
+	_then
+		txt.write(%:,key,%tab,str,%newline)
+	_endif
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.gui_messages(txt,a_class)
+	## 
+	## Write the messages required by the GUI for A_CLASS to the
+	## stream TXT.
+
+	_dynamic defined_messages << equality_set.new()
+
+	_if _self.framework_class?(a_class)
+	_then
+		_for sub _over _self.menubar_elements({:menu,:pullout})
+		_loop
+			_self.write_message(txt,
+					    write_string(sub.value[:name].lowercase),
+					    sub.value[:external_label].default(sub.value[:name]).capitalise)
+		_endloop
+
+	_elif _self.plugin_class?(a_class)
+	_then
+		_self.write_message(txt,.dialog_class,.frame.title.default(_self.message(:no_title)))
+		_self.write_message(txt,"caption",.frame.title.default(_self.message(:no_title)))
+		
+	_else
+		_for el _over _self.gui_elements().fast_elements()
+		_loop
+			el.gui_messages(txt)
+			el.embedded_messages(txt)
+		_endloop
+		
+		_for sub _over _self.menubar_elements({:button})
+		_loop
+			nam << sub.value[:name].lowercase
+			msg << sub.value[:external_label].default(nam.capitalise)
+			
+			_self.write_message(txt,nam,msg)
+		_endloop
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.test_dialog()
+	## 
+	## Return a new instance of the 'plugin' class associated with
+	## the current dialog design.
+
+	pc << .dialog_class + "_plugin"
+	ex << method_table.exemplar_for_name(pc.as_symbol())
+
+	>> ex.new()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_xml_into_design(sx)
+	## 
+	## Parse the simple_xml object SX into SELF, this effectively
+	## modifies SELF to match the design described by SX.
+
+	_self.parse_class_xml(sx)
+	_self.parse_module_xml(sx)
+	_self.parse_menubar_xml(sx)
+	_self.parse_statusbar_xml(sx)
+	_self.parse_docks_xml(sx)
+	_self.parse_databus_xml(sx)
+	_self.parse_messages_xml(sx)
+	_self.parse_frame_xml(sx)
+	_self.parse_gui_layout_xml(sx)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_class_xml(sx)
+	## 
+	## Parse the class information from the simple_xml SX.
+
+	condition.raise(:dd_xml_parsing_progress,:step,:class)
+	
+	.dialog_class << sx.attributes["class"]
+	.dialog_extra_slots << sx.attributes["extra_slots"]
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_module_xml(sx)
+	## 
+	##  Parse the module information from the simple_xml SX.
+
+	condition.raise(:dd_xml_parsing_progress,:step,:module)
+	
+	m << sx.element_matching_name("module")
+
+	_for e _over m.elements_matching_name("property")
+	_loop
+		el_name << e.attributes["name"]
+		
+		_if el_name = "description"
+		_then
+			.build_module_description << e.attributes["value"]
+			
+		_elif el_name = "version"
+		_then
+			.build_module_name << m.attributes["name"] + " " + e.attributes["value"]
+
+		_elif el_name = "package"
+		_then
+			.dialog_package << e.attributes["value"]
+		_elif el_name = "build_module_dir"
+		_then
+			.build_module_dir << e.attributes["value"]
+		_elif el_name = "build_module_requires"
+		_then
+			.build_module_requires << e.attributes["value"].substitute_character(%,,%newline)
+		_else
+			_self.perform(el_name.as_symbol().with_chevron,e.attributes["value"])
+		_endif
+	_endloop
+
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_menubar_xml(sx)
+	## 
+	##  Parse the menubar information from the simple_xml SX.
+
+	_if (m << sx.element_matching_name("menu")) _is _unset 
+	_then
+		_return 
+	_endif
+
+	condition.raise(:dd_xml_parsing_progress,:step,:menubar)
+	
+	.use_menubar? << _true
+	
+	.menubar << rope.new()
+	.gui_layout[:tree_counter] << 0
+
+	_for sm _over m.elements_matching_name("submenu")
+	_loop
+		name << sm.attributes["name"]
+		
+		_local dt << display_tree.new(.gui_layout[:tree_counter]+<<1,
+			       property_list.new_with(:name,name,:type, :menu))
+		dt.styled_string << {:image, {:use_menubar,_self.module_name}, :value, :name}
+		
+		_self.parse_submenu_xml(sm,dt)
+		.menubar.add(dt)
+	_endloop
+
+	.frame.y +<< 15
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_submenu_xml(sm,pdt)
+	## 
+	##  Parse the submenu information from the simple_xml SX.
+	
+	_for e _over sm.xml_elements()
+	_loop
+		_if e.type _is :submenu
+		_then
+			name << e.attributes["name"]
+			st << display_tree.new(.gui_layout[:tree_counter]+<<1,
+					       property_list.new_with(:name,name,:type,:pullout),pdt)
+			st.styled_string << {:image, {:menubar_pullout,_self.module_name}, :value, :name}
+			
+			_self.parse_submenu_xml(e,st)
+			
+		_elif  e.type _is :action
+		_then 
+			name << e.attributes["name"].split_by(%.).last
+			amsg << e.attributes["action_message"]
+			cont << e.attributes["control_type"]
+			
+			st << display_tree.new(.gui_layout[:tree_counter]+<<1,
+					       property_list.new_with(:name,name,
+								      :type,:button,
+								      :action_message,amsg,
+								      :control_type,cont),pdt)
+			st.styled_string << {:image, {:menubar_button,_self.module_name}, :value, :name}
+			
+		_elif  e.type _is :separator
+		_then 
+			name << "-"*30
+			st << display_tree.new(.gui_layout[:tree_counter]+<<1,
+				property_list.new_with(:name,"-"*30,:type,:separator),pdt)
+			st.styled_string << {:value, :name}
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_statusbar_xml(sx)
+	## 
+	##  Parse the statusbar information from the simple_xml SX.
+	
+	_if (sb << sx.element_matching_name("statusbar")) _is _unset 
+	_then
+		_return 
+	_endif
+
+	condition.raise(:dd_xml_parsing_progress,:step,:statusbar)
+	
+	.use_statusbar? << _true
+	.statusbar << rope.new()
+	
+	_for p _over sb.elements_matching_name("pane")
+	_loop
+		a << p.attributes
+		
+		.statusbar.add(
+			statusbar_element.new(
+				property_list.new_with(:id,       a["id"],
+						       :type,   "status",
+						       :style,  a["style"],
+						       :springy,a["springy"] = "true",
+						       :width,  a["width"].as_number())
+					  ))
+	_endloop
+
+	_for p _over sb.elements_matching_name("progress_bar")
+	_loop
+		a << p.attributes
+
+		.statusbar.add(
+			statusbar_progress_element.new(
+				property_list.new_with(:id,         a["id"],
+						       :type,     "progress",
+						       :style,    a["style"],
+						       :indicator,a["indicator"],
+						       :max_count,a["max_count"].as_number(),
+						       :width,    a["width"].as_number())
+					  ))
+	_endloop
+
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_docks_xml(gui_xml)
+	## 
+	##  Parse the docks information from the simple_xml SX.
+	
+	_if (sb << gui_xml.element_matching_name("dock")) _is _unset 
+	_then
+		_return 
+	_endif
+
+	condition.raise(:dd_xml_parsing_progress,:step,:docks)
+
+	.use_docks? << _true 
+	_self.init_docks()
+
+	_for dock_xml _over gui_xml.elements_matching_name("dock")
+	_loop
+		_self.parse_dock_xml(dock_xml,gui_xml)
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_dock_xml(dock_xml,gui_xml)
+	## 
+	## Parse the XML describing the actions to be placed in one of
+	## the four docks (top, bottom, left or right).
+
+	dock_dt << _self.dock_display_tree_named(dock_xml.attributes["name"])
+
+	sec_dt << _self.new_section_for(dock_dt)
+	
+	_for el _over dock_xml.elements.fast_elements()
+	_loop
+		_if el.type _is :section
+		_then
+			sec_dt << _self.new_section_for(dock_dt)
+		_else
+			toolbar_name << el.attributes["name"]
+			tool_dt << _self.new_toolbar_for(sec_dt,toolbar_name)
+
+			# TOOLBAR
+			_for tool_xml _over gui_xml.elements_matching_name("toolbar")
+			_loop
+				_if tool_xml.attributes["name"] = toolbar_name
+				_then
+					_for a _over tool_xml.elements.fast_elements()
+					_loop
+						# ACTION
+						_if a.type _is :action
+						_then
+							a_name << a.attributes["name"].split_by(%.).last
+							an_img << a.attributes["image"]
+						
+							_self.new_toolbar_action_for(tool_dt,a_name,an_img)
+						_else
+							#PULLDOWN
+							mode << a.attributes["mode"].as_symbol()
+							exe? << a.attributes["execute"]
+							styl << a.attributes["style"].as_symbol()
+							
+							npd << _self.new_toolbar_pulldown(tool_dt,a.attributes["name"].default("pulldown"),mode,exe?,styl)
+
+							# Actions in the pulldown
+							_for b _over a.elements.fast_elements()
+							_loop
+								b_name << b.attributes["name"].split_by(%.).last
+								bn_img << b.attributes["image"]
+								
+								_self.new_toolbar_action_for(npd,b_name,bn_img)
+							_endloop
+						_endif 
+					_endloop # action
+				_endif
+			_endloop # toolbar
+		_endif
+	_endloop # section
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.new_section_for(dt)
+	## 
+	## Add and return a section subtree to DT.
+	
+	ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+				property_list.new_with(:image, {:dock_section,_self.module_name},
+						       :name,_self.next_dock_name(:section),
+						       :type,:pullout),dt)
+	ndt.styled_string << {:image, {:dock_section,_self.module_name},
+			      :value, :name}
+
+	>> ndt
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.new_toolbar_for(sec_dt,name)
+	## 
+	## Add and return a toolbar subtree to SEC_DT, name it NAME.
+	
+	ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+				property_list.new_with(:image, {:dock_toolbar,_self.module_name},
+						       :name,name,
+						       :type,:pullout),sec_dt)
+	ndt.styled_string << {:image, {:dock_toolbar,_self.module_name},
+			      :value, :name}
+
+	>> ndt
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.new_toolbar_action_for(tool_dt,name,img_txt)
+	## 
+	## Add and return a toolbar subtree to SEC_DT, name it NAME.
+
+	_if img_txt _isnt _unset
+	_then
+		sp << img_txt.split_by(%.)
+		img_mod << sp.first
+		img_name << sp.last
+	_else
+		img_mod << _self.module_name
+		img_name << :image_button
+	_endif 
+	
+	ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,
+				property_list.new_with(:image, {img_name,img_mod},
+						       :name,name,
+						       :image_file_name,img_name,
+						       :image_module_name,img_mod,
+						       :type,:button),tool_dt)
+	ndt.styled_string << {:image, {img_name,img_mod},
+			      :value, :name}
+
+	>> ndt
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.new_toolbar_pulldown(tool_dt,name,mode,execute,style)
+	## 
+	## Insert a pulldown element as a child of the the TOOL_DT
+	## display tree.  The NAME, MODE, EXECUTE and STYLE values are
+	## stored on the returned display_tree.
+	
+	vals << 	property_list.new_with(
+				:name,_self.next_dock_name(:pulldown),
+				:type,:pulldown,
+				:mode,mode,
+				:execute,execute,
+				:style,style)
+
+	ndt << display_tree.new(.gui_layout[:dock_tree_counter]+<<1,vals,tool_dt)
+	ndt.styled_string << {:image, {:dock_pulldown,_self.module_name}, :value, :name}
+
+	>> ndt
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.dock_display_tree_named(name)
+	## 
+	## Return the dock with the name NAME.
+	
+	_for i _over .docks.fast_elements()
+	_loop
+		_if i.value[:name].lowercase = name.lowercase
+		_then
+			_return i
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_databus_xml(sx)
+	## 
+	## Parse the databus information from the simple_xml SX.
+	
+	_if (sb << sx.element_matching_name("databus")) _is _unset 
+	_then
+		.use_databus? << _false 
+		_return 
+	_endif
+
+	condition.raise(:dd_xml_parsing_progress,:step,:databus)
+	
+	.use_databus? << _true 
+	.databus << property_list.new()
+	.databus[:produce] << ""
+	.databus[:consume] << ""
+
+	_for p _over sb.elements_matching_name("property")
+	_loop
+		n << p.attributes["name"]
+		v << p.attributes["value"]
+
+		_if n = "producer_datatype"
+		_then
+			.databus[:produce] +<< write_string(v,%,)
+		_else
+			.databus[:consume] +<< write_string(v,%,)
+		_endif
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_messages_xml(sx)
+	## 
+	## Parse the messages information from the simple_xml SX.
+	
+	_if (sb << sx.element_matching_name("messages")) _is _unset 
+	_then
+		_return 
+	_endif
+
+	condition.raise(:dd_xml_parsing_progress,:step,:messages)
+	
+	# Messages
+	class_msgs << ""
+	plugin_msgs << ""
+	
+	_for p _over sb.elements_matching_name("property")
+	_loop
+		class? << _if (msg << p.attributes["message"]) _isnt _unset
+			  _then 
+				  >> _true
+			  _else
+				  msg << p.attributes["plugin_message"]
+				  >> _false
+			  _endif
+
+		# Decode special characters
+		msg << basic_wgt_geometry.decode_dd_symbols(msg)
+
+		_if class?
+		_then
+			class_msgs +<< write_string(msg,%newline)
+		_else
+			plugin_msgs +<< write_string(msg,%newline)
+		_endif
+	_endloop
+	
+	.class_messages << class_msgs
+	.plugin_messages << plugin_msgs
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_frame_xml(sx)
+	## 
+	## Parse the framework information from the simple_xml SX.
+
+	condition.raise(:dd_xml_parsing_progress,:step,:frame)
+	
+	fr_w << sx.elements_matching("widget","dd_class","frame").an_element()
+
+	props << .frame.xml_properties(fr_w)
+
+	.frame.set_dd_properties(props)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.parse_gui_layout_xml(sx)
+	## 
+	##  Parse the gui_layout information from the simple_xml SX.
+	
+	condition.raise(:dd_xml_parsing_progress,:step,"GUI Layout : frame")
+	
+	fr_w << sx.elements_matching("widget","dd_class","frame",_true).an_element()
+	fr_name << fr_w.attributes["name"]
+
+	condition.raise(:dd_xml_parsing_progress,:step,"GUI Layout : Top RowCol")
+	
+	rc_w << sx.elements_matching("widget","dd_parent",fr_name,_true).an_element()
+	rc_name << rc_w.attributes["name"]
+	
+	props << .gui_layout[:top_rc].xml_properties(rc_w)
+	
+	.gui_layout[:top_rc].set_dd_properties(props)
+
+	# Start recursive widget creation
+	.gui_layout[:top_rc].parse_items_xml(sx,rc_name)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.copy_icon_files(to_dir)
+	## 
+	## Copy the icon files from the dialog designer module into the
+	## dialogs bitmap directory.
+
+	from_dir << sw_module_manager.module(_self.module_name).safe_full_directory +
+		    "/resources/base/bitmaps/"
+
+	_for e _over _self.gui_elements().fast_elements()
+	_loop
+		_if e.responds_to?(:image_file_name) 
+		_then
+			f_name << e.image_file_name + ".ico"
+
+			_if system.file_exists?(from_dir+f_name)
+			_then
+				system.file_copy(from_dir+f_name,to_dir+f_name)
+			_endif
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.render_outlookbar(canv,x,y,_optional obe)
+	## 
+	## Render the statusbar of SELF on canvas CANV at position
+	## X,Y.  OBE is the optionally passed outlookbar element,
+	## a display tree.
+
+	fs << fill_style.new_solid(colour.called(:gray))
+	fs.realise()
+
+	h << canv.bounds.height - 13
+	w << canv.bounds.width - 13
+	
+	bb << pixel_bounding_box.new(x,y,x+w-2,y+h)
+
+	>> .outlookbar.render_on(canv,bb,obe)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.move_outlook_category(from,to)
+	## 
+	## Move the outlook category from position FROM to position TO,
+	## categories positioned after TO are moved down.
+	
+	cats << .outlookbar.categories
+
+	from_i << cats.index_equal_of(from)
+	to_i   << cats.index_equal_of(to)
+
+	dt << cats.remove_nth(from_i)
+	cats.add_nth(dt,to_i)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.outlookbar_element_list()
+	## 
+	## Return a rope of all the outlookbar elements.
+
+	rp << rope.new()
+
+	names << {"cat_","sub_"}
+	cnts << {0,0}
+	
+	_for m _over .outlookbar.categories.default({}).fast_elements()
+	_loop
+		_for l _over m.fast_depth_first()
+		_loop
+			el << outlookbar_element.new(l.value)
+			lv << l.level-1
+			el.name << l.value[:name].default(write_string(names[lv],cnts[lv]+<<1))
+			l.value[:name] << el.name
+			rp.add(el)
+		_endloop
+	_endloop
+
+	>> rp
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_category()
+	## 
+	## Add a new OUTLOOKBAR category.
+
+	cat_name << .outlookbar.next_category_name()
+	sub_name << .outlookbar.next_sub_category_name()
+
+	cat_values << outlookbar_element.initial_values(cat_name,:cat,.gui_layout[:tree_counter]+<<1)
+	ndt << display_tree.new(.gui_layout[:tree_counter],cat_values)
+	ndt.styled_string << {:image, {:outlook_cat,_self.module_name}, :value, :caption}
+
+	sub_values << outlookbar_element.initial_values(sub_name,:sub,.gui_layout[:tree_counter]+<<1)
+	sdt << display_tree.new(.gui_layout[:tree_counter],sub_values,ndt)
+	sdt.styled_string << {:image, {:outlook_sub,_self.module_name}, :value, :caption}
+
+	ndt.expanded? << _true 
+
+	.outlookbar.categories.add_last(ndt)
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.add_sub_category(dt)
+	## 
+	## Add a sub-category to outlookbar element DT.
+
+	sub_name << .outlookbar.next_sub_category_name()
+	cat_dt << dt.parent_at_level(2)
+	
+	sub_values << outlookbar_element.initial_values(sub_name,:sub,.gui_layout[:tree_counter]+<<1)
+	sdt << display_tree.new(.gui_layout[:tree_counter],sub_values,cat_dt)
+	sdt.styled_string << {:image, {:outlook_sub,_self.module_name}, :value, :caption}
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.delete_outlookbar(dt)
+	## 
+	## Delete the outlookbar element DT.
+
+	_if dt.level _is 2
+	_then
+		i << .outlookbar.categories.index_equal_of(dt)
+
+		.outlookbar.categories.remove_nth(i)
+	_else
+		dt.parent.remove_child(dt)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.copy_image_files()
+	## 
+	## Copy foreign image files into SELF's bitmap directory and
+	## update all references to use the copied images.
+
+	_for el _over _self.gui_elements().fast_elements()
+	_loop
+		_try
+			_self.copy_an_image_file(el)
+		_when error
+			# ignore
+		_endtry
+	_endloop
+
+	_for m _over .docks.default({}).fast_elements()
+	_loop
+		_for dt _over m.fast_leaves()
+		_loop
+			_if dt.value[:type] _is :button
+			_then
+				el << dt.value[:element]
+				_self.copy_an_image_file(el)
+			_endif
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dialog_design.copy_an_image_file(el)
+	## 
+	## Copy the image file associated with GUI element EL from its
+	## designated source into the current dialog's bitmaps directory.
+
+	fn << el.image_file_name
+	mn << el.image_module_name
+
+	_if mn.default("") <> "" _andif
+	    (im << sw_module_manager.module(mn.as_symbol())) _isnt _unset 
+	_then
+		source_path << im.safe_full_directory + "/resources/base/bitmaps/"
+		target_path << write_string(.build_module_dir,%\,.dialog_class,"\resources\base\bitmaps\")
+
+		_for n _over {fn + ".ico",fn + "_grey.ico",fn + ".dib",fn + "_grey.dib"}.fast_elements()
+		_loop
+			sfn << source_path + n
+			tfn << target_path + n
+
+			_if system.file_exists?(sfn) _andif _not system.file_exists?(tfn)
+			_then
+				cmd << write_string("copy ",sfn," ",tfn).substitute_character(%/,%\)
+				system.start_command_with_io(cmd,_false,_false,_false)
+			_endif
+		_endloop
+	_endif
+
+	el.image_module_name << _unset 
+_endmethod
+$
+

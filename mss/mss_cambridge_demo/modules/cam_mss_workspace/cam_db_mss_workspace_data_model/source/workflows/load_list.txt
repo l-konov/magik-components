@@ -1,0 +1,2 @@
+simple_workflow.magik
+standard_workflow.magik

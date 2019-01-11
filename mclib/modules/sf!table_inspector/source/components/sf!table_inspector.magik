@@ -1,0 +1,600 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+def_slotted_exemplar( :sf!table_inspector,
+{
+	{ :saved_auth_methods, _unset },
+	{ :export_directory,   _unset },
+	{ :export_tree_item,   _unset }
+},
+{ :gui_framework } )
+$
+
+_pragma(classify_level=restricted, topic={database})
+sf!table_inspector.define_slot_access( :saved_auth_methods, :write, :private )
+$
+_pragma(classify_level=restricted, topic={database})
+sf!table_inspector.define_slot_access( :export_directory, :write, :public )
+$
+_pragma(classify_level=restricted, topic={database})
+sf!table_inspector.define_slot_access( :export_tree_item, :write, :private )
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+##
+## This class constant contains some code that will disable
+## most of the authorizations that are setup for users
+## (does not include spatial authorization though!)
+##
+sf!table_inspector.define_shared_constant( :authorization_patch_procs,
+	_block
+	    _local l_tbl << sw:dual_key_a_table.new( 3 )
+
+	    l_tbl[ :|sw:dd_collection_mixin|, :|read_authorised?| ] <<
+		    _proc @sf!dd_collection_mixin_read_authorization_hack()
+			    >> _true
+		    _endproc
+	    
+	    l_tbl[ :|sw:dd_collection_mixin|, :|write_authorised?| ] <<
+		    _proc @sf!dd_collection_mixin_write_authorization_hack()
+			    >> _true
+		    _endproc
+	    
+	    l_tbl[ :|sw:swg_dsn_admin_engine|, :|permission_for?()| ] <<
+		    _proc @sf!swg_dsn_admin_engine_authorization_hack()
+			    >> _true
+		    _endproc
+
+	    >> l_tbl
+	_endblock,
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!table_inspector.define_shared_constant( :databus_consumer_data_types,
+##
+## The various consumer types this plugin reacts on when data
+## is put on the databus. 
+##
+	{ :status,
+	  :current_dsview,
+	  :current_alternative,
+	  :edit_object_actions,
+	  :tree_item_for_html_export
+	},
+	:public )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!table_inspector.define_shared_constant( :databus_producer_data_types,
+	{ :current_tab_page
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.invoke( _optional p_framework, p_properties )
+
+	## Convenience method to launch the GUI.
+
+	>> _self.new( _self.class_name, p_framework, p_properties ).activate()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_inspector.init( p_name, p_framework,
+					  _optional p_properties )
+
+	_super.init( p_name, p_framework, p_properties )
+
+	.saved_auth_methods << sw:dual_key_a_table.new()
+	.export_directory   << sw:system.temp_directory_name
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_inspector.init_actions()
+
+	_local l_action_name << :edit_object
+
+	_super.init_actions()
+
+	_for i_action_name _over { :suspend,
+				   :disable_authorization,
+				   :restore_authorization
+				 }.fast_elements()
+	_loop
+	    _self.add_action(
+		_self.define_action( i_action_name, _self,
+				     :enabled?, _true ) )
+	_endloop
+
+	_self.add_action(
+		_self.define_action( :export_directory, _self ) )
+
+	_self.add_action(
+		_self.define_action( :export_to_html, _self,
+				     :enabled?, _false,
+				     :image,    { :export_to_html,
+						  :mclib_tree_item } ) )
+
+	_for i_action_name _over { :edit_object,
+				   :edit_object_floating
+				 }.fast_elements()
+	_loop
+	    _self.add_action(
+		_self.define_action(  i_action_name, _self,
+			:enabled?, _false,
+			:image,    { i_action_name,
+				     _if i_action_name = :edit_object
+				     _then >> :ui_resources
+				     _else >> _self.module_name
+				     _endif } ) )
+
+	    _self.add_action(
+		sw:sw_proxy_action.new_for( _self.action( i_action_name ) ) )
+	_endloop
+	
+	_self.action( :restore_authorization ).enabled? << _false
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_inspector.notify_post_init_plugins()
+
+	_super.notify_post_init_plugins()
+
+	_local l_app << _self.application
+	_local l_dbs
+	_local l_em
+
+	_if l_app _isnt _unset _andif
+	    ( l_dbs << l_app.databus ) _isnt _unset _andif
+	    ( l_em << _self.component( :editor ) ) _isnt _unset
+	_then
+		l_em.databus       << l_dbs
+		l_em.sf!ti_databus << _self.databus
+
+		_self.databus.add_producer( l_em, :tree_item_for_html_export )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.post_build_gui()
+
+	## This will get _self notified when the tab is changed.
+
+	_local l_tb << .container.items[2].items[2]
+
+	_super.post_build_gui()
+
+	l_tb.page_change_selector << { :|tab_page_changed()|, l_tb }
+	l_tb.agent.model          << _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.sw_databus_data_available( i_data_type_name, p_data )
+
+	## Called whenever information is put on the databus that we
+	## are interested in.
+
+	_super.sw_databus_data_available( i_data_type_name, p_data )
+
+	_if i_data_type_name = :status
+	_then
+		# Put the passed information on the status-bar...
+		_self.changed( :status_info, :text, p_data )
+
+	_elif i_data_type_name = :current_dsview
+	_then
+		_self.close_text_display_window()
+		_self.top_frame.title <<
+			_if p_data _isnt _unset
+			_then >> _self.message( :title_with_view_info,
+						p_data.external_name )
+			_else >> _self.title
+			_endif
+
+		_self.update_alternative_status_bar( p_data )
+
+	_elif i_data_type_name = :current_alternative
+	_then
+		_self.close_text_display_window()
+		_self.update_alternative_status_bar( p_data )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!table_inspector.wm_close()
+
+	_self.close_text_display_window()
+
+	_self.restore_authorization()
+
+	_self.close_open_dialogs()
+
+	_super.wm_close()
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.suspend()
+
+	_self.restore_authorization()
+
+	_self.suspend_open_dialogs()
+
+	_super.suspend()
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={database})
+_method sf!table_inspector.title
+
+	>> _self.message( :title )
+_endmethod
+$
+
+
+##
+##	A C T I O N   C A L L B A C K S
+##	_______________________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.disable_authorization()
+
+	## Callback to disable the callbacks that normally implement
+	## authorization checks.
+
+	_local l_storage << _self.saved_auth_methods
+	_local l_proc
+
+	_for i_class_name,
+	     i_callback_name,
+	     i_patch_proc,
+	     i_method        _over _self.patched_authorization_info()
+	_loop
+#write( " -> ", a_callback_name, " - ", a_method.value, ", ", a_method.value.name )
+		_if ( l_proc << i_method.value ) _is _unset _orif
+		    l_proc.name <> i_callback_name
+		_then
+			_continue
+		_endif
+#write( "patching: ", i_class_name, ".", i_callback_name )
+		l_storage[ i_class_name, i_callback_name ] << l_proc
+
+		condition.raise( :mclib_patched_auth_method_info,
+				 :class,  i_class_name,
+				 :method, i_callback_name )
+
+		i_method.value << i_patch_proc
+	_endloop
+
+	_self.action( :disable_authorization ).enabled? << _false
+	_self.action( :restore_authorization ).enabled? << _true
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.restore_authorization( _optional p_force_restore? )
+
+	## Callback to re-install the callbacks that implement
+	## authorization checks. This method can only work properly
+	## if method disable_authorization() was called before this
+	## method gets called.
+
+	_local l_saved_code << _self.saved_auth_methods
+	_local l_orig_proc
+	_local l_my_proc
+
+	p_force_restore? << p_force_restore? _is _true
+
+	_for i_class_name,
+	     i_callback_name,
+	     i_patch_proc,
+	     i_method        _over _self.patched_authorization_info()
+	_loop
+		l_orig_proc << l_saved_code[ i_class_name, i_callback_name ]
+		l_my_proc   << i_patch_proc
+#write( l_orig_proc, ", ", i_patch_proc, ", ", _try >> i_method.value.name = i_patch_proc.name _when error >> "??" _endtry )
+		#
+		# Make sure there is something to restore:
+		# - We need to have the "original" method procedure
+		# - this code must have tweaked the code
+		# - the current code is what we put there OR
+		#   the caller asked to restore the original code
+		#
+		_if l_orig_proc _isnt _unset _andif
+		    i_patch_proc _isnt _unset _andif
+		    ( i_method.value.name = i_patch_proc.name _orif
+		      p_force_restore? )
+		_then
+			i_method.value << l_orig_proc
+
+			condition.raise( :mclib_restored_auth_method_info,
+					 :class,  i_class_name,
+					 :method, i_callback_name )
+		_endif
+	_endloop
+
+	_self.action( :disable_authorization ).enabled? << _true
+	_self.action( :restore_authorization ).enabled? << _false
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.export_directory()
+
+	## Launch a Windows-dialog to let the user select the
+	## directory where any output should be written to.
+	#
+	# win32_standard_dialog.new( :dir_select_dialog, ... )
+	# does not work properly - so we use this work-around...
+
+	_self.export_directory <<
+		_self.top_frame.actual.select_directory(
+			_self.export_directory, _false )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.export_to_html()
+
+	## Callback to export the data from the current tree item
+	## into an HTML file.
+
+	_local l_fn << sw:system.temp_file_name(
+				  "data.htm", _self.export_directory ) 
+
+	.export_tree_item.sf!export_to_html( l_fn )
+
+	_self.show_message( _self.message( :export_completed_info, l_fn ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.edit_object(
+		p_object, p_callback, p_caller, _gather p_call_args )
+
+	## This is a convenience callback for the components to
+	## launch an editor for the passed object.
+
+	>> _self.component( :editor ).perform(
+			p_callback, p_object, _scatter p_call_args )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.edit_object_floating(
+		p_object, p_callback, p_caller, _gather p_call_args )
+
+	## This is a convenience callback for the components to
+	## launch an editor for the passed object.
+
+	>> _self.component( :editor ).perform(
+			p_callback, p_object, _scatter p_call_args )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.display_text( p_string, p_frame_title )
+
+	## Launch a window that displays a fixed-font text A_STRING.
+	## The window title will be A_FRAME_TITLE.
+
+	_local l_key << :db_info_display
+	_local l_dlg
+
+	_if ( l_dlg << _self.get_dialog( l_key ) ) _is _unset
+	_then
+		l_dlg << mclib:sf!fixed_font_text_display.new()
+
+		_self.cache_dialog( l_key, l_dlg )
+	_endif
+
+	l_dlg.activate()
+	l_dlg.title << p_frame_title
+	l_dlg.display_text( p_string )
+	#
+	# Keep the focus on this window/frame...
+	#
+	_self.top_frame.set_focus()
+_endmethod
+$
+
+
+##
+##	N E W   F U N C T I O N A L I T Y
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.define_action(
+		p_name, _optional p_engine, _gather p_props )
+
+	_if p_engine _is _unset _then p_engine << _self _endif
+
+	>> sw:sw_action.new( p_name,
+		:caption, p_engine.message( p_name ),
+		:engine,  p_engine,
+		:action_message,  p_name.with_parentheses,
+		:tooltip,         p_engine.message( p_name + :|_tt| ),
+		:short_help_text, p_engine.message( p_name + :|_sh| ),
+		_scatter p_props )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector.tab_page_changed( p_tab_box, p_page_number )
+
+	## The method gets called whenever the tab is changed in the
+	## top-frame.
+
+	_local l_dbs  << _self.databus
+	_local l_data
+
+	l_dbs.make_data_available( :current_tab_page, p_page_number )
+
+	l_data << l_dbs.request_data( :edit_object_actions, _self )
+	_if l_data _is _unset _then l_data << {}.new( 2 ) _endif
+
+	_self.action( :edit_object ).agent          << l_data[ 1 ]
+	_self.action( :edit_object_floating ).agent << l_data[ 2 ]
+
+	_self.action( :export_to_html ).enabled? << _false
+	.export_tree_item << _unset
+	_for i_ti _over l_dbs.request_all_data( :tree_item_for_html_export,
+						_self )
+	_loop
+		_if i_ti _isnt unset
+		_then
+			_self.action( :export_to_html ).enabled? << _true
+			.export_tree_item << i_ti
+			_leave
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _iter _method sf!table_inspector.patched_authorization_info()
+
+	_local l_class_name
+	_local l_callback_name
+	_local l_class
+	_local l_method
+	_local l_ok?
+
+	_for i_key_vec,i_patch_proc _over _self.authorization_patch_procs.
+					  fast_keys_and_elements()
+	_loop
+		( l_class_name, l_callback_name ) << ( _scatter i_key_vec )
+#write( "I ",  l_class_name, ", ", l_callback_name )
+		( l_class, l_ok? ) << sw:get_global_value( l_class_name )
+#write( "  ", l_ok?, ", ", l_class, ", ", l_class.method( l_callback_name ) )
+		_if _not l_ok? _orif
+		    ( l_method << l_class.method( l_callback_name ) ) _is _unset
+		_then
+			_continue
+		_endif
+
+		_loopbody( l_class_name, l_callback_name, i_patch_proc,
+			   l_method )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_inspector.close_text_display_window()
+
+	## If a text-display window is open, close it.
+
+	_local l_dlg
+
+	_if ( l_dlg << _self.get_dialog( :db_info_display ) ) _isnt _unset _andif
+	    l_dlg.frame_active?
+	_then
+		l_dlg.suspend()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_inspector.update_alternative_status_bar(
+			 p_ds_alternative )
+
+	## Update the statusbar information in which alternative the user
+	## currently is.
+
+	_self.changed( :alternative_info, :text,
+		       _try
+			       >> p_ds_alternative.alternative_path_name()
+		       _when error
+			       >> ""
+		       _endtry )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_inspector.close_open_dialogs()
+
+	_self.perform_on_dialogs( :|quit()|, _true )
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_inspector.suspend_open_dialogs()
+
+	_self.perform_on_dialogs( :|suspend()|, _false )
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_inspector.perform_on_dialogs( p_callback, p_decache? )
+
+	## Performs the specified method (A_CALLBACK) on each dialog
+	## that is cached by _self. If DECACHE? is _true, the dialog
+	## is removed from self's cache.
+
+	_local l_lookup << .dialogs
+
+	_for i_key,i_dialog _over l_lookup.keys_and_elements()
+	_loop
+		i_dialog.perform( p_callback )
+		_if p_decache? _is _true
+		_then
+			l_lookup.remove_key( i_key )
+		_endif
+	_endloop
+_endmethod
+$

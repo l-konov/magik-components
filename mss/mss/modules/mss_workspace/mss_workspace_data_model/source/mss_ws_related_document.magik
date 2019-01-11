@@ -1,0 +1,360 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_ws_related_document
+##
+## A reference to a related document for a job or design.
+##
+
+def_slotted_exemplar(:mss_ws_related_document,
+{},
+{:mss_workspace_ds_record})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_ws_related_document.define_shared_constant(
+	:rootdir_lookup,
+	## A property list where each key is a positive integer and
+	## each value is a root directory to use for file lookups.  The
+	## purpose of this structure is to allow a common root
+	## directory (or directories) to be referenced in a single
+	## place, rather than stored with each mss_ws_related_document
+	## record.  This will make it easier to relocate file
+	## structures if ever required in the future (for example, due
+	## to a server change, or to keep development and production
+	## environments separate).
+	property_list.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_ws_related_document.define_shared_variable(
+	:usage_handlers,
+	## A list of keys and values where each key is a non-negative
+	## integer, and each value is the method on self that will be
+	## used to display a document of that type.  Values should not be
+	## removed from this list, but they may be added (c.f. the
+	## usage_string method).  Values from 0 to 99 are reserved for
+	## internal use.
+	property_list.new_with(
+		0, :|display_document_external()|,
+		1, :|display_document_layout()|),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_ws_related_document.fire_pre_insert_actions(prop_values)
+	## 
+	##
+
+	_super.fire_pre_insert_actions(prop_values)
+	prop_values << _self.prepare_filename(prop_values)
+
+	_return prop_values
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_ws_related_document.fire_pre_update_actions(prop_values)
+	## 
+	##
+
+	_super.fire_pre_update_actions(prop_values)
+	prop_values << _self.prepare_filename(prop_values)
+
+	_return prop_values
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_ws_related_document.prepare_filename(pl)
+	## 
+	## Prepare a filename for storage.  PL is a property list that
+	## may contain the key :filename, to indicate the proposed
+	## filename.  The result returned is that same property list,
+	## which may be modified as follows:
+	##  :filename - may have initial drive letter converted to
+	##              a UNC equivalent, and may have an initial
+	##              standard root directory stripped off.
+	##  :rootdir_id - will be unset if no standard root directory
+	##              was stripped off, or an integer reference to
+	##              that standard directory.
+	##
+
+	_if (raw_fname << pl[:filename]) _is _unset
+	_then
+		# No proposed filename - no changes need to be made to PL.
+		_return pl
+	_endif
+
+	# Is raw_fname in a form that isnt actually a filename (such as
+	# a web address or FTP site?).  In this case, use it as-is.
+	# The following is not a fully robust way of figuring this out,
+	# but it is useful enough for now.
+	_if raw_fname.index_of_seq("://") _isnt _unset
+	_then
+		# Explicitly clear out rootdir_id, since it does not apply.
+		pl[:rootdir_id] << _unset
+		_return pl
+	_endif
+	
+	# First, canonicalise to remove relative paths.
+	fname << system.canonicalise(raw_fname)
+
+	# Next, remove drive letters.
+	sep_chars << {%/, %\}
+	_if _not _self.use_drive_letter_for_filename?(fname) _andif
+	    fname.size >= 2 _andif
+	    fname[2] _is %: _andif
+	    (unc_equiv << system.mss_convert_drive_letter_to_unc(fname[1])) _isnt _unset 
+	_then
+		# At this point, fname[3] must be a slash (I think) because of
+		# what system.canonicalise() does.  However, I'll protect
+		# against that just in case system.canonicalise()
+		_if fname.size >= 3 _andif
+		    sep_chars.includes?(fname[3])
+		_then
+			slice_idx << 4
+		_else
+			slice_idx << 3
+		_endif 
+		fname << system.pathname_down(unc_equiv, fname.slice_to_end(slice_idx))
+	_endif
+
+	# Next, parse out known root directories.
+	test_fname << fname.lowercase
+	test_fname_size << test_fname.size
+	rid << _unset
+	_for i, j _over _self.rootdir_lookup.fast_keys_and_elements()
+	_loop
+		l << j.size
+		_if test_fname.cf_subseq(j.lowercase, 1, 1, l) _is _maybe _andif
+		    (test_fname_size = l _orif
+		     (test_fname_size > l _andif sep_chars.includes?(test_fname[l + 1])))
+		_then
+			rid << i
+			_if fname.size > l + 1 _andif
+			    sep_chars.includes?(fname[l + 1])
+			_then
+				slice_idx << l + 2
+			_else
+				slice_idx << l + 1
+			_endif 
+			fname << fname.slice_to_end(slice_idx)
+			_leave
+		_endif
+	_endloop
+	
+	pl[:filename] << fname
+	pl[:rootdir_id] << rid
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_ws_related_document.use_drive_letter_for_filename?(fname)
+	## 
+	## By default, drive letters will be converted to UNC names
+	## wherever possible.  This may be redefined to change this
+	## behavior for specific cases in your local environment (for
+	## example, if a DFS type filesystem is always available to all
+	## of your users under a consistent drive letter, it may be
+	## best to allow that drive letter rather than converting it
+	## back to a UNC name that could change in the future).
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_ws_related_document.full_filename
+	## 
+	## Return the full filename for self, which includes expanding
+	## the root directory.
+	##
+
+	fname << _self.filename
+	_if (rid << _self.rootdir_id) _is _unset _orif
+	    (root_lkp << _self.rootdir_lookup[rid]) _is _unset
+	_then
+		_return fname
+	_endif 
+
+	# If a root directory is assigned, then fname must be something.
+	fname << fname.default("")
+	sep_chars << {%/, %\}
+	_if fname.size >= 1 _andif
+	    sep_chars.includes?(fname[1])
+	_then
+		# Path shouldn't be relative anyways, but this is especially
+		# true if a root directory is provided.
+		fname << fname.slice_to_end(2)
+	_endif
+	_return system.pathname_down(root_lkp, fname)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_ws_related_document.usage_string
+	## 
+	## Return a string describing self's usage_id.
+	##
+
+	usage << _self.usage_id.default(0)
+	_return _self.message(write_string("usage_id_", usage).as_symbol())
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_ws_related_document.all_usage_values()
+	## 
+	## 
+
+	r << rope.new()
+	_for i _over _self.usage_handlers.fast_keys_and_elements()
+	_loop
+		r.add_last(_self.message(write_string("usage_id_", i).as_symbol()))
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_ws_related_document.usage_id_for_string(str)
+	## 
+	## 
+
+	_for i _over _self.usage_handlers.fast_keys_and_elements()
+	_loop
+		_if _self.message(write_string("usage_id_", i).as_symbol()) = str
+		_then
+			_return i
+		_endif 
+	_endloop
+
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_ws_related_document.display_document(_optional a_plugin)
+	## 
+	## Display the document associated with self.  A_PLUGIN, if
+	## provided, is the plugin that initiated this (which may be
+	## useful if a handle is required on an application).
+	##
+
+	usage << _self.usage_id.default(0)
+	_if (handler_method << _self.usage_handlers[usage]) _is _unset
+	_then
+		_return
+	_endif
+	_return _self.perform(handler_method, a_plugin)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_ws_related_document.display_document_external()
+	## 
+	## Display an external document.
+	##
+
+	_if (fname << _self.full_filename) _is _unset _orif
+	    fname = ""
+	_then
+		_return
+	_endif
+	
+	cmdstr << write_string("start ", %", %", " ",
+			       %", fname, %")
+	system.start_command(cmdstr)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_ws_related_document.display_document_layout(a_plugin)
+	## 
+	## Start the layout designer for displaying a layout.
+	##
+
+	_if (fname << _self.full_filename) _is _unset _orif
+	    fname = ""
+	_then
+		_return
+	_endif
+	
+	# If there is no layout_plugin available, or if
+	# mss_swaf_changes has not been loaded, then this cannot be
+	# accomplished.  The implementation here is rather ugly, but
+	# not worth breaking out into a separate module for the sake of
+	# a single method.  The following hoops are jumped through to
+	# prevent unwanted global shadowing in the event that this gets
+	# compiled in an image that does not have the layout_plugin
+	# class.
+
+	_if (l_plugin << get_global_value(:layout_plugin)) _is _unset _orif 
+	    (l_document << get_global_value(:layout_document)) _is _unset _orif 
+	    (l_view << get_global_value(:layout_view)) _is _unset 
+	_then
+		_return _self.display_document_external()
+	_endif
+		
+	a_handler << _unset 
+	_if a_plugin _isnt _unset
+	_then
+		_for i _over a_plugin.application.plugins()
+		_loop
+			_if i.is_kind_of?(l_plugin) _andif
+			    i.responds_to?(:|mss_start_layout_designer()|)
+			_then
+				a_handler << i
+				_leave
+			_endif
+		_endloop
+	_endif
+	
+	_if a_handler _is _unset
+	_then
+		_return _self.display_document_external()
+	_endif
+	
+	# Load the layout
+	_try _with cond
+		new_layout << l_document.new_from_xml(fname)
+	_when error
+	_endtry
+
+	_if new_layout _is _unset 
+	_then
+		condition.raise(:user_error, :string, _self.message(:invalid_layout, fname))
+	_endif 
+
+	(app, lm) << a_handler.mss_start_layout_designer()
+
+	# Manage the layout.
+	a_view << l_view.new(_unset, lm)
+	a_view.document << new_layout
+
+	lm.manage_layout(a_view)
+	
+_endmethod
+$

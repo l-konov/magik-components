@@ -1,0 +1,9 @@
+<gui>
+  <work_area>
+    <self/>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

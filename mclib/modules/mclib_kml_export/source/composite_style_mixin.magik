@@ -1,0 +1,33 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-10 18:54:19 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 08-10-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method composite_area_style.kml_style()
+	## returns a KML style for me.
+	## 
+	##
+
+	# (08-10-2006 Brad Sileo): created.
+	>> _if (fg << .fg_fill_style) _isnt _unset
+	   _then
+		   >>fg.kml_style()
+	   _elif (os << .outline_style) _isnt _unset 
+	   _then
+		   >> os.kml_style()
+	   _endif
+_endmethod
+$

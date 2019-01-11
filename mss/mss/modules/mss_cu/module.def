@@ -1,0 +1,17 @@
+mss_cu	1
+
+description
+	MSS compatible units/cost estimating
+end
+
+requires
+	mss_workspace
+	mss_cu_data_model
+	mss_cu_editor
+	mss_cu_engine
+	mss_cu_config_gui
+	mss_cu_query
+	mss_cu_report
+	mss_cu_tracking
+	mss_cu_workspace_extensions
+end

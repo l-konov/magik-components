@@ -1,0 +1,9 @@
+sw_component
+component_framework
+framework_display_plugin
+application
+plugin
+plugin_framework
+gui_framework
+
+framework_inspector

@@ -1,0 +1,33 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+dd_record_mixin.define_shared_variable(
+	:mss_defined_code_triggers,
+	## Ordered collection of all code-defined triggers to be run.
+	rope.new(),
+	:public)
+$
+
+_pragma(classify_level=restricted)
+_method dd_record_mixin.mss_run_code_triggers(type, old_rec, _optional geom_type)
+	## 
+	## 
+
+	_for meth_name _over _self.mss_defined_code_triggers.fast_elements()
+	_loop
+		_self.perform(meth_name, type, old_rec, geom_type)
+		_if _not _self.is_valid?
+		_then
+			_leave
+		_endif
+	_endloop
+	
+_endmethod
+$

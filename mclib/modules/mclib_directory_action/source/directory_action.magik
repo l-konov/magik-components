@@ -1,0 +1,182 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-07 14:59:04 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 09-12-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:directory_action,
+                          {
+				  {:history,_unset},
+				  {:controls,_unset}
+			  },
+			  {:sw_action})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.init(name,properties)
+	## 
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	.controls << set.new()
+	.history << stack.new()
+	>> _super.init(name,properties)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.add_combo_box_item(gui,control_props, override_properties, _optional button_override_props)
+	## Create the combo box for me, showing my history, current
+	## value, and selector button.
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	rc << rowcol.new(gui,1,_unset,:pixel,
+			 :col_spacing,0,
+			 :row_spacing,0)
+
+	cnt << _super.add_combo_box_item(rc,control_props,override_properties)
+	.controls.add(cnt)
+	_self.create_directory_button(rc, button_override_props)
+	>> cnt
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.create_directory_button(gui, _optional button_override_props)
+	## Builds the directory selector button for me.
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	override_properties << button_override_props.default(property_list.new())
+	control_props << property_list.new_with()
+	tooltip << override_properties[:tooltip].default(_self.caption)
+	id << override_properties[:identifier]
+	_if ( the_image << _self.image ) _isnt _unset
+	_then
+		the_control << image_button_item.new( gui, the_image,
+						      _self, :select_directory|()|,
+						      :balloon_help_text, tooltip,
+						      :property_aspect, :action_state,
+						      :identifier, id,
+						      _scatter control_props)
+		_if system.os_name _is :windows
+		_then
+			the_control.insensitive_image << _self.disabled_image
+			_if (has_border? << override_properties[:has_border?]) _isnt _unset
+			_then
+				the_control.set_property( :has_border? , has_border? )
+			_endif
+		_endif
+		_if override_properties[:keyboard_navigation_policy] _is _false
+		_then
+			the_control.allow_keyboard_navigation? << _false
+		_endif
+	_endif
+	.controls.add(the_control)
+	>> the_control
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.image
+	## Returns the image to use for my directory access button
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	_if (img <<  _super.image) _is _unset
+	_then
+		img << smallworld_product.get_raster_image(:open_folder,:mclib_directory_action)
+	_endif
+	>> img
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.select_directory()
+	## startup my directory selector
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	fd << file_dialog.new(_self,:set_directory|()|)
+	fd.operation << :select_directory
+	fd.directory << _self.value
+	fd.activate()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.set_directory(val)
+	## 
+	## 
+	##
+
+	# (09-07-2007 Brad Sileo): created.
+	_self.set_value(val,_true)
+	>> val
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.top_frame
+	## Gets a top_frame so that the file_dialog will work
+	## 
+	##
+
+	# (09-07-2007 Brad Sileo): created.
+	>> _self.engine.top_frame
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method directory_action.value << val
+	## Updates my value plus managing the hostory of it.
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	_if _self.value _isnt _unset _andif
+	    _self.value ~= ""
+	_then
+		_for a_item _over .history.fast_elements()
+		_loop
+			_if a_item = val
+			_then
+				dup? << _true 
+			_endif
+		_endloop
+		_if dup? _isnt _true 
+		_then
+			.history.push(val)
+		_endif 
+	_endif 
+	_self.items << .history
+	>> _super.value << val
+_endmethod
+$

@@ -1,0 +1,30 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method coordinate_mixin.convert_to_json()
+	## convert_to_json() : json_array
+	_if _self.has_z?
+	_then
+		_return json_array.new_from({_self.x,_self.y, _self.z})
+	_else 
+		_return json_array.new_from({_self.x,_self.y})
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method coordinate_mixin.write_as_json(a_stream)
+	## convert_to_json() : json_array
+	_dynamic !print_float_precision! << 12
+	_local s << a_stream
+	_if _self.has_z?
+	_then
+		s.write(%[, _self.x, %,, _self.y, %,, _self.z, %])
+	_else 
+		s.write(%[, _self.x, %,, _self.y, %])
+	_endif 
+	
+_endmethod
+$

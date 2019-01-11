@@ -1,0 +1,411 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_wp_assignment_plugin
+##
+## Tool for assigning work point values to CUs.
+##
+
+def_slotted_exemplar(:mss_cu_wp_assignment_plugin,
+{
+	{:engine, _unset}
+},
+{:mss_application_databus_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_wp_assignment_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string, :refresh_cu_list},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.engine
+	## 
+	## If an engine has not been requested, create and cache a
+	## mss_cu_summary_engine.
+	##
+
+	_if .engine _is _unset
+	_then
+		.engine << mss_cu_summary_engine.new()
+	_endif
+	_return .engine
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.init_actions()
+	## 
+	## 
+
+	r1 << rope.new()
+	_for i _over {:assign_blank_wps,
+		      :clear_wps
+	}.fast_elements()
+	_loop
+		r1.add_last({i, _self.message(:mode_ + i)})
+	_endloop 
+	_self.add_action(sw_action.new(:assignment_mode,
+				       :engine, _self,
+				       :toolbar_control, :choice_item,
+				       :items, r1,
+				       :value, :assign_blank_wps))
+	_self.add_action(sw_action.new(:auto_refresh,
+				       :engine, _self,
+				       :toolbar_control, :toggle_item,
+				       :value, _true))
+	_self.add_action(sw_action.new(:inside_trail,
+				       :engine, _self,
+				       :toolbar_control, :toggle_item,
+				       :value, _false))
+	_self.add_action(sw_action.new(:perform_updates,
+				       :engine, _self,
+				       :action_message, :|perform_updates()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+
+	p.start_row()
+	label_item.new(p, _self.message(:assignment_mode))
+	_self.action(:assignment_mode).place_control_on(p, :dialog)
+	p.start_row()
+	_self.action(:auto_refresh).place_control_on(p, :dialog)
+	p.start_row()
+	_self.action(:inside_trail).place_control_on(p, :dialog)
+	p.start_row()
+	_self.action(:perform_updates).place_control_on(p, :dialog, :min_width, 75)
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.trail
+	##
+	## Request the trail from the application databus.
+	##
+
+	_for info _over _self.application_databus_request_all_data(:map_trail)
+	_loop
+		# Just in case there are any other (custom) things producing
+		# trails, specifically get one that is managed by an actual
+		# map. 
+		_if info[1].is_kind_of?(map)
+		_then 
+			_return info[2], info[1]
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.perform_updates()
+	## 
+	## Apply the work point updates requested by the user.
+	##
+
+	# Validate that pre-conditions are OK to perform the update.
+	_self.status_string << ""
+	pl << _self.check_perform_updates_allowed()
+	mode << _self.action(:assignment_mode).value
+	xact_desc << _self.message(:mode_ + mode)
+
+	ds_group << dataset_group.new(pl[:dbvs_to_do])
+	trans << custom_record_transaction.new(ds_group, _self, :|int!perform_updates()|, {pl}, xact_desc)
+
+	ok? << _false
+	_protect
+		_self.status_string << _self.message(:performing_updates)
+		update_pl << trans.run()
+		ok? << _true
+	_protection
+		_if ok? _is _false
+		_then
+			_self.status_string << _self.message(:failed)
+		_endif 
+	_endprotect
+
+	_if _self.action(:auto_refresh).value _is _true
+	_then
+		_self.status_string << _self.message(:refreshing_cu_list)
+		_self.databus_make_data_available(:refresh_cu_list, _true)
+	_endif
+
+	_self.status_string << update_pl[:status_string].default("")
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.check_perform_updates_allowed()
+	## 
+	## Ensure that updates are permitted, based on the current
+	## settings.
+	##
+
+	ad << mss_cu_engine.active_design
+	cus_to_do << rope.new()
+	dbvs_to_do << equality_set.new()
+	retval << property_list.new_with(
+			  :cus_to_do, cus_to_do,
+			  :dbvs_to_do, dbvs_to_do)
+
+	pa << _unset
+	_if _self.action(:inside_trail).value _is _true
+	_then
+		_if (tr << _self.trail) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_trail))
+		_endif
+		(sr_ok?, sr) << area.check_proposed_sectors(tr.sectors)
+		_if _not sr_ok?
+		_then
+			condition.raise(:user_error, :string, _self.message(:incomplete_trail))
+		_endif
+		pa << pseudo_area.new(sr)
+		pa.world << tr.world
+	_endif
+	
+	mode << _self.action(:assignment_mode).value
+	_if mode _is :assign_blank_wps _orif
+	    mode _is :clear_wps
+	_then
+		# Use a mss_cu_summary_engine to obtain all CUs, and use the
+		# cu_report_plugin on the databus to set properties for that
+		# query.
+		e << _self.engine
+		e.clear()
+		_if (crp << _self.databus_request_data(:cu_report_plugin)) _isnt _unset
+		_then
+			# A cu_report_plugin is found, so use it to set properties.
+			keep_no_ops? << crp.get_option(:include_cus_with_no_operation?)
+			e.set_designs(crp.all_designs_for_report)
+		_else
+			# No cu_report_plugin available, so use default settings.
+			keep_no_ops? << _true 
+			_if ad _is _unset
+			_then
+				e.set_designs({})
+			_else
+				e.set_designs(ad.ordered_design_path)
+			_endif 
+		_endif
+		e.combine_similar_cus? << _false 
+		e.include_cus_with_no_operation? << keep_no_ops?
+		
+		# N.B.: for efficiency, this does not call set_results() on the
+		# engine, because that isn't required: the raw_cus are
+		# sufficient at this point.
+		_for i _over e.raw_cus.fast_elements()
+		_loop
+			_if i.is_a_datastore_object? _is _false _orif
+			    i.is_detached? _is _true 
+			_then
+				# Only update actual non-detached datastore objects.  Anything
+				# else is something that has been added by a customization
+				# hook, and which is not updateable here.
+				_continue
+			_endif 
+			
+			wpn << i.work_point_number.default("")
+			_if mode _is :assign_blank_wps _andif
+			    wpn ~= ""
+			_then
+				# The work point has been assigned already.
+				_continue
+			_endif
+			_if mode _is :clear_wps _andif
+			    wpn = ""
+			_then
+				# The work point is already blank.
+				_continue
+			_endif 
+			_if keep_no_ops? _is _false _andif
+			    i.operation.default("") = ""
+			_then
+				_continue
+			_endif
+
+			# If there is a spatial test, apply it to the tracked record.
+			_if pa _isnt _unset
+			_then
+				_if (t_rec << i.tracked_record()) _is _unset
+				_then
+					# Can't get the associated RWO.
+					_continue
+				_endif
+
+				# Examine each of the point, chain, and/or area geometry that
+				# has been defined as the CU geometry for this record.
+				geom_ok? << _false
+				_for meth_name _over {:|mss_cu_point_geometry()|,
+						      :|mss_cu_chain_geometry()|,
+						      :|mss_cu_area_geometry()|}.fast_elements()
+				_loop
+					_if (t_geom << t_rec.perform(meth_name)) _is _unset
+					_then
+						_continue
+					_endif
+					_if pa.spatial_relation_with(t_geom) _is :disjoint
+					_then
+						_continue
+					_endif
+					_if _not pa.world.includes_geometry?(t_geom)
+					_then
+						_continue
+					_endif
+
+					# All tests pass - mark it as OK.
+					geom_ok? << _true
+					_leave
+				_endloop
+
+				_if _not geom_ok?
+				_then
+					# No work point geometry found that interacts.
+					_continue
+				_endif
+			_endif
+
+			# All tests pass: add the CU to the set to be processed.
+			cus_to_do.add_last(i)
+		_endloop
+
+		# Ensure that there are some CUs to process.
+		_if cus_to_do.size = 0
+		_then
+			_if mode _is :assign_blank_wps
+			_then 
+				_self.user_error(:no_cus_to_do_assign_blank_wps)
+			_elif mode _is :clear_wps
+			_then
+				_self.user_error(:no_cus_to_do_clear_wps)
+			_else
+				# Catch-all message for any other modes not explicitly handled
+				# above.
+				_self.user_error(:no_cus_to_do)
+			_endif 
+		_endif
+	_endif
+
+	_for i _over cus_to_do.fast_elements()
+	_loop
+		dbvs_to_do.add(i.source_view)
+	_endloop
+
+	# Ensure that all databases are writable.
+	_for i _over dbvs_to_do.fast_elements()
+	_loop
+		_if _not i.writable?
+		_then
+			_self.user_error(:database_not_writable, i.view_name)
+		_endif
+	_endloop
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_wp_assignment_plugin.int!perform_updates(pl)
+	## 
+	## Do the work of performing the actual updates.
+	##
+
+	# Since multiple CUs may have the same RWO: store each RWO
+	# processed in a lookup table so that the work point
+	# calculation can be bypassed on second and subsequent calls
+	# for the same RWO.
+	lkp << equality_hash_table.new()
+	cus_to_do << pl[:cus_to_do]
+	c1 << 0
+	c2 << 0
+	mode << _self.action(:assignment_mode).value
+
+	_for cu_ref _over cus_to_do.fast_elements()
+	_loop
+		c1 +<< 1
+		_if mode _is :assign_blank_wps
+		_then 
+			_if (t_rec << cu_ref.tracked_record()) _is _unset
+			_then
+				# Can't get the associated RWO.
+				_continue
+			_endif
+			_if (wp_num << lkp[t_rec]) _is _unset
+			_then
+				# No cached value is available - figure it out.
+				_if (wpc << t_rec.mss_cu_work_point_candidate()) _is _unset
+				_then
+					wp_num << :none
+				_else
+					wp_num << wpc.work_point_number.default("").as_charvec()
+				_endif
+				lkp[t_rec] << wp_num
+			_endif
+			
+			_if wp_num _is :none
+			_then
+				# Convention to identify that no candidate is found.
+				_continue
+			_endif
+			
+			dr << cu_ref.detached()
+			dr.work_point_number << wp_num
+			dr.source_collection.update(dr)
+			c2 +<< 1
+			
+		_elif mode _is :clear_wps
+		_then
+			_if cu_ref.work_point_number ~= ""
+			_then
+				dr << cu_ref.detached()
+				dr.work_point_number << ""
+				dr.source_collection.update(dr)
+				c2 +<< 1
+			_endif
+		_endif 
+	_endloop 
+
+	stat_msg << _self.message(:wps_updated_status, c1, c2)
+	_return property_list.new_with(
+			:status_string, stat_msg)
+	
+_endmethod
+$

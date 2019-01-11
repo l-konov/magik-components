@@ -1,0 +1,162 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package sw
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method sw_job.print_job_information(itos)
+	##
+	##  replaces similar logic in:
+	##     job_information_dialog.activate_in( a_frame )
+	##
+	##	 called by mclib_job_information_dialog.activate_in()
+	##
+	##
+	## This override is to provide additional job information to
+	## the users - specifically, the job arguments
+	##
+	##  Arguments:  internal_text_output_stream
+	##  Returns:    updated internal_text_output_stream
+
+	job_info << itos
+	job_info.put_charvec(_self.field(:summary).external_name)
+	job_info.put(%newline)
+	job_info.put_charvec("--------")
+	job_info.put(%newline)
+	_if _self.summary _isnt _unset
+	_then
+		job_info.put_charvec(_self.summary)
+	_endif
+	job_info.put(%newline)
+	job_info.put(%newline)
+	job_info.put_charvec(_self.field(:description).external_name)
+	job_info.put(%newline)
+	job_info.put_charvec("--------")
+	job_info.put(%newline)
+	_if _self.description _isnt _unset
+	_then
+		job_info.put_charvec(_self.description)
+	_endif
+
+	#BEGIN MCLIB
+	job_info.put(%newline)
+	job_info.put(%newline)
+	job_info.put_charvec(_self.field(:arguments).external_name)
+	job_info.put(%newline)
+	job_info.put_charvec("--------")
+	job_info.put(%newline)
+	_if _not _self.arguments.empty?
+	_then
+		_for job_arg _over _self.arguments.fast_elements()
+		_loop
+			_if job_arg.key = "unset"
+			_then
+				write("here2")
+				job_info.put_charvec(job_arg.key.write_string)
+				job_info.put(tab_char)
+				job_info.put_charvec(job_arg.value.write_string)
+			_else
+				# it's all in the value
+
+				val << job_arg.value.evaluate()
+				_if val.responds_to?(:fast_keys_and_elements|()|) _andif
+					val.class_name _isnt :symbol _andif 
+					_not val.inherits_from?(charindex_mixin)
+				_then
+					_for sub_key, sub_val  _over val.fast_keys_and_elements() 
+					_loop
+						job_info.put(tab_char)
+						job_info.put(tab_char)
+						job_info.put_charvec(sub_key.write_string)
+						job_info.put(tab_char)
+
+						_if sub_val.class_name _isnt :symbol _andif 
+							_not sub_val.inherits_from?(charindex_mixin)
+						_then
+							#write("inner: ", sub_val, tab_char, sub_val.class_name)
+							_if sub_val.responds_to?(:fast_keys_and_elements|()|)
+							_then 
+								_for sub_sub_key, sub_sub_val _over sub_val.fast_keys_and_elements()
+								_loop
+									job_info.put(%newline)	
+									job_info.put(tab_char)
+									job_info.put(tab_char)
+									job_info.put_charvec(sub_sub_key.write_string)
+									job_info.put(tab_char)
+									job_info.put(tab_char)
+									job_info.put_charvec(sub_sub_val.write_string)
+								_endloop
+							_elif sub_val.responds_to?(:fast_elements|()|)
+							_then
+								_for sub_sub_val _over sub_val.fast_elements()
+								_loop
+									job_info.put(%newline)	
+									job_info.put(tab_char)
+									job_info.put(tab_char)
+									job_info.put_charvec(sub_sub_val.write_string)
+								_endloop
+							_else #maybe a bool or something else
+								job_info.put_charvec(sub_val.write_string)
+							_endif
+						_else # strings / symbols
+							job_info.put_charvec(sub_val.write_string)
+						_endif 
+						job_info.put(%newline)	
+					_endloop
+				_else
+					job_info.put(tab_char)
+					job_info.put_charvec(val.write_string)
+				_endif
+			_endif 
+			
+			job_info.put(%newline)	
+		_endloop
+	_endif 
+	#END MCLIB	
+	job_info.put(%newline)	
+	job_info.put_charvec(_self.field(:outcome_summary).external_name)
+	job_info.put(%newline)
+	job_info.put_charvec("--------")
+	job_info.put(%newline)
+	_if _self.outcome_summary _isnt _unset
+	_then
+		job_info.put_charvec(_self.outcome_summary)
+	_endif
+	job_info.put(%newline)
+	job_info.put(%newline)
+	job_info.put_charvec(_self.field(:outcome_description).external_name)
+	job_info.put(%newline)
+	job_info.put_charvec("--------")
+	job_info.put(%newline)
+	_if _self.outcome_description _isnt _unset
+	_then
+		job_info.put_charvec(_self.outcome_description)
+	_endif
+	job_info.put(%newline)
+	_return itos
+_endmethod
+$

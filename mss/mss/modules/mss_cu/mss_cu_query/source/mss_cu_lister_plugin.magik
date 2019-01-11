@@ -1,0 +1,578 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_lister_plugin
+##
+## Plugin to list a set of CUs.
+##
+
+def_slotted_exemplar(:mss_cu_lister_plugin,
+{
+	{:items, _unset, :readable},
+	{:cu_list, _unset, :readable}
+},
+{:mss_plugin, :mss_cu_list_mixin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_lister_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:set_cu_list, :candidate_cu_select, :candidate_cu_double_click, :cu_lister_properties},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_lister_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:current_cu_list, :cu_updated},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	_self.set_option(:cu_code, "")
+	_self.set_option(:work_point_number, "")
+	_self.set_option(:quantity, 1)
+	_self.set_option(:unit_multiplier, _unset)
+	.cu_list << sorted_collection.new(10, mss_cu_holder.standard_sort_proc)
+
+	# Build a list of all operations.
+	all_ops << sorted_collection.new()
+	tbl << mss_cu_engine.view.collections[:mss_cu_operation_definition]
+	fd << tbl.all_fields[:operation]
+	_for op _over tbl.record_exemplar.match_string(fd, "").fast_elements()
+	_loop 
+		_if op.default("") ~= ""
+		_then
+			all_ops.add(op)
+		_endif
+	_endloop
+
+	# Allow a blank operation for this functionality.
+	all_ops.add("")
+	
+	def_op << _self.message(:default_operation)
+	_if _not equality_set.new_from(all_ops).includes?(def_op)
+	_then
+		def_op << all_ops.an_element()
+	_endif
+
+	all_ops2 << rope.new()
+	_for i _over all_ops.fast_elements()
+	_loop
+		all_ops2.add_last({i, mss_cu_operation_definition.short_name_for(i)})
+	_endloop
+	_self.set_option(:all_operations, all_ops2)
+	_self.set_option(:operation, def_op)
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:insert_cu,
+				       :engine, _self,
+				       :action_message, :|insert_cu()|))
+	_self.add_action(sw_action.new(:update_cu,
+				       :engine, _self,
+				       :action_message, :|update_cu()|))
+	_self.add_action(sw_action.new(:delete_cu,
+				       :engine, _self,
+				       :action_message, :|delete_cu()|))
+	_self.manage_actions_for_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.build_gui(container, _optional xml_element)
+	## 
+	##
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << _true
+	p.resize_y? << _true
+
+	ps << :|perform_safely()|
+	go << :|get_option()|
+	so << :|set_option()|
+
+	p.start_row()
+	label_item.new(p, _self.message(:panel_header))
+	
+	p.start_row()
+	.items[:cu_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :cu_list,
+			      :data_selector, :cu_list,
+			      :select_notifier, :|cu_list_selected()|,
+			      :double_click_notifier, :|cu_list_double_click()|,
+			      :editor_required_notifier, :|cu_list_editor_required()|,
+			      :value_changed_notifier, {ps, :|cu_list_value_changed()|},
+			      :column_widths, mss_cu_holder.list_display_tree_column_widths().copy(),
+			      :column_headings, mss_cu_holder.list_display_tree_column_headings().copy(),
+			      :height_in_chars, 5,
+			      :distribute_spare_width, :always,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+
+	p.start_row()
+	# Pack this row in tight.
+	p.width_spacing << 2
+	label_item.new(p, _self.message(:cu_code))
+	.items[:cu_code] <<
+		text_item.new(p, "",
+			      :display_length, 8,
+			      :model, _self,
+			      :aspect, :cu_code,
+			      :value_selector, {go, :cu_code},
+			      :change_selector, {ps, so, :cu_code})
+	.items[:operation] <<
+		text_choice_item.new(p, "",
+				     :items, _self.get_option(:all_operations),
+				     :model, _self,
+				     :aspect, :operation,
+				     :value_selector, {go, :operation},
+				     :change_selector, {ps, so, :operation})
+	label_item.new(p, _self.message(:work_point_number))
+	.items[:work_point_number] <<
+		text_item.new(p, "",
+			      :display_length, 3,
+			      :model, _self,
+			      :aspect, :work_point_number,
+			      :value_selector, {go, :work_point_number},
+			      :change_selector, {ps, so, :work_point_number})
+	label_item.new(p, _self.message(:quantity))
+	mgr << numeric_value_manager.new_with_properties(:integer?, _true)
+	.items[:quantity] << ti << 
+		managed_value_text_item.new(p, "",
+					    :display_length, 3,
+					    :manager, mgr,
+					    :model, _self,
+					    :aspect, :quantity,
+					    :fail_selector, :|nvm_invalid_input()|,
+					    :value_selector, {go, :quantity},
+					    :change_selector, {ps, so, :quantity})
+	label_item.new(p, _self.message(:unit_multiplier))
+	mgr << numeric_value_manager.new_with_properties(:integer?, _false,
+							 :precision, 2)
+	.items[:unit_multiplier] << ti << 
+		managed_value_text_item.new(p, "",
+					    :display_length, 5,
+					    :manager, mgr,
+					    :model, _self,
+					    :aspect, :unit_multiplier,
+					    :fail_selector, :|nvm_invalid_input()|,
+					    :value_selector, {go, :unit_multiplier},
+					    :change_selector, {ps, so, :unit_multiplier})
+	# Return to normal spacing.
+	p.width_spacing << 6
+
+	p.start_row()
+	x << _self.action(:insert_cu).place_control_on(p, :dialog)
+	x.min_width << 75
+	x << _self.action(:update_cu).place_control_on(p, :dialog)
+	x.min_width << 75
+	x << _self.action(:delete_cu).place_control_on(p, :dialog)
+	x.min_width << 75
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.nvm_invalid_input(cond, bad_value)
+	## 
+	## Redisplay the current value if invalid input is received.
+	## 
+
+	# The following works around a bug in managed_value_text_item.handle_event()
+	# which raises this specific error when hitting the return key
+	# in the field being managed:
+	real_error << cond[:cond]
+	_if real_error _isnt _unset _andif
+	    real_error.name _is :does_not_understand _andif
+	    real_error[:selector] _is :|trim_spaces()|
+	_then
+		_return
+	_endif
+
+	# Except for the above case, re-display the current field value.
+	_self.changed(:quantity)
+	_self.changed(:unit_multiplier)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :set_cu_list
+	_then
+		.cu_list.empty()
+		_for i _over data.fast_elements()
+		_loop
+			dt << i.as_list_display_tree()
+			.cu_list.add(dt)
+		_endloop
+		_self.changed(:cu_list, :renew)
+		
+	_elif data_type_name _is :candidate_cu_double_click
+	_then
+		_if data _is _unset
+		_then
+			cu_code << _unset
+			op << _unset
+		_else
+			cu_code << data[:cu_code]
+			op << data[:operation]
+		_endif 
+		_if cu_code.default("") ~= ""
+		_then
+			_self.set_option(:cu_code, cu_code, _true)
+		_endif
+		_if op.default("") ~= ""
+		_then
+			_self.set_option(:operation, op, _true)
+		_endif
+
+	_elif data_type_name _is :cu_lister_properties
+	_then
+		_for key, value _over data.fast_keys_and_elements()
+		_loop
+			_if {:cu_code, :operation, :work_point_number}.includes?(key)
+			_then
+				_self.set_option(key, value.default(""), _true)
+			_elif {:quantity}.includes?(key)
+			_then
+				num_value << value
+				_if num_value _isnt _unset _andif
+				    (num_value << num_value.as_number()) _isnt _unset 
+				_then
+					num_value << num_value.rounded
+				_endif
+				_self.set_option(key, num_value, _true)
+			_elif {:unit_multiplier}.includes?(key)
+			_then
+				num_value << value
+				_if num_value _isnt _unset _andif
+				    (num_value << num_value.as_number()) _isnt _unset 
+				_then
+					num_value << num_value.as_float
+				_endif
+				_self.set_option(key, num_value, _true)
+			_endif
+		_endloop
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_if data_type_name _is :current_cu_list
+	_then
+		r << rope.new()
+		_for i _over .cu_list.fast_elements()
+		_loop
+			r.add_last(i.key)
+		_endloop
+		_return r
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.selected_cu
+	## 
+	## Return the mss_cu_holder that is currently selected in the
+	## cu_list, and the selected display tree.
+	##
+
+	_if (ti << .items[:cu_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		_return sel.key, sel
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.ensure_selected_cu()
+	## 
+	## Ensure that a selection has been made in the cu_list.
+	##
+
+	(sel_key, sel) << _self.selected_cu
+	_if sel_key _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_cu))
+	_endif
+	_return sel_key, sel
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.cu_list_selected(selection)
+	## 
+	## Enable/diable items as appropriate when a selection is
+	## made.
+	##
+
+	_if (cu_holder << _self.selected_cu) _isnt _unset 
+	_then
+		_self.set_attributes_for_cu_holder(cu_holder)
+	_endif
+
+	_self.manage_actions_for_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.manage_actions_for_cu_list_selection()
+	## 
+	## 
+
+	cu_sel? << _self.selected_cu _isnt _unset
+	_self.action(:update_cu).enabled? << cu_sel?
+	_self.action(:delete_cu).enabled? << cu_sel?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.cu_list_double_click(selection)
+	## 
+	## 
+
+	# N.B.: this is currently redundant (due to the fact that the
+	# cu_list_select() method does the same thing), but I'm not
+	# entirely commited to the choice of having a single-click set
+	# these attributes... so in case I remove the single-click code
+	# later on, leave the double-click code here for now.
+	_if selection _is _unset _orif
+	    (cu_holder << selection.key) _is _unset
+	_then
+		_return
+	_endif
+
+	_self.set_attributes_for_cu_holder(cu_holder)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.cu_list_value_changed(a_tree, value_id, new_value, old_value)
+	## 
+	## 
+
+	_super.cu_list_value_changed(a_tree, value_id, new_value, old_value)
+	_self.set_attributes_for_cu_holder(a_tree.key, {value_id})
+	_self.databus_make_data_available(:cu_updated, _true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.set_attributes_for_cu_holder(cu_holder, _optional attr_list)
+	## 
+	## Update various attributes of self to reflect the data stored
+	## in CU_HOLDER.  If ATTR_LIST is provided, it is a list of
+	## attributes of the CU_HOLDER to use - if not provided, all
+	## will be used.
+	##
+
+	_for attr_name _over attr_list.default({:cu_code, :operation, :work_point_number,
+						:quantity, :unit_multiplier}).fast_elements()
+	_loop
+		_self.set_option(attr_name, cu_holder.perform(attr_name), _true)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.cu_definition_for_attributes()
+	## 
+	## Return the mss_cu_definition record that matches the
+	## cu_code and operation attributes stored in the options
+	## slot.
+	##
+
+	pl << property_list.new_with(:cu_code, cu_code << _self.get_option(:cu_code),
+				     :effective_date, date.now())
+	_if (op << _self.get_option(:operation).default("")) ~= ""
+	_then
+		pl[:operation] << op
+	_endif
+	all_cus << mss_cu_engine.cus_for_attributes(pl)
+	_if all_cus.size = 0
+	_then
+		pl.remove_key(:effective_date)
+		all_cus << mss_cu_engine.cus_for_attributes(pl)
+	_endif
+	
+	_if all_cus.size = 0
+	_then
+		_if op = ""
+		_then
+			condition.raise(:user_error, :string, _self.message(:undefined_cu, cu_code))
+		_else
+			condition.raise(:user_error, :string, _self.message(:undefined_cu_and_operation, cu_code, op))
+		_endif
+	_endif 
+
+	# Possibly should report configuration error here if more than
+	# one CU found.
+
+	_return all_cus.an_element()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.insert_cu()
+	## 
+	## Insert a CU reference for the data entered.
+	##
+
+	cu_rec << _self.cu_definition_for_attributes()
+
+	pl << property_list.new_with(:cu_definition, cu_rec,
+				     :operation, _self.get_option(:operation),
+				     :work_point_number, _self.get_option(:work_point_number),
+				     :quantity, _self.get_option(:quantity).default(1),
+				     :unit_multiplier, _self.get_option(:unit_multiplier))
+	base_cu_holder << mss_cu_holder.new(pl)
+	_if cu_rec.usage = mss_cu_engine.macro_unit_usage_value
+	_then
+		all_cu_holders << base_cu_holder.expand_for_macro_units()
+		_if all_cu_holders.size = 0
+		_then
+			_self.user_error(:mu_config_no_children, cu_rec.cu_code)
+		_endif 
+	_else
+		all_cu_holders << {base_cu_holder}
+	_endif
+
+	_for idx, cu_holder _over all_cu_holders.fast_keys_and_elements()
+	_loop 
+		dt << cu_holder.as_list_display_tree()
+
+		_if idx = 1
+		_then 
+			# Select this one, and deselect any that are already selected.
+			dt.selected? << _true
+			_for i _over .cu_list.fast_elements()
+			_loop
+				i.selected? << _false
+			_endloop
+		_endif 
+		.cu_list.add(dt)
+	_endloop
+	
+	_self.changed(:cu_list, :refresh)
+	_self.databus_make_data_available(:cu_updated, _true)
+	_self.manage_actions_for_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.update_cu()
+	## 
+	## Update the selected CU reference.
+	##
+
+	(old_cu_holder, sel) << _self.ensure_selected_cu()
+
+	cu_rec << _self.cu_definition_for_attributes()
+	_if cu_rec.usage = mss_cu_engine.macro_unit_usage_value
+	_then
+		_self.user_error(:cannot_update_to_macro_unit, cu_rec.cu_code)
+	_endif
+	
+	pl << property_list.new_with(:cu_definition, cu_rec,
+				     :operation, _self.get_option(:operation),
+				     :work_point_number, _self.get_option(:work_point_number),
+				     :quantity, _self.get_option(:quantity).default(1),
+				     :unit_multiplier, _self.get_option(:unit_multiplier))
+	old_cu_holder.update_attributes_from(pl)
+	old_sort_key << sel.value[:sorter]
+	dt << old_cu_holder.as_list_display_tree(sel)
+	new_sort_key << dt.value[:sorter]
+	_if old_sort_key ~= new_sort_key
+	_then
+		# Force the list to be resorted.
+		.cu_list.order_proc << .cu_list.order_proc
+	_endif 
+	
+	_self.changed(:cu_list, :refresh)
+	_self.databus_make_data_available(:cu_updated, _true)
+	_self.manage_actions_for_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_lister_plugin.delete_cu()
+	## 
+	## Delete the selected CU reference.
+	##
+
+	(cu_holder, sel) << _self.ensure_selected_cu()
+
+	# N.B.: public comments for sorted_collection.remove() says
+	# that it works on identity, but this doesn't seem to be true -
+	# instead, the first thing with a matching sort key is
+	# returned.  So, do it myself.
+	_for i, j _over .cu_list.fast_keys_and_elements()
+	_loop
+		_if j _is sel
+		_then
+			.cu_list.remove_nth(i)
+			_leave
+		_endif
+	_endloop
+	
+	_self.changed(:cu_list, :refresh)
+	_self.databus_make_data_available(:cu_updated, _true)
+	_self.manage_actions_for_cu_list_selection()
+	
+_endmethod
+$

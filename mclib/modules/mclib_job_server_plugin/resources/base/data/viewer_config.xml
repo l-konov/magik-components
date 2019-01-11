@@ -1,0 +1,59 @@
+<!-- config.xml for Job Server -->
+<config base="job_server_plugin.viewer_config">
+	
+  <plugins>
+  <!--
+	<plugin name="schedule_pi" class_name="mclib_job_list_plugin">
+	  <properties>
+		<property name = "resource_module_name" value = "mclib_job_server_plugin"/>
+		<property name = "gui_definition_module_name" value = "mclib_job_server_plugin"/>
+	  </properties>
+	</plugin>
+	
+	<plugin name="processed_pi" class_name="mclib_job_list_plugin">
+	  <properties>
+		<property name = "resource_module_name" value = "mclib_job_server_plugin"/>
+		<property name = "gui_definition_module_name" value = "mclib_job_server_plugin"/>
+	  </properties>
+	</plugin>  -->
+
+	<plugin name="schedule_pi" class_name="mclib:mclib_job_list_plugin">
+		<properties>
+			<property name = "resource_module_name" value = "mclib_job_server_plugin"/>
+			<property name = "gui_definition_module_name" value = "mclib_job_server_plugin"/>
+			<property name = "gui_definition_file_name" value = "viewer_gui_sched.xml"/>
+ 			<property name = "floating_gui_definition_file_name" value = "viewer_gui_sched.xml"/>
+ 			<property name = "embedded_gui_definition_file_name" value = "viewer_gui_sched.xml"/>
+			<property name = "config_definition_file_name" value = "viewer_config_sched.xml"/>
+			<property name = "title_message_id" value="queued_title"/>
+			<property name = "editor_manager_name" value="editor_manager"/>
+			<property name = "help_id" value="100510"/>
+	      </properties>
+	      <visible_fields>
+		  <field name="user"/>
+		  <field name="type_name"/>
+		  <field name="priority"/>
+		  <field name="status"/>
+		  <field name="submitted"/>
+		  <field name="submitted"/>
+		  <field name="started"/>
+		  <field name="server"/>
+		  <field name="id"/>
+		  <field name="repeats?"/>
+	      </visible_fields>
+	</plugin>
+	<plugin name="processed_pi" class_name="mclib:mclib_job_list_plugin">
+		<properties>
+			<property name = "resource_module_name" value = "mclib_job_server_plugin"/>
+			<property name = "gui_definition_module_name" value = "mclib_job_server_plugin"/>
+			<property name = "gui_definition_file_name" value = "viewer_gui_proc.xml"/>
+			<property name = "floating_gui_definition_file_name" value = "viewer_gui_proc.xml"/>
+			<property name = "embedded_gui_definition_file_name" value = "viewer_gui_proc.xml"/>
+			<property name = "config_definition_file_name" value = "viewer_config_proc.xml"/>
+			<property name = "title_message_id" value="processed_title"/>
+			<property name = "editor_manager_name" value="editor_manager"/>
+			<property name = "help_id" value="100515"/>
+ 	      </properties>	
+	</plugin>
+  </plugins>
+</config>

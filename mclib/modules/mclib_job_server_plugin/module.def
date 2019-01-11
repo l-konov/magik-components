@@ -1,0 +1,10 @@
+mclib_job_server_plugin	4001
+
+description
+	modifications to the job server
+end
+
+requires
+	job_server_plugin
+	mclib_package
+end

@@ -1,0 +1,10 @@
+mclib_ds_text_dir_reader	2
+
+description
+	Dialogs that allows to read/modify ds_text_directories and user settings stored in the ACE (e.g. bookmarks).
+end
+
+requires
+	tree
+	mclib_package
+end

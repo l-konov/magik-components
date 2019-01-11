@@ -1,0 +1,112 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method pub_rest.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to roads.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif 
+	    corr_rwo.source_collection.name _is :min_road _andif
+	    corr_geom.geom_category _is :linear
+	_then
+		_return _true
+	_endif
+	
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method pub_rest.mss_ptrule_update_from_correlation(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to roads, and update self's attributes from
+	## that road.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    corr_rwo.source_collection.name _is :min_road
+	_then
+		_self.street << corr_rwo.name
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method pub_rest.mss_select_related_min_road(ptrule)
+	## 
+	## This action can be bound to a hotkey to select a related
+	## min_road.
+	##
+
+	# Only run this operation if the hotkey is pressed during a PDR.
+	_if ptrule.manager.pdr_running_ptrule _is _unset
+	_then
+		_return
+	_endif
+
+	# If is possible to get information from the
+	# :last_correlation_geometry key of the pdr_data slot - but,
+	# that only holds a single geometry.  Just in case, consider
+	# elements in the :dynamic_correlation key if the
+	# :last_correlation_geometry doesn't have what we want.  This
+	# could happen if, for example, multiple features could return
+	# true in the mss_ptrule_ok_for_correlation?() method.
+	_if (corr_geom << ptrule.pdr_data[:last_correlation_geometry]) _isnt _unset _andif
+	    corr_geom.rwo_type _is :min_road
+	_then
+		test_geoms << {corr_geom}
+	_else
+		test_geoms << ptrule.dynamic_correlated_geometry()
+	_endif 
+	_for rel_geom _over test_geoms.fast_elements()
+	_loop
+		_if rel_geom.is_a_datastore_object? _andif 
+		    (rel_rwo << rel_geom.rwo) _isnt _unset _andif 
+		    rel_rwo.source_collection.name _is :min_road
+		_then
+			_if (par_rwos << ptrule.user_data[:rel_min_roads]) _is _unset
+			_then
+				par_rwos << ptrule.user_data[:rel_min_roads] << equality_set.new()
+			_endif
+			par_rwos.add(rel_rwo)
+			ptrule.manager.flash_geometry(rel_geom)
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method pub_rest.mss_ptrule_post_insert_activity(ptrule)
+	## 
+	## Forge relationships, if they have been set up.
+	##
+
+	_super.mss_ptrule_post_insert_activity(ptrule)
+
+	_protect 
+		_if (data << ptrule.user_data[:rel_min_roads]) _isnt _unset
+		_then
+			_for i _over data.fast_elements()
+			_loop
+				_self.min_roads.add(i)
+			_endloop 
+		_endif
+	_protection
+		# If any errors occur, still clear out correlation
+		# information.
+		ptrule.user_data.remove_key(:rel_min_roads)
+	_endprotect
+	
+_endmethod
+$

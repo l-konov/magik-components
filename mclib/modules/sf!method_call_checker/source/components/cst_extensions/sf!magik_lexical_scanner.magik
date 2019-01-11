@@ -1,0 +1,95 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+##
+## The behavior of this scanner is as from the core class;
+## the only difference is that this subclass uses class
+## mclib:sf!lexeme and not sw:lexeme to create tokens.
+##
+def_slotted_exemplar( :sf!magik_lexical_scanner,
+{},
+{ :magik_lexical_scanner } )
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!magik_lexical_scanner.scan_string(s)
+
+	.lexlist << sw:rope.new()
+	len << s.size
+	_if len > 0 _andif s[len] _is newline_char
+	_then	.input << s
+	_else	.input << sw:byte_character_vector.new(len+1)
+		.input.replace_slice(1,len,s)
+		.input[len+1] << newline_char
+	_endif
+	.input_stream << _unset
+	.pos << 0
+	_catch @done
+	    _loop
+		ch << .input[.pos +<< 1]
+		.start << .pos
+		class << _self.charclass(ch)
+		# ignore white space
+		_if class _is :white
+		_then
+			_continue
+		# lookup action, check if singleton
+		_elif (a << _self.actions[class]) _isnt _unset
+		_then	
+		    _if a[1] _isnt %x
+		    _then 
+			.lexlist.add_last(
+				mclib:sf!lexeme.new( a, _unset, _unset, .pos, 1 ) )
+		    _else
+			.start << .pos
+			.pattern_pos << 0
+			_self.perform(a,ch)
+		    _endif
+		_else		# error
+			_self.scan_error("bad character")
+		_endif
+	    _endloop
+	_endcatch
+	>> .lexlist
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method	sf!magik_lexical_scanner.add_token(type,_optional data,comment)
+
+	.lexlist.add_last(
+	    mclib:sf!lexeme.new( type, data, comment, .start, .pos - .start + 1 ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!magik_lexical_scanner.scan_error(message)
+
+	.lexlist.add_last(
+	    mclib:sf!lexeme.new( :bad, message, _unset, .start, .pos - .start + 1 ) )
+	_throw @done
+_endmethod
+$

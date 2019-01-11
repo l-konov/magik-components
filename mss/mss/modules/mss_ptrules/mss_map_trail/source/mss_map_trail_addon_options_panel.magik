@@ -1,0 +1,136 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+##
+## mss_map_trail_addon_options_panel
+##
+## An options panel to allow configuration of settings for
+## the mss_map_trail_addon_plugin.
+##
+
+def_slotted_exemplar(:mss_map_trail_addon_options_panel,
+{
+	{:plugin, _unset}
+},
+:options_panel)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_map_trail_addon_options_panel.init(plugin)
+	##
+	## Initialise this panel.  PLUGIN is the owner.
+	##
+	
+	_super.init()
+	.plugin << plugin
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_map_trail_addon_options_panel.activate_in(parent)
+	## 
+	## Build the GUI for this panel.
+	##
+
+	rc_main << rowcol.new(parent, _unset, 1, :pixel,
+			      :style, :group_box,
+			      :resize?, _true,
+			      :model, _self)
+
+	.items[:note_extend_parallel] << label_item.new(rc_main, _self.message(:note_extend_parallel))
+
+ 	rc1 << rowcol.new(rc_main, _unset, 2, :pixel,
+			  :style, :nested)
+
+	.items[:discrete_spacing_label] << label_item.new(rc1, _self.message(:discrete_spacing_label))
+
+	ldf << .plugin.get_length_display_format()
+	mgr << unit_value_manager.new_with_properties(:mm,
+						      :display_unit_format, ldf,
+						      :value_required?, _true,
+						      :output_value_with_unit?, _false)
+	.items[:discrete_spacing] <<
+		managed_value_text_item.new(rc1, "",
+					    :display_length, 8,
+					    :manager, mgr,
+					    :value, .plugin.get_option(:discrete_spacing).default(0.0))
+
+	.items[:offset_discrete_spacing_label] << label_item.new(rc1, _self.message(:offset_discrete_spacing_label))
+
+	mgr << unit_value_manager.new_with_properties(:mm,
+						      :display_unit_format, ldf,
+						      :value_required?, _true,
+						      :output_value_with_unit?, _false)
+	.items[:offset_discrete_spacing] <<
+		managed_value_text_item.new(rc1, "",
+					    :display_length, 8,
+					    :manager, mgr,
+					    :value, .plugin.get_option(:offset_discrete_spacing).default(0.0))
+
+	.items[:corner_style_label] << label_item.new(rc1, _self.message(:corner_style_label))
+	.items[:corner_style] <<
+		text_choice_item.new(rc1, "",
+				     :items, {{:circular, _self.message(:cs_circular)},
+					      {:square, _self.message(:cs_square)},
+					      {:bevelled, _self.message(:cs_bevelled)},
+					      {:acute, _self.message(:cs_acute)}})
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_map_trail_addon_options_panel.caption
+	## 
+	## 
+
+	_return _self.message(:caption)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_map_trail_addon_options_panel.on_activation()
+	## 
+	## Whenever the sub-dialog is activated or reactivated,
+	## refresh all the values of the controls to reflect
+	## the current state of the options.
+	##
+
+	.items[:discrete_spacing].value << .plugin.get_option(:discrete_spacing).default(0.0)
+	.items[:offset_discrete_spacing].value << .plugin.get_option(:offset_discrete_spacing).default(0.0)
+	.items[:corner_style].value << .plugin.get_option(:corner_style).default(:acute)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_map_trail_addon_options_panel.apply()
+	## 
+	## Apply value changes.
+	##
+
+	_try
+		val << .items[:discrete_spacing].value
+		.plugin.set_option(:discrete_spacing, val)
+	_when managed_value_text_item_read_fail
+	_endtry
+
+	_try
+		val << .items[:offset_discrete_spacing].value
+		.plugin.set_option(:offset_discrete_spacing, val)
+	_when managed_value_text_item_read_fail
+	_endtry
+
+	.plugin.set_option(:corner_style, .items[:corner_style].value)
+	
+_endmethod
+$

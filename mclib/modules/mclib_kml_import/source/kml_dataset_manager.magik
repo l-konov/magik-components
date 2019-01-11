@@ -1,0 +1,145 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:42:01 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:kml_dataset_manager,{},:uds_manager)
+$
+kml_dataset_manager.define_shared_constant( :dataset_exemplar,
+                                             transient_dataset,
+                                             :private )
+$
+
+_pragma(classify_level=basic)
+_method kml_dataset_manager.switch_ace_visibility(_optional ace_name, update_ace?)
+	##
+	## If UPDATE_ACE? is true then make dataset visible for all
+	## scales in ace with ACE_NAME and commit the ace changes.
+	##
+	_if update_ace? _isnt _false
+	_then 
+		ace_name << ace_name.default("default")
+		_if (current_ace << gis_program_manager.ace(ace_name)) _is _unset
+		_then
+			condition.raise(:warning, :string, _self.message(:unknown_ace, _unset, ace_name))
+		_else 
+			_if _not (write? << (ace_view << gis_program_manager.ace_view).writable?)
+			_then
+				(chg?, write?) << ace_view.switch(:write)
+			_endif
+			
+			_if write?
+			_then
+				current_id << current_ace.id
+				ace_rwo_table << current_ace.dataset_rwo_table
+				ace_app_table << current_ace.dataset_app_access_table
+				dataset_name << .dataset.name
+				ace_vis_table << ace_view.collections[:sw_gis!dataset_visibility]
+				rwo_vis_table << ace_view.collections[:sw_gis!dataset_vhs]
+				rwo_seq << level << type << 0
+				sort_proc << _proc(table1, table2)
+						     >> table1.external_name < table2.external_name
+					     _endproc
+				sorted_user_tables << sorted_collection.new(_unset, sort_proc)
+				
+				ace_rwo_table.remove_all_at(current_id, dataset_name)
+				ace_app_table.remove_all_at(current_id, dataset_name)
+				
+				_for a_collection _over .dataset.user_tables()
+				_loop
+					_if a_collection.responds_to?(:geometry_fields)
+					_then
+						sorted_user_tables.add(a_collection)
+					_endif 
+				_endloop
+				
+				_for a_collection _over sorted_user_tables.fast_elements()
+				_loop
+					rwo_name << a_collection.name
+					r << ace_rwo_table.insert({current_id,
+								   dataset_name,
+								   rwo_seq+<<1,
+								   level,
+								   type,
+								   rwo_name,
+								   0,
+								   ""})
+					geom_seq << 0
+					sorted_geom_fields << sorted_collection.new(_unset, sort_proc)
+					_for a_geom_field _over a_collection.geometry_fields.fast_elements()
+					_loop
+						sorted_geom_fields.add(a_geom_field)
+					_endloop 
+					
+					_for geometry_field _over sorted_geom_fields.fast_elements()
+					_loop
+						ace_app_table.insert({current_id,
+								      dataset_name,
+								      rwo_name,
+								      geom_seq+<<1,
+								      geometry_field.name,
+								      0,
+								      "geom_field_editor"})
+					_endloop
+				_endloop
+				
+				_for scale _over current_ace.scales.elements()
+				_loop
+					ace_vis << ace_vis_table.at(current_id, scale.id, dataset_name)
+					_if ace_vis _is _unset
+					_then
+						ace_vis << ace_vis_table.insert({current_id,
+										 scale.id,
+										 dataset_name,
+										 ace_view.uvas[:sw_gis!ace_id].get()})
+					_endif 
+					
+					ace_vis_id << ace_vis.vis_id
+					_for a_collection _over sorted_user_tables.fast_elements()
+					_loop
+						rwo_name << a_collection.name
+						rwo_vis_table.remove_all_at(ace_vis_id, rwo_name)
+						_for geometry_field _over a_collection.geometry_fields.fast_elements()
+						_loop
+							rwo_vis_table.insert({ace_vis_id,
+									      rwo_name,
+									      geometry_field.app_type,
+									      0,
+									      _true,
+									      _true,
+									      _true })
+						_endloop 
+					_endloop		
+				_endloop
+				ace_view.commit()
+			_else
+				condition.raise(:warning, :string, _self.message(:ace_view_readonly))
+			_endif
+		_endif
+	_endif 
+_endmethod
+$

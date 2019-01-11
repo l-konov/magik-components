@@ -1,0 +1,12 @@
+cam_mss_cu	1
+
+description
+	Cambridge DB glue code for mss_cu
+end
+
+requires
+	mss_cu_ptrule_extensions
+	cam_db_mss_cu_data_model
+	cam_db_mss_cu_engine
+	cam_db_mss_cu_report
+end

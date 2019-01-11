@@ -1,0 +1,8 @@
+<!-- this file configures the plugins that are available to the object_editor -->
+
+<config>
+    <plugins>
+        <plugin name="field_lister"
+	        class_name="mclib:sf!table_inspector_field_lister" />
+    </plugins>
+</config>

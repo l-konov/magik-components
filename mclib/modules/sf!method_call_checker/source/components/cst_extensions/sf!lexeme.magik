@@ -1,0 +1,50 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## This class does the same sw:lexeme does - it just also stores the
+## line number on which the lexeme was found.
+##
+def_slotted_exemplar( :sf!lexeme,
+{
+	{ :sf!line_no, _unset }
+},
+{ :lexeme } )
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA})
+sf!lexeme.define_slot_access( :sf!line_no, :write, :readonly )
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!lexeme.init( _gather args )
+
+	_dynamic !sf!current_line_number!
+
+	.sf!line_no << !sf!current_line_number!
+
+	>> _super.init( _scatter args )
+_endmethod
+$

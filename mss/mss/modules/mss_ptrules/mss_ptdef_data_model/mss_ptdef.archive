@@ -1,0 +1,814 @@
+#% text_encoding = utf8
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"mss_ptdef_action_type", 
+				       :ds_uint, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(10, "Start")
+enum.add_archive_values(100, "Press")
+enum.add_archive_values(1000, "Hotkey 1")
+enum.add_archive_values(1010, "Hotkey 2")
+enum.add_archive_values(1020, "Hotkey 3")
+enum.add_archive_values(1030, "Hotkey 4")
+enum.add_archive_values(1040, "Hotkey 5")
+enum.add_archive_values(20, "Restart")
+enum.add_archive_values(200, "Drag")
+enum.add_archive_values(300, "Release")
+enum.add_archive_values(310, "Pre Release")
+enum.add_archive_values(320, "Post Release")
+enum.add_archive_values(400, "Complete")
+enum.add_archive_values(410, "Pre Complete")
+enum.add_archive_values(420, "Post Complete")
+
+_endblock
+$
+
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"mss_ptdef_cu_operation_type", 
+				       :ds_uint, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(0, "")
+enum.add_archive_values(10, "Install")
+enum.add_archive_values(20, "Abandon")
+enum.add_archive_values(30, "Remove")
+enum.add_archive_values(40, "Transfer")
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1,
+                                  "mss_ptdef",
+                                  write_string("Pointing Rule Definition"),
+                                  "mss_ptdef",
+                                  _unset,{0,0,0},0} ,40369.0000000, -3654.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+
+
+an_f << o.add_field("internal_name", "Internal Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+
+
+an_f << o.add_field("ptrule_class", "Pointing Rule Class", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+
+
+an_f << o.add_field("dataset_name", "Dataset Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("table_name", "Table Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("geometry_name", "Geometry Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("help_text_id", "help_text_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("help_text", "Help Text", :text)
+an_f.archive_text_join_field(:help_text_id)
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("attributes", "Attributes", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+an_f << o.add_field("properties", "Properties", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+an_f << o.add_field("child_ptdefs", "Child Definitions", :join)
+an_f.editor_name << "dbset_field_editor"
+
+
+an_f << o.add_field("parent_ptdefs", "Parent Definitions", :join)
+an_f.editor_name << "dbset_field_editor"
+
+
+an_f << o.add_field("actions", "Actions", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+an_f << o.add_field("cu_references", "CU References", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {24,
+                                  "mss_ptdef_action",
+                                  write_string("Ptdef Action"),
+                                  "mss_ptdef_action",
+                                  _unset,{0,0,0},0} ,70369.0000000, -21745.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("type", "Type", :physical)
+an_f.archive_set_field_type_to(:|mss_ptdef_action_type|,_unset)
+an_f.print_width << 14
+
+
+an_f << o.add_field("seq", "Evaluation Order", :physical)
+an_f.archive_set_field_type_to(:|ds_int|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("action_method", "Action Method", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("param_1", "Parameter 1", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("param_2", "Parameter 2", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("param_3", "Parameter 3", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("mss_ptdef_id", "Mss Ptdef Id", :physical)
+
+
+an_f << o.add_field("ptdef", "Pointing Rule Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {41,
+                                  "mss_ptdef_attribute",
+                                  write_string("Ptdef Attribute"),
+                                  "mss_ptdef_attribute",
+                                  _unset,{0,0,0},0} ,70369.0000000, -9699.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+
+
+an_f << o.add_field("value", "Value", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("mss_ptdef_id", "Mss Ptdef Id", :physical)
+
+
+an_f << o.add_field("set_method", "Set Method", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("visible?", "Visible?", :physical)
+an_f.archive_set_field_type_to(:|ds_bool|,_unset)
+an_f.print_width << 10
+an_f.archive_default_value << true
+
+
+an_f << o.add_field("ptdef", "Pointing Rule Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {56,
+                                  "mss_ptdef_cu_reference",
+                                  write_string("Ptdef CU Reference"),
+                                  "mss_ptdef_cu_reference",
+                                  _unset,{0,0,0},0} ,70367.0000000, -27745.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("cu_code", "CU Code", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+an_f.mandatory? << True
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|mss_ptdef_cu_operation_type|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("quantity", "Quantity", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("unit_multiplier", "Unit Multiplier", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << (0.0)
+
+
+an_f << o.add_field("mss_ptdef_id", "Mss Ptdef Id", :physical)
+
+
+an_f << o.add_field("ptdef", "Pointing Rule Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {71,
+                                  "mss_ptdef_folder",
+                                  write_string("Ptdef Folder"),
+                                  "mss_ptdef_folder",
+                                  _unset,{0,0,0},0} ,0.00000000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+
+
+an_f << o.add_field("parent_id", "Parent Id", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("seq", "Sequence", :physical)
+an_f.archive_set_field_type_to(:|ds_int|,_unset)
+an_f.print_width << 10
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {83,
+                                  "mss_ptdef_folder_relationship",
+                                  write_string("Ptdef Folder Relationship"),
+                                  "mss_ptdef_folder_relationship",
+                                  _unset,{0,0,0},0} ,-726.000000000, -7064.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("parent_id", "Parent Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("child_id", "Child Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("seq", "Sequence", :physical)
+an_f.archive_set_field_type_to(:|ds_int|,_unset)
+an_f.print_width << 10
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {94,
+                                  "mss_ptdef_property",
+                                  write_string("Ptdef Property"),
+                                  "mss_ptdef_property",
+                                  _unset,{0,0,0},0} ,70369.0000000, -15745.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("value", "Value", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("mss_ptdef_id", "Mss Ptdef Id", :physical)
+
+
+an_f << o.add_field("ptdef", "Pointing Rule Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {142,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_ptdef", "mss_ptdef_property")
+r.add_default_join_names()
+r.join_name << "mss_ptdef_to_mss_ptdef_pro"
+r.reverse_join_name << "mss_ptdef_pro_to_mss_ptdef"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((29657*2.0),(-15745.0),(40369.0),(-15745.0),(40369.0),(-5109.0))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {114,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_ptdef", "mss_ptdef_attribute")
+r.add_default_join_names()
+r.join_name << "mss_ptdef_to_mss_ptdef_att"
+r.reverse_join_name << "mss_ptdef_att_to_mss_ptdef"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((29675*2.0),(-9699.0),(40369.0),(-9699.0),(40369.0),(-5109.0))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {131,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_ptdef", "mss_ptdef_action")
+r.add_default_join_names()
+r.join_name << "mss_ptdef_to_mss_ptdef_act"
+r.reverse_join_name << "mss_ptdef_act_to_mss_ptdef"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((63437.0),(-21771.0),(40369.0),(-21771.0),(40369.0),(-2577*2.0))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {107,
+                                        "m:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_ptdef", "mss_ptdef")
+r.add_default_join_names()
+r.ordered? << _true
+r.archive_update_int_info_rec({_unset, 
+"int!mss_ptdef_mss_ptdef", 
+"", 
+"", 
+"", 
+""})
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((14105*2.0),(-5109.0),(14105*2.0),(-9699.0),(33395.0),(-9699.0),(33395.0),(-5109.0))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {121,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_ptdef", "mss_ptdef_cu_reference")
+r.add_default_join_names()
+r.join_name << "mss_ptdef_to_mss_ptdef_cu_"
+r.reverse_join_name << "mss_ptdef_cu__to_mss_ptdef"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((59837.0),(-3471*2.0**3),(40369.0),(-3471*2.0**3),(40369.0),(-2577*2.0))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_ptdef, :attributes, 114, :parent)
+case_object.archive_join_field_info(:mss_ptdef, :properties, 142, :parent)
+case_object.archive_join_field_info(:mss_ptdef, :child_ptdefs, 107, :parent)
+case_object.archive_join_field_info(:mss_ptdef, :parent_ptdefs, 107, :child)
+case_object.archive_join_field_info(:mss_ptdef, :actions, 131, :parent)
+case_object.archive_join_field_info(:mss_ptdef, :cu_references, 121, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_ptdef_action, :mss_ptdef_id, :mss_ptdef, :id, 131)
+case_object.archive_join_field_info(:mss_ptdef_action, :ptdef, 131, :child)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_ptdef_attribute, :mss_ptdef_id, :mss_ptdef, :id, 114)
+case_object.archive_join_field_info(:mss_ptdef_attribute, :ptdef, 114, :child)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_ptdef_cu_reference, :mss_ptdef_id, :mss_ptdef, :id, 121)
+case_object.archive_join_field_info(:mss_ptdef_cu_reference, :ptdef, 121, :child)
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_ptdef_property, :mss_ptdef_id, :mss_ptdef, :id, 142)
+case_object.archive_join_field_info(:mss_ptdef_property, :ptdef, 142, :child)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef,
+                                            {"name",
+                                            "internal_name",
+                                            "ptrule_class",
+                                            "dataset_name",
+                                            "table_name",
+                                            "geometry_name",
+                                            "help_text",
+                                            "actions",
+                                            "attributes",
+                                            "properties",
+                                            "child_ptdefs",
+                                            "parent_ptdefs",
+                                            "cu_references"})
+case_object.archived_indices(:mss_ptdef, {"name"}, {})
+case_object.archived_indices(:mss_ptdef, {"internal_name"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef_action,
+                                            {"ptdef",
+                                            "type",
+                                            "seq",
+                                            "action_method",
+                                            "param_1",
+                                            "param_2",
+                                            "param_3"})
+case_object.archived_indices(:mss_ptdef_action, {"mss_ptdef_id"}, {131})
+case_object.archive_aspect_field(:mss_ptdef_action, :ptdef, :mss_ptdef, :internal_name)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef_attribute,
+                                            {"ptdef",
+                                            "name",
+                                            "value",
+                                            "set_method",
+                                            "visible?"})
+case_object.archived_indices(:mss_ptdef_attribute, {}, {114})
+case_object.archived_indices(:mss_ptdef_attribute, {"mss_ptdef_id"}, {})
+case_object.archive_aspect_field(:mss_ptdef_attribute, :ptdef, :mss_ptdef, :internal_name)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef_cu_reference,
+                                            {"ptdef",
+                                            "cu_code",
+                                            "operation",
+                                            "quantity",
+                                            "unit_multiplier"})
+case_object.archived_indices(:mss_ptdef_cu_reference, {"mss_ptdef_id"}, {121})
+case_object.archive_aspect_field(:mss_ptdef_cu_reference, :ptdef, :mss_ptdef, :internal_name)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef_folder,
+                                            {"id",
+                                            "name",
+                                            "parent_id",
+                                            "seq"})
+case_object.archived_indices(:mss_ptdef_folder, {"parent_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef_folder_relationship,
+                                            {"parent_id",
+                                            "child_id",
+                                            "seq"})
+case_object.archived_indices(:mss_ptdef_folder_relationship, {"child_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ptdef_property,
+                                            {"ptdef",
+                                            "name",
+                                            "value"})
+case_object.archived_indices(:mss_ptdef_property, {"mss_ptdef_id"}, {142})
+case_object.archive_aspect_field(:mss_ptdef_property, :ptdef, :mss_ptdef, :internal_name)
+
+_endblock
+$
+
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$

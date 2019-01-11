@@ -1,0 +1,372 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_record_tracking_mixin
+##
+## A superclass that provides common behavior for allowing a
+## subclass to generically relate itself to any other database
+## record in the same partition.
+##
+## In order to inherit from this class, several pre-requisites
+## must be satisfied:
+##
+## The database table for which the subclass serves as a record
+## exemplar must have the following fields:
+## - record_tid (ds_uint, mandatory)
+## - record_id (ds_uint, mandatory, indexed)
+## If making use of mss_workspace functionality (c.f. the method
+## mss_record_tracking_mixin.tracking_records_for()), then then
+## table must also have the following field:
+## - mss_design_id (ds_uint, mandatory, indexed)
+##
+## The subclass must have the following methods:
+## - mss_complex_key_table_name
+##   - A symbol that is the name of the complex key table (as
+##     described below).
+## - mss_complex_key_record
+##   - This method must return the complex key record associated
+##     with the main tracking record.  Typically, this is managed
+##     as a 1:0 database join, as only a small subset of main
+##     tracking records will require the use of a related complex
+##     key record.
+## - user_error(ERROR_CODE, gather ARGS)
+##   - This method may be called if there is an error that is
+##     preventing tracking information from being inserted/updated.
+##
+## The complex key table must have the following fields:
+## - record_tid (ds_uint, mandatory)
+## - complex_key (ds_char16canon_vec size 48 or larger, mandatory)
+##   - The size of this field must be large enough to store any
+##     complex key value for records being tracked (c.f. the
+##     method dd_record_mixin.mss_convert_key_to_string()).
+##
+## The record exemplar for the complex key table must have the
+## following methods:
+## - mss_parent_record
+##   - This method must return the main tracking record associated
+##     with the complex key record.  Typically, this is managed
+##     as a 1:0 database join, as only a small subset of main
+##     tracking records will require the use of a related complex
+##     key record.
+## - mss_set_parent_record(A_PARENT)
+##     Forge the join to the parent record A_PARENT.
+##
+## Finally, note that subclasses that inherit from both this
+## and dd_record_mixin will encounter several conflict
+## methods.  If possible, consider inheriting from the
+## mss_record_tracking_ds_record class, which manages conflict
+## resolution for these methods.
+##
+
+def_mixin(:mss_record_tracking_mixin)
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.insert_tracking_record(main_rec, tracking_ndr)
+	##
+	## Insert a new instance of a tracking record to track the
+	## database MAIN_REC, based on the detached record TRACKING_NDR.
+	## This detached record must be prepopulated with any
+	## application-specific attributes.  This  method will then do
+	## the following: 
+	## - If MAIN_REC has a simple key, this will simply set
+	##   the record_id attribute of TRACKING_NDR to its key value,
+	##   and insert it.
+	## - If MAIN_REC has a complex key, this will set the record_id
+	##   attribute of TRACKING_NDR to 0, and will create a complex
+	##   key record to manage the relationship back to MAIN_REC.
+	## The record resulting from inserting TRACKING_NDR is returned.
+	##
+
+	track_tbl << tracking_ndr.source_collection
+	_if tracking_ndr.record_tid _is _unset
+	_then
+		tracking_ndr.record_tid << main_rec.mss_tid
+	_endif
+	
+	_if main_rec.mss_complex_key?
+	_then
+		# Need to create a complex key record to manage this.
+		tracking_ndr.record_id << 0
+		result << track_tbl.insert(tracking_ndr)
+		ck_ndr << track_tbl.source_view.collections[_self.mss_complex_key_table_name].new_detached_record()
+		ck_ndr.mss_set_parent_record(result)
+		ck_ndr.record_tid << tracking_ndr.record_tid
+		_try
+			ck_ndr.complex_key << main_rec.mss_convert_key_to_string()
+		_when db_array_length_out_of_bounds
+			_self.user_error(:key_too_long, main_rec)
+		_endtry
+		ck_result << ck_ndr.source_collection.insert(ck_ndr)
+	_else
+		# Can be managed as a simple ds_uint key.
+		tracking_ndr.record_id << main_rec.key_value()[1]
+		result << track_tbl.insert(tracking_ndr)
+	_endif
+
+	_return result
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.clone_tracking_record(new_main_rec)
+	## 
+	## Clone self so that it is parented to NEW_MAIN_REC.
+	##
+
+	dr << _self.detached()
+	rec << _self.insert_tracking_record(new_main_rec, dr)
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.tracked_record(_optional source_view)
+	## 
+	## Return the tracked record associated with self.  This will
+	## be from SOURCE_VIEW (if specified), or from self's view.
+	##
+
+	_if source_view _is _unset
+	_then
+		source_view << _self.source_view
+	_endif
+	_if (tbl_name << _self.tracked_record_table_name_for_tid(_self.record_tid, source_view)) _is _unset _orif
+	    (tbl << source_view.collections[tbl_name]) _is _unset
+	_then
+		_return _unset
+	_endif
+
+	_if (rec_ex << tbl.record_exemplar).mss_complex_key?
+	_then
+		# Navigate through the complex key table to find the tracked
+		# record.
+		_if (ck << _self.mss_complex_key_record) _is _unset
+		_then
+			_return _unset
+		_endif
+		retval << tbl.at(_scatter rec_ex.mss_convert_string_to_key(ck.complex_key))
+	_else
+		retval << tbl.at(_self.record_id)
+	_endif
+
+	# As a precaution, avoid self-referencing records.
+	_if retval = _self
+	_then
+		retval << _unset
+	_endif 
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common}, usage={redefinable})
+_method mss_record_tracking_mixin.tracked_record_table_name_for_tid(tid, dbv)
+	## 
+	## Return the name of the table in database view DBV that
+	## corresponds to table ID value TID.
+	##
+	## If the method dd_record_mixin.mss_tid has been redefined or
+	## subclassed to return a non-standard table ID, then this
+	## method will also need to be redefined to map back from that
+	## TID to the corresponding table name.
+	##
+
+	_if (dd_rec << dbv.collections[:dd!collection].at(tid)) _is _unset
+	_then
+		_return _unset
+	_endif
+	_return dd_rec.name.as_symbol()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.tracking_records_for(_optional rec, design)
+	## 
+	## Return all tracking records for database record REC and/or
+	## mss_design record DESIGN (at least one parameter must be entered).
+	## Note that DESIGN can also be specified by its ID value.
+	##
+	## This can be called on the record exemplar if REC is set, but
+	## it must be called on the template record of the desired
+	## collection otherwise (to sort out the desired database partition).
+	##
+
+	_if rec _isnt _unset
+	_then
+		_if (track_tbl << _self.source_collection) _is _unset
+		_then
+			track_tbl << rec.source_view.collections[_self.class_name]
+		_endif
+		_if track_tbl _is _unset
+		_then
+			_return {}
+		_endif
+		
+		rec_tid << rec.mss_tid
+		_if rec_tid _is _unset _orif
+		    rec_tid <= -1
+		_then
+			# Internal table - not tracked.
+			_return {}
+		_endif 
+		
+		_if rec.mss_complex_key?
+		_then
+			# Need to use the complex key table.
+			r << rope.new()
+			_if design _isnt _unset
+			_then
+				_if design.is_a_datastore_object?
+				_then
+					design_id << design.id
+				_else
+					design_id << design
+				_endif 
+			_else
+				design_id << _unset
+			_endif
+			ck_tbl << track_tbl.source_view.collections[_self.mss_complex_key_table_name]
+			ck_pred << predicate.eq(:record_tid, rec_tid) _and
+				   predicate.eq(:complex_key, rec.mss_convert_key_to_string())
+			_for ck_rec _over ck_tbl.select(ck_pred).fast_elements()
+			_loop
+				_if (wt_rec << ck_rec.mss_parent_record) _isnt _unset _andif
+				    (design_id _is _unset _orif wt_rec.mss_design_id = design_id)
+				_then
+					r.add_last(wt_rec)
+				_endif
+			_endloop
+			_return r
+		_else
+			# Can query track_tbl directly.
+			pred << predicate.eq(:record_tid, rec_tid) _and
+				predicate.eq(:record_id, rec.key_value()[1])
+			_if design _isnt _unset
+			_then
+				pred _and<< predicate.eq(:mss_design_id, design.id)
+			_endif 
+			_return track_tbl.select(pred)
+		_endif
+	_else
+		track_tbl << _self.source_collection
+		_if design.is_a_datastore_object?
+		_then
+			design_id << design.id
+		_else
+			design_id << design
+		_endif 
+		pred << predicate.eq(:mss_design_id, design_id)
+		_return track_tbl.select(pred)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_iter _method mss_record_tracking_mixin.tracked_record_all_geometry(_optional including_meatball?)
+	## 
+	## Use self's tracked record to get all geometry.
+	##
+
+	_if (rec << _self.tracked_record()) _isnt _unset _andif
+	    rec.responds_to?(:|all_geometry()|)
+	_then
+		_for i _over rec.all_geometry(including_meatball?)
+		_loop
+			_loopbody(i)
+		_endloop 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.source_rwo_records()
+	## 
+	## If self's tracked record exists, return a rwo_set with that
+	## record - otherwise, return a rwo_set with self.
+	##
+
+	_if (rec << _self.tracked_record()) _isnt _unset
+	_then
+		_return rwo_set.new_with(rec)
+	_else
+		_return rwo_set.new_with(_self)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_record_tracking_mixin.bounds
+	## 
+	## Derive this from self's tracked record.
+	## 
+
+	_if (rec << _self.tracked_record()) _isnt _unset _andif
+	    rec.responds_to?(:bounds)
+	_then
+		_return rec.bounds
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.get_spatial_context_names()
+	## 
+	## Derive this from self's tracked record.
+	##
+
+	s << set.new()
+	_if (rec << _self.tracked_record()) _isnt _unset
+	_then
+		rec_view << rec.source_view
+		s.add_all(rec.get_spatial_context_names().default({}))
+		_for a_geom _over _self.tracked_record_all_geometry()
+		_loop
+			s.add_all(rec.spatial_context_names_for_world(a_geom.world).default({}))
+		_endloop 
+	_endif
+	_return s
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_record_tracking_mixin.get_spatial_context(context_name)
+	## 
+	## Derive this from self's tracked record.
+	## 
+
+	_dynamic !current_application!
+	
+	_if (rec << _self.tracked_record()) _is _unset
+	_then
+		_return _unset
+	_endif 
+
+	# This is a bit of a hack, but rely on application to do the
+	# rest of the work here.  The reason is that the application is
+	# what controls context-to-ace-and-universe mapping (c.f.
+	# application.get_spatial_context_for_record())
+	_if !current_application! _is _unset
+	_then
+		_return _unset
+	_endif
+	_return !current_application!.get_spatial_context_for_record(rec, context_name)
+	
+_endmethod
+$

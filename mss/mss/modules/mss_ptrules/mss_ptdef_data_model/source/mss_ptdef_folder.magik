@@ -1,0 +1,243 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef_folder
+##
+## Folder for organizing mss_ptdef records.
+##
+
+def_slotted_exemplar(:mss_ptdef_folder,
+{},
+{:mss_ptdef_ds_record})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder.delete_trigger(_gather args)
+	## 
+	## When deleting, also cascade-delete substructure.
+	##
+
+	_dynamic !mss_recursion!
+	
+	_super.delete_trigger(_scatter args)
+
+	# Just in case there are cyclic references...
+	_if !mss_recursion! _is _unset
+	_then
+		!mss_recursion! << equality_set.new()
+	_endif
+	_if !mss_recursion!.includes?(_self.id) _then _return _endif
+	!mss_recursion!.add(_self.id)
+
+	_for i _over _self.child_folder_relationships.fast_elements()
+	_loop
+		i.delete()
+	_endloop
+	_for i _over _self.child_folders.fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_folder.child_folders
+	## 
+	## Return all child folders (in order).
+	##
+
+	tbl << _self.source_collection
+	sc << sorted_collection.new(10,
+				    _proc(a, b)
+					    _if (x << a[1] _cf b[1]) _isnt _maybe
+					    _then
+						    _return x
+					    _endif
+					    _return a[2] _cf b[2]
+				    _endproc)
+	_for i _over tbl.select(predicate.eq(:parent_id, _self.id)).fast_elements()
+	_loop
+		sc.add({i.seq.default(0), i.name, i})
+	_endloop 
+
+	r << rope.new()
+	_for i _over sc.fast_elements()
+	_loop
+		r.add_last(i[3])
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_folder.parent_folder
+	## 
+	## 
+
+	_if (parent_id << _self.parent_id) _is _unset
+	_then
+		_return _unset
+	_endif
+	_return _self.source_collection.at(parent_id)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_folder.child_folder_relationships
+	## 
+	## Return child mss_ptdef_folder_relationship as an (unordered)
+	## rope.
+	##
+
+	_return rope.new_from(_self.source_view.collections[:mss_ptdef_folder_relationship].
+			      all_at(_self.id))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_folder.child_ptdefs
+	## 
+	## Return all child mss_ptdef records (in order)
+	##
+
+	sc << sorted_collection.new(10,
+				    _proc(a, b)
+					    _if (x << a[1] _cf b[1]) _isnt _maybe
+					    _then
+						    _return x
+					    _endif
+					    _return a[2] _cf b[2]
+				    _endproc)
+	_for i _over _self.child_folder_relationships.fast_elements()
+	_loop
+		_if (child_ptdef << i.child_ptdef) _is _unset
+		_then
+			# This is actually a data error, but it can be ignored here.
+			_continue
+		_endif 
+		sc.add({i.seq.default(0), child_ptdef.name, child_ptdef})
+	_endloop 
+
+	r << rope.new()
+	_for i _over sc.fast_elements()
+	_loop
+		r.add_last(i[3])
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_folder.set_parent_folder(parent)
+	## 
+	## Set self's parent folder to PARENT.
+	##
+
+	# The following check ensures that PARENT is not already a
+	# subfolder of self.  (With protection to avoid an infinite
+	# loop on data which may be corrupt).
+	all_parents << equality_set.new()
+	test_p << parent
+	_loop
+		_if test_p _is _unset _orif
+		    all_parents.includes?(test_p)
+		_then
+			_leave
+		_endif 
+		all_parents.add(test_p)
+		_if test_p = _self
+		_then
+			condition.raise(:user_error, :string, _self.message(:set_parent_folder_recursive))
+		_endif
+		test_p << test_p.parent_folder
+	_endloop
+	
+	_if parent _is _unset
+	_then
+		parent_id << _unset
+	_else
+		parent_id << parent.id
+	_endif
+	dr << _self.detached()
+	dr.parent_id << parent_id
+	_return dr.source_collection.update(dr)
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_folder.clone_to_parent_folder(parent)
+	##
+	## Create a clone of self, and parent it to PARENT.  This will
+	## recursively do all subfolders.
+	##
+
+	# The following check ensures that children are not infinitely
+	# copied if self is being copied to a subfolder of self.
+	_dynamic !mss_recursion!
+	_if !mss_recursion! _is _unset
+	_then
+		!mss_recursion! << equality_set.new()
+	_endif
+	_if !mss_recursion!.includes?(_self)
+	_then
+		_return
+	_endif
+	
+	_if parent _is _unset
+	_then
+		parent_id << _unset
+	_else
+		parent_id << parent.id
+	_endif
+
+	dr << _self.detached()
+	dr.parent_id << parent_id
+	new_rec << dr.source_collection.insert(dr)
+	!mss_recursion!.add(new_rec)
+	
+	_for i _over _self.child_folders.fast_elements()
+	_loop
+		i.clone_to_parent_folder(new_rec)
+	_endloop 
+	_for i _over _self.child_ptdefs.fast_elements()
+	_loop
+		i.clone_to_parent_folder(new_rec, _self)
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef_folder.prepare_for_serial(_optional include_id?, include_fk_join_fields?)
+	## 
+	## If not including foreign key join fields, also remove the
+	## parent_id field.
+	##
+
+	_if (pl << _super.prepare_for_serial(include_id?, include_fk_join_fields?)) _is _unset
+	_then
+		_return
+	_endif
+	_if include_fk_join_fields? _isnt _true
+	_then
+		pl.remove_key(:parent_id)
+	_endif
+
+	_return pl
+
+_endmethod
+$

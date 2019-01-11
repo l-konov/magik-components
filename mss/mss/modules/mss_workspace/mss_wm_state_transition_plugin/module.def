@@ -1,0 +1,9 @@
+mss_wm_state_transition_plugin	1
+
+description
+	Plugin for managing state transitions
+end
+
+requires
+	mss_workspace_manager
+end

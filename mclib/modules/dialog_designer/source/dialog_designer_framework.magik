@@ -1,0 +1,31 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## Dialog Designer Framework - frame for the Dialog Designer GUI.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dialog_designer_framework,{},:gui_framework)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer_framework.close()
+	## 
+	## Close an acitvated test dialog and then close SELF.
+	
+	_self.component(:dialog_designer).close_test_dialog()
+	_super.close()
+_endmethod
+$

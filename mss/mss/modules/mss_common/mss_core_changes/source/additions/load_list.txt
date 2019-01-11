@@ -1,0 +1,7 @@
+application_mixin.magik
+charindex_mixin.magik
+condition.magik
+sector_rope.magik
+sw_component.magik
+system.magik
+world_mixin.magik

@@ -1,0 +1,12 @@
+mclib_specials_editor_plugin	4000
+
+description
+	Editor Plugin for adding and managing (enable/disable) actions for :rwo_special actions 
+end
+
+requires
+	editor_plugin
+	mclib_package
+end
+
+language en_gb

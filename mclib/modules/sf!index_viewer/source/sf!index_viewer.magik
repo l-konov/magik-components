@@ -1,0 +1,763 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+
+_package mclib
+$
+##
+## This file contains a handy tool to report/display indexes defined
+## in a database.
+##
+## To report defines indexes (and their size), simply call:
+## MagikSF> cs_index_viewer( <a database view> )
+##
+## <a database view> must be a handle on a currently active/accessible
+## database in the session.
+##
+## To obtain a slightly nicer report (with the same data though), a GUI
+## can be launched with this command:
+## MagikSF> cs_index_viewer.display( <a database view> )
+##
+## In the GUI version the table informaiton is displayed in blue,
+## index field information is normally displayed in black. If
+## an index looks suspicious (e.g. on a string field), the index
+## is drawn in red.
+##
+## To obtain a report for a different database view just execute
+## the call for that database view. It is not possible to have
+## several instances of this class.
+##
+## For both calls a few options can be specified to reduce the
+## output that is created/displayed.
+## :sort_by
+##	A symbol that defines a callback method on a collection.
+##	The method defines sort order of the output.
+##	By default the data is ordered ascending by internal
+##	table name (e.g. the default value is :name).
+##
+## :skip_list
+##	With this key a list of patterns (or internal table names)
+##	can be specified which shall not be part of the output.
+##	By default all internal tables will be ignored, so the
+##	default list looks like this:
+##	{ "dd!*", "sw_gis!*", "int!*" }.
+##
+## :keep_pattern
+##	This key allows to specify a list of patterns or collection
+##	names we want to see. By default we want to see everything
+##	but the items in the skip_list list. So the default value
+##	for this key is this: { "*" }.
+##
+## :internal_tables?
+##	This key provides a Boolean value to indicate if we are
+##	interested in data from internal tables. By default the
+##	value for this key is _false.
+##
+## :all_tables?
+##	The value for this key decides if the ouput contains
+##	collections that do not have additional indexes defined.
+##	By default this value for this key is _false.
+##
+## The class can not really be instantiated because there is
+## no new() method.
+##
+## Messages are defined at the end of this file - which is not too
+## nice but it keeps the overhead small (e.g. no module comes with
+## this file, but messages/strings are still not hard-coded...
+##
+## It would be nice if there would be an output option from the
+## GUI to convert the graphical output into HTML...
+##
+_pragma(classify_level=debug, topic={database})
+def_slotted_exemplar( :sf!index_viewer,
+{
+	{ :options, _unset },
+	{ :data,    _unset },
+	{ :dialog,  _unset },
+	{ :widgets, _unset }
+},
+:model )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!index_viewer.define_slot_access( :options, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!index_viewer.define_slot_access( :data, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!index_viewer.define_slot_access( :dialog, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!index_viewer.define_slot_access( :widgets, :write, :readonly )
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+sf!index_viewer.define_shared_constant( :message_accessor,
+	message_handler.new( :sf!index_viewer ),
+	:private )
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+##
+## Styled string for general table information...
+##
+sf!index_viewer.define_shared_constant( :table_info_styled_string,
+	styled_string.new( :blue,
+			   :value, :col_size, :tab,
+			   :value, :col_name, :tab,
+			   :value, :col_ext_name, :tab,
+			   :value, :col_blocks, :tab,
+			   :value, :data_blocks, :tab,
+			   :value, :tot_idx_blocks ),
+	:private )
+$
+
+_pragma(classify_level=restricted, topic={database})
+##
+## Styled string to display the size an index (in blocks).
+##
+sf!index_viewer.define_shared_constant( :index_info_styled_string,
+	styled_string.new( :value, :idx_number,
+			   :tab, :tab, :tab, :tab, :tab,
+			   :blue, :value, :idx_size ),
+	:private )
+$
+
+_pragma(classify_level=restricted, topic={database})
+##
+## Styled string for "good" index information (index seems ok)...
+##
+sf!index_viewer.define_shared_constant( :good_index_styled_string,
+	styled_string.new( :tab,
+			   :code, :value, :name, :tab,
+			   :code, :value, :type_desc, :tab_left,
+			   :merge, 3,
+			   :black, :value, :core_type ),
+	:private )
+$
+
+_pragma(classify_level=restricted, topic={database})
+##
+## Styled string for "bad" index information (contains a string)...
+##
+sf!index_viewer.define_shared_constant( :bad_index_styled_string,
+	styled_string.new( :tab,
+			   :red, :value, :name, :tab,
+			   :red, :value, :type_desc, :tab_left,
+			   :merge, 3,
+			   :black, :value, :core_type ),
+	:private )
+$
+
+_pragma(classify_level=restricted, topic={database})
+##
+## Styled string for "bad" index information (contains a string)...
+##
+sf!index_viewer.define_shared_constant( :rwo_id_index_styled_string,
+	styled_string.new( :tab,
+			   :orange, :value, :name, :tab,
+			   :orange, :value, :type_desc, :tab_left,
+			   :merge, 3,
+			   :black, :value, :core_type ),
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={widget})
+##
+## This constant defines the column alignment for the tree_item
+##
+sf!index_viewer.define_shared_constant( :column_alignments,
+	{ :right, :left, :left, :right, :right, :left },
+	:private )
+$
+
+
+##
+##	P U B L I C   A P I
+##	___________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!index_viewer.invoke( a_view, _gather key_value_pairs )
+
+	## Create a text output (at the Magik prompt) of the defined
+	## indexes in the database referenced by A_VIEW.
+	## KEY_VALUE_PAIRS is a list of key/symbol value pairs that
+	## allows to tune the output that will be created.
+	## :sort_by
+	##	A symbol that defines a callback method on a collection.
+	##	The method defines sort order of the output.
+	##	By default the data is ordered ascending by internal
+	##	table name.
+	##
+	## :skip_list
+	##	With this key a list of patterns (or internal table names)
+	##	can be specified which shall not be part of the output.
+	##	By default all internal tables will be ignored, so the
+	##	default list looks like this:
+	##	{ "dd!*", "sw_gis!*", "int!*" }.
+	##
+	## :keep_pattern
+	##	This key allows to specify a list of patterns or collection
+	##	names we want to see. By default we want to see everything
+	##	but the items in the skip_list list. So the default value
+	##	for this key is this: { "*" }.
+	##
+	## :internal_tables?
+	##	This key provides a Boolean value to indicate if we are
+	##	interested in data from internal tables. By default the
+	##	value for this key is _false.
+	##
+	## :all_tables?
+	##	The value for this key decides if the ouput contains
+	##	collections that do not have additional indexes defined.
+	##	By default this value for this key is _false.
+
+	_local fields
+	_local vals
+
+	_self.options << _self.process_options( key_value_pairs )
+
+	_for a_col,info,total _over _self.collections( a_view )
+	_loop
+	    #
+	    # Table name, #elements, primary table size (blocks)
+	    #
+	    write( _self.message( :prnt_table_info,
+				  a_col.name, a_col.external_name,
+				  info.first, info[ 4 ].first ) )
+	    fields << a_col.all_fields
+
+	    _for count,index_info _over a_col.all_index_names.
+					fast_keys_and_elements()
+	    _loop
+		#
+		# Size of this index (in blocks)
+		#
+		write( _self.message( :prnt_index_info,
+				      info.last[ count + 1 ] ) )
+		_for an_index_field _over index_info.fast_elements()
+		_loop
+			vals << _self.get_index_field_info(
+					fields, an_index_field )
+			#
+			# Index field name, field type, gis field type
+			#
+			write( _self.message( :prnt_index_fld_info,
+					      an_index_field,
+					      vals[ :type_desc ],
+					      vals[ :core_type ] ) )
+		_endloop
+		_if count < total
+		_then
+			write( _self.message( :prnt_sep_line ) )
+		_endif
+	    _endloop
+	    write()
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={database})
+_method sf!index_viewer.display( a_view, _gather key_value_pairs )
+
+	## Provide a GUI that displays the index information from
+	## the database referenced by A_VIEW.
+	## For an explanation of the key-value pairs, please see
+	## method invoke().
+
+	_self.options << _self.process_options( key_value_pairs )
+
+	_self.options[ :view ] << a_view
+
+	_self.collect_display_data( a_view )
+
+	_self.refresh_display( a_view )
+_endmethod
+$
+
+
+##
+##	P R I V A T E   I N T E R F A C E
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.message( a_msg_id, _gather args )
+
+	## Helper method to retrieve a user string from the
+	## message system...
+
+	>> _self.message_accessor.
+		human_string( a_msg_id, _unset, _scatter args )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!index_viewer.process_options( a_key_value_vec )
+
+	## This method validates the options that have been passed
+	## by the user and sets up defaults for those options that
+	## have not been specified by the user. 
+
+	_local settings << property_list.new_from_gathered( a_key_value_vec )
+
+	_if settings[ :sort_by ] _is _unset
+	_then
+		settings[ :sort_by ] << :name
+	_endif
+	_if settings[ :skip_list ] _is _unset
+	_then
+		settings[ :skip_list ] << { "dd!*", "sw_gis!*", "int!*" }
+	_endif
+	_if settings[ :keep_pattern ] _is _unset
+	_then
+		settings[ :keep_pattern ] << { "*" }
+	_endif
+
+	settings[ :internal_tables? ] << settings[ :internal_tables? ] _is _true
+	settings[ :all_tables? ]      << settings[ :all_tables? ] _is _true
+
+	>> _self.options << settings
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _iter _method sf!index_viewer.collections( a_view )
+
+	## This iterator yields all collections from the
+	## database view A_VIEW that are a match based on the
+	## "restrictions" a user might have specified.
+
+	_local list    << sorted_collection.new()
+	_local options << _self.options
+	_local skip    << options[ :skip_list ]
+	_local keep    << options[ :keep_pattern ]
+	_local int?    << options[ :internal_tables? ]
+	_local all?    << options[ :all_tables? ]
+	_local total
+	_local name
+	_local keep?
+
+	list.sort_by( options[ :sort_by ] )
+	list.add_all( a_view.collections )
+
+	_for a_col _over list.fast_elements()
+	_loop @outer
+		#
+		# Deal only with collection which provide index and block
+		# information (e.g. not view_collections)...
+		#
+		_if a_col.method( :nindexes ) _is _unset _orif
+		    a_col.method( :|ds!info()| ) _is _unset
+		_then
+			_continue
+		_endif
+		    
+		#
+		# Shall we keep internal tables?
+		#
+		_if int? _andif a_col.descriptor.internal_table?
+		_then
+			_continue
+		_endif
+
+		#
+		# Info for tables with no additional index?
+		#
+		_if ( total << a_col.nindexes ) < 1 _andif
+		    _not all?
+		_then
+			_continue
+		_endif
+
+		name << a_col.name.write_string
+
+		#
+		# Ignore the ones that we are told to skip...
+		#
+		_for a_pattern _over skip.fast_elements()
+		_loop
+			_if name.matches?( a_pattern )
+			_then
+				_continue @outer
+			_endif
+		_endloop
+		#
+		# Check if the collection should be processed...
+		#
+		keep? << _false
+		_for a_pattern _over keep.fast_elements()
+		_loop
+			_if name.matches?( a_pattern )
+			_then
+				keep? << _true ; _leave
+			_endif
+		_endloop
+		_if _not keep? _then _continue @outer _endif
+
+		_loopbody( a_col, _allresults a_col.ds!info(), total )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.get_index_field_info(
+			 all_phys_fields, an_index_field )
+
+	## This method returns a property_list containing
+	## the "important" information for an index field
+	## and also a styled string for its GUI representation.
+
+	_local type      << all_phys_fields[ an_index_field ].type
+	_local phys_type << type.phys_type
+	_local size
+	_local key
+	_local type_desc
+	_local core_type
+	_local ss
+
+	type_desc << _if ( size << type.size ) _isnt _unset _andif
+			 size > 1
+		     _then >> write_string( phys_type, %[, size, %] )
+		     _else >> phys_type.write_string
+		     _endif
+	core_type << _if ( key << type.key ) _isnt _unset _andif
+			 key <> phys_type
+		     _then >> write_string( key )
+		     _else >> ""
+		     _endif
+	#
+	# For indexes using a vector type raise a "red flag",
+	# unless we look at field rwo_id...
+	#
+	_if size.default( 0 ) > 1
+	_then
+		ss << _if an_index_field <> :rwo_id #_andif
+		      #phys_type.index_of_seq( :char ) _isnt _unset
+		      _then >> _self.bad_index_styled_string
+		      _else >> _self.rwo_id_index_styled_string
+		      _endif
+	_else
+		ss << _self.good_index_styled_string
+	_endif
+	
+	>> property_list.new_with(
+		   :name,          an_index_field,
+		   :type_desc,     type_desc,
+		   :core_type,     core_type,
+		   :styled_string, ss )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.collect_display_data( a_view )
+
+	## Helper method for the GUI to make display_tree objects
+	## for each collection and the found indexes.
+
+	_local ss_col   << _self.table_info_styled_string
+	_local ss_idx   << _self.index_info_styled_string
+	_local list_sep << _self.message( :list_sep_string )
+	_local data     << _self.data
+	_local vals
+	_local fields
+	_local children
+
+	_if data _is _unset
+	_then
+		data << _self.data << rope.new()
+	_else
+		data.empty()
+	_endif
+
+	#
+	# Create a "top entry" (in blue) for each collection...
+	#
+	_for a_col,info _over _self.collections( a_view )
+	_loop
+		idxs << info.last
+		vals << property_list.new_with(
+			    :col_size,       info.first,
+			    :col_name,       a_col.name,
+			    :col_ext_name,   a_col.external_name,
+			    :col_blocks,     info[ 3 ],
+			    :data_blocks,    idxs.first,
+			    :tot_idx_blocks, info[ 3 ] - idxs.first,
+			    :idx_sizes,      idxs.subseq( 2 ).
+				                 join_as_strings( list_sep ) )
+		dt << display_tree.new( a_col, vals )
+		dt.styled_string << ss_col
+
+		data.add_last( dt )
+
+		#
+		# For each defined index, create a subtree that
+		# provides a "running index number" and the index size...
+		#
+		fields << a_col.all_fields
+		_for count,index_info _over a_col.all_index_names.
+					    fast_keys_and_elements()
+		_loop
+			vals << property_list.new_with(
+				    :idx_number, _self.message( :gui_idx_info,
+								count ),
+				    :idx_size,   idxs[ count + 1 ] )
+			dtc << display_tree.new( vals, vals )
+			dtc.styled_string << ss_idx
+			dt.add_child( dtc )
+
+			#
+			# For each field in this index, add it to the
+			# current index tree...
+			#
+			_for an_index_field _over index_info.fast_elements()
+			_loop
+				vals << _self.get_index_field_info(
+						fields, an_index_field )
+
+				dtcc << display_tree.new( vals, vals )
+				dtcc.styled_string << vals[ :styled_string ]
+
+				dtc.add_child( dtcc )
+			_endloop
+		_endloop
+
+		dt.expand_fully()
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.refresh_display( _optional a_view )
+
+	## Intenal helper method to build a frame for the GUI
+	## and to collect all the data from the given database...
+
+	_local dlg
+	_local ti
+
+	_if ( dlg << _self.dialog ) _is _unset
+	_then
+		_self.dialog << dlg << multi_frame.new( "" )
+
+		_self.build_gui( dlg )
+
+		.top_frame << dlg
+	_endif
+
+	_if a_view _isnt _unset
+	_then
+		dlg.title << _self.message( :gui_frame_title,
+					    a_view.external_name, a_view.name )
+	_endif
+
+	_self.changed( :data, :refresh )
+
+	dlg.activate()
+	#
+	# Adjust the column widths...
+	#
+	_if ( ti << _self.widgets[ :tree_item ] ) _isnt _unset
+	_then
+		_local hh << ti.headings_holder
+		_for a_col_num _over range( 1, hh.number_of_columns )
+		_loop
+			hh.column_width( a_col_num ) <<
+				hh.optimal_column_width( a_col_num )
+		_endloop
+	_endif 
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.build_gui( a_container )
+
+	## This code builds the GUI interface.
+	## The interface is fairly simple and does not allow to
+	## change/set all the options that are offered at the
+	## Magik command prompt.
+	## Currently only two options can be changed from the GUI:
+	## :all_tables? and
+	## :keep_pattern.
+	
+	_local headings  << {}.new( 6 )
+	_local settings  << _self.options
+	_local gi        << _self.widgets
+	_local pnl       << panel.new( a_container )
+	_local rc        << rowcol.new( pnl, 1, _unset, :pixel,
+					:default_row_alignment, :centre,
+					:col_spacing, 20 )
+	_local html_print?
+
+	_if gi _is _unset
+	_then
+		_self.widgets << gi << property_list.new()
+	_endif
+				   
+	_for idx _over range( 1, headings.size )
+	_loop
+		headings[ idx ] <<
+			_self.message( :gui_header_col +
+				       idx.write_string.as_symbol() )
+	_endloop
+
+	gi[ :all_tables? ] <<
+		toggle_item.new( rc, _self.message( :gui_all_tables? ),
+				 :value, settings[ :all_tables? ] )
+
+	gi[ :keep_pattern ] <<
+		text_item.new(  rc, _self.message( :gui_tbl_filter ),
+			       :value, settings[ :keep_pattern ].
+				           join_as_strings( %space ) )
+
+	gi[ :refresh ] <<
+		image_button_item.new_safe( rc,
+			smallworld_product.
+				get_raster_image( :refresh, :ui_resources ),
+			_self, { :|perform_private()|, :|update_display()| } )
+
+	gi[ :print ] <<
+		image_button_item.new_safe( rc,
+			smallworld_product.
+			    get_raster_image( :print, :ui_resources ),
+			_self, { :|perform_private()|, :|print_display()| } )
+
+	_if ( html_print? << sw:tree_item.responds_to?( :|sf!export_to_html()| ) )
+	_then
+	    gi[ :html_print ] <<
+		image_button_item.new_safe( rc,
+			smallworld_product.
+			    get_raster_image( :export_to_html, :mclib_tree_item ) )
+	_endif
+
+	pnl.start_row()
+	gi[ :tree_item ] <<
+		tree_item.new( pnl,
+			       :resize?, _true,
+			       :model,             _self,
+			       :aspect,            :data,
+			       :column_headings,   headings,
+			       :column_alignments, _self.column_alignments )
+
+	_if html_print?
+	_then
+		_local btn << gi[ :html_print ]
+
+		btn.model    << _self
+		btn.selector << { :|perform_private()|,
+				  :|html_print_display()| }
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.update_display()
+
+	## This method is called when the refresh button is clicked.
+
+	_local settings  << _self.options
+	_local gi        << _self.widgets
+
+	settings[ :all_tables? ]  << gi[ :all_tables? ].value
+	settings[ :keep_pattern ] << gi[ :keep_pattern ].value.
+				     split_by( %space )
+
+	_self.collect_display_data( settings[ :view ] )
+
+	_self.refresh_display()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.print_display()
+
+	## Create a printable output of what is currently displayed.
+	## Once this is done, inform the user where the file that has
+	## been created is located.
+
+	_local view << .options[ :view ]
+	_local args << rope.new()
+	_local path << system.pathname_from_components(
+			       _self.message( :prnt_file_name, view.name ),
+			       system.getenv( :temp ) )
+	_local strm << external_text_output_stream.new( path )
+
+	_protect
+		_dynamic !output! << strm
+
+		_for k,v _over .options.fast_keys_and_elements()
+		_loop
+			args.add_last( k )
+			args.add_last( v )
+		_endloop
+
+		_self.invoke( view, _scatter args )
+
+		_self.show_message( _self.message( :gui_print_complete, path ) )
+	_protection
+		_if strm _isnt _unset _then strm.close() _endif
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!index_viewer.html_print_display()
+
+	## Creates HTML output from the data that is currently displayed.
+
+	_local view  << .options[ :view ]
+	_local path  << system.pathname_from_components(
+				_self.message( :prnt_html_name, view.name ),
+				system.getenv( :temp ) )
+	_local title << _self.message( :sf!html_title,
+				       view.external_name, view.name )
+	_local strm  << external_text_output_stream.new( path )
+
+	_protect
+		strm.write( _self.message( :sf!html_header, title ) )
+			    
+		_self.widgets[ :tree_item ].sf!export_as_html_on(
+					strm, _self.column_alignments )
+
+		_self.show_message( _self.message( :gui_print_complete, path ) )
+	_protection
+		_if strm _isnt _unset
+		_then
+			strm.write( _self.message( :sf!html_footer ) )
+			strm.close()
+		_endif
+	_endprotect	
+_endmethod
+$

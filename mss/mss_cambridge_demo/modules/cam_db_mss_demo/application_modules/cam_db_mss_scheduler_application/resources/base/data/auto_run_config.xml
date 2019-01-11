@@ -1,0 +1,9 @@
+<config base="mss_scheduler_processor_gui.config">
+  <plugins>
+    <plugin name="mss_scheduler_engine" class_name="mss_scheduler_engine">
+      <properties>
+         <property name="auto_run_scheduler_engine?" value="true"/>
+      </properties>
+    </plugin>
+  </plugins>
+</config>

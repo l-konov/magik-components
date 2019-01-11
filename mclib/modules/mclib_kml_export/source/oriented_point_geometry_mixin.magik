@@ -1,0 +1,52 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-03-23 22:42:50 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method oriented_point_geometry_mixin.as_kml_lookat(range,tilt,heading)
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic !print_float_precision! << 12
+	pt << _self.projected_for_kml()
+	elems << {
+			 simple_xml_thing.new("longitude",pt.coord.x.write_string),
+			 simple_xml_thing.new("latitude",pt.coord.y.write_string),
+			 simple_xml_thing.new("range",range.write_string),
+			 simple_xml_thing.new("tilt",tilt.write_string),
+			 simple_xml_thing.new("heading",heading.write_string)
+		 }
+	>> simple_xml_thing.new("LookAt",elems)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method oriented_point_geometry_mixin.as_kml_entity(_optional height)
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic !print_float_precision! << 12
+	pt << _self.projected_for_kml()
+	>> simple_xml_thing.new("Point",rope.new_with(
+						simple_xml_thing.new(:coordinates,{write_string(pt.coord.x,%,,pt.coord.y,%,,height.default(0))})
+					 ))
+_endmethod
+$

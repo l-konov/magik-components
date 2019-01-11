@@ -1,0 +1,788 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+##
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+def_slotted_exemplar( :sf!table_lister,
+{
+	#
+	# Public slots
+	#
+	{ :table_list, _unset },
+	#
+	# Private slots
+	#
+	{ :widgets,      _unset },
+	{ :on_tab_page,  _unset },
+	{ :tbl_sorter,   _unset },
+	{ :fld_sorter,   _unset },
+	{ :ds_view,      _unset },
+	{ :collection,   _unset },
+	{ :dd_info_strm, _unset }
+},
+{ :plugin } )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :table_list, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :widgets, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :on_tab_page, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :tbl_sorter, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :fld_sorter, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :ds_view, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :collection, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_slot_access( :dd_info_strm, :write, :private )
+$
+
+
+##
+##	P R O P E R T I E S
+##	___________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines the callback (on a collection class) by
+## which database tables will be sorted.
+## The value can be changed at run-time.
+##
+sf!table_lister.def_property( :sort_tables_by,
+	:type,		:symbol,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, :name )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines the callback (on a field class) by
+## which table fields will be sorted.
+## The value can be changed at run-time.
+##
+sf!table_lister.def_property( :sort_fields_by,
+	:type,		:symbol,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, :name )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property determines if the user can define filters to
+## reduce the amount of data shown in the table list.
+## The value can't be changed at run-time.
+##
+sf!table_lister.def_property( :allow_filtering?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _true )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property determines if the code automatically
+## refreshes the table list data when a viewing option
+## has been changed or not.
+## The value can be changed at run-time.
+##
+sf!table_lister.def_property( :auto_refresh?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _false )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property provides an initial value for action
+## empty_tables? If _true, empty tables will be shown.
+## The value can be changed (by the user) at run-time.
+##
+sf!table_lister.def_property( :show_empty_tables?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _false )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines if the record list uses stripes
+## (e.g. the background color changes between white and
+## 'orange' on the display).
+## The value can't be changed at run-time.
+##
+sf!table_lister.def_property( :show_stripes?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _true )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property provides an initial value for action
+## table_size? If _true, the size of tables will be shown.
+## The value can be changed (by the user) at run-time.
+##
+sf!table_lister.def_property( :show_table_size?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _true )
+$
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property provides an initial value for action
+## system_tables? If _true, system tables will be shown.
+## The value can be changed (by the user) at run-time.
+##
+sf!table_lister.def_property( :show_system_tables?,
+	:type,		:boolean,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, _false )
+$
+
+
+##
+##	C L A S S   C O N S T A N T S
+##	_____________________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_shared_constant( :databus_consumer_data_types,
+	{ :current_dsview },
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!table_lister.define_shared_constant( :databus_producer_data_types,
+	{ :status,
+	  :edit_object_actions,
+	  :current_table,
+	  :refresh_record_list,
+	  :tree_item_for_html_export
+	},
+	:public )
+$
+
+
+_pragma(classify_level=restricted, topic={database}, usage={redefinable})
+sf!table_lister.define_shared_constant( :style_string_defs,
+	_block
+	    _local data << { :value, :size, :tab,
+			     :value, :name, :tab,
+			     :value, :ext_name }
+
+	    >> sw:property_list.new_with(
+		   :internal, { :red,   _scatter data },
+		   :user,     { :black, _scatter data },
+		   :ext_db,   { :blue,  _scatter data } )
+	_endblock,
+	:private )
+$
+
+_pragma(classify_level=restricted, topic={database}, usage={redefinable})
+sf!table_lister.define_shared_constant( :table_information_actions,
+	{ :describe_fields,
+	  :describe_triggers,
+	  :describe_phys_fields,
+	  :key_fields,
+	  :physical_fields,
+	  :join_fields,
+	  :geometry_fields,
+	  :derived_fields },
+	:private )
+$
+
+					
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_lister.init( p_name, p_framework )
+
+	_super.init( p_name, p_framework )
+
+	.table_list   << sw:rope.new()
+	.tbl_sorter   << sw:sorted_collection.new()
+	.fld_sorter   << sw:sorted_collection.new()
+	.widgets      << sw:property_list.new()
+	.dd_info_strm << sw:internal_text_output_stream.new()
+	.on_tab_page  << _unset
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_lister.init_actions()
+
+	## Define all available actions for _self.
+
+	_local l_option_names << { :empty_tables?,
+				   :table_size?,
+				   :system_tables? }
+	_local l_fwk          << _self.framework
+	_local l_value
+
+	_super.init_actions()
+	#
+	# Define selection/filter actions.
+	# Important: For each action referenced in local variable
+	# OPTION_NAMES, a property (or at least a callback) must
+	# be defined that can provide an appropriate initial value.
+	#
+	# At run-time the current value of the action widget and
+	# the value of the property are likely to differ.
+	#
+	_for i_action_name _over l_option_names.fast_elements()
+	_loop
+		l_value << _self.perform( :|show_| + i_action_name )
+
+		_self.add_action(
+		    l_fwk.define_action( i_action_name, _self,
+			:value,		       l_value,
+			:menubar_control,      :toggle_item,
+			:toolbar_control,      :toggle_item,
+			:value_change_message, :|check_refresh()| ) )
+	_endloop
+	#
+	# User interaction
+	#
+	_for i_action_name _over { :list,
+				   :refresh
+				 }.fast_elements()
+	_loop
+		_self.add_action(
+		    l_fwk.define_action( i_action_name, _self,
+			:enabled?, i_action_name _is :refresh,
+			:image,    { i_action_name, :ui_resources } ) )
+	_endloop
+	#
+	# Table information
+	#
+	_for i_action_name _over _self.table_information_actions.
+				 fast_elements()
+	_loop
+		_self.add_action(
+		    l_fwk.define_action( i_action_name, _self,
+			:enabled?, _false,
+			:action_message,
+			    { :|display_info_from_dd()|, i_action_name } ) )
+	_endloop
+
+	_self.add_action(
+	    l_fwk.define_action( :edit_object, _self,
+			       :enabled?, _false,
+			       :image,    { :edit_object, :ui_resources } ) )
+	_self.add_action(
+	    l_fwk.define_action( :edit_object_floating, _self,
+			       :enabled?, _false,
+			       :image,    { :edit_object,
+					    :mclib_table_inspector } ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.build_gui( p_container, _optional p_xml_element )
+
+	_local l_xml_info << p_xml_element.default( sw:simple_xml_thing )
+	_local l_pnl      << sw:panel.new( p_container )
+	_local l_headings << { _self.message( :size_heading ),
+			       _self.message( :int_name_heading ),
+			       _self.message( :ext_name_heading ) }
+	_local l_ti
+	_local l_setter
+
+	l_pnl.border_height <<
+	l_pnl.border_width  << 0
+
+	.widgets[ :table_list ] << l_ti <<
+		sw:tree_item.new( l_pnl,
+			:model,    _self,
+			:mode,     :one,
+			:resize?,  _true,
+			:stripes?, _self.show_stripes?,
+			:aspect,   :table_list,
+			:data_selector,         :table_list,
+			:select_notifier,       :|table_selected()|,
+			:double_click_notifier, :|double_click()|,
+			:allow_filtering?,      _true,
+			:column_headings,       l_headings,
+			:column_alignments,     { :right, :left, :left },
+			:column_headings_styled_strings,
+		            { { :align, :centre, l_headings[ 1 ] },
+			      { :align, :centre, l_headings[ 2 ] },
+			      { :align, :centre, l_headings[ 3 ] } } )
+	#
+	# Create more features on the pop-up menu...
+	#
+	_self.add_actions_to_lister_popup_menu( l_ti )
+	#
+	# Filtering works only in CST 4.0 and later...
+	#
+	_if l_ti.method( :|allow_filtering?<<| ) _isnt _unset
+	_then
+		l_ti.allow_filtering? << _self.allow_filtering?
+	_endif
+	#
+	# Evaluate any attributes specified in the gui.xml...
+	#
+	_for i_key,i_value _over l_xml_info.xml_attributes()
+	_loop
+		l_setter << i_key.as_symbol().with_chevron
+		_if l_ti.responds_to?( l_setter )
+		_then
+			l_ti.perform( l_setter, i_value.evaluate() )
+		_endif
+	_endloop
+
+	l_pnl.tab_label << _self.message( :tab_label )
+	#
+	# This is quite a nasty trick to figure out on which tab page
+	# the plugin has been placed. There are two plugins on this
+	# page, so the tab_box is the parent of the current container.
+	#
+	_self.on_tab_page <<
+		( .widgets[ :container ] << p_container.parent ).pages.size
+
+	>> l_pnl
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.note_change( p_sender, p_aspect, _gather p_data )
+
+	## React on change notifications from the environment.
+
+	_if p_sender _is .ds_view
+	_then
+		#
+		# Refresh the list when
+		# a) the alternative has changed
+		# b) an LWT operation occured
+		# c) the view data has changed (e.g. because of a rollback)
+		# d) the view was changed to a checkpoint
+		#
+		_if p_aspect _is :alternative_path _orif
+		    p_aspect _is :lwt_state        _orif
+		    ( p_aspect _is :view _andif
+		      p_data[ 1 ] _is :changes )   _orif
+		    p_aspect _is :checkpoint
+		_then
+			_self.refresh()
+		_endif
+	_endif
+
+	_super.note_change( p_sender, p_aspect, _scatter p_data )
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.sw_databus_data_available( p_data_type_name, p_data )
+
+	_if p_data_type_name = :current_dsview
+	_then
+		_if .ds_view _isnt _unset
+		_then
+			.ds_view.remove_dependent( _self )
+		_endif
+
+		.ds_view << p_data
+
+		_if p_data _isnt _unset
+		_then
+			p_data.add_dependent( _self )
+		_endif
+
+		_self.refresh()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.sw_databus_data_requested(
+		p_data_type_name, _gather p_args )
+
+	## 
+
+	_if p_data_type_name = :edit_object_actions
+	_then
+		_if .widgets[ :container ].current_page = _self.on_tab_page
+		_then
+			_return { _self.action( :edit_object ),
+				  _self.action( :edit_object_floating ) }
+		_endif
+
+	_elif p_data_type_name = :tree_item_for_html_export
+	_then
+		_if .widgets[ :container ].current_page = _self.on_tab_page
+		_then
+			_return .widgets[ :table_list ]
+		_endif
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.table_selected( p_tree_selection )
+
+	_self.collection << _if _not p_tree_selection.empty?
+			    _then
+				    >> p_tree_selection.an_element().key
+			    _endif
+	_self.manage_actions()
+
+	_self.databus.make_data_available( :current_table, _self.collection )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.double_click( p_tree_selection )
+
+	_local l_act
+
+	_if ( l_act << _self.action( :list ) ).enabled?
+	_then
+		l_act.execute_action()
+	_endif
+_endmethod
+$
+
+
+##
+##	A C T I O N   C A L L B A C K S
+##	_______________________________
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.check_refresh()
+
+	## 
+
+	_if _self.auto_refresh?
+	_then
+		_self.refresh()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.refresh()
+
+	## 
+
+	_local l_new_stat << :ok
+
+	_self.table_list.empty()
+
+	_protect
+		_if _self.ds_view _is _unset _then _return _endif
+
+		l_new_stat << :failed
+		_self.set_status << :busy
+
+		_self.collect_tables_data()
+
+		_self.create_display_trees()
+
+		_self.changed( :table_list, :renew )
+
+		_self.adjust_column_widths()
+
+		l_new_stat << :ok
+	_protection
+		_self.changed( :table_list, :renew )
+
+		_self.set_status << l_new_stat
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.edit_object()
+
+	## Update the contents of an embedded editor for the current table.
+
+	_self.framework.edit_object(
+		_self.collection,
+		:|set_collection_in_embedded_editor()|, _self, _true )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.edit_object_floating()
+
+	## Update the contents of a stand-alone editor for the current table.
+
+	_self.framework.edit_object_floating(
+		_self.collection,
+		:|activate_editor_for_collection()|, _self, _true )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.list()
+
+	## Display the contents of the current collection;
+	## put the request on the databus, so that one
+	## sibling component can take care of this...
+
+	_self.databus.make_data_available( :refresh_record_list,
+					   _self.collection )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_lister.display_info_from_dd( p_action_name )
+
+	_local l_strm     << _self.dd_info_strm
+	_local l_table    << _self.collection
+	_local l_callback
+	_local l_data
+
+	l_strm.reset()
+
+	_dynamic !output! << l_strm
+
+	l_callback <<
+		_if p_action_name.index_of_seq( :describe ) _is _unset
+		_then >> p_action_name
+		_else >> p_action_name.with_parentheses
+		_endif
+
+	l_data << l_table.perform( l_callback )
+	_if l_data _isnt _unset
+	_then
+		_self.write_formatted_field_data_on( !output!, l_data )
+	_endif
+
+	_self.framework.display_text(
+		!output!.string,
+		_self.message( :dd_info_frame_title,
+			       l_table.source_view.name,
+			       l_table.name,
+			       _self.action( p_action_name ).caption ) )
+_endmethod
+$
+
+
+##
+##	I N T E R N A L   C O D E
+##	_________________________
+##
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_lister.manage_actions()
+
+	## 
+
+	_local l_table   << _self.collection
+	_local l_active? << l_table _isnt _unset
+
+	_self.action( :edit_object_floating ).enabled? << 
+	_self.action( :edit_object ).enabled?          << 
+	_self.action( :list ).enabled?                 << l_active?
+
+	_for i_action _over _self.table_information_actions.fast_elements()
+	_loop
+		_self.action( i_action ).enabled? << l_active?
+	_endloop
+
+	_if l_table _is _unset _then _return _endif
+
+	_self.action( :geometry_fields ).enabled? <<
+		l_table.descriptor.record_exemplar.
+		method( :geometry_fields ) _isnt _unset
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_lister.set_status << p_string
+
+	## 
+
+	_self.databus.make_data_available( :status, p_string, _self )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_lister.collect_tables_data()
+
+	## 
+
+	_local l_sorter << _self.tbl_sorter
+
+	l_sorter.empty()
+	l_sorter.sort_by( _self.sort_tables_by )
+
+	l_sorter.add_all( _self.ds_view.collections )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!table_lister.create_display_trees()
+
+	## 
+
+	_local l_list   << _self.table_list
+	_local l_ssd    << _self.style_string_defs
+	_local l_size?  << _self.action( :table_size? ).value _is _true
+	_local l_empty? << _self.action( :empty_tables? ).value _is _true
+	_local l_sys?   << _self.action( :system_tables? ).value _is _true
+	_local l_it?
+	_local l_data
+	_local l_dt
+
+	_for i_table _over _self.tbl_sorter.fast_elements()
+	_loop
+		_if i_table.empty? _andif
+		    _not l_empty?
+		_then
+			_continue
+		_endif
+
+		l_it?  << i_table.descriptor.internal_table?
+		_if l_it? _andif _not l_sys?
+		_then
+			_continue
+		_endif
+
+		l_data << sw:property_list.new_with(
+				:size,     _if l_size?
+					   _then >> i_table.size
+					   _else >> %?
+					   _endif,
+				:name,     i_table.name,
+				:ext_name, i_table.external_name )
+
+		l_dt << sw:display_tree.new( i_table, l_data )
+		l_dt.styled_string <<
+			_if l_it?
+			_then >> l_ssd[ :internal ]
+			_else >> _if i_table.class_name.index_of_seq( :extdb ) _isnt _unset
+				 _then >> l_ssd[ :ext_db ]
+				 _else >> l_ssd[ :user ]
+				 _endif
+			_endif
+		l_list.add( l_dt )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_lister.adjust_column_widths()
+
+	## 
+	_local l_ti
+
+	_if ( l_ti << _self.widgets[ :table_list ] ) _isnt _unset
+	_then
+		l_ti.sf!adjust_column_widths()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_lister.write_formatted_field_data_on(
+			 p_stream, p_vector_with_fields )
+
+	## 
+
+	_local l_sorter << _self.fld_sorter
+	_local l_width  << 0
+
+	l_sorter.empty()
+	l_sorter.sort_by( _self.sort_fields_by )
+
+	_for i_fld _over p_vector_with_fields.fast_elements()
+	_loop
+		l_sorter.add( i_fld )
+		l_width << i_fld.name.size.max( l_width )
+	_endloop
+
+	l_width +<< 1
+	_for i_fld _over l_sorter.fast_elements()
+	_loop
+		p_stream.write( i_fld.name.as_charvec().space_pad( l_width ),
+				i_fld.external_name,
+				%newline )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!table_lister.add_actions_to_lister_popup_menu(
+			 p_tree_item )
+
+	_local l_pm << p_tree_item.popup_menu
+
+	sw:separator_item.new( l_pm )
+	_self.action( :refresh ).place_control_on( l_pm, :menu )
+	_self.action( :list ).place_control_on( l_pm, :menu )
+
+	sw:separator_item.new( l_pm )
+	_self.action( :edit_object ).place_control_on( l_pm, :menu )
+	_self.action( :edit_object_floating ).place_control_on( l_pm, :menu )
+_endmethod
+$

@@ -1,0 +1,166 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-10-09 10:34:07 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dataset_collection_mixin.as_kml()
+	## Create a single XML object to represent this entrie
+	## collection - be careful with large sets as this can use lots
+	## of memory!! See write_kml_file() instead.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	namespaces << property_list.new_with(:xmlns,"http://earth.google.com/kml/2.0")
+	folders << rope.new()
+	_for a_coll _over _self.all_collections().fast_elements()
+	_loop
+		_if _not a_coll.record_exemplar.is_rwo?
+		_then
+			_continue 
+		_endif
+		cur_coll << _self.select(:collection,{a_coll.name})
+		elems << cur_coll.as_kml_placemarks()
+		elems.add_first(simple_xml_thing.new("name",a_coll.external_name))
+		elems.add_first(simple_xml_thing.new("description",a_coll.external_name))
+		folders.add_last(simple_xml_thing.new("Folder",
+						      elems))
+	_endloop
+	doc << simple_xml_thing.new("Document",
+				    folders,
+				    _unset)
+	>> simple_xml_thing_ns.new("kml",
+				   {doc},
+				   _unset,
+				   namespaces)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dataset_collection_mixin.as_kml_placemarks()
+	## Returns a rope with KML placemark for everything within me.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	res << rope.new()
+	_for a_rec _over _self.fast_elements()
+	_loop
+		_try _with cond
+			res.add(a_rec.as_kml_placemark())
+		_when error
+			condition.raise(:kml_record_error,:record,a_rec,:condition,cond)
+		_endtry 
+	_endloop
+	>> res
+_endmethod
+$
+
+_method dataset_collection_mixin.write_kml_file(file_path, a_app_or_style_system, _optional ace_name, display_scale_name, progress_proc)
+	## Output the contents of me into the KML file
+	## FILE_PATH. A_APPLICATION is required ot get an appropriate
+	## style system to use for the output. If it is an application,
+	## then ACE_NAME and DISPLAY_SCALE_NAME are used to select the
+	## appropriate style system from it.
+	## PROGRESS_PRO is a reporter proc used during the processing
+	## and is handed to a progress_counter as the reporter
+	##
+	ace_name << ace_name.default(:default)
+	display_scale_name << display_scale_name.default("Auto")
+	_if a_app_or_style_system.is_kind_of?(application)
+	_then
+		a_app_or_style_system << a_app_or_style_system.get_style_system_for(ace_name,
+										    display_scale_name)
+	_endif
+	
+	(file,root_dir) << system.pathname_components(file_path)
+
+	_dynamic !GEARTH_DIRECTORY! << root_dir
+	_dynamic !GEARTH_TARGET_DIRECTORY! << root_dir
+	_dynamic user:!GEARTH_STYLE_SYSTEM! << a_app_or_style_system
+
+	xml_stream << xml_output_stream.new_file( file_path )
+
+	# Write a prolog
+	xml_stream.write_prolog()
+	_protect
+		_self.write_kml_on(xml_stream, progress_proc)
+ 		ok? << _true 
+ 	_protection
+		_try 
+			xml_stream.close()
+		_when error
+		_endtry 
+ 	_endprotect
+_endmethod
+
+
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dataset_collection_mixin.write_kml_on(a_xml_stream, _optional progress_proc, name)
+	## 
+	## PROGRESS_PROC is a procudure given to my progress counter as
+	## a reporter.
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	namespaces << property_list.new_with(:xmlns,"http://earth.google.com/kml/2.0")
+	simple_xml_thing_ns.new("kml",
+				{},
+				_unset,
+				namespaces)
+	a_xml_stream.start_element("kml")
+	a_xml_stream.start_element("Document")
+	a_xml_stream.write_element("name",name.default("Smallworld Export"))
+	pc1 << progress_counter.new_on_count(1,_self.all_collections().size)
+	_if progress_proc _isnt _unset
+	_then
+		pc1.reporter << progress_proc
+	_endif 
+	_for a_coll _over _self.all_collections().fast_elements()
+	_loop
+		_if _not a_coll.record_exemplar.is_rwo?
+		_then
+			_continue 
+		_endif
+		a_xml_stream.start_element("Folder")
+		a_xml_stream.write_element("name",a_coll.external_name.write_string)
+		a_xml_stream.write_element("description",a_coll.external_name.write_string)
+		cur_coll << _self.select(:collection,{a_coll.name})
+		#debug show(_self,cur_coll,a_coll.name)
+		pc << progress_counter.new_on_count(100,cur_coll.size)
+		_if progress_proc _isnt _unset
+		_then
+			pc.reporter << progress_proc
+		_endif 
+		_for a_elem _over cur_coll.fast_elements()
+		_loop
+			a_xml << a_elem.as_kml_placemark()
+			simple_xml.write_element(a_xml_stream,a_xml)
+			pc.next()
+		_endloop 
+		a_xml_stream.end_element()
+		pc1.next()
+	_endloop
+	a_xml_stream.end_element()
+	a_xml_stream.end_element()
+_endmethod
+$
+

@@ -1,0 +1,42 @@
+<gui>
+  <menu name="menubar" type="menubar">
+    <submenu name="file" mnemonic_id="file_m">
+      <action name="mss_cu_report_plugin.export_to_excel"/>
+      <action name="close"/>
+    </submenu>
+
+    <submenu name="view" mnemonic_id="view_m">
+      <action name="mss_cu_report_plugin.refresh"/>
+    </submenu>
+
+    <submenu name="options">
+      <action name="mss_cu_report_plugin.combine_similar_cus?"/>
+      <action name="mss_cu_report_plugin.include_cus_with_no_operation?"/>
+      <action name="mss_cu_report_plugin.include_parent_designs?"/>
+      <action name="mss_cu_report_plugin.work_point_subtotals?"/>
+    </submenu>
+  </menu>
+
+  <toolbar name="refresh">
+    <action name="mss_cu_report_plugin.refresh"/>
+  </toolbar>
+  <toolbar name="export">
+    <action name="mss_cu_report_plugin.export_to_excel"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="refresh"/>
+    <toolbar name="export"/>
+  </dock>
+
+  <work_area>
+    <tab_box>
+      <plugin plugin_name="mss_cu_report_plugin"/>
+      <plugin plugin_name="mss_cu_wp_assignment_plugin"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="status_string" style="innie" width="300" springy="true"/>
+  </statusbar>
+</gui>

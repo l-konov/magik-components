@@ -1,0 +1,45 @@
+
+Version Notes ... in reverse order.
+
+v1.5
+- Documentation file updated.
+- fixed issue with hanging plugin action selection gui when a raster image was missing in CORE.
+- fixed issue with non-refresh of Magik/XML code when first going to the Magik/XML tab
+- added input mechanism to add extra slots to dialog Base Class
+- added input mechanism for setting pragma statement code settings
+- added input mechanism for adding additional slots to the base gui class
+- added input mechanism for setting the package for the dialog
+- es_es language edited (thank you Alejandro Cañas [alexcaas@gmail.com])
+- added unit_text_item widget
+- fixed :select_directory (open_file_dir widget) incompatibility with SW4.
+- fixed internationalization issue with the :top_dock,:bottom_dock (etc.) messages
+- added date_time_input widget
+
+
+Nov 25, 2007 - v1.4
+- bug fixes (tabular_list, element_editor, tree_list)
+- modified button_item icons/cursor
+- fr_ca language added (internet translation ... corrections likely)
+- es_es language added (internet translation ... corrections likely)
+- pt_pt language added (internet translation ... corrections likely)
+- ko_kr language added (thank you Heewook Park [heewook.park@ge.com] )
+
+Oct 15, 2007 - v1.3
+- added plugin_item widget
+- removed dependency on select_path module- added file/directory selection widget
+- added style selection widget
+- added auto-generation of supplementary gui/framework & plugin files so developers can expand/customize produced GUI functionality in a place that the Dialog Designer won’t overwrite if the GUI layout is tweaked and re-built.
+- added FAQ section
+- added this “Release Information’ section
+
+Aug 8, 2007 - v1.2.1
+- de_de language added (thank you Stefan Alpers [stefan.alpers@its-service.de] )
+- Fixed scalability limitation so the generated build_gui() is not more than 256 lines long - now multiple methods are recursively generated.
+- Fixed initialisation issue with image_resource setting tool
+
+July 2, 2007 - v1.2
+- Initial release version, uploaded to SourceForge July 2, 2007.
+
+
+Graham Garlick
+graham@ifactorconsulting.com

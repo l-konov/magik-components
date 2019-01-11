@@ -1,0 +1,2 @@
+map.magik
+map_trail.magik

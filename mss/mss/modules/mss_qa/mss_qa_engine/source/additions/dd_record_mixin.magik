@@ -1,0 +1,44 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_qa}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_qa_records_for(mode, qa_engine)
+	## 
+	## Return a vector of information describing the records
+	## related to self that should be considered for QA checking.
+	## MODE is the search mode, which may be :trail, :scrapbook,
+	## :difference_stream, or :entire_database.  QA_ENGINE is the
+	## mss_qa_engine requesting this information.
+	##
+	## Each element in the return vector is a two-item vector of
+	## information:
+	## - the record to examine.
+	## - a true/false flag: if true, an attempt will be made to
+	##   determine if this record has already been processed, and
+	##   if it has, it will not be reprocessed (although this
+	##   capability is limited by the amount of data being examined
+	##   and it will be disabled once a threshold size of records
+	##   have been cached).  Note that if your QA checks run fast,
+	##   and have been written to properly identify errors with
+	##   unique descriptors, there is no harm in running a check
+	##   twice.
+	##
+
+	_if mode _is :trail
+	_then
+		# Default this to true, since multiple geometries could be
+		# found in the spatial scan for a given RWO.
+		dbl_check? << _true
+	_else
+		dbl_check? << _false
+	_endif
+	_return {{_self, dbl_check?}}
+	
+_endmethod
+$

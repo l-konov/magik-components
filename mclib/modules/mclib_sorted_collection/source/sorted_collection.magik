@@ -1,0 +1,499 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - October 2005
+##
+_package sw
+$
+
+
+##
+## The main goal of these additions (to the sorted_collection
+## core class) is
+## a) to reduce the time needed for sorting objects by using
+##    compiled Magik to sort data;
+## b) to allow the sorting of data by more than one attribute.
+##
+## The term "compiled Magik" refers to the trick to compile
+## Magik code "on-the-fly" at run-time so that perform() statements
+## can be avoided during the execution of Magik code.
+## If a small amount of data that needs to be sorted (500 objects
+## or less), the actual run-time difference between a compiled
+## procedure and a procedure created by using the sort_by()
+## callback is rather tiny. The Magik profiler will report a
+## difference, but it should not be noticable by a user.
+## The difference can become noticable when large amounts of
+## data are sorted, potentially on several fields, or if the
+## machine where the code is executed is performing other
+## tasks too.
+##
+
+
+_pragma(classify_level=advanced, topic={sorting}, usage={redefinable})
+##
+## This class constant defines the time-stamp format for the
+## source code that is automatically generated. The current
+## format is: month-name, day of month, year " at " HH:MM:SS. 
+##
+sorted_collection.define_shared_constant( :sf!code_time_stamp_format,
+	"#B #d,#Y at #H:#M:#S.",
+	:private )
+$
+
+
+##
+##	P U B L I C   A P I
+##	___________________
+##
+
+_pragma(classify_level=basic, topic={sorting})
+##
+## This Boolean class variable decides if the automatically generated
+## sorting procedures will add _try statements when data is accessed
+## from objects in the data that shall be sorted.
+## Using "unsafe" code - e.g. without _try blocks - is a little more
+## efficient and behaves like the core implementation when a
+## sorting procedure is defined by using the callback sort_by().
+##
+sorted_collection.define_shared_variable( :sf!safe_sorting?, _false, :public )
+$
+
+
+_pragma(classify_level=advanced, topic={sorting})
+_method sorted_collection.sf!new( a_collection, order_info,
+				  _optional distinct?, size )
+
+	## Public method for creating a sorted_collection which is
+	## sorted by a given set of fields. If distint? is _true then
+	## duplicate records are only added once to the sorted collection.
+	## This method explicitly uses a sorted_collection to sort
+	## (see new_collection above for a general interface).
+	##
+	## A_COLLECTION:
+	##	Any collection of objects; the collection class
+	##	must implement the callbacks elements() and
+	##	fast_elements().
+	##
+	## ORDER_INFO:
+	##	A vector of vectors that describes how items in
+	##	A_COLLECTION are supposed to be sorted. Each sub-
+	##	vector should be composed like this:
+	##	{ <field-access-callback> [, :asc|:desc ] }.
+	##	By default columns are sorted in ascending order;
+	##	to reverse the order use the symbol :desc.
+	##	E.g. { { :name, :desc },
+	##	       { :id,   :asc } }
+	##	would sort entries first by name in alphabetically
+	##	descending order and then by id in ascending order.
+	##
+	## DISTINCT?:
+	##	A Boolean which defaults to _false and determines
+	##	if identical objects in the passed data should be
+	##	removed prior to processing.
+	##
+	## SIZE:
+	##	A hint at the potential size of the sorted_collection.
+
+	_local base_class << _if distinct? _is _true
+			     _then >> sw:sorted_set
+			     _else >> _self
+			     _endif
+
+	_if order_info.empty?
+	_then
+		order_info << { :yourself }
+	_endif
+
+	>> base_class.from_collection(
+		   a_collection,
+		   _self.sf!build_order_proc_for( order_info ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={sorting})
+_method sorted_collection.sf!new_sorted_by_index( a_collection, order_info )
+
+	## A stripped down version of sf!new() with a slightly different
+	## interface.
+	##
+	## A_COLLECTION:
+	##	is any "list" of data that can be accessed with
+	##	an_element() or fast_elements().
+	##
+	## ORDER_INFO:
+	##	A vector of vectors, describing how data is
+	##	supposed to be sorted.  Each vector looks like this:
+	##	{ <column-index> [, :asc|:desc ] }.
+	##	<column-index> can be any object that is used to index
+	##	A_COLLECTION (e.g. an integer for ropes or simple_vectors,
+	##	or a key from property_lists or hash_tables).
+	##      By default data is sorted in ascending order.
+
+	_if order_info.empty? _then _return a_collection _endif
+
+	>> _self.from_collection(
+		   a_collection,
+		   _self.sf!build_index_order_proc_for( order_info ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={sorting})
+_method sorted_collection.sf!sort_by( order_info, _optional safe? )
+
+	## This callback allows to replace the current order
+	## procedure of _self.
+	## The main difference to the core callback sort_by() is that
+	## a) the created sorting procedure can work on multiple
+	##    fields and be sort ascending or descending;
+	## b) compiled Magik is used to sort data (e.g. no perfrom()
+	##    statements are used during the sorting).
+	##
+	## ORDER_INFO:
+	##	A vector of vectors that describes how objects in
+	##	_self are supposed to be sorted. Each sub-vector
+	##	should be composed like this:
+	##	{ <field-access-callback> [, :asc|:desc ] }.
+	##	By default columns are sorted in ascending order;
+	##	to reverse the order use the symbol :desc.
+	##	E.g. { { :name, :desc },
+	##	       { :id,   :asc } }
+	##	would sort entries first by name in alphabetically
+	##	descending order and then by id in ascending order.
+	##
+	## SAFE?:
+	##	A Boolean to indicate if the created code should
+	##	contain _try blocks to deal with _unset values.
+	##	If no value is provided, the value of class
+	##	constant sf!safe_sorting? will determine the value
+	##	for this paramter.
+
+	_self.order_proc <<
+		_self.sf!build_order_proc_for( order_info, safe? )
+_endmethod
+$
+
+
+##
+##	I N T E R N A L   C O D E
+##	_________________________
+##
+
+
+_pragma(classify_level=restricted, topic={sorting})
+_private _method sorted_collection.sf!build_order_proc_for(
+			 order_info, _optional safe?, show_source_code? )
+
+	## Build a procedure that orders two records, based on ORDER_INFO.
+
+	## ORDER_INFO:
+	##	Is a vector containing vectors of the form
+	##	{ <field name> [, :asc|:desc] }.
+	##	If the 2nd vector element is not :desc, the "column" will
+	##	be sorted ascending.
+	##
+	## SAFE?:
+	##	This Boolean value determines if the created code should
+	##	try to catch errors that might occur because accessed values
+	##	are _unset (and not suitable for comparison).
+	##	If no value is passed, the value of class constant
+	##	sf!safe_sorting? determines the value of this parameter.
+	##	Technically speaking this mean a _try statement will be
+	##	added to the code and if an error is encountered the
+	##	comparison value for the currently processed data pair
+	##	is _maybe.
+	##
+	## SHOW_SOURCE_CODE?:
+	##	A debugging helper. If set to _true, this method will
+	##	print out the source code before it is compiled.
+	#
+	# The produced code is supposed to look like this for ORDER_INFO
+	# passed as { { :size, :desc }, { :name } }:
+	#
+	#_proc @sf!collection_order_proc( obj1, obj2 )
+	#	## This procedure has been automatically generated
+	#	## on October 08,2005 at 15:01:31.
+	#	_local res
+	#	res << obj2.size _cf obj1.size
+	#	_if res <> _maybe _then _return res _endif
+	#	>> obj1.name _cf obj2.name
+	#_endproc
+	#
+	# When the class constant sf!safe_sorting? is _true or the
+	# parameter SAFE? is the Boolean value _true, the generated
+	# code will look like this:
+	#
+	#_proc @sf!collection_order_proc( obj1, obj2 )
+	#	## This procedure has been automatically generated
+	#	## on October 08,2005 at 15:01:38.
+	#	_local res
+	#	res << _try >> obj2.size _cf obj1.size _when error >> _maybe _endtry
+	#	_if res <> _maybe _then _return res _endif
+	#	>> _try >> obj1.name _cf obj2.name _when error >> _maybe _endtry
+	#_endproc
+
+	_local nl   << newline_char
+	_local tc   << tab_char
+	_local code << sw:internal_text_output_stream.new()
+	_local field_name
+	_local ordering
+	
+	_if safe? _is _unset _then safe? << _self.sf!safe_sorting? _endif
+
+	_self.sf!create_sort_proc_header( code, order_info.size > 1,
+					  "sf!collection_order_proc" )
+
+	_for cnt,field_info _over order_info.fast_keys_and_elements()
+	_loop
+		( field_name, ordering )<< ( _scatter field_info )
+
+		_self.sf!create_sort_proc_body( code, field_name, _false,
+						ordering _is :desc, safe?,
+						cnt = order_info.size )
+	_endloop
+
+	_self.sf!create_sort_proc_footer( code, show_source_code? )
+
+	>> code.string.evaluate()	     
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={sorting})
+_private _method sorted_collection.sf!build_index_order_proc_for(
+			 order_info, _optional safe?, show_source_code? )
+
+	## Build a procedure that orders two vectors, based on ORDER_INFO.
+	##
+	## ORDER_INFO:
+	##	A vector containing vectors of the form
+	##	{ <index-number> [, :asc|:desc] }.
+	##	If the second vector element is not :desc, this "column"
+	##	will be sorted ascending.
+	##
+	## SAFE?:
+	##	This Boolean value determines if the created code should
+	##	try to catch errors that might occur because accessed values
+	##	are _unset (and not suitable for comparison).
+	##	If no value is passed, the value of class constant
+	##	sf!safe_sorting? determines the value of this parameter.
+	##	Technically speaking this mean a _try statement will be
+	##	added to the code and if an error is encountered the
+	##	comparison value for the currently processed data pair
+	##	is _maybe.
+	##
+	## SHOW_SOURCE_CODE?:
+	##	A debugging helper. If set to _true, this method will
+	##	print out the source code before it is compiled.	
+	#
+	# The produced code is supposed to look like this for ORDER_INFO
+	# passed as { { 1, :asc }, { 2, :desc }, { 3, :desc } }:
+	#
+	#_proc @sf!indexed_collection_order_proc( obj1, obj2 )
+	#	## This procedure has been automatically generated
+	#	## on October 08,2005 at 15:02:21.
+	#	_local res
+	#	res << obj1[ 1 ] _cf obj2[ 1 ]
+	#	_if res <> _maybe _then _return res _endif
+	#	res << obj2[ 2 ] _cf obj1[ 2 ]
+	#	_if res <> _maybe _then _return res _endif
+	#	>> obj2[ 3 ] _cf obj1[ 3 ]
+	#_endproc
+	#
+	# When the class constant sf!safe_sorting? is _true or the
+	# parameter SAFE? is the Boolean value _true, the generated
+	# code will look like this:
+	#
+	#_proc @sf!indexed_collection_order_proc( obj1, obj2 )
+	#	## This procedure has been automatically generated
+	#	## on October 08,2005 at 15:02:28.
+	#	_local res
+	#	res << _try >> obj1[ 1 ] _cf obj2[ 1 ] _when error >> _maybe _endtry
+	#	_if res <> _maybe _then _return res _endif
+	#	res << _try >> obj2[ 2 ] _cf obj1[ 2 ] _when error >> _maybe _endtry
+	#	_if res <> _maybe _then _return res _endif
+	#	>> _try >> obj2[ 3 ] _cf obj1[ 3 ] _when error >> _maybe _endtry
+	#_endproc
+	
+	_local nl   << sw:newline_char
+	_local tc   << sw:tab_char
+	_local code << sw:internal_text_output_stream.new()
+	_local col_idx
+	_local ordering
+	_local reverse?
+	
+	_if safe? _is _unset _then safe? << _self.sf!safe_sorting? _endif
+
+	_self.sf!create_sort_proc_header( code, order_info.size > 1,
+					  "sf!indexed_collection_order_proc" )
+
+	_for cnt,field_info _over order_info.fast_keys_and_elements()
+	_loop
+		( field_idx, ordering )<< ( _scatter field_info )
+		_self.sf!create_sort_proc_body( code, field_idx, _true,
+						ordering _is :desc, safe?,
+						cnt = order_info.size )
+	_endloop
+
+	_self.sf!create_sort_proc_footer( code, show_source_code? )
+
+	>> code.string.evaluate()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={sorting}, usage={redefinable})
+_private _method sorted_collection.sf!create_sort_proc_header(
+			 a_stream, need_local_var?, a_proc_name )
+
+	## This is a helper method that create the header code for
+	## a (sorting) procedure.
+	##
+	## A_STREAM:
+	##	An (internal) output stream that collects the
+	##	Magik code that will be created.
+	##
+	## NEED_LOCAL_VAR?:
+	##	A Boolean variable that decides if a local variable
+	##	(named 'res') will be declared or not.
+	##
+	## A_PROC_NAME:
+	##	The name of the procedure that will be created.
+	#
+	# It is safe to simply change the generated code comment that is
+	# created by this method. If the name of the defined local variable
+	# is changed, please also update method sf!create_sort_proc_body()
+	# to use the 'new' variable name.
+
+	_local nl << newline_char
+	_local tc << tab_char
+
+	a_stream.write( "_proc @", a_proc_name, "( obj1, obj2 )",
+			nl, tc,
+			"## This procedure has been automatically generated",
+			nl, tc, "## on " )
+
+	date_time.now().format_to( a_stream, _self.sf!code_time_stamp_format )
+
+	_if need_local_var?
+	_then
+		a_stream.write( nl, tc, "_local res" )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={sorting})
+_private _method sorted_collection.sf!create_sort_proc_body(
+			 a_stream, an_access_value,
+			 keyed_access?, descending?, safe?, last_field? )
+
+	## This is a helper method that create the header code for
+	## a (sorting) procedure.
+	##
+	## A_STREAM:
+	##	An (internal) output stream that collects the
+	##	Magik code that will be created.
+	##
+	## AN_ACCESS_VALUE:
+	##	A (Magik) value that will provides access to the
+	##	necessary data (either a field name or key value).
+	##
+	## KEYED_ACCESS?:
+	##	This Boolean decides if code will be generated that
+	##	uses callbacks (.) or indexed access ([]).
+	##
+	## DESCENDING?:
+	##	This Boolean determines how to objects have to be
+	##	compared to achieve the desired sorting result.
+	##
+	## SAFE?:
+	##	This Boolean determines if _try statements should be
+	##	created to catch any problem when data is accessed
+	##	during the sorting process.
+	##
+	## LAST_FIELD?:
+	##	A Boolean indicator that tells if we deal with the
+	##	last field that is used for sorting or not.
+
+	_local nl << newline_char
+	_local tc << tab_char
+
+	_if last_field? _is _true
+	_then
+		a_stream.write( nl, tc, ">> " )
+	_else
+		a_stream.write( nl, tc, "res << " )
+	_endif
+
+	_if safe? _then a_stream.write( "_try >> " ) _endif
+	
+	_if reverse?
+	_then
+	    _if keyed_access?
+	    _then
+		    a_stream.write( "obj2[ ", an_access_value, " ] _cf obj1[ ",
+				              an_access_value, " ]" )
+	    _else
+		    a_stream.write( "obj2.", an_access_value,
+				    " _cf obj1.", an_access_value )
+	    _endif
+	_else
+	    _if keyed_access?
+	    _then
+		    a_stream.write( "obj1[ ", an_access_value, " ] _cf obj2[ ",
+				              an_access_value, " ]" )
+	    _else
+		    a_stream.write( "obj1.", an_access_value,
+				    " _cf obj2.", an_access_value )
+	    _endif
+	_endif
+
+	_if safe? _then a_stream.write( " _when error >> _maybe _endtry" ) _endif
+
+	_if last_field? _isnt _true
+	_then
+		a_stream.write( nl, tc,
+				"_if res <> _maybe _then _return res _endif" )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={sorting}, usage={redefinable})
+_private _method sorted_collection.sf!create_sort_proc_footer(
+			 a_stream, show_source_code? )
+
+	## This is a helper method that creates the Magik code for
+	## 'closing' a procedure. It also prints out the Magik source
+	## code to the terminal - if requested.
+	##
+	## A_STREAM:
+	##	An (internal) output stream that collects the
+	##	Magik code that will be created.
+	##
+	## SHOW_SOURCE_CODE?:
+	##	The name of the procedure that will be created.
+
+	a_stream.write( %newline, "_endproc" )
+
+	_if show_source_code? _is _true
+	_then
+		write( a_stream.string )
+	_endif
+_endmethod
+$

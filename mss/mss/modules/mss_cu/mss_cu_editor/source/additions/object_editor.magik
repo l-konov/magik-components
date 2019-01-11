@@ -1,0 +1,190 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method object_editor.mss_insert_with_cus(cu_list)
+	## 
+	## Inserts a new object using proposed field values, and
+	## assigns CUs based on the contents of CU_LIST.
+	## 
+
+	# Build the insert transaction, which is a copy of the work
+	# done in the insert() method (except that the transaction is
+	# not actually run yet).
+	proposed_values << _self.get_proposed_field_values(:insert)
+	my_collection << _self.collection
+	the_prev_object << _self.current_object
+	
+	data << _self.message(:insert_undo_description, my_collection.external_name)
+	rt << record_transaction.new_insert(my_collection, proposed_values, data)
+	ok_mess << _if rt.undoable?
+		   _then
+			   >> _self.message(:insert_succeeded)
+		   _else
+			   >> _self.message(:insert_permanently_succeeded)
+		   _endif
+	
+	# Add in processing to maintain CUs on the result, and run it.
+	pl << property_list.new_with(:object_editor, _self,
+				     :action, :insert,
+				     :proposed_values, proposed_values)
+	_if (dsg << _self.collection.record_exemplar.mss_cu_dataset_group_for_transaction(pl)) _is _unset
+	_then
+		dsg << _self.collection.source_view
+	_endif
+
+	crt << mss_cu_editor_transaction.new(dsg, _self,
+					     :|mss_maintain_cus()|, {rt, cu_list}, data)
+	crt.record_transaction << rt
+	_self.run_transaction(crt)
+	_self.check_transaction_result(rt)
+			
+	# Redisplay the status message which would be overwritten by .current_object<<
+	_self.changed(:status, :label, ok_mess)
+
+	# Redraws the geometry of previous object.
+	_self.redraw_prev_object_geom(the_prev_object, proposed_values)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method object_editor.mss_update_with_cus(cu_list)
+	## 
+	## Updates the current object using proposed field values, and
+	## assigns CUs based on the contents of CU_LIST.
+	## 
+
+	# Build the update transaction, which is a copy of the work
+	# done in the update() method (except that the transaction is
+	# not actually run yet).
+	proposed_values << _self.get_proposed_field_values(:update)
+	data << _self.message(:update_undo_description, _self.collection.external_name)
+	rt << record_transaction.new_update(_self.current_object, proposed_values, data)
+	ok_mess << _if rt.undoable?
+		   _then >> _self.message(:update_succeeded)
+		   _else >> _self.message(:update_permanently_succeeded)
+		   _endif
+
+	# Add in processing to maintain CUs on the result, and run it.
+	pl << property_list.new_with(:object_editor, _self,
+				     :action, :update,
+				     :proposed_values, proposed_values)
+	_if (dsg << _self.current_object.mss_cu_dataset_group_for_transaction(pl)) _is _unset
+	_then
+		dsg << _self.current_object.source_view
+	_endif
+	
+	crt << mss_cu_editor_transaction.new(dsg, _self,
+					     :|mss_maintain_cus()|, {rt, cu_list}, data)
+	crt.record_transaction << rt
+	_self.run_transaction(crt)
+	_self.check_transaction_result(rt)
+
+	# Redisplay the status message which would be overwritten by .current_object<<
+	_self.changed(:status, :label, ok_mess)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method object_editor.mss_place_with_cus(cu_list)
+	## 
+	## Insert a new object using the trail to set the designated
+	## default geometry field (as defined in the CASE Tool),
+	## and assigns CUs based on the contents of CU_LIST.
+	##
+
+	proposed_values << _self.get_proposed_field_values(:insert)
+	(ok?, geom_created?) << _self.set_default_geometry(proposed_values)
+
+	_if ok?
+	_then
+		_protect
+			ok? << _false 
+			_self.mss_insert_with_cus(cu_list)
+			ok? << _true
+		_protection
+			_if _not ok? _andif geom_created?
+			_then
+				# Clear the geom if it was a generated default.
+				val << property_list.new_with(_self.default_geom_field_name(), _unset)
+				_self.set_proposed_values(val)
+			_endif
+		_endprotect
+
+		# Only get here if insert was successful. If it wasn't we
+		# don't empty the trail.
+		_if geom_created?
+		_then 
+			_self.trail.empty()
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method object_editor.mss_move_with_cus(cu_list)
+	## 
+	## Update the current object using the trail to set the
+	## designated default geometry field (as defined in the CASE Tool),
+	## and assigns CUs based on the contents of CU_LIST.
+	##
+
+	proposed_values << _self.get_proposed_field_values(:insert)
+	(ok?, geom_created?) << _self.set_default_geometry(proposed_values)
+
+	_if ok?
+	_then
+		_protect
+			ok? << _false
+			_self.mss_update_with_cus(cu_list)
+			ok? << _true
+		_protection
+			_if _not ok? _andif geom_created?
+			_then
+				# Clear the geom if it was a generated default.
+				val << property_list.new_with(_self.default_geom_field_name(), _unset)
+				_self.set_proposed_values(val)
+			_endif
+		_endprotect
+
+		# Only get here if insert was successful. If it wasn't we
+		# don't empty the trail.
+		_if geom_created?
+		_then 
+			_self.trail.empty()
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method object_editor.mss_maintain_cus(rt, cu_list)
+	## 
+	## Run the insert or update transaction contained in RT, and
+	## then maintain compatible units for the resulting record,
+	## based on the contents of CU_LIST.
+	##
+
+	_if (rec << rt.run()) _is _unset
+	_then
+		# Duplicate key value for an insert transaction - don't do any
+		# CU processing, as an error will be raised downstream of this
+		# to indicate this to the user.
+		_return
+	_endif
+
+	mss_cu_engine.maintain_cus_for_record(rec, cu_list, mss_cu_engine.active_design)
+	_return rec
+	
+_endmethod
+$

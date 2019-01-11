@@ -1,0 +1,30 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method pub_rest.mss_ovc_consistency_roots(mode, engine, target_dataset)
+	##
+	## If self has a join to any car_park that is not yet being
+	## processed, then process it.
+	##
+	
+	r << _super.mss_ovc_consistency_roots(mode, engine, target_dataset)
+	_for p _over _self.car_parks.fast_elements()
+	_loop 
+		_if p.corresponding_record(target_dataset) _is _unset _andif
+		    _not engine.record_in_process_set?(p)
+		_then
+			engine.mark_as_pending_insert_update(p)
+			r.add_all_last(p.mss_ovc_consistency_roots(mode, engine, target_dataset))
+		_endif
+	_endloop
+	_return r
+	
+_endmethod
+$

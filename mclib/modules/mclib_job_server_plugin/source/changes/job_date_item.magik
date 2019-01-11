@@ -1,0 +1,45 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package sw
+$
+
+# KO below is the original that is commented out.
+#_pragma(classify_level=restricted, topic={job_server})
+#_method job_date_item.new( parent, label, owner, _optional value, dvm )
+#	## Create a new control and build it. See init() for arguments.
+#	_return _clone.init( parent, label, owner, value, dvm )
+#_endmethod
+#$
+
+# match up the new() arguments to the init() arguments.
+# FIXME: revisit at 4.1.1 as this may be addressed.
+_pragma(classify_level=restricted, topic={job_server})
+_method job_date_item.new( parent, label, owner, _gather args )
+	## Create a new control and build it. See init() for arguments.
+	_return _clone.init( parent, label, owner, _scatter args )
+_endmethod
+$

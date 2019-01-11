@@ -1,0 +1,439 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_state_transition_plugin.magik
+##
+## GUI plugin for handling state transitions for MSS workspace
+## functionality. 
+##
+
+def_slotted_exemplar(:mss_wm_state_transition_plugin,
+{
+	{:selected_job, _unset, :readable},
+	{:selected_design, _unset, :readable},
+	{:active_design, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_state_transition_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:selected_job, :selected_design},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_state_transition_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string},
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+##
+## Sets the name of the statusbar pane which will be used to
+## display merge/post status info. Defaults to
+## :status_info. 
+##
+mss_wm_state_transition_plugin.def_property(
+	:status_info_statusbar_pane_name,
+	:type, :symbol,
+	:default_value, :status_info)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.set_application_status_info_text(status_str)
+	## 
+	## Set the status info on the statusbar of self's owning application.
+	##
+
+	_if (app << _self.application) _isnt _unset _andif
+	    (st_info_key << _self.status_info_statusbar_pane_name) _isnt _unset
+	_then
+		app.update_statusbar(st_info_key, :text, status_str)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.selected_job << x
+	## 
+	## 
+
+	_if x _is _unset
+	_then
+		_if .selected_job _isnt _unset
+		_then
+			.selected_job << _unset
+			_self.manage_actions_for_selected_job()
+		_endif
+	_else
+		_if .selected_job _is _unset _orif
+		    .selected_job.id ~= x.id _orif
+		    .selected_job.status ~= x.status _orif
+		    .selected_job.name ~= x.name
+		_then
+			.selected_job << x.detached()
+			_self.manage_actions_for_selected_job()
+		_endif
+	_endif
+	_return .selected_job
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.selected_design << x
+	## 
+	## 
+
+	_if x _is _unset
+	_then
+		_if .selected_design _isnt _unset
+		_then
+			.selected_design << _unset
+			_self.manage_actions_for_selected_design()
+		_endif
+	_else
+		_if .selected_design _is _unset _orif
+		    .selected_design.id ~= x.id _orif
+		    .selected_design.status ~= x.status _orif
+		    .selected_design.job_and_design_full_name ~= x.job_and_design_full_name
+		_then
+			.selected_design << x.detached()
+			_self.manage_actions_for_selected_design()
+		_endif
+	_endif
+	_return .selected_design
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.active_design << x
+	## 
+	## 
+
+	_if x _is _unset
+	_then
+		_if .active_design _isnt _unset
+		_then
+			.active_design << _unset
+			_self.manage_actions_for_active_design()
+		_endif
+	_else
+		_if .active_design _is _unset _orif
+		    .active_design.id ~= x.id _orif
+		    .active_design.status ~= x.status _orif
+		    .active_design.job_and_design_full_name ~= x.job_and_design_full_name
+		_then
+			.active_design << x.detached()
+			_self.manage_actions_for_active_design()
+		_endif
+	_endif
+	_return .active_design
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.pre_activation()
+	## 
+	## 
+
+	mss_workspace_manager_engine.add_dependent(_self, :active_design)
+	_self.active_design << mss_workspace_manager_engine.active_design
+	
+	mss_workspace_manager_engine.view.add_dependent(_self, :view)
+	mss_workspace_manager_engine.view.add_observer(_self, {:update, :pre_delete},
+						       {:mss_job, :mss_design})
+
+	_self.manage_actions_for_selected_job()
+	_self.manage_actions_for_selected_design()
+	_self.manage_actions_for_active_design()
+	
+	_super.pre_activation()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.terminate()
+	## 
+	## 
+
+	mss_workspace_manager_engine.remove_dependent(_self, :active_design)
+	mss_workspace_manager_engine.view.remove_dependent(_self, :view)
+	mss_workspace_manager_engine.view.remove_observer(_self, {:update, :pre_delete},
+							  {:mss_job, :mss_design})
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :selected_job
+	_then
+		_self.selected_job << data
+	_elif data_type_name _is :selected_design
+	_then
+		_self.selected_design << data
+	_endif 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_if who _is mss_workspace_manager_engine
+	_then
+		_self.active_design << mss_workspace_manager_engine.active_design
+		
+	_elif who _is mss_workspace_manager_engine.view
+	_then
+		_if {:insert, :update, :pre_delete}.includes?(what)
+		_then 
+			tbl << data[1]
+			data_rec << data[2]
+			_if tbl.name _is :mss_job _andif
+			    .selected_job _isnt _unset _andif 
+			    data_rec.id = .selected_job.id
+			_then
+				_if what _is :pre_delete
+				_then
+					_self.selected_job << _unset
+				_else
+					_self.selected_job << data_rec
+				_endif
+			_endif 
+			_if tbl.name _is :mss_design _andif
+			    .selected_design _isnt _unset _andif 
+			    data_rec.id = .selected_design.id
+			_then
+				_if what _is :pre_delete
+				_then
+					_self.selected_design << _unset
+				_else
+					_self.selected_design << data_rec
+				_endif
+			_endif 
+			_if tbl.name _is :mss_design _andif
+			    data_rec = mss_workspace_manager_engine.active_design
+			_then
+				_if what _is :pre_delete
+				_then
+					_self.active_design << _unset
+				_else
+					_self.active_design << data_rec
+				_endif
+			_endif
+		_elif what _is :view
+		_then
+			# Re-get all records after a view change.
+			_if .selected_job _isnt _unset
+			_then
+				_self.selected_job << .selected_job.attached()
+			_endif 
+			_if .selected_design _isnt _unset
+			_then
+				_self.selected_design << .selected_design.attached()
+			_endif
+			_self.active_design << mss_workspace_manager_engine.active_design
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.manage_actions_for_selected_job()
+	## 
+	## 
+
+	role << :mss_selected_job_state_transitions
+	_if .selected_job _is _unset
+	_then
+		title << _self.message(:title_no_selected_job)
+	_else
+		title << _self.message(:title_selected_job, .selected_job.name)
+	_endif 
+	_self.update_menus_for_role(role, .selected_job, title)
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.manage_actions_for_selected_design()
+	## 
+	## 
+
+	role << :mss_selected_design_state_transitions
+	_if .selected_design _is _unset
+	_then
+		title << _self.message(:title_no_selected_design)
+	_else
+		title << _self.message(:title_selected_design, .selected_design.job_and_design_full_name)
+	_endif 
+	_self.update_menus_for_role(role, .selected_design, title)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.manage_actions_for_active_design()
+	## 
+	##
+	
+	role << :mss_active_design_state_transitions
+	_if .active_design _is _unset
+	_then
+		title << _self.message(:title_no_active_design)
+	_else
+		title << _self.message(:title_active_design, .active_design.job_and_design_full_name)
+	_endif 
+	_self.update_menus_for_role(role, .active_design, title)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.update_menus_for_role(role, rec, title)
+	## 
+	## 
+
+	new_states << _unset 
+	all_menus << _self.framework.get_all_gui_elements_with_role(role)
+	_for a_menu _over all_menus.fast_elements()
+	_loop
+		a_menu.empty()
+		
+		# Only need to figure this out the first time through:
+		_if new_states _is _unset
+		_then
+			_if rec _is _unset
+			_then 
+				new_states << {}
+			_else
+				new_states << rec.get_subsequent_state_names(_true)
+			_endif
+		_endif
+
+		act << sw_action.new(:st_heading,
+				     :engine, _self,
+				     :caption, title,
+				     :enabled?, rec _isnt _unset)
+		act.place_control_on(a_menu, :menu)
+
+		_if rec _isnt _unset
+		_then
+			cur_state << rec.status
+			separator_item.new(a_menu)
+			_if new_states.size = 0
+			_then
+				act << sw_action.new(:st_none,
+						     :engine, _self,
+						     :caption, _self.message(:no_subsequent_states),
+						     :enabled?, _false)
+				act.place_control_on(a_menu, :menu)
+			_else
+				_for i, st_name _over new_states.fast_keys_and_elements()
+				_loop
+					act << sw_action.new(write_string("st_", i).as_symbol(),
+							     :engine, _self,
+							     :caption, st_name,
+							     :action_message, {:|perform_state_transition()|, rec, cur_state, st_name})
+					act.place_control_on(a_menu, :menu)
+				_endloop 
+			_endif 
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_state_transition_plugin.perform_state_transition(det_rec, from_state_name, to_state_name)
+	## 
+	## Perform the state transition to move job or design DET_REC from
+	## the state named FROM_STATE_NAME to the state named
+	## TO_STATE_NAME.  Note that DET_REC can either be an
+	## instantiated or detached record, and if it is detached, it
+	## will be checked to ensure that it is still valid before
+	## proceeding. 
+	##
+
+	_local me << _self
+	_if (rec << det_rec.attached()) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:invalid_design))
+	_endif	
+
+	msg << _self.message(:performing_state_transition, from_state_name, to_state_name, rec.short_description)
+	_self.set_application_status_info_text(msg)
+	_self.status_string << msg
+
+	ok? << false
+	_protect
+		_handling mss_information _with
+		_proc(cond)
+			_import me
+			me.set_application_status_info_text(cond.report_contents_string)
+			me.status_string << cond.report_contents_string
+		_endproc
+		_handling mss_question _with _self.mss_question_handler
+		_handling ds_alternative_already_open_for_write _with _self.user_error_handler
+	
+		mss_workspace_manager_engine.perform_state_transition(
+			rec, from_state_name, to_state_name,
+			property_list.new_with(:gui_handler, _self))
+
+		_self.set_application_status_info_text("")
+		_self.status_string << ""
+		
+		_if rec _isnt _unset _andif
+		    rec = mss_workspace_manager_engine.active_design
+		_then
+			mss_workspace_manager_engine.check_writable_status()
+		_endif 
+		ok? << _true
+	_protection
+		_if _not ok?
+		_then
+			# Only blank this out if not OK - if processing completed OK,
+			# it may be displaying a useful message for user (from the
+			# check_writable_status() call).
+			_self.set_application_status_info_text("")
+			_self.status_string << ""
+		_endif
+	_endprotect 
+	
+_endmethod
+$

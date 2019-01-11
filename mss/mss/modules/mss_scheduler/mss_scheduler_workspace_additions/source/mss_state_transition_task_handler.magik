@@ -1,0 +1,132 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_state_transition_task_handler
+##
+## Task handler for performing state transitions for
+## jobs/designs in the mss_workspace modules.
+##
+
+def_slotted_exemplar(:mss_state_transition_task_handler,
+{},
+{:mss_scheduled_task_handler})
+$
+
+mss_scheduler_engine.define_task_handler(:design_state_transition, mss_state_transition_task_handler)
+mss_scheduler_engine.define_task_handler(:job_state_transition, mss_state_transition_task_handler)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_state_transition_task_handler.parameters_for_task_type(task_type)
+	## 
+	##
+
+	pl << property_list.new()
+	_if task_type _is :design_state_transition
+	_then
+		pl[:design_id] << {:integer}
+		pl[:from_state_name] << {:string}
+		pl[:to_state_name] << {:string}
+	_elif task_type _is :job_state_transition
+	_then
+		pl[:job_id] << {:integer}
+		pl[:from_state_name] << {:string}
+		pl[:to_state_name] << {:string}
+	_endif 
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_state_transition_task_handler.int!run()
+	## 
+	## Perform the work required to complete the state transition.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	mss_workspace_manager_engine.view.rollforward()
+	_protect
+		# Determine the job or design to be transitioned.
+		_if .type = "job_state_transition"
+		_then
+			_if (job_id << .parameters[:job_id]) _is _unset _orif
+			    (rec << mss_workspace_manager_engine.job_table.at(job_id)) _is _unset
+			_then
+				.failure_code << :missing_job
+				.error_output.write(_self.message(:job_id_not_found, job_id), newline_char)
+				_return _false 
+			_endif
+		_else 
+			_if (design_id << .parameters[:design_id]) _is _unset _orif
+			    (rec << mss_workspace_manager_engine.design_table.at(design_id)) _is _unset
+			_then
+				.failure_code << :missing_design
+				.error_output.write(_self.message(:design_id_not_found, design_id), newline_char)
+				_return _false 
+			_endif
+		_endif
+		
+		# Perform state transition processing.
+		res << _self.state_transition(rec)
+	_protection
+		# Upon completion, ensure there is no active design.
+		mss_workspace_manager_engine.open_design(_unset)
+	_endprotect
+	
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_state_transition_task_handler.state_transition(rec)
+	## 
+	## 
+
+	_handling mss_information _with procedure
+	_handling mss_question _with procedure
+	
+	# Open the design to be processed - this is necessary for some
+	# state transitions.
+	_if rec.source_collection.name _is :mss_design
+	_then
+		mss_workspace_manager_engine.open_design(rec)
+	_endif
+	
+	# Determine the state transitions for success/failure.
+	wf << rec.workflow()
+	from_state_name << .parameters[:from_state_name].default("")
+	_if rec.status ~= from_state_name
+	_then
+		.failure_code << :wrong_from_state
+		.error_output.write(_self.message(:wrong_from_state, rec.short_description, rec.status, from_state_name))
+		_return _false
+	_endif
+	
+	to_state_name << .parameters[:to_state_name].default("")
+	trans << wf.get_state_transition(rec.source_collection.name, from_state_name, to_state_name)
+	
+	_if trans _is _unset
+	_then
+		.failure_code << :missing_transition
+		.error_output.write(_self.message(:missing_transition, rec.short_description, from_state_name, to_state_name))
+		_return _false 
+	_endif
+
+	trans.perform_state_transition(rec, property_list.new())
+
+	_return true
+	
+_endmethod
+$

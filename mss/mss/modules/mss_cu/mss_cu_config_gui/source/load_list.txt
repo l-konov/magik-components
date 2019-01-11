@@ -1,0 +1,14 @@
+message_usages.magik
+
+mss_cu_config_framework.magik
+mss_cu_config_fw_pi.magik
+
+mss_cu_properties_dialog.magik
+
+mss_cu_general_config_plugin.magik
+mss_cu_cost_group_config_plugin.magik
+mss_cu_import_export_config_plugin.magik
+mss_cu_group_config_plugin.magik
+mss_cu_job_type_config_plugin.magik
+mss_cu_mu_config_plugin.magik
+mss_cu_property_config_plugin.magik

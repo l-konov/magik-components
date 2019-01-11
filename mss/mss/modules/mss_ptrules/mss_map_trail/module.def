@@ -1,0 +1,10 @@
+mss_map_trail	1
+
+description
+	MSS additions to map_trail functionality
+end
+
+requires
+	mss_application_databus
+	mss_core_changes
+end

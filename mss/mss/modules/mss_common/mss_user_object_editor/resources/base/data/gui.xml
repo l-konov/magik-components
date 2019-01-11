@@ -1,0 +1,42 @@
+
+<gui base="editor_plugin.gui">
+
+  <toolbar name="other">
+    <action name="highlight_on_selection" source="field_lister"/>
+    <pulldown mode="simple" execute="yes">
+      <action name="select_geometry" source="field_lister"/>
+      <action name="select_geometry" source="field_lister"/>
+      <action name="add_geometry_to_selection" source="field_lister"/>
+      <action name="remove_geometry_from_selection" source="field_lister"/>
+    </pulldown>
+    <pulldown mode="simple" execute="yes">
+      <action name="select_spatial_context_and_goto"/>
+      <action name="select_spatial_context_and_goto"/>
+      <action name="select_spatial_context_and_goto_new_window"/>
+    </pulldown>
+    <action name="copy_to_scrapbook"/>
+    <action name="help"/>
+  </toolbar>
+
+  <work_area>
+    <paned_window side_by_side="no" dynamic="no">
+      <self stretch="0"/>
+      <paned_window side_by_side="no" dynamic="yes" stretch="100">
+        <plugin plugin_name="field_lister" stretch="100"/>
+	<tab_box>
+	  <!-- The following paned_window looks useless, but it is required because
+	       object_editor_field_lister.update_embedded_gui() fails when it is
+	       built in a property_page instead of a paned_window. -->
+          <paned_window side_by_side="no" dynamic="no" tab_label_id="embedded_field_value_editor">
+            <plugin plugin_name="field_lister" gui_type="field_value_editor"/>
+          </paned_window>
+          <plugin plugin_name="rwo_specials"/>
+	</tab_box>
+      </paned_window>
+    </paned_window>
+  </work_area>
+
+</gui>
+
+
+

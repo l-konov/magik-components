@@ -1,0 +1,100 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method map_gui_framework.note_change( who, aspect, _gather data )
+	## 
+	## Handle change notifications.
+	##
+
+	# 2004/07/02 TM  If already in :mss_ptrule mode, do not
+	#                forcibly change to :geometry mode when
+	#                a trail notification happens.
+	# 2011/04/25 TM  Updated for V4.2 compatibility.
+	
+        #show( _self, "note_change", who, aspect, _scatter data )
+        
+	_super.note_change( who, aspect, _scatter data )
+	
+	_if .document _isnt _unset
+	_then
+		_if who _is .document
+		_then
+			_if aspect _is :angular_coordinate_display_format _orif
+			    aspect _is :linear_coordinate_display_format
+			_then
+				_self.update_statusbar( _self.location_statusbar_pane_name,
+							:text, _self.location_description())
+			_endif 
+			
+		_elif who _is .document.map
+		_then
+			_if aspect _is :selection
+			_then
+				( a_geometry_set ) << ( _scatter data )
+                                _self.handle_selection_change( who, a_geometry_set )
+                        _elif aspect _is :selection_content
+                        _then
+                                ( an_rwo_set, a_geometry_set ) << ( _scatter data )
+                                _self.handle_selection_change( who, a_geometry_set )
+			_elif aspect _is :trail
+			_then
+				_dynamic !suppress_trail_interaction_mode?!
+
+				# MSS START CHANGE
+				_if !suppress_trail_interaction_mode?! _is _false
+				_then 
+					pers_mode << .the_interaction_handler.mss_current_persistent_mode
+					_if pers_mode.name _is :mss_ptrule _andif
+					    pers_mode.mss_trail_enabled?()
+					_then
+						# If working in mss_ptrule mode, and if the active ptrule is
+						# expecting a trail, then stay in that mode rather than
+						# switching to geometry mode.
+						#
+						# Note that this applies, even if this got initiated by a
+						# trail-based action: for example, clearing or reversing the
+						# trail.  Thus, we cannot rely on the
+						# !suppress_trail_interaction_mode?! being reliably set.
+						# (that is, it can be set to true for things initiated by the
+						# mss_ptrule_manager, but not by the trail).
+						!suppress_trail_interaction_mode?! << _true 
+					_endif
+				_endif 
+				# MSS END CHANGE
+				
+				(a_trail, from_trail?) << (_scatter data)
+				_if !suppress_trail_interaction_mode?!  _is _false _andif 
+				    from_trail? _is _true _andif
+				    _self.interaction_mode_enabled?( :geometry ) _andif 
+				    (mode << _self.current_interaction_mode).name _isnt :geometry 
+				_then
+					_self.set_interaction_mode(:geometry)
+				_endif
+
+				_self.databus_make_data_available( :map_trail, { a_trail.owner, a_trail })
+				
+				_self.update_statusbar( _self.location_statusbar_pane_name,
+							:text, _self.location_description())
+
+				
+			_elif aspect _is :trail_projection _orif 
+			      aspect _is :trail_measurement_type _orif 
+			      aspect _is :linear_coordinate_display_format _orif 
+			      aspect _is :length_display_format
+			_then
+				_self.update_statusbar( _self.location_statusbar_pane_name,
+							:text, _self.location_description())
+				
+			_endif 
+		_endif 
+	_endif 
+
+_endmethod
+$

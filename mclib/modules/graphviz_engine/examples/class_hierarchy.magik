@@ -1,0 +1,103 @@
+_package sw
+$
+_global graphviz_class_hierarchy <<
+_proc@graphviz_class_hierarchy(output_format,output_directory,_optional filter_type)
+
+	## Usage:
+	##
+	## graphviz_class_hierarchy(:svg,"c:\temp",:dot)
+
+	write("The following output files have been created...")
+	_for a_ds _over gis_program_manager.cached_datasets()
+	_loop
+		_if a_ds.is_kind_of?(database_view)
+		_then
+			_local output_file << system.pathname_down(output_directory,
+								   write_string(a_ds.name,"_class_hierarchy.",output_format))
+			
+			a_ds.graphviz_create_inheritance_chart(output_format,
+							       output_file,
+							       filter_type)
+
+			write(output_file)				       
+		_endif
+	_endloop
+_endproc
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method database_view.graphviz_create_inheritance_chart(output_format,output_filename,_optional filter_type)
+	## 
+	## 
+	
+	_global dg
+
+	dg << dot_graph.new("ClassHierarchy")
+
+	dg.set_attribute(:concentrate,"true")
+	
+	_local method_tables << equality_set.new()
+
+	# first, get all the record_exemplar's method_tables that we
+	# are interested in.
+
+	dg.set_attribute(:label,_self.external_name)
+ 	
+	_for a_coll _over _self.collections.fast_elements()
+	_loop
+		_if a_coll.name.index_of(%!) _isnt _unset 
+		_then
+			_continue 
+		_endif
+
+		_local rex << a_coll.descriptor.record_exemplar
+		_local mt  << rex.method_table
+		method_tables.add(mt)
+
+		_local a_node
+		
+		_if rex.class_name _isnt a_coll.name
+		_then
+			a_node << dg.create_node(a_coll.name)
+			_local a_edge << dg.create_edge({rex.class_name,a_coll.name})
+		_else
+			a_node << dg.create_node(rex.class_name)
+		_endif
+
+		a_node.set_attribute(:label,write_string(a_coll.external_name,"\n(",a_coll.name,")"))
+		a_node.set_attribute(:tooltip,a_coll.external_name)
+		a_node.set_attribute(:color,"crimson")
+		a_node.set_attribute(:style,"filled")
+		a_node.set_attribute(:shape,"box")
+
+		_for a_parent _over mt.parents(_true)
+		_loop
+			method_tables.add(a_parent)
+		_endloop
+	_endloop
+
+	# then loop over each method_table and make a dot_edge for each
+	# connection to an immediate parent.
+	_loop
+		_local a_method_table << method_tables.an_element()
+
+		_if a_method_table _is _unset 
+		_then
+			_leave 
+		_endif
+		
+		method_tables.remove(a_method_table)
+
+		# in this case, DO NOT specify _true in the parents() argument
+		# because we DO NOT want a recursive result.
+		_for a_parent _over a_method_table.parents()
+		_loop
+			dg.create_edge({a_parent.metadata[:class_name],a_method_table.metadata[:class_name]})
+		_endloop
+	_endloop
+	
+	# then continuously loop to find parent/child relationships. 
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+
+_endmethod
+$

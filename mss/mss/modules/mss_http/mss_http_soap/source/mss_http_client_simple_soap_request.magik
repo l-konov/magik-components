@@ -1,0 +1,148 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_client_simple_soap_request
+##
+## Wrapper to format information suitable for sending a request
+## to an HTTP SOAP server.  This is "simple", because documents
+## are explicitly converted to a stored string (rather than
+## streamed directly), which will impose limits on the volume of
+## data that can be handled.
+##
+## Example use:
+## - Set variable Y to be a SOAP request to get the current
+##   time from time.soapware.org.:
+##   - soap_eng << mss_http_soap_engine.new()
+##   - soap_eng.add_to_body(simple_xml_thing.new("getCurrentTime"))
+##   - y << soap_eng.document
+##
+## Then, the following can be issued:
+## - x << mss_http_client_simple_soap_request.new(
+##         :url, "http://time.soapware.org/currentTime",
+##         :soap_action, write_string(%", "/currentTime", %"),
+##         :soap_document, y)
+## - x.execute()  [or x.debug_execute() for debug details]
+## - res << x.response.response_body_as_xml()
+##
+## To debug-print the simple_xml_document received:
+## - res.elements[1].pprint_on(indentation_stream.new(!terminal!))
+##
+## As a more complex example, create the document variable Y as follows:
+## - t1 << simple_xml_thing.new("mns:NDFDgenByDay", _unset,
+##    {"xmlns:mns", "http://www.weather.gov/forecasts/xml/DWMLgen/wsdl/ndfdXML.wsdl",
+##     "SOAP-ENV:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/"})
+## - t1.elements.add(simple_xml_thing.new("latitude", "48.0", {"xsi:type", "xsd:decimal"}))
+## - t1.elements.add(simple_xml_thing.new("longitude", "-111.0", {"xsi:type", "xsd:decimal"}))
+## - t1.elements.add(simple_xml_thing.new("startDate", "2007-05-14", {"xsi:type", "xsd:date"}))
+## - t1.elements.add(simple_xml_thing.new("numDays", "5", {"xsi:type", "xsd:integer"}))
+## - t1.elements.add(simple_xml_thing.new("format", "24 hourly", {"xsi:type", "typens:formatType"}))
+## - soap_eng << mss_http_soap_engine.new()
+## - soap_eng.add_to_body(t1)
+## - y << soap_eng.document
+##
+## Then, ask NOAA for the forecast for those days:
+## - x << mss_http_client_simple_soap_request.new(
+##         :url, "http://www.weather.gov/forecasts/xml/SOAP_server/ndfdXMLserver.php",
+##         :soap_action, "http://www.weather.gov/forecasts/xml/DWMLgen/wsdl/ndfdXML.wsdl#NDFDgenByDay",
+##         :soap_document, y)
+## - x.debug_execute()
+##
+
+def_slotted_exemplar(:mss_http_client_simple_soap_request,
+{
+	{:soap_action, _unset},
+	{:soap_document, _unset}
+},
+{:mss_http_client_request})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_simple_soap_request.define_slot_access(
+	:soap_action,
+	## SOAPAction string to be sent in header.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_simple_soap_request.define_slot_access(
+	:soap_document,
+	## The simple_xml_document that is to be sent.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+mss_http_client_simple_soap_request.define_shared_constant(
+	:option_types,
+	## A set of option types recongized by this class.
+	_block
+		_local s
+		s << mss_http_client_request.option_types.copy()
+		s.add(:default_text_encoding)
+		>> s
+	_endblock,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_simple_soap_request.init_defaults()
+	## 
+	## 
+
+	_super.init_defaults()
+	.http_request_method << "POST"
+	_self.set_option(:content_type, "text/xml")
+	_self.set_option(:default_text_encoding, :utf8)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_simple_soap_request.init_header_fields_for_request()
+	## 
+	## Initialize header data for sending a request.
+	## 
+
+	_super.init_header_fields_for_request()
+	_if .soap_action _isnt _unset
+	_then
+		_self.set_header_field("SOAPAction", .soap_action)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+_method mss_http_client_simple_soap_request.soap_document << x
+	## 
+	## If a soap_document has been provided, use that to set the
+	## raw_post_string. 
+	##
+
+	.soap_document << x
+	s1 << internal_text_output_stream.new()
+	s2 << xml_output_stream.new(s1, :minimise_whitespace?, _true)
+
+	# N.B.: support for text encoding on internal streams is only
+	# managed via a shared variable, so set it as safely as possible.
+	old_dte << s2.default_text_encoding
+	_protect
+		s2.default_text_encoding << _self.get_option(:default_text_encoding)
+		simple_xml.write_document_on(s2, x)
+	_protection
+		s2.default_text_encoding << old_dte
+	_endprotect
+	
+	.raw_post_string << s1.string
+	
+_endmethod
+$

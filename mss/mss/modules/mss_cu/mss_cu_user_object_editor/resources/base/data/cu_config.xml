@@ -1,0 +1,5 @@
+<config base="mss_user_object_editor.config">
+  <plugins>
+    <plugin name="cu_editor" class_name="mss_cu_editor_plugin"/>
+  </plugins>
+</config>

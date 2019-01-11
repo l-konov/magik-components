@@ -1,0 +1,10 @@
+mss_qa	1
+
+description
+	MSS Quality Assurance
+end
+
+requires
+	mss_qa_engine
+	mss_qa_gui
+end

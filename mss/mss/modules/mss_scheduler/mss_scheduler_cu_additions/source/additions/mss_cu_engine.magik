@@ -1,0 +1,47 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_cu_engine.submit_export_cus_task(rec, parms)
+	## 
+	## Submit a scheduled task to export CUs for design REC.  PARMS is a
+	## list of parameters to pass to the task.
+	##
+
+	tbl << mss_scheduler_engine.scheduled_task_collection
+	
+	# Format the parameter text.
+	pl << property_list.new_with(:design_id, rec.id)
+	_if (x << parms[:output_filename]) _isnt _unset
+	_then
+		pl[:output_filename] << x
+	_endif
+	_if (x << parms[:include_parent_designs?]) _isnt _unset
+	_then
+		pl[:include_parent_designs?] << x
+	_endif
+	_if (x << parms[:combine_similar_cus?]) _isnt _unset
+	_then
+		pl[:combine_similar_cus?] << x
+	_endif
+	parm_text << tbl.record_exemplar.parameter_text_for_property_list(pl)
+
+	# Create a transaction to insert this record.
+	pl << property_list.new_with(
+		      :type, :export_cus,
+		      :submitter, gis_program_manager.login_name,
+		      :priority, parms[:priority].default(5),
+		      :scheduled_start_time, parms[:scheduled_start_time].default(date_time.now()),
+		      :schedule_interval, 0,
+		      :parameter_text, parm_text)
+	rt << record_transaction.new_insert(tbl, pl)
+	rt.run()
+										  
+_endmethod
+$

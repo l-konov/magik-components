@@ -1,0 +1,18 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# Make the following slot readable.
+#
+_pragma(classify_level=basic)
+group_editor_field_item.define_slot_access(
+	:group_name,
+	## The name of the group that self manages.
+	:readable,
+	:public)
+$

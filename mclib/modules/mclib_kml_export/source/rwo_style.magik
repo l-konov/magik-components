@@ -1,0 +1,28 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-09-29 19:57:03 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_style.kml_style()
+	## returns the KML representation of me.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	actual << _self.actual_gis_style
+	>> actual.kml_style()
+_endmethod
+$

@@ -1,0 +1,11 @@
+mclib_rwo_predicates_plugin		4000
+
+description
+	A plugin which supports managing RWO predicates for an application
+end
+
+requires
+	mclib_package
+	ace_core
+	component_framework
+end

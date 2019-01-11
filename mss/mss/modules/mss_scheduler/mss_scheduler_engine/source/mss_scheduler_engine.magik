@@ -1,0 +1,913 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+# Indicated portions Copyright © 2005 Brad Sileo.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_engine.magik
+##
+## Engine class for performing the central processing for the
+## MSS task manager.  Also includes its own thread handling
+## actions that can be plugged in to any GUI.
+##
+
+def_slotted_exemplar(:mss_scheduler_engine,
+{
+	{:thread, _unset, :readable},
+	{:run_status, _unset, :readable},
+	{:soft_interrupt?, _unset, :readable},
+	{:managed_task_types, _unset, :readable},
+	{:running_task_result, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+mss_scheduler_engine.define_property(
+	:auto_run_scheduler_engine?, :boolean,
+	"Should we start the server automatically on init?",
+	_true, _false, _false)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+mss_scheduler_engine.define_property(
+	:active_task_types, :string,
+	"A comma separated list of task types that will be initially active, or unset for all",
+	_true, _true, _unset)
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+mss_scheduler_engine.define_shared_constant(
+	:databus_producer_data_types,
+	{:managed_task_types, :run_status, :run_status_string},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable, subclassable})
+mss_scheduler_engine.define_shared_constant(
+	:scheduled_task_table_name,
+	## The name of the table that holds scheduled tasks.
+	:mss_scheduled_task,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable, subclassable})
+mss_scheduler_engine.define_shared_constant(
+	:scheduled_task_result_table_name,
+	## The name of the table that holds scheduled task results.
+	:mss_scheduled_task_result,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+mss_scheduler_engine.define_shared_variable(
+	:defined_task_handlers,
+	## Property list of all known task types, along with the class
+	## that is used to handle that type.
+	property_list.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+mss_scheduler_engine.define_shared_constant(
+	:view_name,
+	## The name of the database view that holds scheduler information.
+	:mss_scheduler,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_engine.view
+	## 
+	## The database view that holds scheduler information.
+	##
+
+	_return gis_program_manager.cached_dataset(_self.view_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_engine.scheduled_task_collection
+	##
+	## Returns the collection where my scheduled tasks are stored.
+	##
+
+	# (02-09-2005 Brad Sileo, TenSails): created.
+	
+	_return _self.view.collections[_self.scheduled_task_table_name]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_engine.scheduled_task_result_collection
+	##
+	## Returns the collection where my scheduled task results are
+	## stored.
+	##
+
+	# (02-09-2005 Brad Sileo, TenSails): created.
+	
+	_return _self.view.collections[_self.scheduled_task_result_table_name]
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduler_engine.verify_dataset(_optional check_only?)
+	##
+	## Confirms that my dataset is open, and opens it if needed
+	## unless check_only? is true.  If the dataset is not opened at
+	## the end of this run, raises :no_datasets_opened.
+	## The open(ed) view is returned.
+	##
+
+	# (02-11-2005 Brad Sileo): created.
+	
+	_if (a_view << _self.view) _is _unset
+	_then
+		_if check_only? _isnt _true 
+		_then
+			_self.open_dataset()
+		_endif
+		_if (a_view << _self.view) _is _unset
+		_then
+			condition.raise(:no_datasets_opened, :string, _self.message(:dataset_open_failed))
+		_endif
+	_endif
+	_return a_view
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method mss_scheduler_engine.open_dataset()
+	##
+	## Opens my scheduler dataset and returns the SOC holding
+	## it.  Raises no_datasets_opened if this fails.
+	## 
+
+	# (02-11-2005 Brad Sileo): created.
+	
+	_return gis_program_manager.open_datasets(_self.view_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_engine.define_task_handler(type, a_handler)
+	## 
+	## Define A_HANDLER to be the class used to handle tasks of
+	## type TYPE.
+	##
+
+	_self.defined_task_handlers[type] << a_handler
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_engine.get_task_handler_exemplar(type)
+	## 
+	## Return the exemplar handler used to handle tasks of
+	## type TYPE.
+	##
+
+	_return _self.defined_task_handlers[type]
+	
+_endmethod
+$
+
+# Thread handling methods - copied from engine_model.
+#
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.run_status << status
+	## 
+	## Similar functionality as for engine_model.
+	##
+
+	_if (fw << _self.framework) _isnt _unset _andif
+	    (tf << fw.top_frame) _isnt _unset
+	_then
+		tf.busy? << status _is :running
+	_endif 
+	_self.action(:process_tasks).enabled? << status _isnt :running
+	_self.action(:soft_interrupt).enabled? << .soft_interrupt? _isnt _true _andif
+						  status _is :running
+	_self.action(:hard_interrupt).enabled? << status _is :running
+	.run_status << status
+	_self.changed(:run_status)
+	_self.changed(:run_status_string)
+	_self.databus_make_data_available(:run_status, status)
+	_self.databus_make_data_available(:run_status_string, _self.run_status_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.run_status_string
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_return _self.message(.run_status)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.run_engine(priority, method_name, _gather args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		_self.user_error(:engine_running)
+	_endif
+	.soft_interrupt? << _false 
+	.thread << _proc(model, method, args)
+			   model.int!run_engine(method, args)
+		   _endproc.fork_at(priority, _self, method_name, args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.int!run_engine(method, _optional args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_protect
+		_handling user_error _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		_self.run_status << :running
+		_if method.is_class_of?({})
+		_then
+			method.new_appending(_scatter args).send_to(_self)
+		_else
+			_self.perform(method,_scatter args)
+		_endif
+	_protection
+		.thread << _unset
+		_self.run_status << :ready
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.soft_interrupt()
+	## 
+	## Simply flag the inner loop to stop after the next completed
+	## task.
+	##
+
+	.soft_interrupt? << _true
+	_self.action(:soft_interrupt).enabled? << _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.hard_interrupt()
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if _self.top_frame _isnt _unset _andif
+	    _self.show_question(_self.message(:ok), _self.message(:cancel),
+				_self.message(:warn_hard_interrupt)) _is _false 
+	_then
+		_return
+	_endif
+	
+	_if .thread _isnt _unset
+	_then
+		.thread.kill_and_wait()
+	_endif
+	_self.run_status << :ready
+	_self.status_string << _self.message(:interrupted)
+
+	_if (task_res << _self.running_task_result) _isnt _unset _andif
+	    task_res.outcome_code = "Pending"
+	_then
+		_self.flag_hard_interrupt(task_res)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_engine.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.init(_gather args)
+	## 
+	##
+
+	_super.init(_scatter args)
+	.thread << _unset
+	.run_status << :ready
+	.soft_interrupt? << _false
+	.managed_task_types << property_list.new()
+	_for i _over _self.defined_task_handlers.fast_keys_and_elements()
+	_loop
+		.managed_task_types[i] << _true
+	_endloop
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:process_tasks,
+				       :short_help_text, _self.message(:process_tasks_sh),
+				       :engine, _self,
+				       :image, {:forward, :ui_resources},
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|process_tasks()|}))
+	_self.add_action(sw_action.new(:soft_interrupt,
+				       :short_help_text, _self.message(:soft_interrupt_sh),
+				       :enabled?, _false,
+				       :engine, _self,
+				       :image, {:stop, :ui_resources},
+				       :action_message, :|soft_interrupt()|))
+	_self.add_action(sw_action.new(:hard_interrupt,
+				       :short_help_text, _self.message(:hard_interrupt_sh),
+				       :enabled?, _false,
+				       :engine, _self,
+				       :image, {:cross, :ui_resources},
+				       :action_message, :|hard_interrupt()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_engine.running_task_result
+	## 
+	## Return the currently running mss_scheduled_task_result record.
+	##
+
+	_if .running_task_result _isnt _unset _andif
+	    _not .running_task_result.is_valid?
+	_then
+		.running_task_result << _unset
+	_endif
+	_return .running_task_result
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduler_engine.initial_managed_task_types()
+	##
+	## returns a list of symbols based on the value of :active_task_types
+	## This will be unset if no specific active_task_types are
+	## configured for me.  Otherwise, it is a list of symbols which
+	## are task handler types.
+	##
+
+	# (02-11-2005 Brad Sileo): created.
+	
+	_if (att << _self.active_task_types) _is _unset _then _return _unset _endif 
+	types << att.split_by(%,).map(_proc(e) >> e.as_symbol() _endproc)
+	_return types
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.post_init_plugins()
+	## 
+	## setup my managed types based on the active_task_types_property.
+	##
+
+	# (02-11-2005 Brad Sileo): created.
+	
+	_if (active_types << _self.initial_managed_task_types()) _isnt _unset 
+	_then
+		_for i _over _self.defined_task_handlers.fast_keys_and_elements()
+		_loop
+			.managed_task_types[i] << active_types.includes?(i)
+		_endloop
+		_self.changed(:managed_task_type_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.post_activation()
+	## 
+	## Start me auto running if the :auto_run_scheduler_engine?
+	## property is true.
+	##
+
+	# (02-11-2005 Brad Sileo): created.
+	
+	_if _self.auto_run_scheduler_engine? _is _true 
+	_then
+		_self.action(:process_tasks).execute_action()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_engine.permission_to_terminate?()
+	## 
+	## Check if I am running and refuse to terminate if so.
+	##
+
+	# (01-31-2005 Brad Sileo, TenSails): created.
+	
+	_if _self.run_status _is :running
+	_then
+		condition.raise(:termination_aborted, :object, _self,
+				:reason, _self.message(:task_server_running))
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_engine.terminate_on_close?
+	## 
+	## Set me to terminate on close.
+	##
+
+	# (01-31-2005 Brad Sileo, TenSails): created.
+	
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.terminate()
+	## 
+	## 
+
+	_self.soft_interrupt()
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_if data_type_name _is :managed_task_types
+	_then
+		_return .managed_task_types
+	_elif data_type_name _is :run_status
+	_then
+		_return .run_status
+	_elif data_type_name _is :run_status_string
+	_then
+		_return _self.run_status_string
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.tab_label << _self.message(:tab_label)
+	p.start_row()
+	tree_item.new(p,
+		      :grid_lines?, _true,
+		      :model, _self,
+		      :aspect, :managed_task_type_list,
+		      :data_selector, :managed_task_type_list,
+		      :value_changed_notifier, :|managed_task_type_value_changed()|,
+		      :column_widths, {200, 70},
+		      :column_headings, {_self.message(:ch_task_type),
+					 _self.message(:ch_enabled?)},
+		      :column_allow_sort?, _false,
+		      :mode, :none,
+		      :resize_x?, _false,
+		      :resize_y?, _true) 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.managed_task_type_list
+	## 
+	## 
+
+	sc << sorted_collection.new(10, _proc(a, b)
+						_return a.value[:external_name] _cf
+							b.value[:external_name]
+				    _endproc)
+
+	sstr << styled_string.new(:value, :external_name, :tab_centre,
+				  :toggle, :enabled?)
+	_for i, j _over _self.defined_task_handlers.fast_keys_and_elements()
+	_loop
+		pl << property_list.new_with(:external_name, j.external_name_for_task_type(i),
+					     :enabled?, .managed_task_types[i].default(_false))
+		dt << display_tree.new(i, pl)
+		dt.styled_string << sstr
+		sc.add(dt)
+	_endloop
+
+	_return sc
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.managed_task_type_value_changed(a_tree, value_id, new_value)
+	## 
+	## 
+
+	.managed_task_types[a_tree.key] << new_value
+	_self.databus_make_data_available(:managed_task_types, .managed_task_types)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.process_tasks()
+	## 
+	## Do the work of finding the next task, and performing it.
+	##
+
+	_dynamic !mss_scheduler_initiator! << _self
+	
+	.soft_interrupt? << _false 
+	ok? << _false
+	_local me << _self
+	_local major_error_count << 0
+	
+	_protect
+		_self.status_string << ""
+
+		_loop
+			_catch :any_error
+			       _handling error _with
+			       _proc(cond)
+				       # For the outer error handler, no errors are expected, since
+				       # any application-specific errors for a particular task are
+				       # handled by the mss_scheduled_task_handler.run() method.  So,
+				       # errors at this point indicate a problem in allocating a task
+				       # (i.e. can't write to mss_scheduler database).  Log a limited
+				       # number of these to the terminal, with a sleep period
+				       # in-between.  But, if too many happen, shut down.
+				       _import me, major_error_count
+				       !terminal!.write(me.message(:major_error), newline_char)
+				       cond.report_on(!terminal!)
+				       !traceback!(!terminal!)
+				       major_error_count +<< 1
+				       me.status_string << me.message(:warn_major_errors, major_error_count)
+				       _if major_error_count >= 10
+				       _then
+					       !terminal!.write(me.message(:major_error_count_exceeded), newline_char)
+					       me.soft_interrupt()
+				       _else
+					       _thisthread.sleep(10000)
+				       _endif
+				       !terminal!.flush()
+				       _throw :any_error
+			       _endproc
+			       
+			       _if .soft_interrupt?
+			       _then
+				       _self.status_string << ""
+				       _leave
+			       _endif
+
+			       _if (task << _self.figure_next_task()) _is _unset
+			       _then
+				       # If there is no task, just wait a couple seconds and try again.
+				       _self.status_string << _self.message(:waiting_for_task)
+				       _thisthread.sleep(2000)
+				       _continue
+			       _endif
+
+			       trans << mss_scheduler_transaction.new(
+						_self.view, _self, :|pre_process_task()|, {task})
+			       task_res_data << trans.run()
+			       _if task_res_data _is _unset _orif
+				   (task_res << task_res_data[1]) _is _unset
+			       _then
+				       # This task has been grabbed by another scheduler process
+				       # between the time it it was identified in figure_next_task()
+				       # and the time that it was pre-processed.  This is OK, but
+				       # fall through this loop, to go get the next task.
+				       _continue
+			       _endif 
+
+			       .running_task_result << task_res
+			       
+			       # If there is no handler for this task, note it.
+			       _if (h_ex << _self.get_task_handler_exemplar(task_res.type.as_symbol())) _is _unset
+			       _then
+				       _self.flag_no_handler(task_res)
+				       _continue
+			       _endif
+			       
+			       _self.status_string << _self.message(:performing_task, h_ex.external_name_for_task(task_res))
+			       h << h_ex.new(task_res)
+			       task_retval << h.run()
+			       _self.flag_task_complete(task_res, task_retval, h)
+			_endcatch
+
+			.running_task_result << _unset 
+		_endloop
+		
+		ok? << _true 
+	_protection
+		_if major_error_count = 0
+		_then 
+			_self.status_string << ""
+		_else
+			_self.status_string << _self.message(:warn_major_errors, major_error_count)
+		_endif 
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.figure_next_task()
+	## 
+	## Get the next task that is a candidate to be processed, or
+	## return unset if there is no candidate.
+	##
+
+	# Perform a rollforward to ensure the most recent available
+	# data is queried.
+	dbv << _self.view
+	dbv.rollforward()
+	
+	tbl << _self.scheduled_task_collection
+	task_types << equality_set.new()
+	_for i, j _over .managed_task_types.fast_keys_and_elements()
+	_loop
+		_if j _is _true
+		_then
+			task_types.add(i.write_string)
+		_endif
+	_endloop
+	
+	_if task_types.empty?
+	_then
+		_return _unset
+	_endif 
+	
+	best_cand << _unset
+	best_cand_prio << _unset
+	best_cand_start_time << _unset
+	
+	_for i _over tbl.select(predicate.le(:scheduled_start_time, date_time.now())).fast_elements()
+	_loop
+		_if _not task_types.includes?(i.type)
+		_then
+			# This task is not managed by self - ignore it.
+			_continue
+		_endif
+		
+		_if best_cand _is _unset
+		_then
+			# This is the first candidate.
+			best_cand << i
+			best_cand_prio << i.priority
+			best_cand_start_time << i.scheduled_start_time
+			_continue
+		_endif
+		
+		try_cand_prio << i.priority
+		try_cand_start_time << i.scheduled_start_time
+		_if try_cand_prio > best_cand_prio _orif
+		    (try_cand_prio = best_cand_prio _andif
+		     try_cand_start_time < best_cand_start_time)
+		_then
+			# This is a better candidate.
+			best_cand << i
+			best_cand_prio << try_cand_prio
+			best_cand_start_time << try_cand_start_time
+		_endif
+	_endloop
+
+	_return best_cand
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.pre_process_task(task)
+	## 
+	## Pre-process the task TASK:
+	## - Create a task result that notes that it is in-progress.
+	## - If a follow-up task is needed, create it.
+	## - Delete the original task.
+	##
+
+	_if _not task.is_valid?
+	_then
+		# The task has been taken by a different processor.  Return
+		# unset to indicate this.
+		_return {_unset}
+	_endif
+	
+	dbv << task.source_view
+	task_tbl << task.source_collection
+	res_tbl << _self.scheduled_task_result_collection
+	
+	# If need be, insert the next scheduled task.
+	_if (interval << task.schedule_interval) _isnt _unset _andif
+	    (int_val << interval.value.rounded) > 0
+	_then
+		pl << property_list.new_with(
+			      :type, task.type,
+			      :submitter, task.submitter,
+			      :priority, task.priority,
+			      :scheduled_start_time, task.scheduled_start_time +
+				      time_interval.new_seconds(int_val),
+			      :schedule_interval, task.schedule_interval,
+			      :parameter_text, task.parameter_text)
+		trans << record_transaction.new_insert(task_tbl, pl)
+		trans.run()
+	_endif
+	
+	# Insert a pending result.
+	pl << property_list.new_with(
+		      :scheduled_task_id, task.id,
+		      :type, task.type,
+		      :submitter, task.submitter,
+		      :processor_id, _self.processor_id_description,
+		      :priority, task.priority,
+		      :scheduled_start_time, task.scheduled_start_time,
+		      :schedule_interval, task.schedule_interval,
+		      :actual_start_time, date_time.now(),
+		      :actual_end_time, date_time.now(),
+		      :outcome_code, "Pending",
+		      :parameter_text, task.parameter_text)
+	trans << record_transaction.new_insert(res_tbl, pl)
+	task_res << trans.run()
+	
+	# Delete the task to be processed.
+	trans << record_transaction.new_delete(task)
+	trans.run()
+
+	_return {task_res}
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.processor_id_description
+	## 
+	## A description of self's process ID.
+	##
+
+	_return write_string(system.host_name, " ", system.process_id).truncate(24)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.flag_no_handler(task_res)
+	## 
+	## Mark the task result record TASK_RES as having no handler to
+	## execute it.
+	##
+
+	pl << property_list.new_with(
+		      :actual_end_time, date_time.now(),
+		      :outcome_code, "Fail",
+		      :failure_code, _self.message(:fail_no_handler).truncate(48))
+	trans << record_transaction.new_update(task_res, pl)
+	trans.run()
+				     
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.flag_task_complete(task_res, task_retval, a_handler)
+	## 
+	## Flag the task TASK_RES as being complete.  TASK_RETVAL is
+	## true if it completed OK, or anything else to indicate an
+	## error.  A_HANDLER is the mss_scheduled_task_handler that
+	## contains a log of results.
+	##
+
+	_if task_retval _is _true
+	_then 
+		pl << property_list.new_with(
+			      :actual_end_time, date_time.now(),
+			      :outcome_code, "OK")
+	_else
+		fail_code << a_handler.failure_code.default("").write_string
+		_if fail_code = ""
+		_then
+			fail_code << _self.message(:fail_unknown_reason)
+		_endif 
+		pl << property_list.new_with(
+			      :actual_end_time, date_time.now(),
+			      :outcome_code, "Fail",
+			      :failure_code, fail_code.truncate(48))
+	_endif
+
+	_if (proc_desc << a_handler.process_description) _isnt _unset _andif
+	    proc_desc ~= ""
+	_then
+		pl[:process_description] << proc_desc
+	_endif
+	_if (error_desc << a_handler.error_description) _isnt _unset _andif
+	    error_desc ~= ""
+	_then
+		pl[:error_description] << error_desc
+	_endif
+
+	trans << record_transaction.new_update(task_res, pl)
+	trans.run()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_engine.flag_hard_interrupt(task_res)
+	## 
+	## Mark the task result record TASK_RES as having been
+	## hard-interrupted.
+	##
+
+	_dynamic !mss_scheduler_initiator! << _self
+	
+	pl << property_list.new_with(
+		      :actual_end_time, date_time.now(),
+		      :outcome_code, "Fail",
+		      :failure_code, _self.message(:fail_hard_interrupt).truncate(48))
+	trans << record_transaction.new_update(task_res, pl)
+	trans.run()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduler_engine.add_scheduled_task(properties)
+	##
+	## Create a new scheduled task using the details in
+	## properties.  The new record is returned.
+	## PROPERTIES must include:
+	##    :type - the type of task
+	##    :parameters - A property_list of parameter keys and values
+	## for the job
+	##
+	## OPTIONAL:
+	##   :submitter - user name - default gis_program_manager.login_name
+	##   :priority - A number 1-256 - default 10
+	##   :scheduled_start_time - default now
+	##   :schedule_interval - time_value - default unset  
+	##
+
+	# (02-09-2005 Brad Sileo, TenSails): created.
+	
+	_self.verify_dataset()
+	coll << _self.scheduled_task_collection
+	properties[:priority] << properties[:priority].default(10)
+	properties[:scheduled_start_time] << properties[:scheduled_start_time].default(date_time_now())
+	params << properties.remove_key(:parameters)
+	str << coll.record_exemplar.parameter_text_for_property_list(params.default(property_list.new()))
+	properties[:parameter_text] << str
+	rt << record_transaction.new_insert(coll, properties)
+	rt.run()
+	_return rt.result
+	
+_endmethod
+$

@@ -1,0 +1,10 @@
+mss_workspace_tracking	1
+
+description
+	Capabilities to track record-level changes in designs
+end
+
+requires
+	mss_code_triggers
+	mss_record_tracking
+end

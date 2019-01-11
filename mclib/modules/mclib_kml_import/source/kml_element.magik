@@ -1,0 +1,89 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:41:45 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:kml_element,
+                             {},
+			     {:simple_xml_thing})
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_element.xml_start(tag,attributes)
+	## Handles selecting the correct element type to use for my XML
+	## elements.  Any class defined as kml_<tag_name>_element will
+	## be auto selected and used. Other items int eh data will use
+	## a general kml_element to represent them
+	## 
+	##
+
+	# (08-07-2007 Brad Sileo): created.
+	elem_name << :kml_ + tag.write_string.lowercase.as_symbol() + :_element
+	# show(elem_name,package(:mclib)[elem_name])
+	>> _if (exem << package(:mclib)[elem_name]) _isnt _unset 
+	_then
+		>> exem.new(tag,_unset,attributes)
+	_else
+		>> _clone.init(tag,_unset,attributes)
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_element.rwo_set(dataset)
+	## Returns the rwo_set with me in it.
+	## This default version just returns rwo_sets for all my children
+	##
+
+	# (08-08-2007 Brad Sileo): created.
+	todo << stack.new()
+	res << rwo_set.new()
+	todo.add_all(_self.elements)
+	_loop
+		next << todo.pop()
+		_if next _is _unset _then _leave _endif
+		_if next.is_kind_of?(kml_element)
+		_then
+			res.add_all(next.rwo_set(dataset))
+		_endif 
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_element.geometry_set()
+	## Defaults to an empty set, as only special classes that are
+	## geometry can return anything
+	## 
+	##
+
+	# (08-08-2007 Brad Sileo): created.
+	>> {}
+_endmethod
+$

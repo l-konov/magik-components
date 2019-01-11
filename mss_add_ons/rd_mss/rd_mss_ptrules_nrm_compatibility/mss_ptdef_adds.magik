@@ -1,0 +1,75 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright (C) 2009-2011  regioDATA GmbH, D-Freiburg im Breisgau
+# Author: Reinhard Hahn
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+_pragma(classify_level=basic, topic={mss_ptrule,nrm_compatibility})
+_method mss_ptdef.rd!pages_attributes(tbl, _optional an_ace)
+	## List of field_names according to the order of the
+	## visibility_tags :main_page, :sub_page_1, :sub_page_2, ...
+	##
+	## The series of pages is stopped at the point, where there are
+	## no data found for one of the sub_pages
+	_local pages <<
+		_iter _proc @pages ()
+			      _local page_nr << 0
+			      _local max_pages << 100
+			      _loopbody(:main_page,page_nr)
+			      _loop
+				      page_nr +<< 1
+				      _loopbody(write_string("sub_page_",page_nr).as_symbol(),page_nr)
+				      _if page_nr >= max_pages
+				      _then
+					      condition.raise(:error,:string,
+							      write_string("If you really need more than ",max_pages," pages, increase the value of 'max_pages' in the source code. Otherwise you are lucky for this error avoiding an infinite loop!"))
+				      _endif 
+			      _endloop 
+		      _endproc 
+	_local fns << rope.new()
+	_for a_tag,page_nr _over pages()
+	_loop
+#DEBUG		show(a_tag)
+		_local fns_this_page
+		_if an_ace _isnt _unset 
+		_then
+			fns_this_page << an_ace.table_visible_field_names(tbl.source_view.name, tbl.name, a_tag)
+		_endif
+		_if fns_this_page _is _unset
+		_then
+			fns_this_page << tbl.visible_field_names(a_tag)
+#DEBUG			_if an_ace _isnt _unset _andif fns_this_page _isnt _unset
+#DEBUG			_then write("... using dd") _endif 
+		_endif 
+		_if fns_this_page _is _unset
+		_then
+#DEBUG			write("... not found")
+			_leave
+		_endif
+
+		_for a_fn _over fns_this_page.fast_elements()
+		_loop
+			_if fns.includes?(a_fn)
+			_then
+				write(tbl.source_view.name,":",tbl.name," field ",a_fn," is configured more than once!")
+				_continue
+			_endif
+#DEBUG			write(%tab,%:,a_fn)
+			fns.add(a_fn)
+		_endloop
+	_endloop
+	>> fns
+_endmethod
+$

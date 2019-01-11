@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="windows-1252" standalone="yes"?>
+<dialog class="fifth_dialog" extra_slots="">
+	<module name="fifth_dialog">
+		<property name="version" value="1"/>
+		<property name="description" value="Module Description?"/>
+		<property name="package" value="user"/>
+		<property name="pragma_classify_level" value="restricted"/>
+		<property name="pragma_topic" value="fifth_dialog"/>
+	</module>
+
+	<widget name="a_frame">
+		<property name="dd_class" value="frame"/>
+		<property name="maximizable?" value="True"/>
+		<property name="minimizable?" value="True"/>
+		<property name="resizable?" value="True"/>
+	</widget>
+
+	<widget name="rowcol_01">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="a_frame"/>
+		<property name="bottom_spacing" value="6"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="6"/>
+		<property name="right_spacing" value="6"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="top_level"/>
+		<property name="top_spacing" value="6"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="3"/>
+	</widget>
+
+	<widget name="rowcol_02">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="rowcol_01"/>
+		<property name="bottom_spacing" value="0"/>
+		<property name="col" value="1"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="0"/>
+		<property name="right_spacing" value="0"/>
+		<property name="row" value="1"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="nested"/>
+		<property name="top_spacing" value="0"/>
+		<property name="ncols" value="2"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="panel_separator_01">
+		<property name="dd_class" value="panel_separator"/>
+		<property name="dd_parent" value="rowcol_01"/>
+		<property name="col" value="1"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="min_width" value="10"/>
+		<property name="row" value="2"/>
+		<property name="row_alignment" value="centre"/>
+		<property name="vertical?" value="False"/>
+	</widget>
+
+	<widget name="outlook_bar_01">
+		<property name="dd_class" value="dd_outlook_bar"/>
+		<property name="dd_parent" value="rowcol_01"/>
+		<property name="background_colour" value="0.40000000,0.40000000,0.60000000"/>
+		<property name="category_selected" value="category_selected()"/>
+		<property name="col" value="1"/>
+		<property name="global_selection?" value="True"/>
+		<property name="name" value="obname"/>
+		<property name="row" value="3"/>
+		<property name="sub_category_selected" value="sub_category_selected()"/>
+
+		<dd_outlook_bar_element name="cat_1">
+			<property name="selection_type" value="default"/>
+			<property name="icon_size" value="small"/>
+			<property name="image_file_name" value="outlook_cat"/>
+			<property name="image_module_name" value="dialog_designer"/>
+			<property name="move_sub_categories_allowed?" value="No"/>
+			<property name="remove_sub_categories_allowed?" value="No"/>
+			<property name="caption" value="Main"/>
+			<property name="type" value="cat"/>
+			<property name="name" value="cat_1"/>
+		</dd_outlook_bar_element>
+
+		<dd_outlook_bar_element name="sub_2">
+			<property name="image_file_name" value="proximity_trace"/>
+			<property name="image_module_name" value="ui_resources"/>
+			<property name="draw_selection?" value="Yes"/>
+			<property name="caption" value="Trace"/>
+			<property name="type" value="sub"/>
+			<property name="name" value="sub_2"/>
+		</dd_outlook_bar_element>
+
+		<dd_outlook_bar_element name="more">
+			<property name="image_file_name" value="query"/>
+			<property name="image_module_name" value="ui_resources"/>
+			<property name="draw_selection?" value="Yes"/>
+			<property name="caption" value="Query"/>
+			<property name="type" value="sub"/>
+			<property name="name" value="more"/>
+		</dd_outlook_bar_element>
+
+		<dd_outlook_bar_element name="cat_6">
+			<property name="selection_type" value="default"/>
+			<property name="icon_size" value="small"/>
+			<property name="image_file_name" value="outlook_cat"/>
+			<property name="image_module_name" value="dialog_designer"/>
+			<property name="move_sub_categories_allowed?" value="No"/>
+			<property name="remove_sub_categories_allowed?" value="No"/>
+			<property name="caption" value="Other"/>
+			<property name="type" value="cat"/>
+			<property name="name" value="cat_6"/>
+		</dd_outlook_bar_element>
+
+		<dd_outlook_bar_element name="sub_7">
+			<property name="image_file_name" value="details_add"/>
+			<property name="image_module_name" value="layout_gui"/>
+			<property name="draw_selection?" value="Yes"/>
+			<property name="caption" value="More"/>
+			<property name="type" value="sub"/>
+			<property name="name" value="sub_7"/>
+		</dd_outlook_bar_element>
+	</widget>
+
+	<widget name="image_button_item_01">
+		<property name="dd_class" value="image_button_item"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="col" value="1"/>
+		<property name="col_alignment" value="left"/>
+		<property name="has_border?" value="True"/>
+		<property name="image_file_name" value="ace_dialog"/>
+		<property name="image_module_name" value="admin_ace_plugin"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+		<property name="selector" value="image_button_item_01()"/>
+	</widget>
+
+	<widget name="text_choice_item_01">
+		<property name="dd_class" value="text_choice_item"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="col" value="2"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="is_combo_box" value="False"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+	</widget>
+</dialog>

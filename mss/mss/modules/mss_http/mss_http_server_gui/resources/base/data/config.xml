@@ -1,0 +1,9 @@
+<config>
+  <plugins>
+    <plugin name="http_server" class_name="mss_http_server_engine">
+      <properties>
+         <property name="default_port" value="7314"/>
+      </properties>
+    </plugin>
+  </plugins>
+</config>

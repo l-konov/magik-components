@@ -1,0 +1,12 @@
+mss_workspace_manager	1
+
+description
+	MSS workspace manager engine classes.
+end
+
+requires
+	mss_wm_overlay_view
+	mss_workspace_aggregator
+	mss_workspace_data_model
+	mss_workspace_tracking
+end

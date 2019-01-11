@@ -1,0 +1,27 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# The following code will define custom authorisation rules for
+# the Cambridge Demo system.
+
+_block
+	# Let Default Users change the owner of their design to someone
+	# else (although note that if they do this in error, they do
+	# not have permission to change it back).
+	mss_wm_auth_engine.define_rule(:design_change_owner_own, "Default Users", _true)
+
+	# Let Trusted Users change the owner of any design.
+	mss_wm_auth_engine.define_rule(:design_change_owner_own, "Trusted Users", _true)
+	mss_wm_auth_engine.define_rule(:design_change_owner_other, "Trusted Users", _true)
+
+	# Let Trusted Users perform state transitions on designs that
+	# they do not own.
+	mss_wm_auth_engine.define_rule(:state_transition_other, "Trusted Users", _true)
+_endblock
+$

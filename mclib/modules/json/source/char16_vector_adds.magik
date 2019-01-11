@@ -1,0 +1,49 @@
+#% text_encoding = iso8859_1
+_package sw
+
+_pragma(classify_level=restricted)
+char16_vector.define_shared_constant(
+	:json_quote_character_vec,
+	{%\,
+	 %",
+	 %/,
+	 backspace_char,
+	 newline_char,
+	 tab_char},
+	:public)
+$
+
+_pragma(classify_level=restricted)
+_method	char16_vector.json_quote_for_string()
+	##
+	##
+	_if _self.includes_any?(l_vec << _self.json_quote_character_vec)
+	_then
+		l_result << _self
+		_for i_char _over l_vec.fast_elements()
+		_loop
+			l_result << l_result.substitute_string(i_char, write_string(%\, i_char))
+		_endloop
+		_return l_result
+	_endif
+	
+	_return _self 	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method char16_vector.write_as_json(a_stream)
+	## 
+	## 
+	a_stream.write(%", _self.json_quote_for_string(), %")
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method char16_vector.convert_to_json()
+	_return _self 
+_endmethod
+$
+
+

@@ -1,0 +1,21 @@
+cam_db_swaf_mss_demo	1
+
+description
+	MSS Demo SWAF application for Cambridge database
+end
+
+requires
+	cam_db_swaf_professional_application
+	mss_bulk_update
+	mss_http_server_example
+	mss_http_server_gui
+	mss_ws_http_services
+	mss_scheduler_cu_additions
+	mss_scheduler_workspace_additions
+	mss_cu_user_object_editor
+	cam_mss_cu
+	cam_mss_ptrules
+	cam_mss_qa
+	cam_mss_scheduler
+	cam_mss_workspace
+end 

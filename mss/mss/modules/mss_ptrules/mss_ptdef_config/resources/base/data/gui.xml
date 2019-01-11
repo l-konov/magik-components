@@ -1,0 +1,93 @@
+<gui>
+  <accelerators>
+    <accelerator id="undo_a" name="undo"/>
+    <accelerator id="redo_a" name="redo"/>
+    <accelerator id="cut_a" name="cut"/>
+    <accelerator id="copy_a" name="copy"/>
+    <accelerator id="paste_a" name="paste"/>
+    <accelerator id="refresh_a" name="refresh"/>
+  </accelerators>
+  
+  <menu name="menubar" type="menubar">
+    <submenu name="file" mnemonic_id="file_m">
+      <action name="versions.activate_version_management" mnemonic_id="versions_m"/>
+      <action name="versions.commit" mnemonic_id="commit_m"/>
+      <action name="versions.rollback" mnemonic_id="rollback_m"/>
+      <separator/>
+      <action name="import_pointing_rules"/>
+      <separator/>
+      <action name="close" mnemonic_id="close_m"/>
+    </submenu>
+    <submenu name="edit" mnemonic_id="edit_m">
+      <action name="undo" mnemonic_id="undo_m"/>
+      <action name="redo" mnemonic_id="redo_m"/>
+      <separator/>
+      <action name="cut" mnemonic_id="cut_m"/>
+      <action name="copy" mnemonic_id="copy_m"/>
+      <action name="paste" mnemonic_id="paste_m"/>
+      <separator/>
+      <action name="activate_pointing_rule_editor"/>
+      <separator/>
+      <action name="edit_pointing_rule"/>
+      <action name="clone_pointing_rule"/>
+    </submenu>
+    <submenu name="view" mnemonic_id="view_m">
+      <action name="refresh" mnemonic_id="refresh_m"/>
+    </submenu>
+    <submenu name="options" mnemonic_id="options_m">
+      <action name="folder_config.import_preserve_folders?"/>
+      <action name="folder_config.import_strict_folders?"/>
+    </submenu>
+    <submenu name="tools" mnemonic_id="tools_m">
+      <action name="explorer.start_explorer"/>
+    </submenu>
+  </menu>
+
+  <menu name="folder_list" type="popup">
+      <action name="folder_config.new_root_folder"/>
+      <action name="folder_config.new_sub_folder"/>
+      <separator/>
+      <action name="folder_config.delete_folder"/>
+      <separator/>
+      <action name="folder_config.folder_properties"/>
+      <separator/>
+      <action name="folder_config.export_selected_folder"/>
+  </menu>
+
+  <menu name="folder_contents_list" type="popup">
+      <action name="folder_config.delete_contents_relationship"/>
+      <separator/>
+      <action name="folder_config.contents_properties"/>
+  </menu>
+
+  <menu name="folder_ptdef_list" type="popup">
+      <action name="folder_config.add_to_contents"/>
+      <separator/>
+      <action name="folder_config.edit_pointing_rule"/>
+      <action name="folder_config.clone_pointing_rule"/>
+      <separator/>
+      <action name="folder_config.export_selected_ptrules"/>
+  </menu>
+
+  <toolbar name="database">
+    <action name="versions.commit"/>
+    <action name="versions.rollback"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="database"/>
+  </dock>
+
+  <work_area>
+    <tab_box role="main_tab_box">
+      <plugin plugin_name="folder_config"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar>
+    <pane id="status_info" springy="true" style="innie"/>
+  </statusbar>
+</gui>
+
+
+

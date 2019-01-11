@@ -1,0 +1,47 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-16 21:14:04 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 08-10-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method fill_style.kml_Style()
+	## returns the KMl for me.
+	## 
+	##
+
+	# (08-10-2006 Brad Sileo): created.
+
+	(r,g,b) << _self.colour.rgb()
+	r << (r*255).as_hex_string(2)
+	g << (g*255).as_hex_string(2)
+	b << (b*255).as_hex_string(2)
+	opacity << _self.percent.as_number()/50 * 255
+	o << opacity.as_hex_string(2)
+	col << write_string(o,r,g,b)
+	xml << simple_xml_thing.new("Style",
+				    rope.new_with(simple_xml_thing.new("PolyStyle",
+							  rope.new_with(
+								  simple_xml_thing.new("color",{col}),
+								  simple_xml_thing.new("colorMode",{"normal"}),
+								  
+								  simple_xml_thing.new("fill",{1}),
+								  simple_xml_thing.new("outline",{1})
+							  )
+						      )
+				    )
+				)
+	>> xml
+_endmethod
+$

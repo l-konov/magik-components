@@ -1,0 +1,74 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_cost_group_item
+##
+## A cost group item is the intersection record that links a
+## mss_cu_cost_group with a mss_cu_operation_definition, and
+## which provides the specific cost for that CU / operation
+## when this cost group is used.
+##
+
+def_slotted_exemplar(:mss_cu_cost_group_item,
+{},
+{:mss_cu_ds_record})
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_cost_group_item.cu_cost_group_name
+	## 
+	## 
+
+	_if (rec << _self.mss_cu_cost_group) _isnt _unset
+	_then
+		_return rec.name
+	_else
+		_return ""
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_cost_group_item.cu_code_and_operation
+	## 
+	## 
+
+	_if (rec << _self.mss_cu_operation_definition) _isnt _unset
+	_then
+		_return rec.cu_code_and_operation
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_cost_group_item.general_validator()
+	## 
+	## Ensure that the combination of mss_cu_cost_group_id and
+	## mss_cu_operation_definition_id is unique.
+	##
+
+	pred << predicate.eq(:mss_cu_cost_group_id, _self.mss_cu_cost_group_id) _and
+		predicate.eq(:mss_cu_operation_definition_id, _self.mss_cu_operation_definition_id)
+	_for i _over _self.source_collection.select(pred).fast_elements()
+	_loop
+		_if i.id ~= _self.id
+		_then
+			_self.user_error(:duplicate_cu_cost_group_item)
+		_endif
+	_endloop
+	_return _true
+	
+_endmethod
+$

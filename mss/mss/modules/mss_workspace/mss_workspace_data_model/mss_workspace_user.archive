@@ -1,0 +1,172 @@
+#% text_encoding = utf8
+_block
+
+o << case_object.new_from_archive(
+                                  {227582,
+                                  "mss_workspace_tracking_record",
+                                  write_string("Workspace Tracking Record"),
+                                  "mss_workspace_tracking_record",
+                                  _unset,{0,0,0},0} ,0.00000000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("record_tid", "Record TID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,1)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("record_id", "Record ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,1)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_design_id", "Design ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,1)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|ds_byte|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_wtr_complex_key", "Complex Key", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {227596,
+                                  "mss_wtr_complex_key",
+                                  write_string("WTR Complex Key"),
+                                  "mss_wtr_complex_key",
+                                  _unset,{0,0,0},0} ,0.00000000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("mss_workspace_tracking_record_id", "Workspace Tracking Record ID", :physical)
+an_f.set_key_status_to(_true)
+an_f.mandatory? << True
+
+
+an_f << o.add_field("record_tid", "Record TID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("complex_key", "Complex Key", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,48)
+an_f.print_width << 48
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_workspace_tracking_record", "Mss Workspace Tracking Record", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {227608,
+                                        "1:0",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_workspace_tracking_record", "mss_wtr_complex_key")
+r.add_default_join_names()
+r.join_name << "mss_workspace_to_mss_wtr_compl"
+r.reverse_join_name << "mss_wtr_compl_to_mss_workspace"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((0.0),(-375*2.0**4),(0.0),(-375*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_workspace_tracking_record, :mss_wtr_complex_key, 227608, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_wtr_complex_key, :mss_workspace_tracking_record_id, :mss_workspace_tracking_record, :id, 227608)
+case_object.archive_join_field_info(:mss_wtr_complex_key, :mss_workspace_tracking_record, 227608, :child)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_workspace_tracking_record,
+                                            {"record_tid",
+                                            "record_id",
+                                            "mss_design_id",
+                                            "operation",
+                                            "mss_wtr_complex_key"})
+case_object.archived_indices(:mss_workspace_tracking_record, {"record_id"}, {})
+case_object.archived_indices(:mss_workspace_tracking_record, {"mss_design_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_wtr_complex_key,
+                                            {"record_tid",
+                                            "complex_key",
+                                            "mss_workspace_tracking_record"})
+case_object.archived_indices(:mss_wtr_complex_key, {"complex_key"}, {})
+case_object.archive_aspect_field(:mss_wtr_complex_key, :mss_workspace_tracking_record, :mss_workspace_tracking_record, :id)
+
+_endblock
+$
+
+
+$
+
+$

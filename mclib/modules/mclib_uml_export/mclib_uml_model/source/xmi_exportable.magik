@@ -1,0 +1,66 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+_pragma(classify_level=advanced)
+## Mixin for all uml classes that are XMI exportable
+def_mixin(:xmi_exportable)
+$
+
+_pragma(classify_level=advanced)
+_private _method xmi_exportable.safen_xmi_id(a_string)
+   ## fixup any characters which are disallowed in an XML
+   ##   attribute value.
+   ## 
+   safe_string << char16_string.new()
+
+   _for a_char _over a_string.fast_elements()
+   _loop
+      _if a_char.letter_or_numeric? _orif
+	  a_char _is %. _orif
+	  a_char _is %- _orif
+	  a_char _is %_
+      _then
+	 safe_string.add_last(a_char)
+      _else
+	 safe_string.add_all_last(a_char.value.as_fixed_string(1, 0))
+      _endif
+   _endloop
+
+   _return safe_string.as_charvec()
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method xmi_exportable.xmi_id
+   ## returns : string -- unique identifer for the element
+   ##   represented by this object.
+   ## 
+
+   _return _self.safen_xmi_id(char16_vector.concatenation(_self.owner.xmi_id,
+							  ".", _self.name))
+   
+_endmethod
+$
+

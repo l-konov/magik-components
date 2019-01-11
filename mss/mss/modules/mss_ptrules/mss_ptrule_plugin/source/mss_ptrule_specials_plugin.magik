@@ -1,0 +1,182 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_specials_plugin
+##
+## Plugin used to display special GUI elements for a pointing
+## rule. 
+##
+
+def_slotted_exemplar(:mss_ptrule_specials_plugin,
+{
+	{:gui_stack, _unset, :readable},
+	{:plugins, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted)
+mss_ptrule_specials_plugin.define_property(
+	:action_gui_controls,
+	:object,
+	"Collection of gui controls for current mss_ptrule_gui_plugin's actions" )
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_specials_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:active_ptrule},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_specials_plugin.init(name, framework)
+	## 
+	##
+
+	_super.init(name, framework)
+	.plugins << hash_table.new()
+	_return _self 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_ptrule_specials_plugin.build_gui(a_container)
+	## 
+	## Builds the GUI in A_CONTAINER
+	## 
+
+	.gui_stack << window_stack.new(a_container,
+				       :identifier, :mss_ptrule_specials_plugin)
+	.gui_stack.tab_label << _self.message(:tab_label)
+
+	p << panel.new(.gui_stack)
+	p.name << :mss_ptrule_specials_plugin
+	p.height_spacing << p.width_spacing << 6
+	p.border_width << p.border_height << 2
+
+	p.start_row()
+	label_item.new(p, _self.message(:nothing_to_show))
+	
+	_return .gui_stack
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_ptrule_specials_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## Receives data from the editor's databus.
+	##
+	
+	_if data_type_name _is :active_ptrule
+	_then
+		_self.set_active_ptrule(data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method mss_ptrule_specials_plugin.set_active_ptrule(a_ptrule)
+	## 
+	## Display the special gui for this pointing rule.
+	##
+
+	_self.remove_special_actions()
+	_if .gui_stack _isnt _unset
+	_then
+		.gui_stack.value << :mss_ptrule_specials_plugin
+	_endif
+
+	# Take the plugins off the databus
+	_for a_plugin _over .plugins.fast_elements()
+	_loop
+		a_plugin.databus << _unset
+	_endloop
+
+	_if a_ptrule _isnt _unset _andif
+	    (pkey << a_ptrule.get_property(:gui_plugin_key)) _isnt _unset _andif
+	    (pclass << mss_ptrule_manager.defined_ptrule_gui_plugins[pkey]) _isnt _unset 
+	_then
+		a_plugin << .plugins[pkey]
+		_if a_plugin _is _unset
+		_then
+			a_plugin << .plugins[pkey] << pclass.new(pkey, _self.framework)
+		_endif
+		a_plugin.active_ptrule << a_ptrule
+		a_ptrule.set_gui_plugin(a_plugin)
+
+		# put the plugin on self's databus
+		a_plugin.databus << _self.databus
+		_if .gui_stack _isnt _unset
+		_then
+			_if .gui_stack[pkey] _is _unset
+			_then
+				gui << a_plugin.build_gui(.gui_stack)
+				_if gui _isnt _unset
+				_then 
+					gui.name << pkey
+				_endif
+			_endif
+			.gui_stack.value << pkey
+		_endif
+		_self.show_special_actions(a_plugin)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_ptrule_specials_plugin.show_special_actions(a_plugin)
+	## 
+	## Adds special actions to the gui from the the plugin.
+	##
+
+	gui_elements << _self.framework.get_all_gui_elements_with_role(:rwo_specials)
+	the_controls << rope.new()
+	_for gui_element _over gui_elements.fast_elements()
+	_loop
+		gui_type << _if gui_element.is_kind_of?(menu_base)
+			    _then
+				    >> :menu
+			    _else
+				    >> :toolbar
+			    _endif 
+		_for a _over a_plugin.actions()
+		_loop
+			c << a.place_control_on(gui_element, gui_type)
+			the_controls.add_last(c)
+		_endloop 
+	_endloop
+
+	_self.action_gui_controls << the_controls
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_ptrule_specials_plugin.remove_special_actions()
+	## 
+	## Removes all special actions from the gui
+	##
+
+	_if (the_controls << _self.action_gui_controls) _isnt _unset
+	_then 
+		_for a_control _over the_controls.elements()
+		_loop
+			a_control.unrealise()
+		_endloop
+	_endif
+	
+_endmethod
+$

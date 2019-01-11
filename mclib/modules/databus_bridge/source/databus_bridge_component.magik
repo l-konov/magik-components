@@ -1,0 +1,204 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-05-24 17:50:53 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-14-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+## Description: 
+##  This provides a component that can be used to tie
+## together two databuses on certain data types. It is setup
+## with a fraMework and a bridge bus, as well as a collection
+## of data types which should flow between them. With this in
+## place, it serves as a component on each bus passing the data
+## types back and forth.
+##  To use it, setup the component between the frameworks with
+## an instance like:
+##   dbc << databus_bridge_component.new(:test,   <-- name
+##                                       app,     <-- The framework to get the parent databus from
+##          app.plugin(:editor_manager).sys!slot(:embedded_editors).an_element().databus,  <-- the bridged databus
+##		        {:map_trail},      <-- Types to bridge from the framework
+##		        {:collection})     <-- Types to bridge from the bridged bus
+##
+##
+##  In some gui_framework beneath an application plugin, this might
+## look like:
+## 	databus_bridge_component.new(:clv_bridge,_self.framework,_self.databus,{:map_trail},{})
+##   Which makes a bridge between the framework's databus(aka
+##        the application databus) and the databus on _self on the map_trail type from the application
+##
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:databus_bridge_component,
+                        {
+				{:bridge_bus,_unset},
+				{:mappings, _unset},
+				{:proxy,_unset}
+			},
+			{:sw_component})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.new(name,framework,bridge_bus, framework_types, bridge_types)
+	## Create a new broidge setup between framework and bridge_bus
+	## using MAPPINGS to connect them. See setup_mappings() for
+	## details on MAPPINGS.
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _clone.init(name,framework,bridge_bus, framework_types, bridge_types)
+_endmethod
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.init(name,framework,bridge_bus, framework_types, bridge_types)
+	## 
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	_super.init(name,framework)
+	_self.setup_mappings(framework_types, bridge_types)
+	_self.databus << framework.databus
+	_self.set_bridge_bus(bridge_bus)
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.set_bridge_bus(a_bus)
+	## setup my bridge proxy onto A_BUS
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	.proxy << databus_bridge_proxy.new(:bridge,_self,a_bus,
+					   .mappings[:bridge][:consume],
+					   .mappings[:bridge][:produce])
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.setup_mappings(framework_types, bridge_types)
+	## Create the mappings between my databuses. 
+	##
+	## Items in frameworks_types will be the things that pass from
+	##  the child databus to the framework(parent) databus, so a plugin on the child
+	## bus can request_data for one of these types and the bridge
+	## will also get that data from the framework's bus.
+	##
+	##   The child databus is a "consumer" of these tpyes form the
+	##        parent bus
+	##
+	## Items in the brige_types are those things that will be
+	## passed ot the parent databus fromt he child. with thes ein
+	## place, a child plugin can make_data-available for on of
+	## these types and it will be passed along to the parent bus.
+	##
+	##  The child databus is a "producer" of these types within
+	##        the parent databus
+	## 
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): creeated
+	.mappings << property_list.new()
+	.mappings[:framework] << fw_map << property_list.new()
+	.mappings[:bridge] << br_map << property_list.new()
+	fw_map[:produce] << {}.new_from(bridge_types)
+	fw_map[:consume] << {}.new_from(framework_types)
+	br_map[:produce] << {}.new_from(framework_types)
+	br_map[:consume] << {}.new_from(bridge_types)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.databus_producer_data_types
+	## 
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> .mappings[:framework][:produce]
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.databus_consumer_data_types
+	## 
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> .mappings[:framework][:consume]
+_endmethod
+$
+			
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.proxy_databus_data_available(data_type, data)
+	## Pass data from my bridge bus to my main bus
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _self.databus_make_data_available(data_type,data)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.proxy_databus_data_requested(data_type)
+	## Pass data from my bridge bus to my main bus
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _self.databus_request_data(data_type)
+_endmethod
+$
+
+			
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.sw_databus_data_available(data_type,data)
+	## Passd the data along to my framework
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> .proxy.proxy_databus_make_data_available(data_type,data)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_component.sw_databus_data_requested(data_type)
+	## Passd the data along to my framework
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> .proxy.proxy_databus_data_requested(data_type)
+_endmethod
+$
+
+

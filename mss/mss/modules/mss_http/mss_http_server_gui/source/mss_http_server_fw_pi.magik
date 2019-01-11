@@ -1,0 +1,115 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_server_fw_pi
+##
+## Plugin for providing access to the
+## mss_http_server_framework
+##
+
+def_slotted_exemplar(:mss_http_server_fw_pi,
+{
+},
+{:plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+## Name of the gui definition file.  Defaults to "gui.xml".
+mss_http_server_fw_pi.define_property(
+	:gui_definition_file_name,
+	:string,
+	"Name of the gui definition file",
+	_false, _false, "gui.xml")
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+## Name of the module in which the gui definition is located.
+mss_http_server_fw_pi.define_property(
+	:gui_definition_module_name,
+	:string,
+	"Name of module in which gui definition is located")
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+## Name of the config definition file.  Defaults to "config.xml".
+mss_http_server_fw_pi.define_property(
+	:config_definition_file_name,
+	:string,
+	"Name of the config definition file",
+	_false, _false, "config.xml")
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+## Name of the module in which the config definition is located.
+mss_http_server_fw_pi.define_property(
+	:config_definition_module_name,
+	:string,
+	"Name of module in which config definition is located")
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_fw_pi.gui_definition_module_name
+	## 
+	## Use property (if defined), otherwise just use module name.
+	##
+
+	_return _self.property(:gui_definition_module_name).default(_self.module_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_fw_pi.config_definition_module_name
+	## 
+	## Use property (if defined), otherwise just use module name.
+	##
+
+	_return _self.property(:config_definition_module_name).default(_self.module_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_fw_pi.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:activate_mss_http_server_framework,
+				       :engine, _self,
+				       :action_message, :|activate_mss_http_server_framework()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_fw_pi.activate_mss_http_server_framework()
+	##
+	## Activate the mss_http_server_framework menu.
+	##
+
+	_if (m << _self.get_dialog(:mss_http_server_framework)) _is _unset
+	_then
+		m << mss_http_server_framework.new(
+			     :mss_http_server_framework, _self,
+			     :config_definition_module_name, _self.config_definition_module_name,
+			     :config_definition_file_name, _self.config_definition_file_name,
+			     :gui_definition_module_name, _self.gui_definition_module_name,
+			     :gui_definition_file_name, _self.gui_definition_file_name)
+		_self.cache_dialog(:mss_http_server_framework, m)
+		m.activate_relative_to(_unset, m.message(:title), _self.top_frame, 50, 50)
+	_else 
+		m.activate(_unset, m.message(:title))
+	_endif
+	m.top_frame.minimized? << _false
+	_return m
+	
+_endmethod
+$

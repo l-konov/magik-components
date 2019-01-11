@@ -1,0 +1,10 @@
+mss_workspace_editors	1
+
+description
+	Editor plugins for MSS workspace objects
+end
+
+requires
+	mss_workspace_data_model
+	mss_wm_related_document_gui
+end

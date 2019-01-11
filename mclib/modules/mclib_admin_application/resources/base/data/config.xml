@@ -1,0 +1,151 @@
+<config base="admin_application.config.xml">
+   <plugins>
+          <plugin name="authorisation" class_name="authorisation_plugin">
+	    <properties>
+	       <property name="config_definition_module_name" value="mclib_admin_application"/>
+	       <property name="config_definition_file_name" value="auth_config.xml"/>
+	       <property name="gui_definition_module_name" value="mclib_admin_application"/>
+	       <property name="gui_definition_file_name" value="auth_gui.xml"/>
+	    </properties>
+	  </plugin>
+
+	  <plugin name="insync_admin" class_name="mclib:insync_admin_plugin"/>
+	  <plugin name="thread_manager" class_name="mclib:thread_manager_plugin"/>
+	  <plugin name="case_report" class_name="mclib:case_html_report_application_plugin"/>
+	  <plugin name="case_launcher" class_name="mclib:dynamic_case_launcher_plugin"/>
+
+	  <plugin name="control_panel" class_name="control_panel_plugin">
+	    <views>
+                <view name = "large_icons" />
+                <view name = "small_icons" />
+                <view name = "details" />
+            </views>
+	    <actions>
+                <action action_name  = "ace.start_ace_dialog"
+                        caption_id   = "ace_caption" 
+			comment_id   = "ace_comment"
+			image        = "admin_ace_plugin.ace_dialog" 
+			large_image  = "admin_ace_plugin.ace_dialog_large" 
+			category     = "main" 
+			sub_category = "configuration" />
+
+                <action action_name  = "authorisation.start_authorisation"
+                        caption_id   = "authorisation_caption" 
+			comment_id   = "authorisation_comment"
+			image        = "authorisation_magik_gui.authorisation"
+			large_image  = "authorisation_magik_gui.authorisation_large"
+			category     = "main" 
+			sub_category = "authorisation" />
+
+                <action action_name  = "tools.coordinate_system_editor"
+                        caption_id   = "coordinate_system_editor_caption" 
+			comment_id   = "coordinate_system_editor_comment"
+			image        = "admin_tools_plugin.coordinate_system_editor"
+			large_image  = "admin_tools_plugin.coordinate_system_editor_large"
+			category     = "main" 
+			sub_category = "configuration" />
+
+                <action action_name  = "tools.extensible_enumerator_dialog"
+                        caption_id   = "extensible_enumerator_dialog_caption" 
+			comment_id   = "extensible_enumerator_dialog_comment"
+			image        = "extensible_dd_magik_gui.extensible_enumerator_dialog"
+			large_image  = "extensible_dd_magik_gui.extensible_enumerator_dialog_large"
+			category     = "main" 
+			sub_category = "dd" />
+
+                <action action_name  = "soc.start_soc_dialog"
+                        caption_id   = "soc_caption" 
+			comment_id   = "soc_comment"
+			image        = "admin_soc_plugin.soc_dialog"
+			large_image  = "admin_soc_plugin.soc_dialog_large"
+			category     = "main" 
+			sub_category = "database" />
+
+                <action action_name  = "style.start_style_system"
+                        caption_id   = "style_caption" 
+			comment_id   = "style_comment"
+			image        = "admin_style_plugin.style_system"
+			large_image  = "admin_style_plugin.style_system_large"
+			category     = "main" 
+			sub_category = "configuration" />
+
+                <action action_name  = "tools.system_preferences"
+                        caption_id   = "system_preferences_caption" 
+			comment_id   = "system_preferences_comment"
+			image        = "admin_tools_plugin.settings"
+			large_image  = "admin_tools_plugin.settings_large" 
+			category     = "main" 
+			sub_category = "configuration" />
+
+                <action action_name  = "tools.text_translator_dialog"
+                        caption_id   = "text_translator_dialog_caption" 
+			comment_id   = "text_translator_dialog_comment"
+			image        = "messages_magik_gui.text_translator_dialog"
+			large_image  = "messages_magik_gui.text_translator_dialog_large"
+			category     = "main" 
+			sub_category = "localisation" />
+
+                <action action_name  = "tools.themes_setup"
+                        caption_id   = "themes_setup_caption" 
+			comment_id   = "themes_setup_comment"
+			image        = "themes_magik_gui.themes_setup"
+			large_image  = "themes_magik_gui.themes_setup_large"
+			category     = "main" 
+			sub_category = "configuration" />
+
+                <action action_name  = "tools.unit_display_group_editor"
+                        caption_id   = "unit_display_group_editor_caption" 
+			comment_id   = "unit_display_group_editor_comment"
+			image        = "units_core_magik_gui.unit_display_group_editor"
+			large_image  = "units_core_magik_gui.unit_display_group_editor_large"
+			category     = "main" 
+			sub_category = "configuration" />
+
+                <action action_name  = "versions.activate_version_management"
+                        caption_id   = "version_management_caption" 
+			comment_id   = "version_management_comment"
+			image        = "version_management_plugin.version_manager_remote"
+			large_image  = "version_management_plugin.version_manager_remote_large" 
+			category     = "main" 
+			sub_category = "database" />
+
+                <!-- Start of MCLIB Additions -->
+		<action action_name  = "insync_admin.start_insync_mapping_editor"
+                        caption_id   = "start_insync_mapping_editor_caption" 
+			comment_id   = "start_insync_mapping_editor_comment"
+			image        = "mclib_insync_admin_plugin.insync_editor"
+			large_image  = "mclib_insync_admin_plugin.insync_editor_large" 
+			category     = "main" 
+			sub_category = "database" />
+		<action action_name  = "insync_admin.start_basic_replication_editor"
+                        caption_id   = "start_basic_replication_editor_caption" 
+			comment_id   = "start_basic_replication_editor_comment"
+			image        = "mclib_insync_admin_plugin.replication_editor"
+			large_image  = "mclib_insync_admin_plugin.replication_editor_large" 
+			category     = "main" 
+			sub_category = "database" />
+		<action action_name  = "thread_manager.launch_thread_manager"
+                        caption_id   = "launch_thread_manager_caption" 
+			comment_id   = "launch_thread_manager_comment"
+			image        = "mclib_thread_manager.thread_manager"
+			large_image  = "mclib_thread_manager.thread_manager_large" 
+			category     = "main" 
+			sub_category = "all" />
+		<action action_name  = "case_report.activate_dump_dialog"
+                        caption_id   = "launch_case_dump_dialog_caption" 
+			comment_id   = "launch_case_dump_dialog_comment"
+			image        = "mclib_case_html_reporter.case_dump_dialog"
+			large_image  = "mclib_case_html_reporter.case_dump_dialog_large" 
+			category     = "main" 
+			sub_category = "dd" />
+		<action action_name  = "case_launcher.pick_and_launch"
+                        caption_id   = "launch_case_caption" 
+			comment_id   = "launch_case_comment"
+			image        = "mclib_dynamic_case_launcher.launch_case"
+			large_image  = "mclib_dynamic_case_launcher.launch_case_large" 
+			category     = "main" 
+			sub_category = "dd" />
+	    </actions>
+	</plugin>
+   </plugins>
+</config>

@@ -1,0 +1,683 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_OUTLOOK_BAR - class to gather/render and manage the
+## specifications of an outlookbar element.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_outlook_bar,
+	{
+		{:name,_unset,:writable},
+		{:categories,_unset,:writable},
+		{:global_selection?,_unset,:writable},
+		{:category_selected,_unset,:writable},
+		{:background_colour,_unset,:writable},
+		{:sub_category_selected,_unset,:writable},
+		{:current_sel,_unset,:writable}
+	},:text_window)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_outlook_bar.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :name,:string,
+					  :dialog_element_id,:string,
+					  :dialog_description,:string,
+					  :global_selection?,:boolean,
+					  :category_selected,:string,
+					  :background_colour,:colour,
+					  :sub_category_selected,:string),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	>> _self.dd_properties.deep_copy()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.default_min_width
+	## 
+	## Return the minimum default rendering width.
+
+	>> 150
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	>> 200
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+
+	ob << _super.new_dialog_default(rc,row,col)
+	ob.name << "obname"
+	ob.global_selection? << _true
+	ob.category_selected << "category_selected()"
+	ob.sub_category_selected << "sub_category_selected()"
+	ob.background_colour << colour.called(:gray)
+	
+	ob.categories << _self.initial_categories()
+
+	>> ob
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.initial_categories()
+	## 
+	## Return the initial categories for SELF.
+	cnt << 0
+	cats << rope.new()
+
+	cat_values << outlookbar_element.initial_values("Main",:cat,cnt+<<1)
+	dt << display_tree.new(cnt, cat_values)
+	dt.styled_string << {:image, {:outlook_cat,_self.module_name}, :value, :caption}
+	sub_values << outlookbar_element.initial_values("Sub",:sub,cnt+<<1)
+	st << display_tree.new(cnt, sub_values,dt)
+	st.styled_string << {:image, {:outlook_sub,_self.module_name}, :value, :caption}	
+	sub_values << outlookbar_element.initial_values("Sub-1",:sub,cnt+<<1)
+	st << display_tree.new(cnt, sub_values,dt)
+	st.styled_string << {:image, {:outlook_sub,_self.module_name}, :value, :caption}
+	dt.expanded? << _true 
+	cats.add(dt)
+	
+	cat_values << outlookbar_element.initial_values("Other",:cat,cnt+<<1)
+	dt << display_tree.new(cnt, cat_values)
+	dt.styled_string << {:image, {:outlook_cat,_self.module_name}, :value, :caption}
+	sub_values << outlookbar_element.initial_values("Sub-2",:sub,cnt+<<1)
+	st << display_tree.new(cnt, sub_values ,dt)
+	st.styled_string << {:image, {:outlook_sub,_self.module_name}, :value, :caption}	
+	dt.expanded? << _true 
+	cats.add(dt)
+
+	>> cats
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.hidden_xml_properties(txt)
+	## 
+	## Output the inner structure of SELF to the text stream TXT.
+
+	n_tabs << 2
+	
+	bb << %<
+	es << %/
+	eb << %>
+	qq << %" #"
+	eq << %=
+	sp << " "
+	nl << %newline
+	tb << %tab
+	
+	_for c _over _self.categories.fast_elements()
+	_loop
+		_for dt _over c.fast_trees()
+		_loop
+			txt.write(%newline,n_tabs*tb,bb,"dd_outlook_bar_element name=",qq,dt.value[:name],qq,eb,nl)
+
+			_for k,e _over dt.value.fast_keys_and_elements()
+			_loop
+				_if e _isnt _unset 
+				_then
+					txt.write((n_tabs+1)*%tab,bb,
+						  "property name=",qq,k,qq,
+						  " value=",qq,e,qq,es,eb,nl)
+				_endif
+			_endloop
+
+			txt.write(n_tabs*tb,"</dd_outlook_bar_element>",nl)
+			
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	ob << _super.new_dialog_default(parent,props[:row],props[:col])
+	
+	ob.name <<                  props[:name]
+	ob.global_selection? <<     props[:global_selection?]
+	ob.category_selected <<     props[:category_selected]
+	ob.sub_category_selected << props[:sub_category_selected]
+	ob.background_colour <<     props[:background_colour]
+
+	>> ob
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.parse_inner_structure(xml)
+	## 
+	## Parse the inner structure of SELF from the simple_xml XML.
+
+	cnt << 0
+	.categories << rope.new()
+	vals << property_list.new()
+	
+	_for x _over xml.elements_matching_name("dd_outlook_bar_element")
+	_loop
+		vals.empty()
+		
+		_for p _over x.xml_elements()
+		_loop
+			name << p.attributes["name"].as_symbol()
+			vals[name] << p.attributes["value"]
+		_endloop
+
+		_if vals[:icon_size] _isnt _unset 
+		_then
+			_if dt _isnt _unset 
+			_then
+				.categories.add(dt)
+			_endif
+			
+			cat_values << outlookbar_element.initial_values(vals[:caption],:cat,cnt+<<1)
+
+			_for k,e _over vals.fast_keys_and_elements()
+			_loop
+				_if e _isnt _unset 
+				_then
+					cat_values[k] << e
+				_endif
+			_endloop
+
+			dt << display_tree.new(cnt, cat_values)
+			dt.styled_string << {:image, {:outlook_cat,_self.module_name}, :value, :caption}
+		_else
+			sub_values << outlookbar_element.initial_values(vals[:caption],:sub,cnt+<<1)
+
+			_for k,e _over vals.fast_keys_and_elements()
+			_loop
+				_if e _isnt _unset 
+				_then
+					sub_values[k] << e
+				_endif
+			_endloop
+
+			st << display_tree.new(cnt, sub_values, dt)
+			st.styled_string << {:image, {:outlook_sub,_self.module_name}, :value, :caption}	
+		_endif
+
+	_endloop
+
+	.categories.add(dt)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.render_on(canv,bb,_optional obe)
+	## 
+	## Render SELF on the canvas CANV.
+
+	_if obe _isnt _unset
+	_then
+		.current_sel << obe.parent_at_level(2)
+		cat << .current_sel
+	_else
+		cat << .current_sel
+	_endif
+
+	_if cat _is _unset
+	_then
+		cat << _self.categories.an_element()
+	_endif 
+
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	_if !dialog_element_footprints! _isnt _unset 
+	_then
+		!dialog_element_footprints![pbb] << _self	
+	_endif
+	
+	fs << fill_style.new_solid(_self.background_colour)		
+	
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	st << fill_style.new_with_properties(:foreground_colour,colour.new_rgb(0.4,0.4,0.4),:wash_percent,25)
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	cat_fp << property_list.new()
+
+	up_down << :up
+	_for i _over 1.upto(_self.categories.size)
+	_loop
+		a_cat << _self.categories[i]
+		cat_fp[a_cat] << _self.render_category(canv,pbb.expand(-1),i,up_down)
+
+		_if cat _is _unset _orif a_cat.key _is cat.key
+		_then
+			up_down << :down
+
+			_if cat _isnt _unset 
+			_then
+				_for chi _over 1.upto(a_cat.children.size)
+				_loop
+					ch << a_cat.children[chi]
+					meth << :render_sub_category_ + a_cat.value[:icon_size] + :|()|
+					cat_fp[ch] << _self.perform(meth,canv,pbb.expand(-1),i,chi,obe)
+				_endloop
+			_endif
+		_endif
+	_endloop
+
+	# Outlook Bar Bottom
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	>> cat_fp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.render_category(canv,pbb,n,up_down)
+	## 
+	## Render category N onto CANV with the pixel bounding box
+	## PBB.  UP_DOWN determines whether the rendering is at the
+	## top or the bottom of SELF.
+
+	h << 15
+
+	pbb.xmax -<< 1
+	
+	_if up_down _is :up
+	_then
+		y0 << pbb.ymin + (n-1)*(h+1)
+	_else
+		y0 << pbb.ymax - (_self.categories.size-n+1)*(h+1)
+	_endif
+	
+	x0 << pbb.xmin
+	w << pbb.width
+
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	bb << pixel_bounding_box.new(x0,y0,x0+w,y0+h)
+	pp << pseudo_polygon.new_with_sectors(bb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	vts << vtext_style.new(ts.font)
+	lab << _self.categories[n].value[:caption]
+	text_bb <<  vts.box_coordinates(lab).bounds
+	x << bb.centre.x - text_bb.width.floor _div 2
+	y << bb.centre.y + text_bb.height.floor _div 2 - 1
+
+	canv.draw_text(ts,x,y,lab)
+
+	fs.destroy()
+	ls.destroy()
+
+	>> bb
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.render_sub_category_small(canv,pbb,cat_n,sub_n,_optional obe)
+	## 
+	## Render the sub-catagory sub_n within category CAT_N onto
+	## the canvas CANV within pixel_bounding_box PBB. SMALL icons.
+	
+	cat_h << 15
+	h     << 20
+
+	pbb.xmax -<< 1
+	
+	_if (y0 << pbb.ymin + cat_n*(cat_h+1) + (sub_n-1)*h) > pbb.ymax-h
+	_then
+		_return
+	_endif
+	
+	x0 << pbb.xmin
+	w  << pbb.width
+
+	sub_cat << _self.categories[cat_n].children[sub_n]
+
+	bb << pixel_bounding_box.new(x0,y0,x0+w,y0+h)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:white))
+	vts << vtext_style.new(ts.font)
+	lab << sub_cat.value[:caption]
+
+	ifn  << sub_cat.value[:image_file_name]
+	imn << sub_cat.value[:image_module_name]
+
+	_if sw_module_manager.module_is_defined?(imn) _isnt _true 
+	_then
+		imn << :ui_resources
+	_endif
+
+	_if ifn.default("").empty? _orif imn.default("").empty?
+	_then
+		ifn << :outlook_sub
+		imn << _self.module_name
+	_endif 
+	
+	text_bb <<  vts.box_coordinates(lab).bounds
+	x << bb.xmin + 20
+	y << bb.centre.y + text_bb.height.floor _div 2 - 1
+
+	ras << smallworld_product.get_raster_image(ifn,imn)
+	canv.render_raster(ras,bb.xmin+1,y-14,_false)
+	
+	canv.draw_text(ts,x,y,lab)
+
+	# Draw box around selected sub-category
+	_if obe = sub_cat _andif obe.level _is 3
+	_then
+		ls << line_style.new(colour.called(:green),3)
+		bc <<  text_bb.expand(3).boundary
+
+		_for i _over 1.upto(4)
+		_loop
+			c1 << coordinate(bb.xmin+20,bb.ymin+5) + bc[i]
+			c2 << coordinate(bb.xmin+20,bb.ymin+5) + bc[i+1]
+			canv.draw_segment(ls,c1.x.floor,c1.y.floor,c2.x.floor,c2.y.floor)
+		_endloop
+	_endif 
+
+	>> bb
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.render_sub_category_large(canv,pbb,cat_n,sub_n,_optional obe)
+	## 
+	## Render the sub-catagory sub_n within category CAT_N onto
+	## the canvas CANV within pixel_bounding_box PBB.  LARGE Icons.
+	
+	cat_h << 15
+	h     << 65
+
+	pbb.xmax -<< 1
+	
+	_if (y0 << pbb.ymin + cat_n*(cat_h+1) + (sub_n-1)*h +3) > pbb.ymax - h
+	_then
+		_return
+	_endif
+	
+	x0 << pbb.xmin
+	w  << pbb.width
+
+	sub_cat << _self.categories[cat_n].children[sub_n]
+
+	bb << pixel_bounding_box.new(x0,y0,x0+w,y0+h)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:white),:size,20)
+	vts << vtext_style.new(ts.font)
+	lab << sub_cat.value[:caption]
+
+	ifn << sub_cat.value[:large_image_file_name]
+	imn << sub_cat.value[:large_image_module_name]
+
+	_if ifn.default("").empty? _orif imn.default("").empty?
+	_then
+		ifn << :outlook_sub_32x32
+		imn << _self.module_name
+	_endif 
+	
+	text_bb <<  vts.box_coordinates(lab).bounds
+	x << bb.centre.x - text_bb.width.floor _div 2 
+	y << bb.ymax - 15
+
+	ras << smallworld_product.get_raster_image(ifn,imn)
+	(ras_w,ras_h) << ras.size()
+	canv.render_raster(ras,bb.centre.x-16,y0,_false)
+	
+	canv.draw_text(ts,x,y,lab)
+
+	# Draw box around selected sub-category
+	_if obe = sub_cat _andif obe.level _is 3
+	_then
+		ls << line_style.new(colour.called(:green),3)
+		bc <<  text_bb.expand(4).boundary
+
+		_for i _over 1.upto(4)
+		_loop
+			c1 << coordinate(x-1,y-10) + bc[i]
+			c2 << coordinate(x-1,y-10) + bc[i+1]
+			canv.draw_segment(ls,c1.x.floor,c1.y.floor,c2.x.floor,c2.y.floor)
+		_endloop
+	_endif 
+
+	>> bb
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,"ob << .items[:",_self.dialog_element_id,"] << outlook_bar_component.new(",
+		  %:,.name,",  _self )",%newline)
+
+	_for cat _over .categories.fast_elements()
+	_loop
+		cat_obe  << outlookbar_element.new(cat.value)
+		cat_name << cat_obe.name.lowercase.substitute_character(% ,%_)
+		txt.write(%newline,%tab,"ob.add_category(",%:,cat_name) 
+
+		_for k _over cat_obe.dd_properties().fast_keys()
+		_loop
+			( gui_name,gui_value)  << cat_obe.gui_name_and_value(k,cat_obe.perform(k))
+
+			_if gui_name _is _unset 
+			_then
+				_continue 
+			_endif
+
+			txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)	
+		_endloop
+
+		txt.write(%),%newline)
+
+		_for sub _over cat.children.fast_elements()
+		_loop
+			sub_obe << outlookbar_element.new(sub.value)
+			sub_name << sub_obe.name.lowercase.substitute_character(% ,%_)
+			txt.write(%newline,%tab,"ob.add_sub_category(",%:,cat_name,", :",sub_name)
+			
+			_for k _over sub_obe.dd_properties().fast_keys()
+			_loop
+				( gui_name,gui_value)  << sub_obe.gui_name_and_value(k,sub_obe.perform(k))
+				
+				_if gui_name _is _unset 
+				_then
+					_continue 
+				_endif
+				
+				txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)	
+			_endloop
+			txt.write(%),%newline)
+
+		_endloop
+	_endloop
+
+	txt.write(%newline,%tab,"ob_rc << rowcol.new(",parent_id,%,,"_unset,1,:pixel,:style,:nested,:resize?,_true,")
+	txt.write(%newline,%tab*3,":default_col_alignment,:fill,:default_row_alignment,:fill,:row,",_self.row,",:col,",_self.col,")")	
+	txt.write(%newline,%tab,"ob.build_gui(ob_rc)",%newline)
+
+	# Code for selection events:
+	_if _not (m << _self.category_selected).default("").empty?
+	_then
+		txt.write(%newline,%tab,"ob.add_event_handler(:category_selected,_self,:|",m,"|)")
+	_endif
+	_if _not (m << _self.sub_category_selected).default("").empty?
+	_then
+		txt.write(%newline,%tab,"ob.add_event_handler(:sub_category_selected,_self,:|",m,"|)")
+	_endif
+
+	c << _self.background_colour
+	txt.write(%newline,%tab,"ob.background_colour << colour.new_with_properties(:red,",
+		  c.red,",:green,",c.green,",:blue,",c.blue,%),%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.gui_element_methods()
+	## 
+	## Return the GUI element methods for SELF.
+	
+	rp << _super.gui_element_methods()
+	rp.add(:|post_activation()|)
+
+	_if _not (m << _self.category_selected).default("").empty?
+	_then
+		rp.add(m.as_symbol())
+	_endif
+
+	_if _not (m << _self.sub_category_selected).default("").empty?
+	_then
+		rp.add(m.as_symbol())
+	_endif
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.post_activation_code()
+	## 
+	## Returns SELF's code to be place in the post_activation()
+	## method of SELF's owning plugin.
+
+	>> write_string(%tab,".items[:",_self.dialog_element_id,"].post_activation()",%newline)	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.next_category_name()
+	## 
+	## Return the next unused standard category name.
+
+	base_name << dialog_designer.message(:base_outlook_category_name)
+	name << base_name.write_string
+	cnt << 0
+	_loop
+		_if _self.category_name_unique?(name)
+		_then
+			_return name
+		_endif
+
+		name << write_string(base_name,"-",cnt+<<1)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.category_name_unique?(a_name)
+	## 
+	## Return TRUE if A_NAME is not a current category name.
+
+	_for c _over .categories.default({}).fast_elements()
+	_loop
+		_if c.value[:caption] = a_name
+		_then
+			_return _false 
+		_endif
+	_endloop
+
+	>> _true 
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.next_sub_category_name()
+	## 
+	##  Return the next unused standard sub-category name.
+
+	base_name << dialog_designer.message(:base_outlook_sub_category_name)
+	name << base_name.write_string
+	cnt << 0
+	
+	_loop
+		_if _self.sub_category_name_unique?(name)
+		_then
+			_return name
+		_endif
+
+		name << write_string(base_name,"-",cnt+<<1)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_outlook_bar.sub_category_name_unique?(a_name)
+	## 
+	##  Return TRUE if A_NAME is not a current sub-category name.
+
+	_for c _over .categories.default({}).fast_elements()
+	_loop
+		_for s _over c.children.fast_elements()
+		_loop
+			_if s.value[:caption] = a_name
+			_then
+				_return _false 
+			_endif
+		_endloop
+	_endloop
+
+	>> _true 
+_endmethod
+$
+

@@ -1,0 +1,225 @@
+#% text_encoding = iso8859_1
+_package mclib
+
+def_slotted_exemplar(:kml_import_plugin,
+                      {
+			      {:document, _unset}
+		      },:plugin)
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.init_actions()
+	## 
+	##
+
+	_self.add_action(
+		sw_action.new(:url,
+			      :engine, _self,
+			      :toolbar_control,
+			      {:text_item,
+			       :display_length, 64},
+			      :dialog_control, :text_item,
+			      
+			      :value, _self.message(:url_default)
+			  )
+	      )
+	_self.add_action(
+		sw_action.new(:open_url,
+			      :engine, _self,
+			      :action_message, :open_url|()|,
+			      :toolbar_control, :image_button_item,
+			      :image, {:search_world, :tree_examples},
+			      :caption, _self.message(:open_url)
+			  )
+	      )
+
+	_self.add_action(
+		sw_action.new(:open_dataset,
+			      :engine, _self,
+			      :action_message, :open_dataset|()|,
+			      :toolbar_control, :image_button_item,
+			      :image, {:open, :ui_resources},
+			      :caption, _self.message(:open_dataset),
+			      :enabled?, _true
+			  )
+	      )
+
+	_self.add_action(
+		sw_action.new(:close_dataset,
+			      :engine, _self,
+			      :action_message, :close_dataset|()|,
+			      :toolbar_control, :image_button_item,
+			      :image, {:close, :ui_resources},
+			      :caption, _self.message(:close_dataset),
+			      :enabled?, _false
+			  )
+	      )
+	
+	
+			  
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.build_gui( a_container )
+	## 
+	##
+
+	rc << rowcol.new( a_container, _unset, 1, :pixel,
+			  :style, :top_level)
+
+	rc.tab_label << _self.message(:kml_import)
+
+#	url_rc << rowcol.new( rc, _unset, 2, :pixel,
+#			      :style, :nested)
+#
+#	_self.action(:open_url).place_control_on( a_container, :toolbar )
+#	_self.action( :url ).place_control_on( a_container, :toolbar )
+
+	
+	
+	
+	>>rc 
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.open_url()
+	## 
+	##
+
+	_local url << _self.action(:url).value
+
+	_if .document _isnt _unset 
+	_then
+		.document.close()
+	_endif
+
+	a_response << mclib:http_request.new_for_url( _unset, _unset, _self.action(:url).value ).connect()
+
+	_if a_response _is _unset 
+	_then
+		condition.raise(:user_error, :string, _self.message(:unable_to_connect_to_url, url ) )
+	_endif
+
+	.document << a_response.smart_result()
+	.document.open()
+
+	_self.manage_actions()
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.open_dataset()
+	## 
+	##
+
+	_self.open_url()
+
+	_local a_soc << gis_program_manager.spatial_object_controller(:gis)
+	a_soc.add_dataset_manager( .document.dataset_manager )
+
+	.document.dataset_manager.switch_ace_visibility( _self.application.ace_name, _true )
+
+
+
+	_self.databus.make_data_available(:rwo_set, {_self.message( :kml_data), .document.rwo_set() } )
+							 
+	
+	_self.manage_actions()
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.close_dataset()
+	## 
+	##
+
+	_local a_soc << gis_program_manager.spatial_object_controller(:gis)
+
+	_if .document _isnt _unset _andif
+	     .document.dataset _isnt _unset 
+	 _then
+		 a_soc.remove_dataset_manager( .document.dataset_manager.name )
+		 .document.close()
+		 .document << _unset 
+	_endif
+
+	_self.manage_actions()
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.manage_actions()
+	## 
+	##
+
+
+	_self.action(:close_dataset).enabled? << _self.can_close?
+	_self.action(:open_dataset).enabled? << _self.can_open? 
+
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.terminate()
+	 ## 
+	 ##
+
+	write("Terminate")
+
+	_self.close_dataset()	 
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.can_open?
+	## 
+	##
+
+	_local a_soc << gis_program_manager.spatial_object_controller(:gis)
+
+	_if .document _is _unset 
+	_then
+		_return _true
+	_endif
+
+	_if .document.dataset _isnt _unset 
+	_then
+		ds_name << .document.dataset.name
+		
+		_if a_soc.dataset_manager( ds_name ) _is _unset 
+		_then
+			_return _true
+		_endif
+	_endif
+
+	>> _false
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_import_plugin.can_close?
+	## 
+	##
+
+	_local a_soc << gis_program_manager.spatial_object_controller(:gis)
+	
+	_if .document _is _unset 
+	_then
+		_return _false 
+	_endif
+
+	_if .document.dataset _is _unset 
+	_then
+		_return _false
+	_else
+
+		ds_name << .document.dataset.name
+		
+		_if a_soc.dataset_manager( ds_name ) _is _unset 
+		_then
+			_return _false 
+		_endif
+		
+	_endif
+	
+	>> _true 	
+_endmethod
+$

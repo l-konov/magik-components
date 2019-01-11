@@ -1,0 +1,245 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 14:56:41 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.as_kml()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	namespaces << property_list.new_with(:xmlns,"http://earth.google.com/kml/2.0")
+	>> simple_xml_thing_ns.new("kml",
+				{_self.as_kml_placemark()},
+				_unset,
+				namespaces)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.as_kml_placemark()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	elems << _self.kml_placemark_elements()
+	attribs << {:id,urn_record_handler.get_urn_from_object(_self)}
+	res <<  simple_xml_thing.new("Placemark",
+			     elems,
+			     attribs)
+	#debug simple_xml.write_element_on(!output!,res)
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_placemark_elements(_optional look_at?)
+	## returns the elemants for showing me as a KML placemark. This
+	## is a rope of simple_xml_things.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	elems << rope.new()
+	elems.add_last(simple_xml_text.new(:name,_self.kml_name.write_string))
+	elems.add_last(simple_xml_text.new(:|Snippet|,_self.kml_snippet.write_string))
+	elems.add_last(simple_xml_text.new(:description,_self.kml_description()))
+	_if look_at? _is _true 
+	_then
+		look_at << pseudo_point.new(_self.bounds.centre)
+		look_at.world << rope.new_from_iter(_self,:all_geometry|()|).an_element().world
+		elems.add_last(look_at.as_kml_lookat(4000,45,-125) )
+		elems.add_last(simple_xml_thing.new("Visibility",{1}))
+		elems.add_last(simple_xml_thing.new("Open",{0}))
+	_endif
+	_if (st << _self.kml_style()) _isnt _unset
+	_then 
+		elems.add_last(st)
+	_endif
+	_if (a_geom << _self.kml_geometry()) _isnt _unset
+	_then 
+		elems.add_last(a_geom)
+	_endif 
+	>> elems
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_snippet
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _self.description().write_string
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_description()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	res << "<![CDATA[<table>"
+	_for a_field _over _self.kml_visible_fields.fast_elements()
+	_loop
+		_if a_field.is_join?
+		_then
+			item << _self.perform(a_field.name)
+			_if item _is _unset
+			_then
+				val << "Not Set"
+			_elif item.responds_to?(:size)
+			_then
+				val << write_string(_self.perform(a_field.name).size," records")
+			_else
+				val << write_string(_self.perform(a_field.name).description())
+			_endif 
+		_elif a_field.is_geometry?
+		_then
+			_continue 
+		_else 
+			val << _self.perform(a_field.name)
+		_endif
+		res << write_string(res,"<tr><th>",a_field.external_name,"</th><td>",val,"</td></tr>")
+	_endloop
+	urn << urn_record_handler.get_urn_from_object(_self)
+	res << write_string(res,"<tr><th><a href=", %", "http://localhost:32457/goto?urn=", urn , %" ,">Goto Record in Smallworld</a></th></tr>")
+	res << write_string(res,"<tr><th><a href=", %", "http://localhost:32457/edit?urn=", urn , %" ,">Edit Record in Smallworld</a></th></tr>")
+	res << write_string(res,"</table>]]>")
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_visible_fields
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _self.visible_fields
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_name
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _self.source_collection.external_name
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_style()
+	## returns the XML for a style used for me in KML
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic user:!GEARTH_STYLE_SYSTEM!
+	_dynamic !current_dsview! << _self.source_view
+	res <<  _if (a_geom << _self.default_kml_geometry) _isnt _unset
+		_then
+			st << a_geom.style_in(user:!GEARTH_STYLE_SYSTEM!)
+			>> st.kml_style()
+		_endif
+	>> res
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_geometry(_optional a_field_name, height)
+	## returns the representation of my geometry A_FIELD_NAME, or the
+	## default if not specified, for use in KML
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	height << height.default(_self.kml_height)
+	_if a_field_name _is _unset 
+	_then
+		a_field_name << _self.default_kml_geometry_field()
+	_endif
+	#debug show(_self,a_field_name,_self.perform(a_field_name))
+	_if a_field_name _is _unset 
+	_then
+		_return _unset 
+	_endif
+	>> _if (geom << _self.perform(a_field_name)) _isnt _unset
+	_then 
+		res << geom.as_kml_entity(height)
+		#debug show(res)
+		>> res
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.kml_height
+	## The height to use for my KML geometry. this version returns unset
+	## 
+	##
+
+	# (08-17-2006 Brad Sileo): created.
+	>> _unset 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.default_kml_geometry
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _if (fd << _self.default_kml_geometry_field()) _isnt _unset 
+	   _then
+		   >> _self.perform(fd)
+	   _endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method rwo_record_mixin.default_kml_geometry_field()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	rec_ex << _self.source_collection.record_exemplar
+	_if rec_ex.responds_to?(:editing_properties)
+	_then
+		geom_field_name << rec_ex.editing_properties[:default_geometry_field]
+	_else
+		# Fallback to some random geom field...
+		fds << _self.visible_geometry_fields
+		_if fds.empty? _then _return _unset _endif 
+		geom_field_name << fds.an_element().name
+	_endif
+	#debug show(_self,geom_field_name)
+	>> geom_field_name
+_endmethod
+$

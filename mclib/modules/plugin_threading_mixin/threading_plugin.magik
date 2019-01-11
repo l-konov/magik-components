@@ -1,0 +1,432 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-02-27 20:47:08 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-17-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+
+def_slotted_exemplar(:threading_plugin,
+                          {
+				  {:thread,_unset},
+				  {:run_status,_unset},
+				  {:run_actions,_unset }
+			  },
+			  {:plugin}
+)
+$
+
+_pragma(classify_level=basic)
+## returns the current run status of this engine
+threading_plugin.define_slot_externally_readable(:run_status)
+
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:run_message,:symbol,"The name of the method to run on my framework for my engine")
+$
+
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:priority,:integer,"The thread priority",
+				      _true,_true,light_thread.background_priority)
+$
+
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:run_image_name,:symbol,"The identifier to use for my run_image",
+				      _true,_true,:run_engine)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:run_image_module_name,:symbol,
+				      "The module for my run_image",
+				      _true,_true,:plugin_threading_mixin)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:interrupt_image_name,:symbol,"The identifier to use for my interrupt_image",
+				      _true,_true,:stop)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:interrupt_image_module_name,:symbol,
+				      "The module for my interrupt_image",
+				      _true,_true,:ui_resources)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:suspend_image_name,:symbol,"The identifier to use for my suspend_image",
+				      _true,_true,:signal_stop)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:suspend_image_module_name,:symbol,
+				      "The module for my suspend_image",
+				      _true,_true,:ui_resources)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:resume_image_name,:symbol,"The identifier to use for my resume_image",
+				      _true,_true,:signal_go)
+$
+_pragma(classify_level=basic, topic={gui})
+threading_plugin.define_property(:resume_image_module_name,:symbol,
+				      "The module for my resume_image",
+				      _true,_true,:ui_resources)
+$
+_pragma(classify_level=basic, topic={sams_gui})
+threading_plugin.define_property(:auto_kill_on_run?,:boolean,
+				      "Should an active thread be killed if a new one is started",
+				      _true,_true,_true)
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.run_engine(_optional a_object, a_message, _gather args)
+	## Starts my thread running on A_OBJECT doing A_MESSAGE with ARGS
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_if .thread _isnt _unset 
+	_then
+		_self.cleanup_thread_for_run()
+	_endif
+	_self.thread << _proc@threading(me,a_object, a_message, _gather args)
+			   me.int!run_engine(a_object, a_message, _scatter args)
+		   _endproc.fork_at(_self.priority,_self,a_object, a_message, _scatter args)
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.cleanup_thread_for_run()
+	## Kills an active background thread in me or halts this one,
+	## based on the setting or my property :auto_kill_on_run
+	## 
+	##
+
+	# (02-25-2005 Brad Sileo): created.
+	_if _self.auto_kill_on_run? _is _true 
+	_then
+		.thread.kill()
+	_else
+		condition.raise(:engine_running,_self.name)
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.int!run_engine(_optional a_object, a_message, _gather args)
+	## Does the actual run of the method on a_object which default
+	## to mt framework
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_self.changed(:status,:running)
+	_self.thread << _thisthread
+	_self.manage_actions()
+	action << a_message.default(_self.run_message)
+	_if action _is _unset 
+	_then
+		action << :run_engine_ + _self.name + :|()|
+	_endif
+	target << a_object.default(_self.framework)	
+	_local role << write_string(target.class_name,%.,action)
+	_thisthread.role << role
+	_thisthread.set_name(role)
+	ok? << _false
+	_protect
+		_handling user_error _with target.user_error_handler
+		_handling error _with target.error_handler
+		_handling warning _with target.warning_handler
+		_if action.is_class_of?({})
+		_then
+			action.new_appending(_scatter args).send_to(target)
+		_else
+			target.perform(action,_scatter args)
+		_endif
+		ok? << _true 
+	_protection
+		_if _thisthread _is .thread
+		_then
+			_self.thread << _unset
+		_endif
+		_self.manage_actions()
+		_self.changed(:status,:finished,ok?)
+	_endprotect
+_endmethod
+$
+			  
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.init_actions()
+	## Setup the engine control actions
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	.run_actions << set.new()
+	a_image << {_self.run_image_name,_self.run_image_module_name}
+	_self.add_action(main_run << sw_action.new(:run_engine_ + _self.name,
+				       :engine,_self,
+				       :action_message,:|run_engine()|,
+				       :image,a_image,
+				       :enabled?,_true,
+				       :caption,_self.message(:run_engine_ + _self.name),
+				       :short_help_text,_self.message(:run_engine_ + _self.name + :_sh),
+				       :tooltip,_self.message(:run_engine_ + _self.name + :_tt)
+				   )
+	      )
+
+	_self.add_run_action(main_run)
+	_for a_action_def _over _self.framework.extra_threading_run_actions(_self.name).fast_elements()
+	_loop
+		an_action << a_action_def.new_action(_self)
+		_self.add_action(an_action)
+		.run_actions.add(an_action)
+	_endloop
+	
+	a_image << {_self.interrupt_image_name,_self.interrupt_image_module_name}
+	_self.add_action(sw_action.new(:interrupt_engine_ + _self.name,
+				       :engine,_self,
+				       :action_message,{:|interrupt_engine()|, _self.name},
+				       :image,a_image,
+				       :enabled?,_false,
+				       :caption,_self.message(:interrupt_engine_ + _self.name),
+				       :short_help_text,_self.message(:interrupt_engine_ + _self.name + :_sh),
+				       :tooltip,_self.message(:interrupt_engine_ + _self.name + :_tt)
+				   )
+	      )
+	a_image << {_self.suspend_image_name,_self.suspend_image_module_name}
+	_self.add_action(susp << sw_action.new(:suspend_engine_ + _self.name,
+				       :engine,_self,
+				       :action_message,{:|suspend_engine()|, _self.name},
+				       :image,a_image,
+				       :enabled?,_false,
+				       :caption,_self.message(:suspend_engine_ + _self.name),
+				       :short_help_text,_self.message(:suspend_engine_ + _self.name + :_sh),
+				       :tooltip,_self.message(:suspend_engine_ + _self.name + :_tt)
+				   )
+	      )
+	a_image << {_self.resume_image_name,_self.resume_image_module_name}
+	_self.add_action(resume << sw_action.new(:resume_engine_ + _self.name,
+				       :engine,_self,
+				       :action_message,{:|resume_engine()|, _self.name},
+				       :image,a_image,
+				       :enabled?,_false,
+				       :caption,_self.message(:resume_engine_ + _self.name),
+				       :short_help_text,_self.message(:resume_engine_ + _self.name + :_sh),
+				       :tooltip,_self.message(:resume_engine_ + _self.name + :_tt)
+				   )
+	      )
+
+	# setup a toggle item for the suspend resume functions. this
+	# cna be used instead of the separate buttons above for an
+	# on/off approach.
+	sel_image << smallworld_product.get_raster_image(:signal_go,:ui_resources)
+	# This doesn't actually work since it does not switch to this
+	# when the action is disabled. left here in the event that it
+	# ever gets fixed in core. This is why the :stop_image below
+	# had to be moved into this module and paired with
+	# :stop_image_grey there to get it working right.
+	is_image << smallworld_product.get_raster_image(:signal_stop_go_grey,:plugin_threading_mixin)
+	_self.add_action(sw_action.new(:suspend_resume_engine_ + _self.name,
+				        :engine,_self,
+					:action_message,:|toggle_suspend_resume()|,
+					:toolbar_control,{:image_toggle_item,
+							  :select_image,sel_image,
+							  :insensitive_image, is_image
+					},
+					:image,{:signal_stop,:plugin_threading_mixin},
+					:enabled?,_false,
+					:value,_false,
+					:caption,_self.message(:suspend_resume_engine_ + _self.name),
+					:short_help_text,_self.message(:suspend_resume_engine_ + _self.name + :_sh),
+					:tooltip,_self.message(:suspend_resume_engine_ + _self.name + :_tt)
+				   )
+	      )
+					
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.manage_actions()
+	## Handle state of my actions based on the current thread status
+	## 
+	##
+
+	# (12-22-2004 Brad Sileo, TenSails): created.
+	_if .thread _is _unset 
+	_then
+		_self.set_run_actions_enabled?(_true)
+		_self.action(:interrupt_engine_ + _self.name).enabled? << _false
+		_self.action(:resume_engine_ + _self.name).enabled? << _false
+		_self.action(:suspend_engine_ + _self.name).enabled? << _false
+		_self.action(:suspend_resume_engine_ + _self.name).enabled? << _false
+	_elif .run_status _is :inactive
+	_then
+		_self.set_run_actions_enabled?(_false)
+		_self.action(:interrupt_engine_ + _self.name).enabled? << _true
+		_self.action(:resume_engine_ + _self.name).enabled? << _true 
+		_self.action(:suspend_engine_ + _self.name).enabled? << _false
+		_self.action(:suspend_resume_engine_ + _self.name).enabled? << _true 
+	_elif .run_status _is :running
+	_then
+		_self.set_run_actions_enabled?(_false)
+		_self.action(:interrupt_engine_ + _self.name).enabled? << _true
+		_self.action(:resume_engine_ + _self.name).enabled? << _false
+		_self.action(:suspend_engine_ + _self.name).enabled? << _true
+		_self.action(:suspend_resume_engine_ + _self.name).enabled? << _true 
+	_else
+		_self.set_run_actions_enabled?(_false)
+		_self.action(:interrupt_engine_ + _self.name).enabled? << _false
+		_self.action(:resume_engine_ + _self.name).enabled? << _false
+		_self.action(:suspend_engine_ + _self.name).enabled? << _false
+		_self.action(:suspend_resume_engine_ + _self.name).enabled? << _false 
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.add_run_action(a_action)
+	## Adds A_ACTION to my run_actions. all of these actions are
+	## managed by this plugin for enabled state. This allows you to
+	## define several different actions in your plugin which all
+	## start the engine running, perhaps with different
+	## parameters.  They are then insured to be enabled and
+	## disabled at the right time by this plugin.
+	## 
+	##
+
+	# (01-14-2005 Brad Sileo, TenSails): created.
+	.run_actions.add(a_action)
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.set_run_actions_enabled?(on?)
+	## set the enabled status of all of my .run_actions to on?
+	## 
+	##
+
+	# (01-14-2005 Brad Sileo, TenSails): created.
+	#debug print(.run_actions)
+	_for a_action _over .run_actions.fast_elements()
+	_loop
+		a_action.enabled? << on?
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.message(message_id, _gather args)
+	## gets missing messages from my framework if possible instead
+	## of from me.
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	>> _if _self.has_message?(message_id)
+	   _then
+		   >> _super.message(message_id, args)
+	   _else
+		   >> _self.framework.message(message_id, args)
+	   _endif 
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.thread << a_thread
+	## sets my current thread
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	.thread << a_thread
+	_if a_thread _isnt _unset
+	_then
+		.run_status << :running
+	_else
+		.run_status << _unset
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.interrupt_engine()
+	## Kill my current thread if possible
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_if .thread _isnt _unset 
+	_then
+		.thread.kill_and_wait()
+		_self.action(:suspend_resume_engine_ + _self.name).value << _false 
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.suspend_engine()
+	## Suspend my current thread if possible
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_if .thread _isnt _unset 
+	_then
+		.thread.suspend()
+		.run_status << :inactive
+	_endif
+	_self.manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.resume_engine()
+	## Suspend my current thread if possible
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_if .thread _isnt _unset 
+	_then
+		.thread.resume()
+		.run_status << :running
+	_endif
+	_self.manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method threading_plugin.toggle_suspend_resume()
+	## Toggle my suspend resume state - it I am suspended, resume
+	## me, if I am running, suspend me.
+	## 
+	##
+
+	# (01-26-2005 Brad Sileo, TenSails): created.
+	_if .run_status _is :inactive
+	_then
+		_self.resume_engine()
+	_elif .run_status _is :running
+	_then 
+		_self.suspend_engine()
+	_endif 
+_endmethod
+$

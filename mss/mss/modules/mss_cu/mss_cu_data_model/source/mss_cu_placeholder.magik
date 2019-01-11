@@ -1,0 +1,36 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_placeholder
+##
+## The less-intelligent cousin of the mss_cu_holder, this subclass
+## exists to simply allow the user to directly assign any value
+## that would otherwise be derived by the superclass.  All values
+## should be assigned via the new() and update_attributes_from()
+## protocols.
+##
+
+def_slotted_exemplar(:mss_cu_placeholder,
+{
+	{:description, _unset, :writable, :read_only},
+	{:raw_material_unit_cost, _unset, :writable, :read_only},
+	{:raw_labor_unit_cost, _unset, :writable, :read_only},
+	{:material_unit_cost, _unset, :writable, :read_only},
+	{:labor_unit_cost, _unset, :writable, :read_only},
+	{:total_unit_cost, _unset, :writable, :read_only},
+	{:dimensionality, _unset, :writable, :read_only},
+	{:combined_quantity, _unset, :writable, :read_only},
+	{:material_total_cost, _unset, :writable, :read_only},
+	{:labor_total_cost, _unset, :writable, :read_only},
+	{:total_cost, _unset, :writable, :read_only}
+},
+{:mss_cu_holder})
+$

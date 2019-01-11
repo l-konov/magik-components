@@ -1,0 +1,184 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:41:53 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## Top level item for working with KML files in Magik
+##
+##  To try one out, use this, after loading mclib_http_interface:
+##   kml << mclib:http_request.new_for_url(:test,_unset,
+##    "http://code.google.com/apis/kml/documentation/KML_Samples.kml").connect().smart_result()
+##
+##  To access the records:
+##
+##    kml.rwo_set() or kml.open()
+## 
+## To take a look at one:
+##  gis_program_manager.spatial_object_controller(:gis).add_dataset_manager(kml.dataset_manager))
+##
+##
+def_slotted_exemplar(:kml_document,
+                             {
+				     {:dataset_manager,_unset},
+				     {:dataset,_unset},
+				     {:world,_unset},
+				     {:document_styles, _unset, :readable}
+			     },
+			     {:simple_xml_document})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.init(elements,context)
+	## 
+	## 
+	##
+
+	# (08-07-2007 Brad Sileo): created.
+	_if context _is _unset 
+	_then
+		context << mclib:kml_element 
+	_endif
+	_super.init(elements,context)
+	>> _self 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.rwo_set()
+	## Returns an rwo_set for me....
+	## 
+	##
+
+	# (08-07-2007 Brad Sileo): created.
+	_self.open()
+	>> .dataset.rwo_set()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.open()
+	## Open a transient dataset based on this document.
+	## 
+	##
+
+	# (08-09-2007 Brad Sileo): created.
+	_if .dataset _is _unset 
+	_then
+		_if (doc << _self.top_element.element_matching_name(:|Document|)) _isnt _unset _andif 
+		    (name << doc.element_matching_name(:|name|)) _isnt _unset
+		_then
+			s_name << name.elements[1].default("KML Dataset")
+		_else
+			s_name << "KML Dataset"
+		_endif
+
+		_self.init_document_styles()
+		
+		
+		int_name << s_name.write_string.lowercase.convert_to_non_escape_string().as_symbol()
+		proj << coordinate_system.new_proj_long_lat(:wgs84,:degree)
+		
+		# .dataset_manager << transient_dataset_manager.new(int_name,_unset,proj)
+		.dataset_manager << kml_dataset_manager.new(int_name,_unset,proj)
+		.dataset_manager.open({})
+		.dataset << .dataset_manager.actual_dataset
+		
+		 univ << uds_universe.new(0,:gis,.dataset)
+		.world << uds_world.new(0,:gis,.dataset, proj, univ)
+		
+		.dataset.sys!slot(:params)[:cached_worlds] << property_list.new_with(0,.world)
+		.dataset.external_name << s_name
+		
+		# Now get everything populated and setup.
+		todo << stack.new()
+		res << rwo_set.new()
+		todo.push(_self.top_element)
+		_loop
+			next << todo.pop()
+			_if next _is _unset _then _leave _endif
+			res.add_all(next.rwo_set(.dataset))
+		_endloop
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.close()
+	## 
+	## 
+	##
+
+	# (08-09-2007 Brad Sileo): created.
+	_if .dataset _isnt _unset _then .dataset.discard() _endif 
+	.dataset << _unset 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.dataset_manager
+	## 
+	## 
+	##
+
+	# (08-10-2007 Brad Sileo): created.
+	>> .dataset_manager
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.dataset
+	## 
+	## 
+	##
+
+	# (08-10-2007 Brad Sileo): created.
+	>> .dataset
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.init_document_styles()
+	## 
+	##
+
+	_local styles << equality_hash_table.new()
+	_local doc << _self.top_element.element_matching_name(:|Document|)
+
+	_for an_element _over doc.elements_matching_name(:|Style|)
+	_loop
+		(style_name, a_style ) << an_element.style_info
+
+		_if a_style _isnt _unset 
+		_then
+			styles[style_name] << a_style
+		_endif
+
+	_endloop
+
+	.document_styles << styles
+_endmethod
+$

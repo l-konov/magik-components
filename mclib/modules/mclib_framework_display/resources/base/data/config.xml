@@ -1,0 +1,7 @@
+<config>
+  <plugins>
+    <plugin name="framework_display" class_name="mclib:framework_display_plugin">
+    </plugin>
+  </plugins>
+
+</config>

@@ -1,0 +1,295 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+##
+## mss_wm_overlay_swdp_manager
+##
+## Dataset manager to allow an overlay view of a design
+## alternative. 
+##
+
+def_slotted_exemplar(:mss_wm_overlay_swdp_manager,
+{
+	{:parent_swdp_manager, _unset, :readable},
+	{:seq_no, _unset, :readable},
+	{:override_only?, _unset, :writable},
+	{:raw_replica_geoms, _unset, :readable},
+	{:changed_replica_geoms, _unset, :readable}
+},
+{:swdp_manager})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+mss_wm_overlay_swdp_manager.define_shared_constant(
+	:browsable?,
+	_false,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_wm_overlay_swdp_manager.define_shared_constant(
+	:max_number_of_overlays,
+	## The maximum number of overlays that should be permitted.
+	## Note that increasing this number will cause an increase in
+	## the use of system resources (notably, replica views), and
+	## will likely affect the performance of other tools such as
+	## Object Control when multiple overlays are displayed.
+	5,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+mss_wm_overlay_swdp_manager.define_shared_variable(
+	:colour_for_seq_no,
+	## This lookup table defines the colour to use for displaying
+	## self's replica geometries, based on self's seq_no attribute.
+
+	hash_table.new_with(
+		1, colour.new_rgb(0.0, 1.0, 1.0),
+		2, colour.new_rgb(0.1, 0.95, 0.95),
+		3, colour.new_rgb(0.2, 0.9, 0.9),
+		4, colour.new_rgb(0.3, 0.85, 0.85),
+		5, colour.new_rgb(0.4, 0.8, 0.8)),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.new_from(a_swdp_manager, a_seq_no, repl_view)
+	## 
+	## Create a new instance of self, using A_SWDP_MANAGER as the
+	## parent reference dataset manager.  A_SEQ_NO is a unique
+	## number to use for identifying self.  REPL_VIEW is the
+	## replica view that will be used to render self's data.
+	##
+	
+	_return _clone.init_from(a_swdp_manager, a_seq_no, repl_view)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.init_from(a_swdp_manager, a_seq_no, repl_view)
+	## 
+	## 
+
+	.parent_swdp_manager << a_swdp_manager
+	a_seq_no << a_seq_no.default(1)
+	.seq_no << a_seq_no
+	.override_only? << _true
+	
+	name << _self.name_for_manager_and_seq_no(a_swdp_manager, a_seq_no)
+
+	# Should set up a public way to clone this information for a
+	# swdp_manager:
+	units << a_swdp_manager.sys!slot(:current_units)
+	proj << a_swdp_manager.sys!slot(:current_projection)
+	
+	_self.init(name, units, proj)
+	a_swdp_manager.actual_dataset.add_dependent(_self)
+	repl_view.add_dependent(_self)
+	
+	_self.use(repl_view)
+	_if (ovl_world << a_swdp_manager.world) _isnt _unset _andif
+	    ovl_world.is_valid?
+	_then 
+		_self.select_world(ovl_world)
+	_endif 
+
+	.raw_replica_geoms << equality_geometry_set.new()
+	.changed_replica_geoms << equality_hash_table.new()
+	orig_view_key << repl_view.params[:view_key]
+	orig_view_dataset_name << repl_view.original_dataset_name
+	repl_view.dataset_name << name
+	repl_view.view_name << _self.external_name
+
+	# Implementation note: at various times in past versions and/or
+	# past TSB patch releases, either the :view_key parameter, the
+	# :original_dataset_name parameter, or both, have been required
+	# to convince Object Control to use the same VHS settings as
+	# the dataset being used as a base.  It may be true that as of
+	# the current version, only one of these values are required.
+	# There doesn't seem to be any bad side-effects to keeping both
+	# set though, so that is what is done here.
+	
+	# This is a somewhat sneaky trick, but restore the original
+	# view_key value, which is what is used by the ace_control to
+	# get default visibility settings, and that gets clobbered by
+	# setting view_name above.
+	repl_view.params[:view_key] << orig_view_key
+
+	gis_program_manager.cache_dataset(_self.name, repl_view)
+
+	# The following additional info is needed for ACE visibility
+	# settings to work correctly.  This must be done after the
+	# dataset is cached (since that alters this setting). 
+	repl_view.params[:original_dataset_name] << orig_view_dataset_name
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.note_change(who, what, data)
+	## 
+	## If any database change happens, then decache information
+	## about changed geometries.
+	##
+
+	_if {:view, :alternative_path, :lwt_state}.includes?(what)
+	_then
+		.changed_replica_geoms.empty()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.name_for_manager_and_seq_no(a_swdp_manager, a_seq_no)
+	## 
+	## Return a name for self, derived from A_SWDP_MANAGER and
+	## A_SEQ_NO.
+	##
+
+	_return write_string("mss_overlay_", a_swdp_manager.name, "_", a_seq_no.default(1)).as_symbol()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.set_geometry_data_for_replica_view()
+	## 
+	## Set replica view cached geometry data based on self's
+	## replica view.
+	##
+
+	gset << .raw_replica_geoms
+	gset.empty()
+	_protect
+		v1 << _self.actual_dataset
+		v2 << v1.replicate(:base)
+		_for tname _over {:sw_gis!area,
+				  :sw_gis!chain,
+				  :sw_gis!dimension_holder,
+				  :sw_gis!point,
+				  :sw_gis!simple_area,
+				  :sw_gis!simple_chain,
+				  :sw_gis!simple_point,
+				  :sw_gis!text}.fast_elements()
+		_loop
+			diff_str << ds_difference_stream.new_on(v1.collections[tname],
+								v2.collections[tname])
+			_loop
+				(ch, orig_rec) << diff_str.get()
+				_if ch _is _unset _then _leave _endif
+				_if ch _is :insert _orif
+				    ch _is :update
+				_then
+					gset.add(orig_rec)
+				_endif
+			_endloop 
+		_endloop
+		_self.custom_set_geometry_data_for_replica_view(v1, v2)
+	_protection
+		_if v2 _isnt _unset _then v2.discard() _endif 
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_overlay_swdp_manager.custom_set_geometry_data_for_replica_view(v1, v2)
+	## 
+	## Customizable method to add additional geometries to self's
+	## raw_replica_geoms slot, based on the differences found between
+	## self's replica view V1, and the base view of that replica
+	## view V2.
+	##
+	## Note that V2 is discarded once this is complete.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.geometry_set_from(a_spec, a_world)
+	## 
+	## Custom processing to determine a geometry set from A_SPEC
+	## and A_WORLD (see superclass for further details).  
+	##
+	
+	_if (ds << _self.actual_dataset) _is _unset _orif
+	    ds _is _self
+	_then
+		_return
+	_endif
+
+	_if (my_ds_world << a_world.world_for_dataset(ds)) _isnt _unset 
+	_then
+		a_gs << mss_wm_overlay_geometry_set.new(my_ds_world, _unset, a_spec[1])
+		a_gs.set_overlay_dataset_manager(_self)
+		a_gs.override_only? << _self.override_only?
+		a_gs.style_system << a_spec[2]
+		override_styles << a_spec[2].copy()
+		_if (clr << _self.colour_for_seq_no[_self.seq_no]) _isnt _unset
+		_then 
+			override_styles.set_colour(clr)
+		_endif 
+		a_gs.override_style_system << override_styles
+	_endif
+	      
+	_return a_gs
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_swdp_manager.geometry_changed_in_replica?(a_geom)
+	## 
+	## Return true if A_GEOM is changed in self's replica view,
+	## relative to the parent database view managed by self's
+	## parent_swdp_manager.
+	##
+
+	# Check to see if cached info is known already.
+	_if _not .raw_replica_geoms.includes?(a_geom)
+	_then
+		_return _false
+	_endif 
+	crg << .changed_replica_geoms
+	_if (res << crg[a_geom]) _isnt _unset
+	_then
+		_return res
+	_endif 
+
+	# Get corresponding data from parent_swdp_manager.
+	_if (parent_ds << .parent_swdp_manager.actual_dataset) _is _unset _orif
+	    (parent_geom << a_geom.corresponding_record(parent_ds, _false)) _is _unset 
+	_then
+		crg[a_geom] << _true
+		_return _true
+	_endif
+
+	_if (a_geom_rwo << a_geom.rwo) _is _unset _orif
+	    (parent_geom_rwo << parent_geom.rwo) _is _unset
+	_then
+		# Strictly test geometry.
+		res << _not a_geom.all_substructure_equals?(parent_geom)
+		crg[a_geom] << res
+		_return res
+	_endif
+
+	# Let customizable method sort this out.
+	res << a_geom_rwo.mss_geometry_changed_in_replica?(a_geom, parent_geom_rwo, parent_geom)
+	crg[a_geom] << res
+	_return res
+	
+_endmethod
+$

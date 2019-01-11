@@ -1,0 +1,10 @@
+mclib_child_record_transactions	4000
+
+description
+	Provides the child_record_transaction object which supports nested transactions with joins and other transactions
+end
+
+requires
+	database_transactions
+	mclib_package
+end

@@ -1,0 +1,26 @@
+<gui>
+  <menu name="processor_result_list" type="popup">
+      <action name="mss_scheduler_processor_plugin.refresh_result_list"/>
+  </menu>
+
+  <menu name="results_result_list" type="popup">
+    <action name="mss_scheduler_results_plugin.refresh_result_list"/>
+    <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+  </menu>
+
+  <work_area>
+     <paned_window side_by_side="yes">
+         <tab_box stretch="100">
+	  <plugin plugin_name="mss_scheduler_processor_plugin"/>
+	  <plugin plugin_name="mss_scheduler_results_plugin"/>
+          <plugin plugin_name="mss_scheduler_engine"/>
+         </tab_box>
+        <plugin plugin_name="editor_manager" stretch="0"/>
+      </paned_window>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

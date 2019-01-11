@@ -1,0 +1,537 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_processor_plugin
+##
+## Plugin for providing main GUI for
+## mss_scheduler_processor_framework.
+##
+
+def_slotted_exemplar(:mss_scheduler_processor_plugin,
+{
+	{:items, _unset, :readable},
+	{:start_time, _unset, :readable},
+	{:sorter, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+mss_scheduler_processor_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:managed_task_types},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+mss_scheduler_processor_plugin.define_shared_constant(
+	:edit_auth_right,
+	## Name of the auth right that is authorised to directly
+	## insert/update records.  Note that this is different from
+	## standard authorisation, since any user will be permitted to
+	## insert records as part of other actions (external to this
+	## particular plugin).
+	"mss_scheduler_access",
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+mss_scheduler_processor_plugin.define_shared_constant(
+	:result_list_column_widths,
+	## Column widths to use for result list.
+	{180, 120, 60, 60, 80},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_processor_plugin.result_list_column_headings
+	## 
+	## Column headings to use for result list.
+	## 
+
+	_return {_self.message(:rch_type),
+		 _self.message(:rch_scheduled_start_time),
+		 _self.message(:rch_submitter),
+		 _self.message(:rch_priority),
+		 _self.message(:rch_schedule_interval)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_processor_plugin.result_list_styled_string(disp_tree)
+	##
+	## The styled_string to use for displaying data in the result list.
+	##
+	
+	_return styled_string.new(:value, :type, :tab,
+				  :value, :scheduled_start_time, :tab,
+				  :value, :submitter, :tab,
+				  :value, :priority, :tab,
+				  :value, :schedule_interval)
+
+_endmethod 
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduler_processor_plugin.set_result_list_attributes(pl, task_rec)
+	##
+	## Set the attributes for displaying the search result for
+	## task record TASK_REC.  PL is the property list in which
+	## to store the attributes. 
+	##
+	## This may be redefined, in conjunction with result_list_styled_string(),
+	## result_list_column_widths, and result_list_column_headings.
+	##
+
+	task_type << task_rec.type.as_symbol()
+	handler << mss_scheduler_engine.get_task_handler_exemplar(task_type)
+	
+	pl[:mss_scheduled_task] << task_rec
+	_if handler _is _unset
+	_then 
+		pl[:type] << task_type
+	_else
+		pl[:type] << handler.external_name_for_task(task_rec)
+	_endif
+	
+	pl[:scheduled_start_time] << task_rec.scheduled_start_time
+	pl[:submitter] << task_rec.submitter
+	pl[:priority] << task_rec.priority
+	_if (x << task_rec.schedule_interval) _is _unset _orif
+	    (secs << x.as_time_interval().seconds) <= 0
+	_then
+		sch_int << _self.message(:once)
+	_elif secs < 60
+	_then
+		fmt << unit_specific_format.new_with_properties(
+			       unit_manager.unit(:sec),
+			       :float_decimal_places, 0,
+			       :use_sub_units?, _true)
+		sch_int << fmt.format(x)
+	_elif secs < 3600
+	_then
+		fmt << unit_specific_format.new_with_properties(
+			       unit_manager.unit(:min),
+			       :float_decimal_places, 1,
+			       :use_sub_units?, _true)
+		sch_int << fmt.format(x)
+	_elif secs < 86400
+	_then
+		fmt << unit_specific_format.new_with_properties(
+			       unit_manager.unit(:hour),
+			       :float_decimal_places, 2,
+			       :use_sub_units?, _true)
+		sch_int << fmt.format(x)
+	_else
+		fmt << unit_specific_format.new_with_properties(
+			       unit_manager.unit(:day),
+			       :float_decimal_places, 3,
+			       :use_sub_units?, _true)
+		sch_int << fmt.format(x)
+	_endif 
+	pl[:schedule_interval] << sch_int
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.init(_gather args)
+	## 
+	## 
+
+	_local me << _self 
+	_super.init(_scatter args)
+	.items << property_list.new()
+	sort_proc <<
+		_proc(a, b)
+			# Sorting is different depending on whether or not the task
+			# start time is after the current time.  If it is before the
+			# current time (i.e. ready to run), then sort based on priority
+			# first.  If it is after the current time (i.e. will run at
+			# some point in the future), then sort based on start time first.
+			# Using me.start_time below ensures that the start time does
+			# not change while the sort is being performed.
+			_import me
+			_local start_time << me.start_time
+			a_start << a.value[:scheduled_start_time]
+			b_start << b.value[:scheduled_start_time]
+			a_prio << a.value[:priority]
+			b_prio << b.value[:priority]
+				
+			_if a_start > start_time _orif
+			    b_start > start_time
+			_then
+				# If at least one task will start in the future, then sort on
+				# start time first.
+				_if (x << a_start _cf b_start) _is _maybe
+				_then
+					# Same start time - return higher priority.
+					_return b_prio _cf a_prio
+				_else
+					_return x
+				_endif
+			_else
+				# Both tasks are ready to run.  Sort on priority first.
+				_if (x << b_prio _cf a_prio) _is _maybe
+				_then
+					# Same priority - return earlier start time.
+					_return a_start _cf b_start
+				_else
+					_return x
+				_endif 
+			_endif 
+		_endproc 
+	.sorter << sorted_collection.new(10, sort_proc)
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.pre_activation()
+	## 
+	## 
+
+	mss_scheduler_engine.view.add_dependent(_self, :view, :commit)
+	_self.manage_actions_for_selection()
+	_self.refresh_result_list()
+	_super.pre_activation()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.terminate()
+	## 
+	## 
+
+	mss_scheduler_engine.view.remove_dependent(_self, :view, :commit)
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_dynamic !mss_scheduler_view_operation!
+	
+	_if who _is mss_scheduler_engine.view
+	_then
+		_if what _is :commit _andif
+		    data[1] _is :after
+		_then
+			_self.refresh_result_list()
+		_elif what _is :view
+		_then
+			_if !dsst_operation! _is :start_transaction _orif
+			    !mss_scheduler_view_operation! _is :rollforward
+			_then
+				# Don't refresh during a planned rollforward operation.
+				_return
+			_endif
+			
+			_if data.size >= 3 _andif
+			    data[3].includes?(mss_scheduler_engine.scheduled_task_table_name)
+			_then
+				_self.refresh_result_list()
+			_endif 
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:insert_task,
+				       :short_help_text, _self.message(:insert_task_sh),
+				       :image, {:insert_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|insert_task()|))
+	_self.add_action(sw_action.new(:update_selected_task,
+				       :short_help_text, _self.message(:update_selected_task_sh),
+				       :image, {:update_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|update_selected_task()|))
+	_self.add_action(sw_action.new(:delete_selected_task,
+				       :short_help_text, _self.message(:delete_selected_task_sh),
+				       :image, {:delete_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|delete_selected_task()|))
+	_self.add_action(sw_action.new(:refresh_result_list,
+				       :short_help_text, _self.message(:refresh_result_list_sh),
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh_result_list()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.build_gui(container)
+	## 
+	## 
+
+	.items << property_list.new()
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+	
+	p.start_row()
+	mgr << unit_value_manager.new_with_properties(:hour,
+						      :internal_units, :hour,
+						      :display_unit_format, :hour)
+	.items[:search_time_interval] <<
+		managed_value_text_item.new(p, _self.message(:search_time_interval),
+					    :display_length, 12,
+					    :manager, mgr,
+					    :value, 24,
+					    :model, _self,
+					    :change_selector, :|refresh_result_list()|)
+
+	p.start_row()
+	.items[:result_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :result_list,
+			      :data_selector, :result_list,
+			      :select_notifier, :|manage_actions_for_selection()|,
+			      :double_click_notifier, handler.new( _self, :|update_selected_task()|),
+			      :height_in_chars, 10,
+			      :column_widths, _self.result_list_column_widths.copy(),
+			      :column_headings, _self.result_list_column_headings.copy(),
+			      :distribute_spare_width, :always,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :processor_result_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.selected_task
+	## 
+	## 
+
+	_if (ti << .items[:result_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		rec << sel.value[:mss_scheduled_task]
+		_if rec _isnt _unset _andif
+		    _not rec.is_valid?
+		_then
+			rec << _unset
+		_endif
+		_return rec, sel
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.manage_actions_for_selection()
+	## 
+	## 
+
+	sel << _self.selected_task
+	has_auth? << ((av << gis_program_manager.authorisation_view) _is _unset) _orif
+		     ((cu << av.current_user) _is _unset) _orif
+		     cu.access_to?(_self.edit_auth_right)
+	
+	_self.action(:insert_task).enabled? << has_auth?
+	_self.action(:update_selected_task).enabled? << has_auth? _andif sel _isnt _unset 
+	_self.action(:delete_selected_task).enabled? <<
+		sel _isnt _unset _andif
+		(has_auth? _orif sel.submitter = gis_program_manager.login_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :managed_task_types
+	_then
+		_self.refresh_result_list()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.result_list
+	## 
+	## Return all tasks that are scheduled to be run in the near
+	## future.
+	##
+
+	sc << .sorter
+	sc.empty()
+	_if (range << .items[:search_time_interval].value) _is _unset
+	_then
+		_return sc
+	_endif
+	
+	.start_time << date_time.now()
+	end_time << .start_time + range
+	tbl << mss_scheduler_engine.scheduled_task_collection
+
+	task_types << _unset 
+	_if (task_info << _self.databus_request_data(:managed_task_types)) _isnt _unset
+	_then
+		task_types << equality_set.new()
+		_for i, j _over task_info.fast_keys_and_elements()
+		_loop
+			_if j _is _true
+			_then
+				task_types.add(i.write_string)
+			_endif
+		_endloop
+	_endif
+	
+	_for i _over tbl.select(predicate.le(:scheduled_start_time, end_time)).fast_elements()
+	_loop
+		# If task type filter is available, apply it.
+		_if task_types _isnt _unset _andif
+		    _not task_types.includes?(i.type)
+		_then
+			_continue
+		_endif
+		
+		pl << property_list.new()
+		_self.set_result_list_attributes(pl, i)
+		dt << display_tree.new(i.id, pl)
+		dt.styled_string << _self.result_list_styled_string(dt)
+		sc.add(dt)
+	_endloop
+
+	_return sc
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.refresh()
+	## 
+	## Synonymous with refresh_result_list()
+	##
+
+	_return _self.refresh_result_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.refresh_result_list()
+	## 
+	## 
+
+	_dynamic !mss_scheduler_view_operation!
+
+	# Perform a rollforward to ensure the most recent available
+	# data is queried.
+	!mss_scheduler_view_operation! << :rollforward
+	mss_scheduler_engine.view.rollforward()
+	!mss_scheduler_view_operation! << _unset
+	
+	_self.changed(:result_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.insert_task()
+	## 
+	## 
+
+	tbl << mss_scheduler_engine.scheduled_task_collection
+	_return _self.get_service_provider(:editor_manager).edit_collection(tbl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.ensure_selected_task()
+	##
+	## Ensure that a task has been selected.
+	##
+
+	_if (sel_rec << _self.selected_task) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_task))
+	_endif
+	_return sel_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.update_selected_task(_optional double_click_tree)
+	## 
+	## Edit the task currently selected in the result_list.
+	##
+
+	_if double_click_tree _is _unset
+	_then
+		# Invoked directly - require a selection, and error if nothing
+		# selected. 
+		rec << _self.ensure_selected_task()
+	_else
+		# Invoked via double click - in odd cases, there may be no
+		# selection.  So, don't error
+		_if (rec << _self.selected_task) _is _unset
+		_then
+			_return
+		_endif
+	_endif 
+	_return _self.get_service_provider(:editor_manager).edit_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_plugin.delete_selected_task()
+	## 
+	## Delete the task currently selected in the result_list.
+	##
+
+	_dynamic !mss_scheduler_initiator! << _self
+	
+	_self.ensure_selected_task()
+	(rec, sel) << _self.selected_task
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel),
+				_self.message(:confirm_delete, sel.value[:type])) _is _false
+	_then
+		_return
+	_endif
+	
+	trans << record_transaction.new_delete(rec)
+	trans.run()
+	
+_endmethod
+$

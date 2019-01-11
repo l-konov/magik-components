@@ -1,0 +1,11 @@
+mclib_method_call_checker	1
+
+description
+	Code to analyze method calls in Magik code.
+end
+
+requires
+	component_framework
+	mclib_package
+	mclib_tree_item
+end

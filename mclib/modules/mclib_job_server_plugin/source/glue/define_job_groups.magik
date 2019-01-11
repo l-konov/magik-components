@@ -1,0 +1,89 @@
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+
+# this file contains an example of how to set up job groups for
+# a DM 4.1 installation - then the 'display job groups' toggle
+# in this module can display only those jobs belonging to a
+# specific group. Additionally, it explicitly defines the
+# 'all_jobs' group for use in this module.
+
+# NOTE: for all new groups defined, you will need to place
+# appropriate messages for them in the
+# mclib_jobs_list_gui_framework.msg file, such as:
+
+# :batch_jobs_a					Const. Info Jobs
+# :batch_jobs_b					Design Top Jobs
+# :full_rebuild					Full Const. Info Rebuild
+# :general						General Jobs
+
+#% text_encoding = iso8859_1
+_package user
+
+# Create the batch job groups
+_block
+#	# these jobs take Construction Information writable
+#	sw_job_engine.define_job_group(:batch_jobs_a,
+#								   {:merge_to_build_plans,
+#									:remove_from_build_plans,
+#									:merge_build_plans,
+#									# all hands on deck jobs
+#									:multi_merge_scheme							
+#									})
+#
+#	# these jobs take Design Top writable	
+#	sw_job_engine.define_job_group(:batch_jobs_b,
+#								   {:merge_and_post_as_built,
+#									:post_as_built_to_top,
+#									:merge_and_post_scheme,
+#									:merge_and_post_top_non_dm,
+#									# all hands on deck jobs
+#									:multi_merge_scheme							
+#								   })
+#
+#	# these jobs can run on any machine without dependency
+#	sw_job_engine.define_job_group(:general,
+#								   {:schedule_multi_merge,
+#									:multi_merge_scheme,
+#									:merge_scheme,
+#									:delete_design_datasets,
+#									:align_free_alternatives,
+#									:generate_free_alternatives,
+#									:delete_design_datasets
+#								   })
+#
+#	# Custom job type to handle full rebuilds
+#	sw_job_engine.define_job_group(:full_rebuild,
+#								   {:full_build_plan_rebuild})
+
+	all_job_names << equality_set.new()
+	_for name, group _over sw_job_engine.all_job_groups.fast_keys_and_elements()
+	_loop
+		all_job_names.add_all(group)
+	_endloop
+	sw_job_engine.define_job_group(:all_jobs,
+								   all_job_names.as_simple_vector())
+_endblock
+$

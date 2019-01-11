@@ -1,0 +1,145 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_bulk_update}, usage={redefinable})
+dd_record_mixin.define_shared_constant(
+	:mss_bu_excluded_partition_names,
+	## List of partition names which should not be bulk-updated.
+	{:mss_workspace},
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_bulk_update}, usage={subclassable})
+_method dd_record_mixin.mss_bu_visible_fields(_optional an_ace, vis_tag)
+	##
+	## Return a list of fields which can be updated using the
+	## mss_bulk_update tool.  If AN_ACE is passed, then it is used
+	## (along with visibility tag VIS_TAG) for determining visible
+	## fields. 
+	##
+
+	retval << rope.new()
+	kf_names << _self.key_field_names
+
+	_if an_ace _is _unset
+	_then
+		vfn << _self.visible_field_names
+	_else
+		vfn << an_ace.table_visible_field_names_with_defaults(
+			       _self.source_view.name, _self.source_collection.name, vis_tag)
+	_endif
+	
+	_for fd_name _over vfn.fast_elements()
+	_loop
+		_if (fd << _self.all_fields[fd_name]) _is _unset
+		_then
+			_continue
+		_endif 
+		
+		# Exclude key fields and readonly fields.
+		_if kf_names.includes?(fd_name) _then _continue _endif
+		_if fd.is_readonly? _then _continue _endif 
+
+		# Only physical fields or text join fields are permitted.
+		_if fd.is_physical? _orif
+		    (fd.is_join? _andif fd.join_type _is :text)
+		_then
+			retval.add_last(fd)
+		_endif 
+	_endloop
+	
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_bulk_update}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_bu_eligible?()
+	## 
+	## Return two boolean values:
+	## - The first indicates if self can be considered for bulk
+	##   update processing.
+	## - The second indicates if self's child records should be
+	##   traversed to also be considered for bulk update processing.
+	##
+	## Should be subclassed to remove tables that don't belong,
+	## or to avoid automatically following joins which may result
+	## in unwanted records (i.e. an entire circuit or CP system).
+	##
+
+	_if _self.is_rwo? _andif
+	    _self.dataless?
+	_then
+		# Dataless RWOs don't belong.
+		_return _false, _false
+	_endif
+
+	# Disallow all features in partitions that should not be eligible.
+	_if _self.mss_bu_excluded_partition_names.includes?(_self.source_view.name)
+	_then
+		_return _false, _false
+	_endif
+	
+	_return _true, _true
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_bulk_update}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_bu_child_records()
+	##
+	## Locate all child records which should be considered for bulk
+	## update processing.  Return a rope where each value is
+	## a two item vector:
+	## - The child record.
+	## - A boolean indicating if the child should also be traversed
+	##   to return its child records also.  This will always be true
+	##   as a result of this method, but subclasses may change this.
+	##
+
+	retval << rope.new()
+	_for a_join _over _self.join_fields.fast_elements()
+	_loop
+		# Ingore text joins.
+		_if a_join.join_type _is :text _then _continue _endif
+
+		# Ignore internal joins.
+		_if a_join.heterogeneous? _is _false _andif
+		    (rt << a_join.result_table).descriptor.internal_table?
+		_then
+			_continue
+		_endif
+		
+		# Possibly, this should be set up to only include joins where
+		# structure is :sub.  However, it is useful to pick up many
+		# sibling-type joins too, so instead only exclude joins where
+		# structure is :super.
+		_if a_join.structure_type _is :super _then _continue _endif
+
+		join_name << a_join.name
+		_if a_join.simple_result?
+		_then
+			child_recs << {_self.perform(join_name)}
+		_else
+			child_recs << _self.perform(join_name)
+		_endif
+		_for child_rec _over child_recs.fast_elements()
+		_loop
+			_if child_rec _isnt _unset _andif
+			    child_rec ~= _self 
+			_then
+				retval.add_last({child_rec, _true})
+			_endif 
+		_endloop
+	_endloop
+
+	_return retval
+	
+_endmethod
+$

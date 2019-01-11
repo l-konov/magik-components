@@ -1,0 +1,40 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method dataless_rwo_record.mss_convert_key_to_string()
+	##
+	## Convert the rwo_id key vector to a string.
+	##
+
+	s << internal_text_output_stream.new()
+	sep << ""
+	_for i _over _self.rwo_id.fast_elements()
+	_loop
+		s.write(sep, i)
+		sep << %,
+	_endloop
+	_return s.string
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method dataless_rwo_record.mss_convert_string_to_key(str)
+	##
+	## Convert the given string STR to a key value vector - this is
+	## a one-element vector that is the rwo_id (which is itself a
+	## three-element vector).
+	##
+
+	keystrs << str.split_by(%,)
+	_return {{keystrs[1].as_number(), keystrs[2].as_number(), keystrs[3].as_number()}}
+
+_endmethod
+$

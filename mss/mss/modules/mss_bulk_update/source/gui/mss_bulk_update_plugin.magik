@@ -1,0 +1,1949 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+# Indicated portions Copyright © 2005 Brad Sileo.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+##
+## mss_bulk_update_plugin
+##
+## Plugin to perform update operations on a group of records in
+## a single operation.
+##
+
+def_slotted_exemplar(:mss_bulk_update_plugin,
+{
+	{:items, _unset, :readable},
+	{:parms, _unset, :readable},
+	{:table_list, _unset, :readable},
+	{:raw_records, _unset, :readable},
+	{:collection, _unset, :readable},
+	{:collection_display_tree, _unset, :readable},
+	{:current_record_number, _unset, :readable},
+	{:current_record_list, _unset, :readable},
+	{:field_list, _unset, :readable},
+	{:editor_field_selection, _unset, :readable},
+	{:thread, _unset, :readable},
+	{:run_status, _unset, :readable}
+},
+{:mss_application_databus_plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+mss_bulk_update_plugin.define_property(
+	:field_visibility_tag_name, :string,
+	"Name of the tag which is used to determine field visibilities",
+	_true, _false, "default")
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+ mss_bulk_update_plugin.define_shared_constant(
+	 :databus_producer_data_types,
+	 {:current_object,
+	  :status_string,
+	  :run_status_string,
+	  :bu_current_object,
+	  :bu_field_names,
+	  :bu_field_names_changed},
+	 :public)
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+ mss_bulk_update_plugin.define_shared_constant(
+	 :databus_consumer_data_types,
+	 {:field_selected},
+	 :public)
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+ mss_bulk_update_plugin.define_shared_constant(
+	 :application_databus_producer_data_types,
+	 {:goto_request, :geometry_to_highlight},
+	 :public)
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+ mss_bulk_update_plugin.define_shared_constant(
+	 :application_databus_consumer_data_types,
+	 {:map_trail, :map_selection},
+	 :public)
+$
+
+# Thread handling methods - copied from engine_model.
+#
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.run_status << status
+	## 
+	## Similar functionality as for engine_model.
+	##
+
+	_self.framework.top_frame.busy? << status _is :running
+	_self.action(:interrupt).enabled? << status _is :running
+	.run_status << status
+	_self.changed(:run_status)
+	_self.changed(:run_status_string)
+	_self.databus_make_data_available(:run_status_string, _self.run_status_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.run_status_string
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_return _self.message(.run_status)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.run_engine(priority, method_name, _gather args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:engine_running))
+	_endif
+	.thread << _proc(model, method, args)
+			   model.int!run_engine(method, args)
+		   _endproc.fork_at(priority, _self, method_name, args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.int!run_engine(method, _optional args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_protect
+		_handling user_error _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		_self.run_status << :running
+		_if method.is_class_of?({})
+		_then
+			method.new_appending(_scatter args).send_to(_self)
+		_else
+			_self.perform(method,_scatter args)
+		_endif
+	_protection
+		.thread << _unset
+		_self.run_status << :ready
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.interrupt()
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		.thread.kill_and_wait()
+	_endif
+	_self.run_status << :ready
+	_self.status_string << _self.message(:interrupted)
+
+	_self.set_table_list()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.status_string << x
+	##
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.trail
+	## 
+	## Use the trail from the active map view.
+	##
+	
+	_if (mm << _self.map_manager) _isnt _unset _andif
+	    (amv << mm.active_map_view) _isnt _unset
+	_then
+		_return amv.trail
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+
+	.items << property_list.new()
+	.parms << property_list.new_with(
+			  :suppress_warnings?, _false,
+			  :force_commit?, _true,
+			  :append_text_joins?, _false)
+	.table_list << rope.new()
+	.field_list << {}
+	
+	.raw_records << equality_hash_table.new()
+	.current_record_list << {}
+	.thread << _unset
+	.run_status << :ready
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.get_parameter(key)
+	## 
+	## Return the value for the parameter named KEY.
+	##
+
+	_return .parms[key]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.set_parameter(key, value)
+	## 
+	## Set the value for the parameter named KEY to be VALUE.
+	##
+
+	.parms[key] << value
+	_return value
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.sw_databus_data_available(data_type_name, data)
+	##
+	## Handle data received from the application_databus (for
+	## monitoring the current trail and selection), and from the
+	## framework databus (for monitoring selected fields).
+	##
+	
+	_if data_type_name _is :map_trail
+	_then
+		_self.enable_trail_actions()
+	_elif data_type_name _is :map_selection
+	_then
+		_self.enable_map_selection_actions()
+	_elif data_type_name _is :field_selected
+	_then
+		.editor_field_selection << data
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	## If bu_field_names is requested, return the list of fields to
+	## edit.  Note that if multiple tables are selected, this will
+	## be the union of editable fields from all tables.
+	##
+
+	_if data_type_name _is :bu_field_names
+	_then
+		_return .field_list
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:clear_proposed_changes,
+				       :short_help_text, _self.message(:clear_proposed_changes_sh),
+				       :engine, _self,
+				       :image, {:undo_change, :ui_resources},
+				       :action_message, :|clear_proposed_changes()|))
+	_self.add_action(sw_action.new(:perform_update,
+				       :short_help_text, _self.message(:perform_update_sh),
+				       :engine, _self,
+				       :image, {:update_record, :ui_resources},
+				       :action_message, :|perform_update()|))
+	_self.add_action(sw_action.new(:perform_delete,
+				       :short_help_text, _self.message(:perform_delete_sh),
+				       :engine, _self,
+				       :image, {:delete_record, :ui_resources},
+				       :action_message, :|perform_delete()|))
+	_self.add_action(sw_action.new(:interrupt,
+				       :short_help_text, _self.message(:interrupt_sh),
+				       :engine, _self,
+				       :image, {:stop, :ui_resources},
+				       :action_message, :|interrupt()|))
+
+	_self.add_action(sw_action.new(:add_by_map_selection,
+				       :short_help_text, _self.message(:add_by_map_selection_sh),
+				       :engine, _self,
+				       :image, {:add_to_selection, :ui_resources},
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|add_by_map_selection()|}))
+	_self.add_action(sw_action.new(:add_by_trail,
+				       :short_help_text, _self.message(:add_by_trail_sh),
+				       :engine, _self,
+				       :image, {:geometry_mode, :ui_resources},
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|add_by_trail()|}))
+	_self.add_action(sw_action.new(:add_by_scrapbook,
+				       :short_help_text, _self.message(:add_by_scrapbook_sh),
+				       :image, {:paste, :ui_resources},
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|add_by_scrapbook()|}))
+	
+	_self.add_action(sw_action.new(:remove_by_map_selection,
+				       :short_help_text, _self.message(:remove_by_map_selection_sh),
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|remove_by_map_selection()|}))
+	_self.add_action(sw_action.new(:remove_object,
+				       :short_help_text, _self.message(:remove_object_sh),
+				       :engine, _self,
+				       :action_message, :|remove_object()|))
+	_self.add_action(sw_action.new(:remove_selected_tables,
+				       :short_help_text, _self.message(:remove_selected_tables_sh),
+				       :engine, _self,
+				       :action_message, :|remove_selected_tables()|))
+	_self.add_action(sw_action.new(:remove_all,
+				       :short_help_text, _self.message(:remove_all_sh),
+				       :engine, _self,
+				       :image, {:clear, :ui_resources},
+				       :action_message, :|remove_all()|))
+	_self.add_action(sw_action.new(:remove_by_attribute,
+				       :short_help_text, _self.message(:remove_by_attribute_sh),
+				       :engine, _self,
+				       :action_message, :|remove_by_attribute()|))
+
+	_self.add_action(sw_action.new(:edit_object,
+				       :short_help_text, _self.message(:edit_object_sh),
+				       :image, {:edit_object, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|edit_object()|))
+
+	_self.add_action(sw_action.new(:copy_to_scrapbook,
+				       :short_help_text, _self.message(:copy_to_scrapbook_sh),
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|copy_to_scrapbook()|}))
+	_self.add_action(sw_action.new(:goto_object,
+				       :short_help_text, _self.message(:goto_object_sh),
+				       :image, {:goto_object, :ui_resources},
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|goto_highlight_object()|, :goto}))
+	_self.add_action(sw_action.new(:goto_selected_tables,
+				       :short_help_text, _self.message(:goto_selected_tables_sh),
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|goto_highlight_selected_tables()|, :goto}))
+	_self.add_action(sw_action.new(:goto_all,
+				       :short_help_text, _self.message(:goto_all_sh),
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|goto_highlight_all()|, :goto}))
+	_self.add_action(sw_action.new(:highlight_object,
+				       :short_help_text, _self.message(:highlight_object_sh),
+				       :image, {:highlight_object, :ui_resources},
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|goto_highlight_object()|, :highlight}))
+	_self.add_action(sw_action.new(:highlight_selected_tables,
+				       :short_help_text, _self.message(:highlight_selected_tables_sh),
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|goto_highlight_selected_tables()|, :highlight}))
+	_self.add_action(sw_action.new(:highlight_all,
+				       :short_help_text, _self.message(:highlight_all_sh),
+				       :engine, _self,
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|goto_highlight_all()|, :highlight}))
+	_self.add_action(sw_action.new(:display_first,
+				       :short_help_text, _self.message(:display_first_sh),
+				       :engine, _self,
+				       :image, {:first, :ui_resources},
+				       :action_message, :|display_first()|))
+	_self.add_action(sw_action.new(:display_prev,
+				       :short_help_text, _self.message(:display_prev_sh),
+				       :engine, _self,
+				       :image, {:previous_one, :ui_resources},
+				       :action_message, :|display_prev()|))
+	_self.add_action(sw_action.new(:display_next,
+				       :short_help_text, _self.message(:display_next_sh),
+				       :engine, _self,
+				       :image, {:next_one, :ui_resources},
+				       :action_message, :|display_next()|))
+	_self.add_action(sw_action.new(:display_last,
+				       :short_help_text, _self.message(:display_last_sh),
+				       :engine, _self,
+				       :image, {:last, :ui_resources},
+				       :action_message, :|display_last()|))
+
+	_self.add_action(sw_action.new(:suppress_warnings?,
+				       :short_help_text, _self.message(:suppress_warnings?_sh),
+				       :menu_control, :toggle_item,
+				       :toolbar_control, :image_toggle_item,
+				       :value, _self.get_parameter(:suppress_warnings?),
+				       :engine, _self,
+				       :value_change_message, :|suppress_warnings?<<|))
+	_self.add_action(sw_action.new(:force_commit?,
+				       :short_help_text, _self.message(:force_commit?_sh),
+				       :menu_control, :toggle_item,
+				       :toolbar_control, :image_toggle_item,
+				       :value, _self.get_parameter(:force_commit?),
+				       :engine, _self,
+				       :value_change_message, :|force_commit?<<|))
+	_self.add_action(sw_action.new(:append_text_joins?,
+				       :short_help_text, _self.message(:append_text_joins?_sh),
+				       :menu_control, :toggle_item,
+				       :toolbar_control, :image_toggle_item,
+				       :value, _self.get_parameter(:append_text_joins?),
+				       :engine, _self,
+				       :value_change_message, :|append_text_joins?<<|))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.suppress_warnings? << x
+	## 
+	## 
+
+	_self.set_parameter(:suppress_warnings?, x)
+	_self.action(:suppress_warnings?).set_value(x, _false)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.force_commit? << x
+	## 
+	## 
+
+	_self.set_parameter(:force_commit?, x)
+	_self.action(:force_commit?).set_value(x, _false)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.append_text_joins? << x
+	## 
+	## 
+
+	_self.set_parameter(:append_text_joins?, x)
+	_self.action(:append_text_joins?).set_value(x, _false)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.map_manager
+	## 
+	## Return self's map_manager component.
+	##
+
+	_return _self.application.get_service_provider(:map_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.editor_manager
+	## 
+	## Return self's editor_manager component.
+	##
+
+	_return _self.application.get_service_provider(:editor_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.map_selection
+	## 
+	## Return all geometry selected in the map associated with the
+	## active map view.
+	##
+
+	_return _self.map_manager.active_map_view.map.current_selection
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.current_record
+	## 
+	## Return the current record based on what is selected in the
+	## table_list.
+	##
+
+	_if .current_record_number _is _unset _orif
+	    .current_record_number <= 0 _orif
+	    .current_record_number > .current_record_list.size
+	_then
+		_return _unset
+	_endif
+	cr << .current_record_list[.current_record_number]
+	_if _not cr.is_valid?
+	_then
+		_return _unset
+	_endif
+	_return cr
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.all_selected_tables
+	## 
+	## Return all tables selected in the table_list.
+	##
+
+	_if (tr << .items[:table_list]) _is _unset
+	_then
+		_return
+	_endif
+	r << rope.new()
+	_for i _over tr.selection.fast_elements()
+	_loop
+		r.add_last(i.key)
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.post_activation()
+	##
+	## Ensure items are enabled appropriately.
+	##
+
+	_super.post_activation()
+	_self.enable_prev_next_actions()
+	_self.enable_trail_actions()
+	_self.enable_map_selection_actions()
+	_self.enable_table_selection_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.border_width << p.border_height << 0
+
+	p.start_row()
+	.items[:table_list] <<
+		tree_item.new(p,
+			      :resize_x?, _true,
+			      :resize_y?, _true,
+			      :width_in_chars, 60,
+			      :height_in_chars, 8,
+			      :model, _self,
+			      :aspect, :table_list,
+			      :column_headings,
+			      {_self.message(:ch_rec_number),
+			       _self.message(:ch_rec_count),
+			       _self.message(:ch_table_name)},
+			      :col_resize_values, {0.10, 0.10, 0.80},
+			      :grid_lines?, _false,
+			      :column_allow_sort?, _false,
+			      :column_allow_visibility_change?, _false,
+			      :mode, :many,
+			      :data_selector, :table_list,
+			      :select_notifier, {:|perform_safely()|, :|table_list_select()|},
+			      :double_click_notifier, {:|perform_safely()|, :|table_list_double_click()|})
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.table_list_select(selection, by_user?)
+	## 
+	## Callback when a selection is made in the table_list
+	## tree_item.
+	##
+
+	_if by_user? _isnt _true _then _return _endif
+
+	tbls << rope.new()
+	_for i _over selection.fast_elements()
+	_loop
+		tbls.add_last(i.key)
+	_endloop
+	
+	_if selection.size = 1
+	_then
+		tbl << tbls.an_element()
+	_else
+		tbl << _unset
+	_endif
+
+	_self.figure_field_names_for_tables(tbls)
+	_self.collection << tbl
+	_if selection.size > 1
+	_then
+		# The following is required because self's current_record is
+		# unset, but the field lister requires some record to work
+		# with.  So, give it anything from the first table.
+		any_rec << .raw_records[tbls.an_element()][:rope].an_element()
+		_self.databus_make_data_available(:bu_current_object, _unset)
+		_self.databus_make_data_available(:bu_current_object, any_rec)
+	_endif 
+	_self.enable_table_selection_actions()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.figure_field_names_for_tables(tbls)
+	## 
+	## Determine a list of field names to use for editing the
+	## collection of tables in TBLS.  Note that if there are
+	## multiple tables, this will be the union of common 
+	## bulk-updatable fields from each table.
+	##
+
+	_if tbls.size = 0
+	_then
+		.field_list << {}
+		_self.databus_make_data_available(:bu_field_names_changed, _true)
+		_return
+	_endif
+
+	_if (app << _self.application) _is _unset _orif
+	    _not app.responds_to?(:ace)
+	_then
+		my_ace << _unset
+		fvt << _unset 
+	_else
+		my_ace << app.ace
+		fvt << _self.field_visibility_tag_name.default("default").as_symbol()
+	_endif
+	
+	wrk_list << tbls[1].record_exemplar.mss_bu_visible_fields(my_ace, fvt)
+	_for i _over 2.upto(tbls.size)
+	_loop
+		# Narrow down list based on exact matches of datatypes for
+		# fields of matching names.  This can produce incorrect results
+		# if domains or catalogs are involved, since those would apply
+		# to one table and not others (potentially).  If this happens,
+		# errors will occur downstream when the user tries to update.
+		# It is not likely a frequent occurrence, and the work-around
+		# is for the user to pick tables individually instead of
+		# picking all at once.
+		try_list << hash_table.new()
+		_for j _over tbls[i].record_exemplar.mss_bu_visible_fields(my_ace, fvt).fast_elements()
+		_loop
+			try_list[j.name] << j
+		_endloop
+		
+		_for j _over wrk_list.size.downto(1)
+		_loop
+			wrk_field << wrk_list[j]
+			try_field << try_list[wrk_field.name]
+			_if try_field _is _unset
+			_then
+				wrk_list.remove_nth(j)
+				_continue
+			_endif
+
+			_if wrk_field.is_join?
+			_then
+				# These can only be text joins.
+				wrk_type << :join
+				wrk_size << 1
+			_else 
+				(wrk_type, wrk_size) << wrk_field.type_parameters()
+			_endif
+			_if try_field.is_join?
+			_then
+				try_type << :join
+				try_size << 1
+			_else 
+				(try_type, try_size) << try_field.type_parameters()
+			_endif
+			
+			_if wrk_type ~= try_type _orif
+			    wrk_size ~= try_size
+			_then
+				wrk_list.remove_nth(j)
+				_continue
+			_endif
+
+			# At this point, field matches.
+		_endloop
+		
+		_if wrk_list.size = 0 _then _leave _endif 
+	_endloop
+
+	.field_list << rope.new()
+	_for i _over wrk_list.fast_elements()
+	_loop
+		.field_list.add_last(i.name)
+	_endloop
+	_self.databus_make_data_available(:bu_field_names_changed, _true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.collection << new_tbl
+	## 
+	## Update the status of various menu items when the collection
+	## changes, and broadcast bu_current_object on the databus so
+	## that field editors can update appropriately.
+	##
+
+	_if new_tbl ~= .collection
+	_then
+		.collection << new_tbl
+		.collection_display_tree << _unset 
+		_if new_tbl _is _unset
+		_then
+			.current_record_number << _unset
+			.current_record_list << {}
+		_else 
+			.current_record_number << 1
+			.current_record_list << .raw_records[new_tbl][:rope]
+		_endif
+		_self.set_collection_display_tree(new_tbl)
+		_for i _over .table_list.fast_elements()
+		_loop
+			_if i.key = new_tbl
+			_then
+				.collection_display_tree << i
+				i.value[:rec_number] << _self.message(:rec_of, .current_record_number)
+			_else
+				i.value[:rec_number] << _unset
+			_endif
+		_endloop
+
+		_if (cl << _self.get_dialog(:attribute_choice)) _isnt _unset
+		_then
+			cl.close()
+		_endif 
+		
+		_self.changed(:table_list, :refresh)
+		_self.enable_prev_next_actions()
+		_self.databus_make_data_available(:bu_current_object, _unset)
+		_self.databus_make_data_available(:bu_current_object, _self.current_record)
+	_endif 
+
+	_return new_tbl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.set_collection_display_tree(new_tbl)
+	## 
+	## Set the collection_display_tree slot to the display_tree
+	## that corresponds to the table NEW_TBL (for convenience when
+	## cycling through records).
+	##
+
+	.collection_display_tree << _unset 
+	_for i _over .table_list.fast_elements()
+	_loop
+		_if i.key = new_tbl
+		_then
+			.collection_display_tree << i
+		_endif 
+	_endloop
+	_self.update_collection_display_tree()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.enable_prev_next_actions()
+	## 
+	## Enable prev/next actions based on the state of self.
+	##
+
+	v1 << .current_record_number.default(1)
+	v2 << .current_record_list
+	_self.action(:display_first).enabled? << v1 > 1
+	_self.action(:display_prev).enabled? << v1 > 1
+	_self.action(:display_next).enabled? << v1 < v2.size
+	_self.action(:display_last).enabled? << v1 < v2.size
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.enable_trail_actions()
+	## 
+	## Enable trail actions based on the state of self.
+	## 
+
+	tr << _self.trail
+	tr_ok? << _false
+	_if tr _isnt _unset _andif
+	    (tr_sr << tr.sectors) _isnt _unset
+	_then
+		tr_ok? << area.check_proposed_sectors(tr_sr)
+	_endif
+	
+	_self.action(:add_by_trail).enabled? << tr_ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.enable_map_selection_actions()
+	## 
+	## Enable map selection actions based on the state of self.
+	## 
+
+	mm << _self.map_manager
+	any_sel? << mm.any_selection?
+	_self.action(:add_by_map_selection).enabled? << any_sel?
+	_self.action(:remove_by_map_selection).enabled? << any_sel?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.enable_table_selection_actions()
+	## 
+	## Enable various actions that depend on the table(s) selected
+	## in the table_list.
+	##
+
+	cr << _self.current_record
+	sel_tables << _self.all_selected_tables
+
+	_self.action(:clear_proposed_changes).enabled? << sel_tables.size > 0
+	_self.action(:perform_update).enabled? << sel_tables.size > 0
+	_self.action(:perform_delete).enabled? << sel_tables.size > 0
+	
+	_self.action(:goto_object).enabled? << cr _isnt _unset
+	_self.action(:goto_selected_tables).enabled? << sel_tables.size > 0
+	_self.action(:goto_all).enabled? << .raw_records.size > 0
+
+	_self.action(:highlight_object).enabled? << cr _isnt _unset
+	_self.action(:highlight_selected_tables).enabled? << sel_tables.size > 0
+	_self.action(:highlight_all).enabled? << .raw_records.size > 0
+	
+	_self.action(:remove_object).enabled? << cr _isnt _unset
+	_self.action(:remove_selected_tables).enabled? << sel_tables.size > 0
+	_self.action(:remove_all).enabled? << .raw_records.size > 0
+	_self.action(:remove_by_attribute).enabled? << cr _isnt _unset
+
+	_self.action(:edit_object).enabled? << cr _isnt _unset
+	_self.action(:copy_to_scrapbook).enabled? << sel_tables.size > 0
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.goto_highlight_object(mode)
+	## 
+	## based on MODE (which is :goto or :highlight), goto or
+	## highlight the current record.
+	##
+
+	_self.status_string << ""
+	_if (cr << _self.current_record) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_current_record))
+	_endif
+	
+	gset << equality_geometry_set.new()
+	_self.add_geometry_to_geometry_set(cr, gset)
+	_self.application_databus_make_data_available(:geometry_to_highlight, gset)
+	_if mode _is :goto
+	_then 
+		_self.application_databus_make_data_available(:goto_request, {gset})
+	_else 
+		_self.application_databus_make_data_available(:geometry_to_highlight, gset)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.goto_highlight_selected_tables(mode)
+	## 
+	## based on MODE (which is :goto or :highlight), goto or
+	## highlight the selected tables.
+	## 
+
+	_self.status_string << ""
+	_if (tbls << _self.all_selected_tables).size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_tables))
+	_endif
+	
+	gset << equality_geometry_set.new()
+	_for tbl _over tbls.fast_elements()
+	_loop
+		_for rec _over .raw_records[tbl][:rope].fast_elements()
+		_loop
+			_self.add_geometry_to_geometry_set(rec, gset)
+		_endloop
+	_endloop
+	_if mode _is :goto
+	_then 
+		_self.application_databus_make_data_available(:goto_request, {gset})
+	_else 
+		_self.application_databus_make_data_available(:geometry_to_highlight, gset)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.goto_highlight_all(mode)
+	## 
+	## based on MODE (which is :goto or :highlight), goto or
+	## highlight all objects.
+	## 
+
+	_self.status_string << ""
+	_if .raw_records.size = 0
+	_then 
+		condition.raise(:user_error, :string, _self.message(:no_data_available))
+	_endif
+	
+	gset << equality_geometry_set.new()
+	_for data _over .raw_records.fast_elements()
+	_loop
+		_for rec _over data[:rope].fast_elements()
+		_loop
+			_self.add_geometry_to_geometry_set(rec, gset)
+		_endloop
+	_endloop
+	_if mode _is :goto
+	_then 
+		_self.application_databus_make_data_available(:goto_request, {gset})
+	_else 
+		_self.application_databus_make_data_available(:geometry_to_highlight, gset)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.add_geometry_to_geometry_set(cr, gset)
+	## 
+	## Add all geometry for the record CR to the geometry set
+	## GSET.
+	##
+
+	_if _not cr.is_valid? _then _return _endif
+	_if _not cr.is_rwo? _then _return _endif
+	_for geom _over cr.all_geometry(_false)
+	_loop
+		gset.add(geom)
+	_endloop
+	_return gset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.display_first()
+	## 
+	## Display the first record for the selected table.
+	##
+
+	_self.status_string << ""
+	_self.current_record_number << 1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.display_prev()
+	## 
+	## Display the previous record for the selected table.
+	## 
+
+	_self.status_string << ""
+	_if .current_record_number _is _unset _orif
+	    .current_record_number <= 1
+	_then
+		_return
+	_endif
+	_self.current_record_number -<< 1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.display_next()
+	## 
+	## Display the next record for the selected table.
+	## 
+
+	_self.status_string << ""
+	_if .current_record_number _is _unset _orif
+	    .current_record_number >= .current_record_list.size
+	_then
+		_return
+	_endif
+	_self.current_record_number +<< 1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.display_last()
+	## 
+	## Display the last record for the selected table.
+	## 
+
+	_self.status_string << ""
+	_self.current_record_number << .current_record_list.size
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.current_record_number << new_val
+	## 
+	## Update the current record number being displayed for the
+	## current table, and broadcast bu_current_object on the
+	## databus so that the editor is updated with this record.
+	##
+
+	.current_record_number << new_val
+	_self.update_collection_display_tree()
+	_self.enable_prev_next_actions()
+	_self.databus_make_data_available(:bu_current_object, _self.current_record)
+	
+	_return new_val
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.update_collection_display_tree()
+	## 
+	## Update the "M of N" string for the current display tree.
+	##
+
+	_if .collection_display_tree _isnt _unset
+	_then 
+		.collection_display_tree.value[:rec_number] <<
+			_self.message(:rec_of, .current_record_number)
+		_self.changed(:table_list, :refresh)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.table_list_double_click(_gather args)
+	## 
+	## Currently, no action is performed on double-click.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.add_to_raw_records(a_rec, _optional cascade?)
+	##
+	## Add A_REC to the raw records being tracked.  If
+	## CASCADE? is true, then child records are also added.
+	##
+
+	# Check to see if this record should participate in the bulk
+	# update process, and if its children should automatically be
+	# selected also.
+	(ok_to_add?, ok_to_add_children?) << a_rec.mss_bu_eligible?()
+	_if _not ok_to_add?
+	_then
+		_return
+	_endif
+	
+	recs << .raw_records
+	tbl << a_rec.source_collection
+	_if (pl << recs[tbl]) _is _unset
+	_then
+		pl << recs[tbl] << property_list.new_with(
+					   :rope, rope.new(),
+					   :set, equality_set.new())
+	_endif
+	_if pl[:set].includes?(a_rec)
+	_then
+		# Already has been added.  Do nothing.
+	_else 
+		pl[:set].add(a_rec)
+		pl[:rope].add_last(a_rec)
+		
+		_if ok_to_add_children? _andif
+		    cascade? _is _true 
+		_then
+			_for child_rwo_info _over a_rec.mss_bu_child_records().fast_elements()
+			_loop
+				_self.add_to_raw_records(child_rwo_info[1], child_rwo_info[2])
+			_endloop 
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_from_raw_records(a_rec, _optional cascade?)
+	##
+	## Remove A_REC from the raw records being tracked.  If
+	## CASCADE? is true, then child records are also removed.
+	##
+
+	recs << .raw_records
+	tbl << a_rec.source_collection
+	_if (pl << recs[tbl]) _is _unset
+	_then
+		_return 
+	_endif
+	_if _not pl[:set].includes?(a_rec)
+	_then
+		# Not in the set.  Do nothing.
+	_else
+		pl[:set].remove(a_rec)
+		_if cascade? _is _true
+		_then 
+			_for child_rwo_info _over a_rec.mss_bu_child_records().fast_elements()
+			_loop
+				_self.remove_from_raw_records(child_rwo_info[1], child_rwo_info[2])
+			_endloop 
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.readjust_raw_record_rope_from_set()
+	## 
+	## After removing records, readjust the rope of records from
+	## the set of records.
+	##
+
+	_for tbl, data _over .raw_records.keys_and_elements()
+	_loop
+		r << data[:rope]
+		s << data[:set]
+		_if r.size = s.size _then _continue _endif 
+		_for i _over r.size.downto(1)
+		_loop
+			_if (test_rec << r[i]) _is _unset _orif
+			    _not test_rec.is_valid? _orif
+			    _not s.includes?(test_rec)
+			_then
+				r.remove_nth(i)
+
+				# Also attempt to do something fancy if removing the current
+				# record (or any preceding record) for the currently selected
+				# table. 
+				_if .current_record_number _isnt _unset _andif 
+				    tbl _is .collection
+				_then
+					_if .current_record_number > r.size
+					_then
+						.current_record_number << r.size
+					_elif i < .current_record_number
+					_then 
+						.current_record_number -<< 1
+					_endif 
+				_endif 
+			_endif 
+		_endloop
+		_if r.size = 0
+		_then
+			# Table has been completely removed.
+			_if tbl _is .collection
+			_then
+				.collection << _unset
+				.current_record_number << _unset
+				.current_record_list << {}
+			_endif 
+			.raw_records.remove_key(tbl)
+		_endif 
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.add_by_map_selection()
+	## 
+	## Add to current set of objects based on map selection.
+	##
+
+	_self.status_string << ""
+	_for geom _over _self.map_selection.fast_elements()
+	_loop
+		_if (an_rwo << geom.rwo) _is _unset _then _continue _endif
+		_self.add_to_raw_records(an_rwo, _true)
+	_endloop
+
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.add_by_trail()
+	##
+	## Add to current set of objects based on everything that is
+	## selectable in the current map view, which overlaps the
+	## current trail.
+	## 
+
+	_self.status_string << ""
+	_if (tr << _self.trail) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:bad_trail))
+	_endif
+	sr << tr.sectors.deep_copy()
+	sr.close()
+	pa << pseudo_area.new(sr)
+	pa.world << tr.world
+	mm << _self.map_manager
+	amv << mm.active_map_view
+	_for geom _over amv.get_selection_candidates(:interacting_with, pa.bounds).fast_elements()
+	_loop
+		_if (an_rwo << geom.rwo) _is _unset _then _continue _endif
+		_if pa.spatial_relation_with(geom) _isnt :disjoint
+		_then
+			_self.add_to_raw_records(an_rwo, _true)
+		_endif 
+	_endloop
+	
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.add_by_scrapbook()
+	##
+	## Add records from the scrapbook.
+	##
+
+	_self.status_string << ""
+	sb << gis_program_manager.scrapbook()
+	_if (cb << sb.clipboard) _is _unset
+	_then
+		_return
+	_endif
+	
+	_for res_set _over cb.fast_elements()
+	_loop
+		_for test_rec _over res_set.fast_elements()
+		_loop
+			# Clipboard may have detached records - attach them.
+			_if test_rec.is_detached?
+			_then
+				work_rec << test_rec.attached()
+			_else
+				work_rec << test_rec
+			_endif
+			_if work_rec _is _unset _then _continue _endif
+			_self.add_to_raw_records(work_rec, _true)
+		_endloop
+	_endloop
+
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_by_map_selection()
+	## 
+	## Remove from current set of objects based on map selection.
+	##
+
+	_self.status_string << ""
+	_for geom _over _self.map_selection.fast_elements()
+	_loop
+		_if (an_rwo << geom.rwo) _is _unset _then _continue _endif
+		
+		# Note: when removing by graphic selection, also remove child
+		# records (as there could be ds_records that cannot be selected
+		# graphically).
+		_self.remove_from_raw_records(an_rwo, _true)
+	_endloop
+	_self.readjust_raw_record_rope_from_set()
+	
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_object()
+	## 
+	## Remove from current set of objects based on the record
+	## selected in the table_list.
+	## 
+
+	_self.status_string << ""
+	_if (cr << _self.current_record) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_current_record))
+	_endif
+	_self.remove_from_raw_records(cr, _false)
+	_self.readjust_raw_record_rope_from_set()
+	
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_selected_tables()
+	## 
+	## Remove all selected tables from the current set of objects.
+	## 
+
+	_self.status_string << ""
+	_if (tbls << _self.all_selected_tables).size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_tables))
+	_endif
+	tbls << equality_set.new_from(tbls)
+	_for tbl, data _over .raw_records.keys_and_elements()
+	_loop
+		_if tbls.includes?(tbl)
+		_then
+			.raw_records.remove_key(tbl)
+		_endif
+	_endloop
+	.collection << _unset
+	.current_record_number << _unset
+	.current_record_list << {}
+
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_all()
+	## 
+	## Clear out the current set of objects.
+	##
+
+	_self.status_string << ""
+	.items[:table_list].selection.select_clear()
+	.raw_records.empty()
+
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_by_attribute()
+	## 
+	## Remove from current set of objects by prompting for ones
+	## that match a specific attribute value.
+	##
+
+	_if .collection _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_collection))
+	_endif
+
+	sel_fields << .editor_field_selection.default({})
+	_if sel_fields.size ~= 1
+	_then
+		condition.raise(:user_error, :string, _self.message(:select_single_field))
+	_endif
+	
+	fd << sel_fields[1].field_descriptor
+	fd_name << fd.name
+	
+	# Get current domain of values.
+	h << equality_hash_table.new()
+	cur_recs << .raw_records[.collection][:rope]
+	_for rec _over cur_recs.fast_elements()
+	_loop
+		_if _not rec.is_valid? _then _continue _endif 
+		val << rec.perform(fd_name)
+		_if h[val] _is _unset
+		_then
+			h[val] << 1
+		_else
+			h[val] +<< 1
+		_endif
+	_endloop
+
+	# Sort based on value (as a string).
+	sc << sorted_collection.new(h.size, _proc(a, b) _return a[2] _cf b[2] _endproc)
+	_for i, j _over h.fast_keys_and_elements()
+	_loop
+		desc << write_string(j.write_string.space_pad(10, _false, _true)," : ", i)
+		sc.add({desc, i.write_string, i, j, cur_recs, fd_name})
+	_endloop
+	
+	_if (cl << _self.get_dialog(:attribute_choice)) _is _unset
+	_then
+		cl << choice_lister.new_dialog(_self, :one_shot, _false)
+		_self.cache_dialog(:attribute_choice, cl)
+	_endif
+	cl.activate_on(sc, _self, {:|perform_safely()|, :|remove_by_attribute_callback()|}, :first)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.remove_by_attribute_callback(data_list)
+	## 
+	## Callback from choice lister - perform the removal, based on
+	## the attribute value selected.
+	##
+	
+	attr_val << data_list[3]
+	cur_recs << data_list[5]
+	fd_name << data_list[6]
+	_for rec _over cur_recs.fast_elements()
+	_loop
+		_if _not rec.is_valid? _then _continue _endif 
+		_if rec.perform(fd_name) = attr_val
+		_then
+			_self.remove_from_raw_records(rec, _false)
+		_endif
+	_endloop
+	_self.readjust_raw_record_rope_from_set()
+	
+	_self.set_table_list()
+	_self.report_current_records()
+	_self.enable_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.edit_object()
+	## 
+	## Edit the selected record.
+	##
+
+	_self.status_string << ""
+	_if (cr << _self.current_record) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_current_record))
+	_endif
+
+	ed_man << _self.editor_manager
+	ed_man.edit_object(cr)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.copy_to_scrapbook()
+	## 
+	## Copy records in selected tables to scrapbook.
+	##
+
+	_self.status_string << ""
+	_if (tbls << _self.all_selected_tables).size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_tables))
+	_endif
+
+	rset << rwo_set.new()
+	_for i _over tbls.fast_elements()
+	_loop
+		rset.add_all(.raw_records[i][:set])
+	_endloop
+	sb << gis_program_manager.scrapbook()
+	sb.set_clipboard(_self.message(:bulk_update_scrapbook), {rset})
+
+	_self.status_string << _self.message(:copied_to_scrapbook)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.set_table_list()
+	## 
+	## Populate the display_trees for all tables being managed.
+	##
+
+	sc << sorted_collection.new(10, _proc(a, b) _return a[1] _cf b[1] _endproc)
+	_for tbl, data _over .raw_records.fast_keys_and_elements()
+	_loop
+		sc.add({tbl.external_name, tbl, data})
+	_endloop
+
+	r << .table_list
+	r.empty()
+	sstr << styled_string.new(:value, :rec_number, :tab,
+				  :value, :rec_count, :tab,
+				  :value, :table_name)
+	_for i _over sc.fast_elements()
+	_loop
+		
+		dt << display_tree.new(i[2],
+				       property_list.new_with(
+					       :rec_number, _unset,
+					       :rec_count, i[3][:rope].size,
+					       :table_name, i[1],
+					       :raw_data, i[3]))
+		dt.styled_string << sstr
+		r.add_last(dt)
+	_endloop
+
+	_self.set_collection_display_tree(.collection)
+	
+	_self.changed(:table_list, :refresh)
+	_self.enable_table_selection_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.report_current_records()
+	## 
+	## Set self's status string based on the current count of
+	## records being managed.
+	##
+
+	tbl_count << 0
+	rec_count << 0
+	_for i _over .raw_records.fast_elements()
+	_loop
+		tbl_count +<< 1
+		rec_count +<< i[:rope].size
+	_endloop
+	_self.status_string << _self.message(:current_record_count, tbl_count, rec_count)
+	_return tbl_count, rec_count
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.clear_proposed_changes()
+	##
+	## Reset all proposed changes.
+	##
+
+	# Simply instruct bu_editor_field_lister to re-get its current
+	# object, which takes care of everything.
+	_self.databus_make_data_available(:current_object, _unset)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.perform_update()
+	## 
+	## Prepare to perform the bulk update, based on the information
+	## entered by the user.
+	##
+
+	# Get all records to apply this to.
+	_if (tbls << _self.all_selected_tables).size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_tables))
+	_endif 
+
+	# Get proposed changes.
+	pvals << _self.databus_request_data(:proposed_values_for_update)
+	_if pvals _is _unset _orif
+	    pvals.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_proposed_changes))
+	_endif 
+
+	# If database is updated, possibly disallow changes.
+	force_commit? << _self.get_parameter(:force_commit?)
+	
+	recs << rope.new()
+	dbs << equality_set.new()
+	_for tbl _over tbls.fast_elements()
+	_loop
+		v << tbl.source_view
+		_if _not v.writable?
+		_then
+			condition.raise(:user_error, :string, _self.message(:not_writable, v.name))
+		_endif
+		_if _not tbl.write_authorised?
+		_then
+			condition.raise(:user_error, :string, _self.message(:not_write_authorised, tbl.external_name))
+		_endif
+		_if force_commit? _andif
+		    v.updated?
+		_then
+			condition.raise(:user_error, :string, _self.message(:db_updated, v.name))
+		_endif 
+		dbs.add(v)
+		recs.add_last(.raw_records[tbl][:rope])
+	_endloop
+
+	# This needs to do something clever with catalogues: even if
+	# the user has updated a single field in the catalogue, all
+	# related catalogue fields should be included in the update.
+	# Unfortunately, there is not a "right" answer here: perhaps
+	# the user does intend to only bulk-update a single field, and
+	# therefore if any data has been selected which would become
+	# invalidated by a new non-catalogue combination of attributes,
+	# it should raise an error.  Since that requires less code
+	# (actually, no code), it is the approach I've taken here.  May
+	# need to revisit this in the future.
+	
+	# Construct a dataset group for transaction.
+	dsg << dataset_group.new(dbs)
+
+	# Construct and perform a transaction for doing the update.
+	trans << custom_record_transaction.new(dsg, _self, :|int!perform_update()|, {recs, pvals},
+					       _self.message(:do_bulk_update))
+
+	# Construct a handler for warning conditions.
+	_if _self.get_parameter(:suppress_warnings?) _is _true 
+	_then
+		wh << _proc(cond)
+			      write(cond.report_contents_string)
+		      _endproc 
+	_else
+		wh << _self.warning_handler
+	_endif
+	
+	_block
+		_handling warning _with wh
+		
+		trans.run()
+	_endblock 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.int!perform_update(recs, pvals)
+	## 
+	## Perform the actual update for all records in RECS, based on
+	## the proposed values in the PVALS property list.
+	##
+
+	c1 << 0
+	c2 << 0
+	c3 << 0
+	_self.status_string << ""
+
+	# Pre-process set to get a record count.
+	_for rec_set _over recs.fast_elements()
+	_loop
+		c1 +<< rec_set.size
+	_endloop
+
+	# Determine if text joins are to be appended, rather than updated.
+	atj? << _self.get_parameter(:append_text_joins?)
+		
+	_for rec_set _over recs.fast_elements()
+	_loop
+		_for rec _over rec_set.fast_elements()
+		_loop
+			c3 +<< 1
+			_if c3 _mod 10 = 0
+			_then
+				_self.status_string << _self.message(:progress_bulk_update, c1, c3)
+			_endif
+
+			_if _not rec.is_valid?
+			_then
+				# Seems unusual, but it is conceivable that an update trigger
+				# on one record causes the deletion of another record.
+				_continue
+			_endif
+						
+			work_pl << property_list.new()
+			any_changes? << _false 
+			_for fname, fval _over pvals.fast_keys_and_elements()
+			_loop
+				# Special processing for text joins, in the case that the
+				# append_text_joins? parameter is set to true.
+				_if atj? _andif
+				    (fd << rec.all_fields[fname]).is_join? _andif
+				    fd.join_type _is :text
+				_then
+					_if fval _is _unset _orif
+					    fval = ""
+					_then
+						# Nothing to append.
+						_continue
+					_endif
+
+					# Get the existing value - if it has any data, append a
+					# newline_char also.
+					curval << rec.perform(fname).default("").as_charvec()
+					_if curval.size > 0 _andif
+					    curval.last _isnt newline_char
+					_then
+						sep << newline_char
+					_else
+						sep << ""
+					_endif
+					work_pl[fname] << write_string(curval, sep, fval)
+					any_changes? << _true
+					_continue
+				_endif
+				
+				_if rec.perform(fname) ~= fval
+				_then
+					work_pl[fname] << fval
+					any_changes? << _true 
+				_endif 
+			_endloop
+			_if any_changes?
+			_then
+				_handling db_value_wrong_type, dd_mandatory_field, dd_bad_field_value
+				_with _self.record_update_handler(rec, c3, c1)
+				
+				rt << record_transaction.new_update(rec, work_pl)
+				rt.run()
+				c2 +<< 1
+			_endif 
+		_endloop
+	_endloop
+
+	_self.clear_proposed_changes()
+	_self.status_string << _self.message(:done_bulk_update, c1, c2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.record_update_handler(a_rec, num, total)
+	## 
+	## Returns a handler for the update of A_REC to give a useful
+	## message when a specific record fails.
+	##
+
+	# (05-25-2005 Brad Sileo): created.
+	
+	_local me << _self
+	>> _proc @sw_component_user_error_proc(condition)
+		   _import me, a_rec, num, total
+		   me.show_message(
+			   me.message(:failed_on_record, num, total, a_rec.description()),
+			   %newline,
+			   condition.report_contents_string)
+		   !abort!()
+	   _endproc
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.perform_delete()
+	## 
+	## Prepare to perform the bulk delete, based on the information
+	## entered by the user.
+	##
+
+	# Get all records to apply this to.
+	_if (tbls << _self.all_selected_tables).size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_tables))
+	_endif 
+
+	# If database is updated, possibly disallow changes.
+	force_commit? << _self.get_parameter(:force_commit?)
+	
+	recs << rope.new()
+	dbs << equality_set.new()
+	_for tbl _over tbls.fast_elements()
+	_loop
+		v << tbl.source_view
+		_if _not v.writable?
+		_then
+			condition.raise(:user_error, :string, _self.message(:not_writable, v.name))
+		_endif
+		_if _not tbl.write_authorised?
+		_then
+			condition.raise(:user_error, :string, _self.message(:not_write_authorised, tbl.external_name))
+		_endif
+		_if force_commit? _andif
+		    v.updated?
+		_then
+			condition.raise(:user_error, :string, _self.message(:db_updated, v.name))
+		_endif 
+		dbs.add(v)
+		recs.add_last(.raw_records[tbl][:rope])
+	_endloop
+
+	# For bulk delete, get confirmation from user.
+	_if _self.top_frame _isnt _unset _andif
+	    _self.show_question(_self.message(:yes), _self.message(:no),
+				_self.message(:confirm_bulk_delete)) _is _false
+	_then
+		_return
+	_endif
+
+	# Add a hook to allow an implementer to control ordering of
+	# what is deleted, or to make a consistent set of records for deletion.
+	recs << _self.figure_records_for_deletion(recs)
+	
+	# Construct a dataset group for transaction.
+	dsg << dataset_group.new(dbs)
+
+	# Construct and perform a transaction for doing the delete.
+	trans << custom_record_transaction.new(dsg, _self, :|int!perform_delete()|, {recs},
+					       _self.message(:do_bulk_delete))
+
+	# Construct a handler for warning conditions.
+	_if _self.get_parameter(:suppress_warnings?) _is _true 
+	_then
+		wh << _proc(cond)
+			      write(cond.report_contents_string)
+		      _endproc 
+	_else
+		wh << _self.warning_handler
+	_endif
+
+	# Clear collection to avoid spurious error messages related to
+	# refreshing field list for deleted records.
+	_self.collection << _unset
+	_block
+		_handling warning _with wh
+		
+		trans.run()
+	_endblock
+
+	# At this point, the transaction is successful, so tidy up the
+	# list of tables.  Any selected table has had its records deleted.
+	tbl_set << equality_set.new_from(tbls)
+	_for i _over tbl_set.fast_elements()
+	_loop
+		.raw_records.remove_key(i)
+	_endloop
+	_for i _over .table_list.size.downto(1)
+	_loop
+		_if tbl_set.includes?(.table_list[i].key)
+		_then
+			.table_list.remove_nth(i)
+		_endif
+	_endloop
+	_self.changed(:table_list, :renew)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_bulk_update}, usage={redefinable})
+_method mss_bulk_update_plugin.figure_records_for_deletion(recs)
+	## 
+	## For a proposed delete operation of all records in the rope
+	## RECS, return the set of things that should actually be
+	## deleted, as an ordered collection.
+	##
+	## The backstop simply returns RECS.  However, this may be
+	## redefined if RECS must be processed in a specific order to
+	## suit your data model, and/or if other records should be
+	## added to or removed from this collection in order to form a
+	## consistent set.
+	##
+
+	_return recs
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_plugin.int!perform_delete(recs)
+	## 
+	## Perform the actual delete for all records in RECS.
+	##
+
+	c1 << 0
+	c2 << 0
+	_self.status_string << ""
+
+	# Pre-process set to get a record count.
+	_for rec_set _over recs.fast_elements()
+	_loop
+		c1 +<< rec_set.size
+	_endloop
+	
+	_for rec_set _over recs.fast_elements()
+	_loop
+		_for rec _over rec_set.fast_elements()
+		_loop
+			c2 +<< 1
+			_if c2 _mod 10 = 0
+			_then
+				_self.status_string << _self.message(:progress_bulk_delete, c1, c2)
+			_endif
+
+			_if _not rec.is_valid?
+			_then
+				# Probably has been cascade-deleted.  Note that this is checked
+				# here (after the count is done), because the user should know
+				# that is has been whacked.
+				_continue
+			_endif
+
+			rt << record_transaction.new_delete(rec)
+			rt.run()
+		_endloop
+	_endloop
+
+	_self.clear_proposed_changes()
+	_self.status_string << _self.message(:done_bulk_delete, c2)
+	
+_endmethod
+$

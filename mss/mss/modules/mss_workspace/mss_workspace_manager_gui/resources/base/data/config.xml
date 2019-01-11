@@ -1,0 +1,7 @@
+<config>
+  <plugins>
+    <plugin name="mss_wm_job_design_plugin" class_name="mss_wm_job_design_plugin"/>
+    <plugin name="mss_wm_search_plugin" class_name="mss_wm_search_plugin"/>
+    <plugin name="mss_wm_state_transition_plugin" class_name="mss_wm_state_transition_plugin"/>
+  </plugins>
+</config>

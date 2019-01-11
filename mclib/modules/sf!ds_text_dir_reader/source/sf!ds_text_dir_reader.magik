@@ -1,0 +1,823 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+_package mclib
+$
+
+########################################################################
+##
+## This file contains a useful tool to read/display the contents
+## of database text directories (used to save preferences).
+##
+## By default the ACE database and the xml_configuration directory
+## are inspected. However, in the new() method any other database
+## or "database directory" can be specified to be used.
+## It is also possible to edit (and later update) the contents of any
+## directory entry. By default the program notepad will be used to edit
+## the text but in the new() method a command can be specified that
+## should be used to start a program to edit a text file.
+## Or the class constant :default_edit_command can be redefined to
+## specify the executable that should be launched to edit text.
+##
+## To start the dialog, the minimum command line is:
+##	MagikSW> sf!ds_text_dir_reader.open()
+## This will open/read the xml_configuration diretory in ACE top.
+##
+## To use Emacs instead of notepad to view/change files, this command
+## line can be used (assuming the executable is in the searchpath):
+##	MagikSW> sf!ds_text_dir_reader.open( _unset, _unset, "gnuclientw.exe" )
+##
+## The class will open a stand-alone dialog - it might be possible to
+## also embed the dialog somewhere else by building a plugin subclass
+## of this class.
+########################################################################
+
+
+_pragma(classify_level=debug)
+def_slotted_exemplar( :sf!ds_text_dir_reader,
+{
+	#
+	# public slots
+	#
+	{ :transaction_view,	_unset },
+	{ :edit_command,	_unset },
+	#
+	# private slots
+	#
+	{ :dir_list,		_unset },
+	{ :selection,		_unset },
+	{ :text_dir_name,	_unset },
+	{ :text_dir,		_unset },
+	{ :gui_items,		_unset },
+	{ :entry2file,		_unset }
+},
+{ :model } )
+$
+
+
+_pragma(classify_level=basic )
+sf!ds_text_dir_reader.define_slot_access( :transaction_view, :write, :readonly )
+$
+_pragma(classify_level=basic )
+sf!ds_text_dir_reader.define_slot_access( :edit_command, :write, :public )
+$
+_pragma(classify_level=basic )
+sf!ds_text_dir_reader.define_slot_access( :dir_list, :write, :readonly )
+$
+_pragma(classify_level=basic )
+sf!ds_text_dir_reader.define_slot_access( :selection, :write, :private )
+$
+_pragma(classify_level=restricted)
+sf!ds_text_dir_reader.define_slot_access( :text_dir_name, :write, :private )
+$
+_pragma(classify_level=restricted)
+sf!ds_text_dir_reader.define_slot_access( :text_dir, :write, :private )
+$
+_pragma(classify_level=restricted)
+sf!ds_text_dir_reader.define_slot_access( :gui_items, :write, :private )
+$
+_pragma(classify_level=restricted)
+sf!ds_text_dir_reader.define_slot_access( :entry2file, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+##
+## Name of the executable that is used to display/edit text.
+## The name of the file that is edited is added to the end
+## of the string that is specified.
+##
+sf!ds_text_dir_reader.define_shared_constant( :default_edit_command,
+	"notepad",
+	:public )
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+##
+## Default text directory that will be inspected.
+## Works hand-in-hand with class constant text_dir_postfixes,
+## which provides the postfixes to identify directories and
+## directory entries.
+##
+sf!ds_text_dir_reader.define_shared_constant( :default_text_dir_name,
+	:xml_configuration,
+	:public )
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+##
+## Postfixes for the passed/given text directory name.
+## (see also code in ds_text_directory.names())
+##
+sf!ds_text_dir_reader.define_shared_constant( :text_dir_postfixes,
+	{ :|_dir|, :|_text| },
+	:private )
+$
+
+
+##
+##	P U B L I C   A P I
+##	___________________
+##
+
+_pragma(classify_level=debug)
+_method sf!ds_text_dir_reader.new(
+		_optional a_db_view, a_text_dir_name, an_edit_command )
+
+	## Creates and returns a new instance of _self.
+	##
+	## A_DB_VIEW:
+ 	##	A handle on a database view;
+	##	defaults to gis_program_manager.ace_top_view
+	## A_TEXT_DIR_NAME:
+	##	A prefix/name for a ds_text_directory; the tables
+	##	<A_TEXT_DIR_NAME>_dir and <A_TEXT_DIR_NAME>_text must
+	##	exist in A_DB_VIEW (see class constant text_dir_postfixes).
+	##	Defaults to :xml_configuration
+	## AN_EDIT_COMMAND:
+	##	A command that is executed to edit a (text) file;
+	##	by default the actual file name/path is appended at
+	##	the end of this string.
+	##	Defaults to "notepad" (see class constant default_edit_command)
+
+	>> _clone.init( a_db_view, a_text_dir_name, an_edit_command )
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ds_text_dir_reader.activate_in( a_container )
+
+	## Callback to build a dialog in a stand-alone frame
+
+	_self.build_gui( a_container )
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method sf!ds_text_dir_reader.title
+
+	## Returns the title for the dialog frame
+
+	_local view << _self.transaction_view
+
+	>> _self.message( :frame_title, _unset,
+			  view.external_name,
+			  view.alternative_path_name(),
+			  _self.text_dir_name )
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method sf!ds_text_dir_reader.build_gui( a_container, _optional xml_element )
+
+	## Generic callback to but the dialog contents in A_CONTAINER
+
+	_local headers   << { _self.message( :created_header ),
+				 _self.message( :size_header ),
+				 _self.message( :entry_header ) }
+	_local header_ss << { { :align, :centre, :bold, headers[ 1 ] },
+			      { :align, :centre, :bold, headers[ 2 ] },
+			      { :align, :centre, :bold, headers[ 3 ] } }
+	_local pnl       << panel.new( a_container )
+
+	_self.gui_items[ :tree_item ] <<
+		tree_item.new( pnl,
+			:model,			 _self,
+			:aspect,		 :directory_entries,
+			:data_selector,		 :|get_directory_entries()|,
+			:select_notifier,	 :|selection()|,
+			:double_click_notifier,  :|edit_leaf_entry()|,
+			:mode,			 :one,
+			:message_on_no_data?,	 _true,
+			:resize?,                _true,
+			:column_selectabilities, { _false, _false, _true },
+			:column_alignments,      { :left, :right, :left },
+			:row_headings_alignment, :centre,
+			:col_resize_values,      { 0, 0, 1 },
+			:column_headings,        headers,
+			:column_headings_styled_strings, header_ss )
+	pnl.start_row()
+
+	_self.add_action_widgets_in( pnl )
+
+	>> a_container
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method sf!ds_text_dir_reader.add_action_widgets_in( a_container )
+
+	_local gi           << _self.gui_items
+	_local button_width << 80
+	_local icon         << _self.get_icon_for_db_view()
+	_local rc           << rowcol.new( a_container, 1, _unset, :pixel,
+					   :style, :button_box )
+
+	gi[ :mode ] <<
+	image_button_item.new_safe( rc, icon,
+			_self, :|toggle_db_access_mode()|,
+			:balloon_help_id, :toggle_db_access_tt )
+
+	gi[ :refresh ] <<
+	button_item.new_safe( rc, _self.message( :refresh ),
+			_self, :|refresh_list()|,
+			:width, button_width )
+
+	_self.make_functions_pulldown( rc )
+
+	gi[ :edit ] <<
+	button_item.new_safe( rc, _self.message( :edit ),
+			_self, :|edit_ds_text()|,
+			:width,                button_width,
+			:enabled?,             _false,
+			:enabled_state_aspect, :leaf_selection? )
+
+	gi[ :update ] <<
+	button_item.new_safe_transaction( rc, _self.message( :update ),
+			_self, :|update_ds_text()|,
+			:width,                button_width,
+			:enabled?,             _false,
+			:enabled_state_aspect, :can_be_updated? )
+
+	gi[ :delete ] <<
+	button_item.new_safe_transaction( rc, _self.message( :delete ),
+			_self, :|delete_ds_text()|,
+			:width,                button_width,
+			:enabled?,             _false,
+			:enabled_state_aspect, :can_be_deleted? )
+
+	gi[ :quit ] <<
+	button_item.new( rc, _self.message( :quit ),
+			 _self, :|quit()|,
+			 :width, button_width )
+
+	>> a_container
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ds_text_dir_reader.quit( _optional cache? )
+
+	## Perform some cleanup:
+	## - Remove dependencies
+	## - delete temporary files
+
+	_self.transaction_view.remove_dependent( _self )
+
+	>> _super.quit( cache? )
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ds_text_dir_reader.note_change( sender, aspect,
+					   _optional data, _gather more_data )
+
+	## Listen to notifications from the environment.
+
+	_if aspect _is :mode _andif
+	    sender _is _self.transaction_view
+	_then
+		#
+		# Update the access/mode icon when the database mode changes
+		#
+		_self.gui_items[ :mode ].image <<
+			_self.get_icon_for_db_view()
+
+	_elif ( aspect _is :alternative_path _orif
+		aspect _is :lwt_state        _orif
+		( aspect _is :view _andif data _is :lwt )     _orif
+	        ( aspect _is :view _andif data _is :changes ) _orif
+		aspect _is :checkpoint
+	      ) _andif
+	      sender _is _self.transaction_view
+	_then
+		#
+		# Refresh the list when
+		# a) the alternative has changed
+		# b) an LWT operation occured
+		# b) an undo/redo operation occured
+		# d) the view data has changed (e.g. because of a rollback)
+		# e) the view was changed to a checkpoint
+		#
+		_self.refresh_list()
+	_endif
+
+	>> _super.note_change( sender, aspect, data, _scatter more_data )
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ds_text_dir_reader.on_deactivation()
+
+	## Get's called when the window is closed.
+
+	_super.on_deactivation()
+
+	_self.cleanup_cached_data_files()
+_endmethod
+$
+
+
+##
+##	P R I V A T E   A P I
+##	_____________________
+##
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.init(
+			 a_db_view, a_text_dir_name, an_edit_command )
+
+	## Initialize and return _self.
+
+	.transaction_view << _if a_db_view _is _unset
+			     _then >> gis_program_manager.ace_top_view
+			     _else >> a_db_view
+			     _endif
+	.edit_command     << _if an_edit_command _is _unset
+			     _then >> _self.default_edit_command
+			     _else >> an_edit_command
+			     _endif
+    	.gui_items  << property_list.new()
+	.entry2file << equality_hash_table.new()
+	.dir_list   << rope.new()
+
+	_self.validate_text_dir_info( a_text_dir_name )
+
+	_self.get_directory_entries()
+
+	_self.transaction_view.add_dependent( _self )
+
+	>> _super.init()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.validate_text_dir_info( a_text_dir_name )
+
+	## Ensure that the text directory that is supposed to be inspected
+	## does exist. We do not want to create a new directory "by accident".
+
+	_local view   << _self.transaction_view
+	_local tables << view.collections
+
+	a_text_dir_name << _if a_text_dir_name _is _unset
+			   _then >> _self.default_text_dir_name
+			   _else >> a_text_dir_name.as_symbol()
+			   _endif
+
+	_for a_postfix _over _self.text_dir_postfixes.fast_elements()
+	_loop
+		tbl << a_text_dir_name + a_postfix
+		_if _not tables.includes_key?( tbl )
+		_then
+			condition.raise( :sf!no_such_ds_text_dir_exists,
+					 :view,        view.external_name,
+					 :ds_dir_name, a_text_dir_name )
+		_endif
+	_endloop
+
+	.text_dir_name << a_text_dir_name
+	.text_dir      << ds_text_directory.new( view, a_text_dir_name )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.get_icon_for_db_view()
+
+	## Get the core "traffic light" icons.
+
+	>> smallworld_product.get_raster_image(
+		   _if _self.transaction_view.mode _is :write
+		   _then >> :traffic_light_green
+		   _else >> :traffic_light_red
+		   _endif, :ui_resources, _false )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.make_functions_pulldown( a_container )
+
+	## Helper method to create all "actions" for the "Functions" pull-down.
+
+	_local gi  << _self.gui_items
+	_local pdm << pulldown_menu.new()
+	_local st? << _self.transaction_view.st_enabled?
+
+	gi[ :view ] <<
+	button_item.new_safe( pdm, _self.message( :view ),
+			_self, :|view_ds_text()|,
+			:enabled?,             _false,
+			:enabled_state_aspect, :leaf_selection? )
+
+	separator_item.new( pdm )
+
+	gi[ :undo ] <<
+	button_item.new_safe( pdm, _self.message( :undo ),
+			      _self, { :|perform_on_view()|, :|undo()| },
+			      :enabled?, _not st? )
+
+	gi[ :redo ] <<
+	button_item.new_safe( pdm, _self.message( :redo ),
+			      _self, { :|perform_on_view()|, :|redo()| },
+			      :enabled?, _not st? )
+
+	separator_item.new( pdm )
+
+	gi[ :commit ] <<
+	button_item.new_safe( pdm, _self.message( :commit ),
+			      _self, { :|perform_on_view()|, :|commit()| } )
+
+	gi[ :rollback ] <<
+	button_item.new_safe( pdm, _self.message( :rollback ),
+			      _self, :|rollback()| )
+
+	gi[ :functions_pd ] <<
+	menu_button_item.new( a_container, _self.message( :functions ), pdm )
+_endmethod
+$
+
+
+##
+##	G U I - R E L A T E D   C A L L B A C K S
+##	_________________________________________
+##
+
+
+_pragma(classify_level=restricted)
+_method sf!ds_text_dir_reader.get_directory_entries()
+
+	## Build a display list for the datastore text directory.
+
+	_local list  << _self.dir_list
+	_local ss    << styled_string.new(
+				:value, :time, :tab,
+				:value, :size, :tab,
+				:value, :node)
+	_local entry
+	_local size
+
+	list.empty()
+
+	_for node, leaf?, time _over _self.text_dir.nodes( "/", _true )
+	_loop
+		size  << _if leaf?
+			 _then >> _self.get_leaf_entry_text( node ).string.size
+			 _else >> ""
+			 _endif
+		entry << display_tree.new( node,
+				property_list.new_with(
+					:node,  node,
+					:leaf?, leaf?,
+					:time,  time,
+					:size,  size ) )
+		entry.styled_string << ss
+		list.add( entry )
+	_endloop
+
+	>> list
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method sf!ds_text_dir_reader.selection( a_tree_selection, user_change? )
+
+	## Callback when something in the list gets selected.
+
+	_self.selection << a_tree_selection.an_element()
+
+	_self.changed( :something_selected? )
+	_self.changed( :leaf_selection? )
+	_self.changed( :can_be_updated? )
+	_self.changed( :can_be_deleted? )
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method sf!ds_text_dir_reader.something_selected?
+
+	## Callback for buttons to determine if they should be anabled
+	## or not.
+
+	>> _self.selection _isnt _unset
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method sf!ds_text_dir_reader.leaf_selection?
+
+	## Callback for buttons to determine if they should be anabled
+	## or not.
+
+	_local sel
+
+	>> ( sel << _self.selection ) _isnt _unset _andif
+	   sel.value[ :leaf? ] _is _true
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ds_text_dir_reader.can_be_updated?
+
+	## Returns a Boolean to indicate if a selected item can be
+	## updated or not.
+
+	_local entry
+	_local path
+
+	>> _self.transaction_view.mode _is :write _andif
+	   _self.leaf_selection? _andif
+	   ( entry << _self.selection.key ) _isnt _unset _andif
+	   ( path << _self.entry2file[ entry ] ) _isnt _unset _andif
+	   system.file_exists?( path )
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ds_text_dir_reader.can_be_deleted?
+
+	## Returns a Boolean to indicate if a selected item can be
+	## deleted or not.
+
+	>> _self.transaction_view.mode _is :write _andif
+	   _self.something_selected?
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.get_leaf_entry_text( an_entry )
+
+	## Returns the text associated with the leaf entry AN_ENTRY.
+
+	>> _self.text_dir.read_stream( an_entry )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method sf!ds_text_dir_reader.edit_leaf_entry( a_selection, _gather data )
+
+	## Callback when a double-click occurs.
+	## This callback only performs an action if a "leaf" was selected.
+
+	_if _not a_selection.value[ :leaf? ] _then _return _endif
+
+	_self.edit_ds_text()
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.toggle_db_access_mode()
+
+	## Toggle between read and write mode...
+
+	_local view << _self.transaction_view
+
+	view.switch( _if view.mode _is :write
+		     _then >> :readonly
+		     _else >> :write
+		     _endif )
+
+	_self.changed( :can_be_updated? )
+	_self.changed( :can_be_deleted? )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.perform_on_view(
+			 a_callback, _gather args  )
+
+	## Execute A_CALLBACK with any passed arguments on the
+	## current database view.
+
+	>> _self.transaction_view.perform( a_callback, _scatter args )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.refresh_list()
+
+	## Update the contents of the list that is displayed
+
+	_local a_view << _self.transaction_view
+
+	_if a_view.st_enabled?
+	_then
+		a_view.rollforward()
+	_endif
+
+	_self.changed( :directory_entries, :renew )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.view_ds_text()
+
+	## Print the text associated to the current selection
+	## at the terminal (in the Emacs buffer).
+
+	_dynamic !output!
+
+	_local str << _self.get_leaf_entry_text( _self.selection.key )
+
+	!output!.write( str.string, newline_char )
+	!output!.flush()
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.edit_ds_text()
+
+	## Get the text associated to the current leaf/selection
+	## and launch an editor.
+
+	_local entry << _self.selection.key
+	_local cmd   << _self.edit_command
+	_local path
+
+	_if ( path << _self.entry2file[ entry ] ) _is _unset _orif
+	    _not system.file_exists?( path )
+	_then
+		_local file
+		_local data
+		_local strm
+
+		( file, data ) << _self.get_file_name_and_data_for( entry )
+		#
+		# Create a text file...
+		#
+		path << system.temp_file_name( file )
+		_protect
+			strm << external_text_output_stream.new( path )
+
+			strm.write( data.string )
+		_protection
+			_if strm _isnt _unset _then strm.close() _endif
+		_endprotect
+
+		_self.entry2file[ entry ] << path
+	_endif
+
+	_self.launch_program( _self.get_launch_command( cmd, path ) )
+
+	_self.changed( :can_be_updated? )
+	_self.changed( :can_be_deleted? )
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_private _method sf!ds_text_dir_reader.get_file_name_and_data_for( entry )
+
+	## Returns a file name and the data string for the reference entry.
+
+	>> entry.split_by( %/ ).last,
+	   _self.get_leaf_entry_text( entry )
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable, subclassable})
+_method sf!ds_text_dir_reader.get_launch_command( a_cmd, a_path )
+
+	## Returns the command that is used to launch an application.
+
+	>> write_string( a_cmd, space_char, %", a_path, %" )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable, subclassable})
+_private _method sf!ds_text_dir_reader.launch_program( a_command )
+
+	## Launch a program as a background thread.
+
+	#write( a_command )
+	_proc @sf!ds_text_dir_reader_launcher( a_string )
+		system.do_command( a_string )
+	_endproc.fork_at( _thisthread.vm_priority - 1, a_command )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.update_ds_text()
+
+	## Delete the current text from the datastore and replace
+	## it with the data that has been edited
+
+	_local data
+	_local path
+	_local entry
+
+	#
+	# Read the data from the file into a Magik string...
+	#
+	( data, path, entry ) << _self.collect_edited_data()
+	#
+	# Update the data in the database...
+	#
+	_self.update_text_dir_entry( data )
+	#
+	# Rename the edited file to a backup file;
+	# remove the link to the data in the file system
+	#
+	system.rename_safely( path, path + %~ )
+	_self.entry2file.remove_key( entry )
+
+	>> property_list.new_with(
+		   :function, _self.message( :update ),
+		   :operand,  entry )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.collect_edited_data()
+
+	## Collect the edited data into a stream.
+
+	_local entry << _self.selection.key
+	_local path  << _self.entry2file[ entry ]
+	_local data  << internal_text_output_stream.new()
+
+	_protect
+	    strm << external_text_input_stream.new( path )
+	    _loop
+		 line << strm.get_line()
+		 _if line _is _unset _then _leave _endif
+		 data.write( line, newline_char )
+	    _endloop
+
+	_protection
+	    _if strm _isnt _unset _then strm.close() _endif
+	_endprotect
+
+	>> data, path, entry
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_private _method sf!ds_text_dir_reader.update_text_dir_entry( data )
+
+	## Delete the exsting entry and write it again.
+
+	_local entry << _self.selection.key
+
+	_self.text_dir.remove( entry )
+	_self.text_dir.write_string( entry, data.string )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.delete_ds_text()
+
+	## Delete the currently seleted entry (and any existing subentries).
+
+	_local entry << _self.selection.key
+	_local info  << entry.as_charvec()
+
+	_self.text_dir.remove( entry )
+
+	>> property_list.new_with(
+		   :function, _self.message( :delete ),
+		   :operand,  entry )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ds_text_dir_reader.rollback()
+
+	## Perform a rollback on the database and clean the file cache.
+
+	_self.perform_on_view( :|rollback()| )
+	_self.cleanup_cached_data_files()
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_private _method sf!ds_text_dir_reader.cleanup_cached_data_files()
+
+	## Removes all temporary data files from a disk and the cache.
+
+	_local lookup << _self.entry2file
+
+	_for a_key,a_path _over lookup.keys_and_elements()
+	_loop
+		system.unlink( a_path, _true, _true )
+		lookup.remove_key( a_key )
+	_endloop
+_endmethod
+$

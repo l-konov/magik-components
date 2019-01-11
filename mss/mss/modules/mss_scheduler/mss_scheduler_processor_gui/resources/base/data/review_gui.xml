@@ -1,0 +1,46 @@
+<gui>
+  <accelerators>
+    <accelerator id="refresh_a" name="refresh"/>
+  </accelerators>
+
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="close"/>
+    </submenu>
+    <submenu name="view">
+      <action name="refresh"/>
+    </submenu>
+    <submenu name="results">
+      <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+    </submenu>
+  </menu>
+
+  <menu name="results_result_list" type="popup">
+    <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+  </menu>
+
+  <toolbar name="view">
+    <action name="refresh"/>
+  </toolbar>
+
+  <toolbar name="results">
+    <action name="mss_scheduler_results_plugin.view_selected_task_result"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="view"/>
+    <toolbar name="results"/>
+  </dock>
+ 
+  <work_area>
+    <tab_box>
+      <plugin plugin_name="mss_scheduler_results_plugin"/>
+      <plugin plugin_name="mss_scheduler_engine"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

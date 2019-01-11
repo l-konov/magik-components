@@ -1,0 +1,9 @@
+mss_http_server_gui	1
+
+description
+	GUI for mss_http_server plugin
+end
+
+requires
+	mss_http_server
+end

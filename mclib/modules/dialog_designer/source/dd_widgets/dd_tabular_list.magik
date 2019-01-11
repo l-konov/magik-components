@@ -1,0 +1,470 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_TABULAR_LIST - object to represent at tree_item for
+## tabular listing.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_tabular_list,{},:tree_item)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_tabular_list.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :mode,                  {:none,:one,:many},
+					  :column_widths,         :string,
+					  :column_headings,       :string,
+					  :column_alignments,     :string,
+					  :grid_lines?,           :boolean,
+					  :stripes?,              :boolean,
+					  :column_allow_groupby?, :boolean,
+					  :allow_filtering?,      :boolean,
+					  :aspect,                :string,
+					  :select_notifier,       :string,
+					  :double_click_notifier, :string,
+					  :resize?,               :boolean
+						),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_tabular_list.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.select_notifier
+	## 
+	## Return the SELECT_NOTIFIER property.
+	
+	>> _self.properties[:select_notifier]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.select_notifier << val
+	## 
+	## Set the SELECT_NOTIFIER property.
+	_self.properties[:select_notifier] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.resize?
+	## 
+	## Return the RESIZE? property.
+	
+	>> _self.properties[:resize?]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.resize? << val
+	## 
+	## Set the RESIZE? property.
+	_self.properties[:resize?] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.stripes?
+	## 
+	## Return the STRIPES? property.
+	
+	>> _self.properties[:stripes?]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.stripes? << val
+	## 
+	## Set the STRIPES? property.
+	_self.properties[:stripes?] << val
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.init(_gather args)
+	## 
+	## Initialize SELF.
+
+	val << args[2].remove_key(:column_widths)
+
+	.properties << property_list.new()
+	_super.init(_scatter args)
+	
+	_self.column_widths << val
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.headings_popup_menu
+	## 
+	## Heading popup menu, do nothing yet.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.column_headings
+	## 
+	##  Return the :column_headings property.
+	
+	_if .properties[:column_headings].default("") = ""
+	_then
+		.properties[:column_headings] << "A,b,Column C"
+		.properties[:column_alignments] << "left,right,center"
+		.properties[:column_widths] << "20,30,60"
+
+		# Effectively initialize the aspect
+		.properties[:aspect] << .properties[:aspect].default("default_table_aspect")
+	_endif
+	
+	>> .properties[:column_headings]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.column_headings << new_val
+	## 
+	## Set the :column_headings property.
+	
+	>> .properties[:column_headings] << new_val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.grid_lines?
+	## 
+	## Return the :grid_lines? property.
+	>> .properties[:grid_lines?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.grid_lines? << new_val
+	## 
+	## Set the :grid_lines? property.
+	>> .properties[:grid_lines?] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.column_allow_groupby?
+	## 
+	## Return the :column_allow_groupby? property.
+	>> .properties[:column_allow_groupby?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.column_allow_groupby? << new_val
+	## 
+	## Set the :column_allow_groupby? property.
+
+	>> .properties[:column_allow_groupby?] << new_val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.allow_filtering?
+	## 
+	## Return the :allow_filtering? property.
+	>> .properties[:allow_filtering?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.allow_filtering? << new_val
+	## 
+	## Set the :allow_filtering? property.
+
+	>> .properties[:allow_filtering?] << new_val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.double_click_notifier
+	## 
+	## Retrieve the property.
+	>> .properties[:double_click_notifier]
+	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.double_click_notifier << new_val
+	## 
+	## Set the property.
+	.properties[:double_click_notifier] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.default_min_width
+	## 
+	## Return the minimum width for SELF.
+	
+	vts << vtext_style.new(_self.font)
+	w << 0
+
+	_for t _over _self.column_headings.default("").split_by(%,).fast_elements()
+	_loop
+		w +<< vts.box_coordinates(t).bounds.width.rounded + 3
+	_endloop
+	
+	>> max(60,w,_self.width.default(60))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.default_min_height
+	## 
+	## Return the default minimum height for SELF.
+
+	>> max(30,15+_self.height.default(30))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.new_with_xml_properties(parent,props)
+	## 
+	## Return new instance of SELF with properties PROPS, placing
+	## in the gui_layout_manager object PARENT (eg. a rowcol)
+
+	desc << props[:dialog_description]
+	props.remove_key(:dialog_description)
+	sel_not << props[:select_notifier]
+	props.remove_key(:select_notifier)
+	dbl_not << props[:double_click_notifier]
+	props.remove_key(:double_click_notifier)
+
+	res <<  _self.new(parent,_scatter props)
+
+	res.dialog_description << desc
+	res.aspect << props[:aspect]
+	res.column_allow_groupby? << props[:column_allow_groupby?].default(_true)
+	res.allow_filtering? << props[:allow_filtering?].default(_false)
+	res.grid_lines? << props[:grid_lines?].default(_true)
+	res.column_headings << props[:column_headings]
+	res.column_alignments << props[:column_alignments]
+	res.select_notifier << sel_not
+	res.double_click_notifier << dbl_not
+	
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.new_dialog_default(rc,row,col,base_id)
+	## 
+	## Return a new instance of SELF with default attributes.
+
+	ddtl <<  _self.new(rc,
+			   :mode,                  :one,
+			   :column_headings,       {"Column A", "Column B"},
+			   :column_alignments,     {:left,:left},
+			   :column_widths ,        {50,50},
+			   :col_alignment,         :fill,
+			   :row_alignment,         :fill,
+			   :height,                80,
+			   :row,row,:col,col)
+
+	ddtl.column_allow_groupby? << _false 
+	ddtl.allow_filtering? << _false 
+	ddtl.grid_lines? << _false
+	ddtl.stripes? << _false
+	ddtl.resize? << _true
+
+	>> ddtl
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+
+	_dynamic !dialog_element_footprints!
+	
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![pbb] << _self
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	# Render Headings.
+	headings << _self.column_headings.default("").split_by(%,)
+	justifications << _self.column_alignments.default("").split_by(%,)
+	vts << vtext_style.new(_self.font)
+
+	hx << pbb.xmin+2
+	hy << pbb.ymin+1
+	
+	_for i _over 1.upto(headings.size)
+	_loop
+		_if (txt << headings[i]) = ""
+		_then
+			txt << "   "
+		_endif 
+		
+		j << _if i <= justifications.size
+		     _then
+			     >> justifications[i].uppercase[1]
+		     _else
+			     >> %L
+		     _endif 
+		
+		h_bb << vts.box_coordinates(txt).bounds
+		h_bb << pixel_bounding_box.new(hx,hy,hx+h_bb.width.floor,hy+h_bb.height.floor-3)
+
+		_self.draw_column_header(canv,h_bb,txt,j)
+		hx +<< h_bb.width + 1
+	_endloop
+
+	# Fill in rest of header line
+	_if hx < pbb.xmax - 1
+	_then
+		h_bb << pixel_bounding_box.new(hx,hy,pbb.xmax-2,hy+h_bb.height.floor-1)
+		_self.draw_column_header(canv,h_bb,"",:left)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.draw_column_header(canv,pbb,txt,just)
+	## 
+	## Draw a column header on the canvas CANV in the box PBB with
+	## column text TXT and justification JUST.
+	
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	w << pbb.width
+	h << pbb.height
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	vts << vtext_style.new(ts.font)
+	txt_bb <<  vts.box_coordinates(txt.default("")).bounds
+	y << pbb.centre.y + txt_bb.height.floor _div 2
+
+	_if just _is %C
+	_then
+		x << pbb.centre.x - txt_bb.width.floor _div 2		
+		canv.draw_text(ts,x,y,txt)		
+	_elif just _is %R
+	_then
+		x << pbb.xmax - txt_bb.width.floor - 1
+		canv.draw_text(ts,x,y,txt)		
+	_else
+		x << pbb.xmin + 2
+		canv.draw_text(ts,x,y,txt)		
+	_endif
+
+	fs.destroy()
+	ls.destroy()	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,".items[:",_self.dialog_element_id, 
+		  "] << tree_item.new(",parent_id)
+	txt.write(%,,%newline,%tab*2,":model,",%tab,"_self")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*2,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	txt.write(" )",%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_tabular_list.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.set_logical_properties(_optional all?)
+	## 
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+	
+	_self.aspect << _self.dialog_element_id + "_aspect"
+	_self.select_notifier << _self.dialog_element_id + "_selected()"
+	_self.double_click_notifier << _self.dialog_element_id + "_double_clicked()"
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.column_widths
+	## 
+	## Return the column widths
+	>> .properties[:column_widths]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_tabular_list.column_widths << val
+	## 
+	## Set the column widths
+	.properties[:column_widths] << val
+_endmethod
+$
+

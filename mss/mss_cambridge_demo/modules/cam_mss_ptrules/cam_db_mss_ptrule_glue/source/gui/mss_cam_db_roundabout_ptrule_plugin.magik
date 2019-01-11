@@ -1,0 +1,105 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_cam_db_roundabout_ptrule_plugin
+##
+## Demonstration of using the mss_ptrule_specials_plugin
+## architecture to provide an additional GUI element.
+##
+
+def_slotted_exemplar(:mss_cam_db_roundabout_ptrule_plugin,
+{
+	{:items, _unset, :readable}
+},
+{:mss_ptrule_gui_plugin})
+$
+
+mss_ptrule_manager.defined_ptrule_gui_plugins[:mss_cam_db_roundabout_ptrule_plugin] << mss_cam_db_roundabout_ptrule_plugin
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_cam_db_roundabout_ptrule_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:toggle_annotation,
+				       :image, {:text, :ui_resources},
+				       :toolbar_control, :image_toggle_item,
+				       :value, _true,
+				       :engine, _self,
+				       :value_change_message, :|toggle_annotation()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_cam_db_roundabout_ptrule_plugin.build_gui(a_container)
+	## 
+	## 
+
+	.items << property_list.new()
+	
+	p << panel.new(a_container)
+	p.height_spacing << p.width_spacing << 6
+	p.border_width << p.border_height << 2
+	
+	p.start_row()
+	label_item.new(p, _self.message(:remind_about_annotation))
+	
+	p.start_row()
+	.items[:name] << text_item.new(p, _self.message(:name),
+				       :display_length, 15,
+				       :max_length, 15)
+	
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_cam_db_roundabout_ptrule_plugin.input_value(field_name)
+	## 
+	## 
+
+	_if .items _isnt _unset _andif
+	    (x << .items[field_name]) _isnt _unset
+	_then
+		_return x.value
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_cam_db_roundabout_ptrule_plugin.toggle_annotation(new_value)
+	##
+	##
+	
+	# This method could be used to actively notify self's pointing
+	# rule that the annotation setting has been toggled.  However,
+	# since this is associated with a simple pointing rule (with a
+	# single PDR), the user cannot change the setting part way
+	# through, so it is sufficient for the pointing rule to
+	# instead check this value as a pre-press action.
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_cam_db_roundabout_ptrule_plugin.create_annotation?
+	## 
+	## Return the value of the :toggle_annotation action.
+	##
+
+	_return _self.action(:toggle_annotation).value
+	
+_endmethod
+$

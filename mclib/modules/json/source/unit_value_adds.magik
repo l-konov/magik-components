@@ -1,0 +1,17 @@
+#% text_encoding = cp1252
+_package sw
+$
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method unit_value.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	out_stream.write('{"value":')
+	_self.value.write_as_json(out_stream)
+	out_stream.write(',"unit":')
+	_self.unit.short_description.write_as_json(out_stream)
+	out_stream.write(%})
+_endmethod
+$

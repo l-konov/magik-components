@@ -1,0 +1,4 @@
+mss_cu_report_framework.magik
+mss_cu_report_fw_pi.magik
+mss_cu_report_plugin.magik
+mss_cu_wp_assignment_plugin.magik

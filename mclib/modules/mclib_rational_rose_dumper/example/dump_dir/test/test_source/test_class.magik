@@ -1,0 +1,125 @@
+# File Notice 1
+# File Notice 2
+# 
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+##
+## Class comment 1
+## Class comment 2
+##
+# Class Notice 1
+# Class Notice 2
+# 
+def_slotted_exemplar(:test_class,{
+                                  {:public_slot,_unset},
+                                  {:private_slot,_unset}},
+                                 {:test_super_class,:test_super_class_two})
+$
+
+test_class.define_slot_access(:public_slot,:write)
+$
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+_method test_class.setter_method<<new_value
+##
+## setter method doc1
+## setter method doc2
+##
+## new_value - Boolean
+## 
+# Method Notice 1
+# Method Notice 2
+# 
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+_method test_class.getter_method
+##
+## getter method doc1
+## getter method doc2
+##
+# Method Notice 1
+# Method Notice 2
+# 
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+_method test_class.param_method(param1,param2,param3)
+##
+## param method doc1
+## param method doc2
+## param method doc3
+##
+## param1 - Boolean
+##                    param1 doc1
+##                    param1 doc2
+## param2 - Integer
+##                    param2 doc1
+##                    param2 doc2
+## param3 - test_class_two
+##                           param3 doc1
+##                           param3 doc2
+# Method Notice 1
+# Method Notice 2
+# 
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+test_class.define_shared_variable(:shared_var1,
+##
+## shared var doc1
+## shared var doc2
+##
+# Method Notice 1
+# Method Notice 2
+# 
+:a_shared_item,
+:private)
+$
+
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+test_class.define_shared_constant(:shared_const,
+##
+## shared const doc1
+## shared const doc2
+##
+# Method Notice 1
+# Method Notice 2
+# 
+:a_shared_item,
+:public)
+$
+
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+_method test_class.bracket_only_method()
+##
+## 
+##
+# Method Notice 1
+# Method Notice 2
+# 
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+_method test_class.param_method2(a_param)
+##
+## this method captured in rose with 1 parameter but no brackets in the name
+##
+## a_param - 
+## 
+# Method Notice 1
+# Method Notice 2
+# 
+_endmethod
+$
+
+

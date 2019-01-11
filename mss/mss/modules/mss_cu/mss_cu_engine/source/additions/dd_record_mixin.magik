@@ -1,0 +1,722 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+dd_record_mixin.define_shared_constant(
+	:mss_cu_default_install_facility_relationships?,
+	## Default value is false.  If this is set to true, then
+	## whatever facility relationships are defined for the
+	## default install operation (typically "Install") will
+	## automatically be applied to all other operations that are
+	## valid for a given CU.
+	_false,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_facility_relationships_for_cu_definition(cu_def, operation)
+	## 
+	## Given a mss_cu_definition record CU_DEF and an operation
+	## value OPERATION, return a collection of
+	## mss_cu_facility_relationship records that can be used to drive
+	## attributes for self.
+	##
+	## Note that the backstop processing in a normally configured
+	## environment will only return one record at most, but
+	## subclasses can alter this via custom code if required.
+	##
+
+	p_name << _self.source_view.name
+	t_name << _self.source_collection.name
+	_if (fac_def << mss_cu_facility_definition.get_for_partition_and_table_name(p_name, t_name)) _is _unset
+	_then
+		_return {}
+	_endif
+
+	# If there is an install operation defined for this feature,
+	# and it it is to be used as the default, then go get it.
+	dio << mss_cu_engine.default_install_operation
+	_if _self.mss_cu_default_install_facility_relationships? _andif
+	    (op_def << cu_def.operation_definition_for(dio)) _isnt _unset
+	_then
+		pred << predicate.eq(:table_code, fac_def.id) _and
+			predicate.eq(:operation, dio)
+		_if (r << rope.new_from(cu_def.mss_cu_facility_relationships.select(pred))).size > 0
+		_then
+			_return r
+		_endif 
+	_endif
+	
+	_if operation _is _unset _orif
+	    operation = ""
+	_then
+		# If no operation given, then choose the default install
+		# operation, which can be considered to represent the
+		# "as-built" state for the purpose of figuring attribute
+		# values. 
+		query_operation << dio
+	_else
+		query_operation << operation
+	_endif
+
+	pred << predicate.eq(:table_code, fac_def.id) _and
+		predicate.eq(:operation, query_operation)
+	_return rope.new_from(cu_def.mss_cu_facility_relationships.select(pred))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_proposed_values_for_cu_definition(cu_def, operation, _optional incl_derived?)
+	## 
+	## Given a mss_cu_definition record CU_DEF and an operation
+	## value OPERATION, return a property list of proposed
+	## attribute values based on mss_cu_facility_reference records
+	## for CU_DEF.
+	##
+	## If INCL_DERIVED? is true, then derived fields will be
+	## returned also - otherwise, only physical or text join fields
+	## are considered.
+	##
+
+	pl << property_list.new()
+	_for fac_rel _over _self.mss_cu_facility_relationships_for_cu_definition(cu_def, operation).fast_elements()
+	_loop
+		_for fac_attr _over fac_rel.mss_cu_facility_attributes.fast_elements()
+		_loop
+			attr_name << fac_attr.attribute_name.as_symbol()
+			attr_val << fac_attr.attribute_value.default("").as_charvec()
+			_if (fd << _self.all_fields[attr_name]) _is _unset
+			_then
+				_continue
+			_endif
+			_if fd.is_join? _andif
+			    fd.join_type _is :text
+			_then
+				pl[attr_name] << attr_val
+			_endif
+
+			_if attr_val = ""
+			_then
+				attr_val << _unset
+			_endif 
+			_if fd.is_physical? _orif
+			    (fd.is_derived? _andif incl_derived? _is _true)
+			_then
+				_try _with cond
+					# Need to put bombproof protection around this, as
+					# configuration errors can cause the following to fail.  But,
+					# dump any config errors to the terminal.
+					_if attr_val _is _unset
+					_then
+						real_val << _unset
+					_else 
+						real_val << _self.value_from_string(fd, attr_val)
+					_endif
+					pl[attr_name] << real_val
+				_when error
+					write("Configuration error in proposed_values_for_cu_definition() for: ", fac_attr)
+					write(cond.report_contents_string)
+				_endtry  
+			_endif 
+		_endloop
+		_self.mss_custom_proposed_values_for_cu_facility_relationship(fac_rel, operation, pl)
+	_endloop
+
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_custom_proposed_values_for_cu_facility_relationship(fac_rel, operation, pl)
+	## 
+	## Customizable method to set additional attributes in the
+	## property list PL, based on the mss_cu_facility_relationship
+	## FAC_REL and the given OPERATION.
+	##
+	## Typically used to provide a status value that is appropriate
+	## for the operation being performed.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.fire_pre_maintain_cus_actions(cu_list)
+	## 
+	## Called on self immediately before updating self's
+	## mss_cu_references records based on the contents of CU_LIST
+	## (a collection of mss_cu_holder records).
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.fire_post_maintain_cus_actions(cu_list)
+	## 
+	## Called on self immediately before updating self's
+	## mss_cu_references records based on the contents of CU_LIST
+	## (a collection of mss_cu_holder records).
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_point_geometry(_optional prop_geoms)
+	## 
+	## Return the point-type geometry of self to use when
+	## determining CU-related calculations.  PROP_GEOMS may be a
+	## property list of proposed geometry values.
+	##
+
+	_return _self.mss_cu_geometry(:point, prop_geoms)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_chain_geometry(_optional prop_geoms)
+	## 
+	## Return the chain-type geometry of self to use when
+	## determining CU-related calculations.  PROP_GEOMS may be a
+	## property list of proposed geometry values.
+	##
+
+	_return _self.mss_cu_geometry(:chain, prop_geoms)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_area_geometry(_optional prop_geoms)
+	## 
+	## Return the area-type geometry of self to use when
+	## determining CU-related calculations.  PROP_GEOMS may be a
+	## property list of proposed geometry values.
+	##
+
+	_return _self.mss_cu_geometry(:area, prop_geoms)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_geometry(geom_category, _optional prop_geoms)
+	## 
+	## Return the geometry of self to use when determining
+	## CU-related calculations.  GEOM_CATEGORY may be :point,
+	## :chain, or :area.  PROP_GEOMS may be a property list of
+	## proposed geometry values. 
+	##
+	## Note that this backstop method simply returns the first one
+	## found, and should be subclassed/redefined as appropriate for
+	## your data model.
+	##
+	
+	_if (real_geom_category << geom_category) _is :chain
+	_then
+		real_geom_category << :linear
+	_endif
+
+	_if prop_geoms _isnt _unset
+	_then
+		_for a_geom _over prop_geoms.fast_elements()
+		_loop
+			_if a_geom.geom_category _is real_geom_category
+			_then
+				_return a_geom
+			_endif
+		_endloop
+	_endif
+	
+	_if _not _self.responds_to?(:|all_geometry()|)
+	_then
+		_return
+	_endif
+	_for a_geom _over _self.all_geometry()
+	_loop
+		_if a_geom.geom_category _is real_geom_category
+		_then
+			_return a_geom
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_work_point_candidate(_optional prop_geoms)
+	## 
+	## Return a candidate mss_cu_work_point record to use for
+	## associating new CU references to self.  PROP_GEOMS may be a
+	## property list of proposed geometry values. 
+	##
+	## This backstop method works as follows:
+	## - If self has a point geometry, and if a mss_cu_work_point
+	##   location geometry is found within a tolerance of self's
+	##   point geometry, use it.
+	## - If self has a chain geometry, and if a mss_cu_work_point
+	##   route geometry is found within a tolerance of the midpoint
+	##   of self's chain geometry, use it.
+	## - If self has any point/chain/area geometry that is fully
+	##   inside a mss_cu_work_point extent geometry, use it.
+	##
+
+	_if (point_geom << _self.mss_cu_point_geometry(prop_geoms)) _isnt _unset _andif
+	    (wp << _self.mss_cu_work_point_candidate_for_point(point_geom)) _isnt _unset
+	_then
+		_return wp
+	_endif
+	_if (chain_geom << _self.mss_cu_chain_geometry(prop_geoms)) _isnt _unset _andif
+	    (wp << _self.mss_cu_work_point_candidate_for_chain(chain_geom)) _isnt _unset
+	_then
+		_return wp
+	_endif
+
+	area_geom << _self.mss_cu_area_geometry(prop_geoms)
+	_for test_geom _over {point_geom, chain_geom, area_geom}.fast_elements()
+	_loop
+		_if test_geom _is _unset _then _continue _endif
+		_if (wp << _self.mss_cu_work_point_candidate_surrounding(test_geom)) _isnt _unset
+		_then
+			_return wp
+		_endif
+	_endloop
+
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method dd_record_mixin.mss_cu_world_for_geometry(a_geom)
+	## 
+	## Return a world to use for performing work point geometry
+	## scanning for A_GEOM.  In cases where A_GEOM is a real or
+	## pseudo geometry, use that - otherwise, use !current_world!
+	## or self's source view default world.
+	##
+
+	_dynamic !current_world!
+	_if a_geom.responds_to?(:world) _andif
+	    (w << a_geom.world) _isnt _unset
+	_then
+		_return w
+	_endif
+	_if !current_world! _isnt _unset
+	_then
+		_return !current_world!
+	_endif
+	_if (tbl << _self.source_view.collections[:sw_gis!world]) _isnt _unset
+	_then
+		_return tbl.at(0, 0)
+	_endif
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_work_point_scan_tolerance(a_geometry)
+	## 
+	## Return a length_value to use for scanning for work points
+	## for A_GEOMETRY.  May be subclassed/redefined to return a
+	## different value, taking into consideration the geometry type
+	## and world if appropriate.
+	##
+
+	_return length_value.new(20, :m)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_work_point_candidate_for_point(point_geom)
+	## 
+	## Return the best mss_cu_work_point candidate based on
+	## proximity to POINT_GEOM.
+	##
+
+	_if (wpv << mss_cu_engine.work_point_view) _is _unset _orif
+	    (tbl << mss_cu_engine.work_point_table) _is _unset
+	_then
+		_return
+	_endif 
+	    
+	# The following handles both composite worlds and datastore worlds.
+	geom_w << _self.mss_cu_world_for_geometry(point_geom)
+	_if geom_w _is _unset _orif
+	    ((wpv_w << geom_w.world_for_dataset(wpv)) _is _unset _andif
+	     (wpv_w << wpv.matching_world(geom_w)) _is _unset)
+	_then
+		_return
+	_endif
+
+	_if (ad << mss_cu_engine.active_design) _is _unset
+	_then
+		validate_design_ids << _unset 
+	_else
+		validate_design_ids << mss_cu_work_point.mss_design_ids_for_uniqueness_check(ad)
+	_endif
+	
+	tol << _self.mss_cu_work_point_scan_tolerance(point_geom).value_in(wpv_w.unit_name)
+	pa << pseudo_area.new(bounding_box.new_enclosing(point_geom.bounds, tol))
+	pa.world << wpv_w
+	best_cand << _unset
+	best_dist << tol
+	_for test_point _over tbl.select(predicate.interacts(:location, pa)).fast_elements()
+	_loop
+		_if (test_geom << test_point.location) _isnt _unset _andif
+		    (test_dist << test_geom.distance_to(point_geom)) <= best_dist
+		_then
+			_if validate_design_ids _is _unset _orif
+			    validate_design_ids.includes?(test_point.mss_design_id)
+			_then
+				best_cand << test_point
+				best_dist << test_dist
+			_endif 
+		_endif
+	_endloop
+
+	_return best_cand
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_work_point_candidate_for_chain(chain_geom)
+	## 
+	## Return the best mss_cu_work_point candidate based on
+	## proximity to CHAIN_GEOM.
+	##
+
+	_if (wpv << mss_cu_engine.work_point_view) _is _unset _orif
+	    (tbl << mss_cu_engine.work_point_table) _is _unset
+	_then
+		_return
+	_endif 
+
+	# The following handles both composite worlds and datastore worlds.
+	geom_w << _self.mss_cu_world_for_geometry(chain_geom)
+	_if geom_w _is _unset _orif
+	    ((wpv_w << geom_w.world_for_dataset(wpv)) _is _unset _andif
+	     (wpv_w << wpv.matching_world(geom_w)) _is _unset)
+	_then
+		_return
+	_endif
+
+	_if (ad << mss_cu_engine.active_design) _is _unset
+	_then
+		validate_design_ids << _unset 
+	_else
+		validate_design_ids << mss_cu_work_point.mss_design_ids_for_uniqueness_check(ad)
+	_endif
+	
+	tol << _self.mss_cu_work_point_scan_tolerance(chain_geom).value_in(wpv_w.unit_name)
+	_if (ll << chain_geom.line_length) = 0.0
+	_then
+		base_coord << chain_geom.first_coord
+	_else
+		base_coord << chain_geom.location_for_length(ll / 2.0).coord
+	_endif 
+	pa << pseudo_area.new(bounding_box.new_enclosing(base_coord.bounds, tol))
+	pa.world << wpv_w
+	best_cand << _unset
+	best_dist << tol
+	_for test_point _over tbl.select(predicate.interacts(:route, pa)).fast_elements()
+	_loop
+		_if (test_geom << test_point.route) _isnt _unset _andif
+		    (test_dist << test_geom.distance_to(base_coord)) <= best_dist
+		_then
+			_if validate_design_ids _is _unset _orif
+			    validate_design_ids.includes?(test_point.mss_design_id)
+			_then
+				best_cand << test_point
+				best_dist << test_dist
+			_endif 
+		_endif
+	_endloop
+
+	_return best_cand
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_work_point_candidate_surrounding(a_geom)
+	## 
+	## Return the best mss_cu_work_point candidate based on
+	## its extent geometry surrounding A_GEOM.
+	##
+
+	_if (wpv << mss_cu_engine.work_point_view) _is _unset _orif
+	    (tbl << mss_cu_engine.work_point_table) _is _unset
+	_then
+		_return
+	_endif 
+	    
+	# The following handles both composite worlds and datastore worlds.
+	geom_w << _self.mss_cu_world_for_geometry(a_geom)
+	_if geom_w _is _unset _orif
+	    ((wpv_w << geom_w.world_for_dataset(wpv)) _is _unset _andif
+	     (wpv_w << wpv.matching_world(geom_w)) _is _unset)
+	_then
+		_return
+	_endif
+
+	_if (ad << mss_cu_engine.active_design) _is _unset
+	_then
+		validate_design_ids << _unset 
+	_else
+		validate_design_ids << mss_cu_work_point.mss_design_ids_for_uniqueness_check(ad)
+	_endif
+
+	# The following caters to dealing with coordinates and
+	# sector_ropes directly, although this usage is really
+	# deprecated.
+	_if a_geom.responds_to?(:world) _andif
+	    a_geom.world _isnt _unset
+	_then
+		# The following hack is used to deal with internals: if
+		# SCAN_GEOM is in a different view than WPV, and if the worlds
+		# of SCAN_GEOM and WPV_W match based on name but not number,
+		# the scan fails to find a match.  So, try to convert this to a
+		# pseudo geometry that can have its world assigned.  In case a
+		# peculiar geometry is passed in (doesn't respond to transformed()),
+		# don't fail.
+		_try 
+			scan_geom << a_geom.transformed(transform)
+			scan_geom.world << wpv_w
+		_when error
+		_endtry 
+	_else
+		_if a_geom.species _is coordinate.species
+		_then
+			scan_geom << pseudo_point.new(a_geom)
+			scan_geom.world << geom_w
+		_elif a_geom.species _is sector_rope.species
+		_then
+			scan_geom << pseudo_chain.new(a_geom)
+			scan_geom.world << geom_w
+		_else
+			_return
+		_endif
+	_endif
+	
+	best_cand << _unset
+	best_area << 1/0
+	_for test_point _over tbl.select(predicate.contains(:extent, scan_geom)).fast_elements()
+	_loop
+		_if (test_geom << test_point.extent) _isnt _unset _andif
+		    (test_area << test_geom.area.abs) < best_area
+		_then
+			_if validate_design_ids _is _unset _orif
+			    validate_design_ids.includes?(test_point.mss_design_id)
+			_then
+				best_cand << test_point
+				best_area << test_area
+			_endif 
+		_endif
+	_endloop
+
+	_return best_cand
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_unit_multiplier_for_definition(mss_cu_def, _optional cu_holder)
+	## 
+	## Given a mss_cu_definition record MSS_CU_DEF, and
+	## mss_cu_holder record CU_HOLDER, return a value that
+	## represents the unit multiplier to use for that type of CU.
+	##
+	## Default processing is as follows:
+	## - If the determined dimensionality is Per Foot or Per Meter, and
+	##   if self's mss_cu_chain_geometry() is set, then return the length
+	##   of that geometry in the appropriate unit system.
+	## - If the determined dimensionality is Per Square Foot or Per
+	##   Square Meter, and if self's mss_cu_chain_geometry() is
+	##   set, then return the length of that geometry in the
+	##   appropriate unit system.
+	## - Otherwise return unset.
+	##
+
+	_if cu_holder _isnt _unset
+	_then
+		cu_dim << cu_holder.dimensionality
+	_elif mss_cu_def _isnt _unset
+	_then
+		cu_dim << mss_cu_def.dimensionality
+	_endif
+
+	_if cu_dim _is _unset
+	_then
+		_return _unset
+	_endif
+	
+	round_to << 100.0
+	
+	tt << text_translator.translator_for_enumerator(:mss_cu_dimensionality_type)
+	_if cu_dim = tt.translation_for_value("Per Meter") _andif
+	    (geom << _self.mss_cu_chain_geometry()) _isnt _unset 
+	_then
+		us << unit_system.new(geom.world.unit, :m)
+		_return (us.convert_output(geom.line_length) * round_to).rounded / round_to
+
+	_elif cu_dim = tt.translation_for_value("Per Foot") _andif
+	    (geom << _self.mss_cu_chain_geometry()) _isnt _unset 
+	_then
+		us << unit_system.new(geom.world.unit, :feet)
+		_return (us.convert_output(geom.line_length) * round_to).rounded / round_to
+
+	_elif cu_dim = tt.translation_for_value("Per Square Meter") _andif
+	      (geom << _self.mss_cu_area_geometry()) _isnt _unset 
+	_then
+		us << unit_system.new(geom.world.unit, :m)
+		_return (us.convert_output(us.convert_output(geom.area)) * round_to).rounded / round_to
+
+	_elif cu_dim = tt.translation_for_value("Per Square Foot") _andif
+	      (geom << _self.mss_cu_area_geometry()) _isnt _unset 
+	_then
+		us << unit_system.new(geom.world.unit, :feet)
+		_return (us.convert_output(us.convert_output(geom.area)) * round_to).rounded / round_to
+	_endif
+
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_process_cu_state_transition(cu_rec, a_transition)
+	## 
+	## Perform any processing required during the state transition
+	## given by A_TRANSITION, for the mss_cu_reference record CU_REC.
+	##
+	## This method simply updates the operation and work point of
+	## an Install type CU_REC to be blank, and it deletes other
+	## types of CUs.  It is likely that you will want to do other
+	## things such as delete records with CUs with a Remove
+	## operation, or update the life cycle status appropriately for 
+	## CUs with an Abandon operation.  However, this will be
+	## entirely specific to your data model and business rules.
+	##
+
+	cur_op << cu_rec.operation.default("")
+	_if cur_op = "" _andif
+	    cu_rec.work_point_number = ""
+	_then
+		# Already blanked out - no change needed.
+		_return
+	_endif
+	
+	_if cur_op = "" _orif
+	    cur_op = mss_cu_engine.default_install_operation
+	_then 
+		det_cu_rec << cu_rec.detached()
+		det_cu_rec.operation << ""
+		det_cu_rec.work_point_number << ""
+		det_cu_rec.source_collection.update(det_cu_rec)
+	_else
+		cu_rec.delete()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cu_dataset_group_for_transaction(pl)
+	## 
+	## Backstop method returns unset, indicating that no special
+	## dataset group is required for inserting / updating self with
+	## CUs.  PL is a property_list which may contain the following:
+	## - :object_editor : the editor initiating the update.
+	## - :action : either :insert, :update, or :delete.
+	## - :proposed_values : a property list of proposed values.
+	##
+	## Subclasses which may be doing cross-dataset transactions
+	## should return a dataset_group that includes all datasets
+	## subject to being updated.
+	##
+
+	_if (pvals << pl[:proposed_values]) _is _unset
+	_then
+		_return _unset 
+	_endif 
+
+	# The following logic is to determine if any super_dd join
+	# fields are of interest. 
+	action << pl[:action].default(:update)
+	tbl << _self.source_collection
+	descr << _unset
+	ds_to_do << equality_set.new_with(_self.source_view)
+	_for key, val _over pvals.keys_and_elements()
+	_loop
+		_if val _is _unset _orif
+		    (a_field << tbl.field(key)) _is _unset
+		_then
+			_continue
+		_endif 
+		_if a_field.is_super_dd_join?
+		_then
+			_if action _is :insert
+			_then
+				# Check the proposed value to see if this really is going to
+				# cause an update of the "other" dataset.  N.B.: this is only
+				# done on insert.  On update, it is assumed that since the
+				# field is marked as being updated, then something about it
+				# must be changing.  Also note that this is true even if the
+				# result of this join is empty/unset... assume that the field
+				# previously had some value that is now being blanked out, so a
+				# transaction on that "other" dataset is still required.
+				_if a_field.simple_result?
+				_then
+					_if val _is _unset
+					_then
+						_continue
+					_endif
+				_else
+					_if val _is _unset _orif
+					    val.size = 0
+					_then
+						_continue
+					_endif
+				_endif
+			_endif
+			
+			_if descr _is _unset
+			_then
+				# Delay calculating this until/unless it is really necessary.
+				descr << tbl.descriptor.unshare(tbl.source_view)
+			_endif 
+			_if (tds << a_field.transaction_dataset) _isnt descr.dataset
+			_then
+				# N.B.: if self is being updated in a replica, then I think the
+				# above processing always will be true, and this will result in
+				# both the replica view and the original view being added to
+				# the dataset group.  I have no idea if this is a good thing or
+				# not, as I don't have any way to test this.
+				ds_to_do.add(tds)
+			_endif
+		_endif 
+	_endloop
+
+	_if ds_to_do.size = 1
+	_then
+		_return _unset
+	_endif
+
+	_return dataset_group.new(ds_to_do)
+	
+_endmethod
+$

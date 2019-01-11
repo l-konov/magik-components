@@ -1,0 +1,139 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-05-19 17:49:21 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-11-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+
+_package mclib
+
+def_slotted_exemplar(:xslt_reporter_scheduled_task,
+                      {
+		      },
+		      {@user:mss_scheduled_task_handler})
+$
+
+user:mss_scheduler_engine.define_task_handler(:create_xslt_report,xslt_reporter_scheduled_task)
+$
+
+
+_pragma(classify_level=advanced, usage={subclassable})
+## defines a list of parameter keys to NOT pass through as
+## properties onto my reporter plugin.
+xslt_reporter_scheduled_task.define_shared_constant(:parameter_pass_through_excludes,
+						     {:reporter_exemplar},
+						     :private)
+$
+
+
+_pragma(classify_level=advanced, usage={subclassable})
+_method xslt_reporter_scheduled_task.int!run()
+	## Create sna instance of my reported exemplar and runs its report.
+	## 
+	##
+
+	# (07-11-2005 Brad Sileo): created.
+	pu << _self.reporter_plugin_exemplar.new(:scheduler,_unset,
+						 _scatter _self.reporter_plugin_parameters)
+	pu.int!dump_report(_false,_false)
+	>> _true 
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={subclassable})
+_method xslt_reporter_scheduled_task.reporter_plugin_parameters
+	## Returns a propertyy list of parameters to be passed to my
+	## reporter instance.
+	## 
+	##
+
+	# (07-11-2005 Brad Sileo): created.
+	# the list fo properties ot not pass to my exemplar.
+	excludes << _self.parameter_pass_through_excludes
+	pl <<  property_list.new()
+	_for a_key, a_val _over .parameters.fast_keys_and_elements()
+	_loop
+		_if _not excludes.includes?(a_key)
+		_then
+			pl[a_key] << a_val
+		_endif
+	_endloop
+	>> pl
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={subclassable})
+_method xslt_reporter_scheduled_task.parameters_for_task_type(a_type)
+	## Returns my parameters
+	## 
+	##
+
+	# (07-11-2005 Brad Sileo): created.
+	>> property_list.new_with(
+		   :dump_path,{:filename},
+		   :reporter_exemplar,{:string, _self.reporter_types},
+		   :output_url,{:string},
+		   :template_name,{:string},
+		   :template_module_name,{:symbol},
+		   :default_soc_name, {:symbol},
+		   :default_dataset_name,{:symbol}
+			 )
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={subclassable})
+_method xslt_reporter_scheduled_task.reporter_types
+	## returns a list of all suibclasses of xslt_reporter_plugin,
+	## but the parent class.
+	## 
+	##
+
+	# (07-14-2005 Brad Sileo): created.
+	res << rope.new_with("@mclib:xslt_reporter_plugin")
+	_for a_table _over mclib:xslt_reporter_plugin.define_method_target.children(_true)
+	_loop
+		gv << a_table.metadata[:exemplar_global]
+		res.add(write_string(%@,gv.package.name,%:,gv.key))
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={subclassable})
+_method xslt_reporter_scheduled_task.reporter_plugin_exemplar
+	## Returns the exempalr to use for my report generation, using
+	## my reporter_exemplar property
+	## 
+	##
+
+	# (07-11-2005 Brad Sileo): created.
+	ex_name << .parameters[:reporter_exemplar]
+	>> _if ex_name _is _unset 
+	_then
+		>> @mclib:xslt_reporter_plugin.value
+	_else
+		>> ex_name.evaluate().value
+	_endif
+_endmethod
+$
+

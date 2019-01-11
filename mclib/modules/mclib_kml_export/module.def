@@ -1,0 +1,10 @@
+mclib_kml_export	4000
+
+description
+	Core KML Exporter
+end
+
+requires
+	# required for hex strings on styles
+	mclib_style_images
+end

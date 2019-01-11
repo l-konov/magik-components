@@ -1,0 +1,113 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_block
+	_local ds_dir << system.getenv("CAM_DB_ACE_DIR")
+
+	# This will ensure that a method finder file will be saved
+	# along with the image.
+	method_finder.lazy_start?
+
+	smallworld_product.init( "smallworld_cam_db",
+					 "Smallworld Cambridge Database" )
+
+	# Set the startup option
+	# :save_open_iamge is only applicaable if we were saving a
+	# closed image and wanted it to created an open image the first
+	# time time it was started.
+	smallworld_product.set_startup_option(:save_open_image?, _false)
+
+	# Since :save_open_image? has been set to false the following
+	# options are irrelevant.
+	# :open_image_name
+	# :save_open_image_options
+	# :save_open_startup_proc
+	# :update_redirector
+
+	# :ds_environment_options can be used to specify options to be
+	# passed to ds_environment.init()
+	smallworld_product.set_startup_option(:ds_environment_options, {:npcls, 32768})
+
+	# Set the authorisation to :none if you don't want to force
+	# users to log in.
+	# By default authorisation is set to :singleuser
+	# smallworld_product.set_startup_option(:authorisation, :none)
+
+	# Set the soc definition to use
+	smallworld_product.set_startup_option(:soc, :gis)
+
+	#As we require gui_2 to be loaded it should not be necessary to
+	# set the :ace option
+
+	# :ace_top_alternative can specifies the alternative in the ACE
+	# used as a parent for users' alternatives.
+	smallworld_product.set_startup_option(:ace_top_alternative, _unset)
+
+	# :style_top_alternative is like :ace_top_alternative but for
+	# the style system
+	smallworld_product.set_startup_option(:style_top_alternative, "|")
+
+	# We want the application manager to start by default, so we'll
+	# set :application to unset
+	smallworld_product.set_startup_option(:application, _unset)
+
+	# Define the applications for this image.
+	smallworld_product.register_application(
+		:cam_db_swaf_professional,
+		:application,
+		:resource_module_name, :cam_db_swaf_professional_application,
+		:html_help_file_name, "swafPro",
+		:html_help_resource_module_name, :swaf_professional_application,
+		:ace_name, :|Electricity|,
+		:default_application_coordinate_system_name, :uk_british_national_grid,
+		:application_coordinate_system_unit, :mm )
+
+	smallworld_product.register_application(
+		:mss_demo,
+		:application,
+		:resource_module_name, :cam_db_swaf_mss_demo,
+		:html_help_file_name, "swafPro",
+		:html_help_resource_module_name, :swaf_professional_application,
+		:description, "The Workbench by Minto Spatial Solutions using SWAF",
+		:external_name, "The Workbench by Minto Spatial Solutions",
+		:ace_name, :|Electricity|,
+		:default_application_coordinate_system_name, :uk_british_national_grid,
+		:application_coordinate_system_unit, :mm
+			   )
+	
+	# We set the interactive option to false before we open the
+	# database so that we can build this image from a batch script
+	# We set this to true afterwards.
+	smallworld_product.set_startup_option(:interactive?, _false)
+
+	#Open the database
+	_if auth_view.alternative_control_enabled? _is _maybe _then 
+		auth_view.alternative_control_enabled? << _false
+	_endif
+	smallworld_product.open_database(ds_dir)
+	_try 
+		gis_program_manager.open_datasets(:mss_config)
+	_when no_datasets_opened
+		write("SOC configuration for mss_config database not completed.")
+	_endtry
+	_try 
+		gis_program_manager.open_datasets(:mss_scheduler)
+	_when no_datasets_opened
+		write("SOC configuration for mss_scheduler database not completed.")
+	_endtry
+	
+	# We'll set the interactive option to true so the user can log in
+	smallworld_product.set_startup_option(:interactive?, _true)
+
+	# Set the startup procedure as we may not have started from a
+	# gis image.
+	smallworld_product.set_startup_procedures(start_application_manager)
+	
+_endblock
+$

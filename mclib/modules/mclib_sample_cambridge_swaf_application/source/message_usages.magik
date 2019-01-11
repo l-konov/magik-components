@@ -1,0 +1,19 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-09 11:37:00 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-23-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+message_handler.new(:mclib_sample_cambridge_swaf_application).set_uses_list({:cam_db_swaf_professional_application})
+$

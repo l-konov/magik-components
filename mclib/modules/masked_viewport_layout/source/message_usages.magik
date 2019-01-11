@@ -1,0 +1,19 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-02-16 12:03:33 Brad.Sileo>
+##
+## Created By: Brad Sileo, TenSails
+## Date: 01-19-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+
+message_handler.new(:masked_viewport_layout).add_use(:viewport_layout)
+$

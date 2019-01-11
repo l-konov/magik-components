@@ -1,0 +1,105 @@
+<gui>
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="close"/>
+    </submenu>
+    <submenu name="search">
+      <action name="mss_qa_engine.run_qa"/>
+      <separator/>
+      <action name="mss_qa_engine.interrupt"/>
+    </submenu>
+    <submenu name="view">
+      <action name="mss_qa_processor_plugin.goto_object"/>
+      <action name="mss_qa_processor_plugin.highlight_object"/>
+      <action name="mss_qa_processor_plugin.select_object"/>
+      <action name="mss_qa_processor_plugin.edit_object"/>
+      <separator/>
+      <action name="mss_qa_processor_plugin.copy_to_scrapbook"/>      
+    </submenu>
+    <submenu name="report">
+      <action name="mss_qa_processor_plugin.display_first_result_page"/>
+      <action name="mss_qa_processor_plugin.display_prev_result_page"/>
+      <action name="mss_qa_processor_plugin.display_next_result_page"/>
+      <action name="mss_qa_processor_plugin.display_last_result_page"/>
+      <separator/>
+      <action name="mss_qa_processor_plugin.export_to_excel"/>
+    </submenu>
+    <submenu name="fix">
+      <action name="mss_qa_processor_plugin.auto_fix"/>
+    </submenu>
+  </menu>
+
+  <menu name="processor_result_list" type="popup">
+    <action name="mss_qa_processor_plugin.goto_object"/>
+    <action name="mss_qa_processor_plugin.highlight_object"/>
+    <action name="mss_qa_processor_plugin.select_object"/>
+    <action name="mss_qa_processor_plugin.edit_object"/>
+  </menu>
+
+  <menu name="managed_check_name_list" type="popup">
+    <action name="mss_qa_engine.mcn_select_all"/>
+    <action name="mss_qa_engine.mcn_select_clear"/>
+    <separator/>
+    <action name="mss_qa_engine.mcn_enable_selection"/>
+    <action name="mss_qa_engine.mcn_disable_selection"/>
+  </menu>
+
+  <menu name="managed_group_list" type="popup">
+    <action name="mss_qa_engine.mg_select_all"/>
+    <action name="mss_qa_engine.mg_select_clear"/>
+    <separator/>
+    <action name="mss_qa_engine.mg_enable_selection"/>
+    <action name="mss_qa_engine.mg_disable_selection"/>
+  </menu>
+
+  <toolbar name="search">
+    <action name="mss_qa_engine.run_qa"/>
+    <action name="mss_qa_engine.interrupt"/>
+  </toolbar>
+
+  <toolbar name="view">
+    <action name="mss_qa_processor_plugin.goto_object"/>
+    <action name="mss_qa_processor_plugin.highlight_object"/>
+    <action name="mss_qa_processor_plugin.select_object"/>
+    <action name="mss_qa_processor_plugin.edit_object"/>
+  </toolbar>
+
+  <toolbar name="prev_next">
+    <action name="mss_qa_processor_plugin.display_first_result_page"/>
+    <action name="mss_qa_processor_plugin.display_prev_result_page"/>
+    <action name="mss_qa_processor_plugin.display_next_result_page"/>
+    <action name="mss_qa_processor_plugin.display_last_result_page"/>
+  </toolbar>
+
+  <toolbar name="fix">
+    <action name="mss_qa_processor_plugin.auto_fix"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="search"/>
+    <toolbar name="view"/>
+    <toolbar name="prev_next"/>
+    <toolbar name="fix"/>
+  </dock>
+ 
+  <work_area>
+    <tab_box>
+      <paned_window side_by_side="yes" tab_label_id="tab_label_qa_engine">
+        <paned_window side_by_side="no" dynamic="no" stretch="0.5">
+          <plugin plugin_name="mss_qa_engine" type="input_mode"/>
+          <tab_box>
+            <plugin plugin_name="mss_qa_engine" type="managed_datasets"/>
+            <plugin plugin_name="mss_qa_engine" type="managed_groups"/>
+	  </tab_box>
+        </paned_window>
+        <plugin plugin_name="mss_qa_engine" stretch="0.5" type="managed_checks"/>
+      </paned_window>
+      <plugin plugin_name="mss_qa_processor_plugin"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

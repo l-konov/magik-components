@@ -1,0 +1,43 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.cam_abandon_selected_cable()
+	##
+	## Action method for abandoning all selected cable features.
+	## - Usage: as a Complete action.
+	## - Prerequisites: user must select at least one cable.
+	## - Additional notes: ensure that :transaction_on_complete?
+	##   property is set to true.
+	##
+
+	sel_rwos << equality_set.new()
+	_for i _over .manager.get_selection_set().fast_elements()
+	_loop
+		_if (an_rwo << i.rwo) _isnt _unset _andif
+		    an_rwo.source_collection.name _is :cable
+		_then
+			sel_rwos.add(an_rwo)
+		_endif
+	_endloop
+
+	_if sel_rwos.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:cam_no_selected_cable))
+	_endif
+
+	_for i _over sel_rwos.fast_elements()
+	_loop
+		dr << i.detached()
+		dr.status << "Abandoned"
+		dr.source_collection.update(dr)
+	_endloop
+	
+_endmethod
+$

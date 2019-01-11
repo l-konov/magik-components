@@ -1,0 +1,126 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic)
+##
+## mss_user_rwo_specials_plugin
+##
+## Extensions to the rwo_specials_plugin.
+##
+
+def_slotted_exemplar(:mss_user_rwo_specials_plugin,
+{
+	{:prev_collection, _unset, :readable}
+},
+{:rwo_specials_plugin})
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_rwo_specials_plugin.build_gui( a_container )
+	## 
+	## Builds the GUI in A_CONTAINER
+	## 
+
+	# This bit of fakery forces the panel to start with a more
+	# sensible than the one-line-high it would otherwise be.
+	retval << _super.build_gui(a_container)
+	fake_panel << panel.new(.gui_stack)
+	fake_panel.name << :fake_nothing_to_show
+	_for i _over 1.upto(4)
+	_loop
+		fake_panel.start_row()
+		label_item.new(fake_panel, "")
+	_endloop 
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_rwo_specials_plugin.set_current_collection(a_collection)
+	##
+	## Do not refresh if collection has not changed.
+	##
+
+	_dynamic !mss_user_object_editor_reset!
+	
+	_if a_collection _is _unset _andif
+	    !mss_user_object_editor_reset! _isnt _unset
+	_then
+		a_collection << !mss_user_object_editor_reset![1]
+	_endif
+	
+	_if a_collection _is .prev_collection
+	_then
+		_return
+	_endif
+
+	_super.set_current_collection(a_collection)
+	.prev_collection << a_collection
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method mss_user_rwo_specials_plugin.show_special_actions( a_plugin )
+	## 
+	## Adds special actions to the gui from the the plugin.
+	##
+	## Subclassed to allow the plugin to control which actions
+	## appear on menus or toolbars as appropriate.
+	##
+	## Deprecated:
+	## Subclassing will be removed in future release, as a similar
+	## functionality is given by
+	## editor_plugin.special_action_names, which is defined by CST
+	## TSB 4.3.0.3 within P150766_1b.magik 
+
+	gui_elements << _self.editor.get_all_gui_elements_with_role( :rwo_specials )
+	the_controls << rope.new()
+	_for gui_element _over gui_elements.fast_elements()
+	_loop
+		gui_type << _if gui_element.is_kind_of?( menu_base )
+			    _then
+				    >> :menu
+			    _else
+				    >> :toolbar
+			    _endif
+		# TM START CHANGE (relative to superclass)
+		_for a _over a_plugin.mss_user_rwo_specials_actions(gui_type)
+		# TM END CHANGE (relative to superclass)
+		_loop
+			_if a_plugin.special_action_names _is :all _orif
+			    a_plugin.special_action_names.includes?( a.name )
+			_then 
+				c << a.place_control_on( gui_element, gui_type )
+				the_controls.add_last(c)
+			_endif 
+		_endloop 
+	_endloop
+
+	_self.action_gui_controls << the_controls
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_rwo_specials_plugin.terminate()
+	## 
+	## Take everything off the databus before terminating.
+	##
+
+	_for a_plugin _over .plugins.fast_elements()
+	_loop
+		a_plugin.databus << _unset
+	_endloop
+	_return _super.terminate()
+	
+_endmethod
+$

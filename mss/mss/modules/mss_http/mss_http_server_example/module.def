@@ -1,0 +1,9 @@
+mss_http_server_example	1
+
+description
+	Example setup of mss_http_server_gui
+end
+
+requires
+	mss_http_server_gui
+end

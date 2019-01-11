@@ -1,0 +1,43 @@
+#% text_encoding = iso8859_1
+_package mclib
+
+def_slotted_exemplar(:kml_gui_plugin,{},:plugin)
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_gui_plugin.init_actions()
+	## 
+	##
+
+	_self.add_action(
+		sw_action.new( :activate_dialog,
+			       :engine, _self,
+			       :action_message, :activate_dialog|()|,
+			       :toolbar_control, :image_button_item,
+			       :image, {:kml_gui, _self.module_name},
+			       :dialog_control, :button_item,
+			       :caption, _self.message(:kml_gui)
+			  )
+		)
+			       
+			       
+	
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_gui_plugin.activate_dialog()
+	## 
+	##
+
+	
+	_local dialog_class << :kml_gui_framework
+
+	_if ( a_dialog << _self.get_dialog( dialog_class ) ) _is _unset 
+	_then
+		ex << get_global_value( @mclib:kml_gui_framework)
+		a_dialog << ex.new( dialog_class, _self )
+		_self.cache_dialog( dialog_class, a_dialog )
+	_endif
+	a_dialog.activate( _unset,  _self.message( :title ) )
+_endmethod
+$

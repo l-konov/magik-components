@@ -1,0 +1,89 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method rwo_record.mss_qa_cable_connectivity(qa_engine, qa_check)
+	## 
+	## Perform a QA check to locate cables that are not connected
+	## to anything at either end.  Unconnected at one end denotes
+	## a warning, and unconnected at both ends denotes an error.
+	##
+
+	# N.B.: this is the common superclass for cable and
+	# internal_cable, which is why the method is defined at this
+	# level. 
+	_if (p << _self.centreline) _is _unset
+	_then
+		condition.raise(:mss_qa_information,
+				:string, "Centreline is not set - cannot validate connectivity",
+				:record, _self,
+				:severity, :error,
+				:error_code, :cable_connectivity,
+				:error_sub_code, :no_path,
+				:locating_geometry, _unset,
+				:auto_fix_data, _unset)
+		_return
+	_endif
+
+	# For simple chains, connectivity cannot be checked.
+	_if p.is_class_of?(simple_chain)
+	_then
+		_return
+	_endif
+	
+	conn_count << 0
+	locating_geom << _unset 
+	_for n _over {p.first_node, p.last_node}.fast_elements()
+	_loop
+		any_conn? << _false 
+		_for conn_geom _over n.top_level_geoms()
+		_loop
+			_if conn_geom = p _then _continue _endif
+
+			# This node is connected to anything - that's good enough.
+			any_conn? << _true
+			_leave
+		_endloop
+		_if any_conn?
+		_then
+			conn_count +<< 1
+		_else
+			# For the case where this is the only disconnected end, use
+			# this as the locating geometry.
+			locating_geom << pseudo_point.new(n.coord)
+			locating_geom.world << p.world
+		_endif
+	_endloop
+
+	_if conn_count = 0
+	_then
+		# Error - not connected at either end.
+		condition.raise(:mss_qa_information,
+				:string, "Not connected at either end",
+				:record, _self,
+				:severity, :error,
+				:error_code, :cable_connectivity,
+				:error_sub_code, :no_connection,
+				:locating_geometry, _unset,
+				:auto_fix_data, _unset)
+	_elif conn_count = 1
+	_then
+		# Warning - not connected at one end.
+		condition.raise(:mss_qa_information,
+				:string, "Not connected at one end",
+				:record, _self,
+				:severity, :warning,
+				:error_code, :cable_connectivity,
+				:error_sub_code, :single_connection,
+				:locating_geometry, locating_geom,
+				:auto_fix_data, _unset)
+	_endif
+	
+_endmethod
+$

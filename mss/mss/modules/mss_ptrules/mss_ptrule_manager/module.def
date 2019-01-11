@@ -1,0 +1,9 @@
+mss_ptrule_manager	1
+
+description
+	MSS Pointing Rule Manager
+end
+
+requires
+	mss_ptdef_data_model
+end

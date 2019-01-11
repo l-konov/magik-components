@@ -1,0 +1,404 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_server_response
+##
+## Wrapper to format information suitable for sending a
+## response from an HTTP server.
+##
+
+def_slotted_exemplar(:mss_http_server_response,
+{
+	{:http_version, _unset},
+	{:status_code, _unset},
+	{:reason_phrase, _unset},
+	{:response_filename, _unset},
+	{:response_object, _unset},
+	{:connection_manager, _unset}
+},
+{:mss_http_generic_request_response})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_response.define_slot_access(
+	:http_version,
+	## The HTTP protocol version to be returned.
+	:writable)
+$
+
+_pragma(classify_level=restricted)
+mss_http_server_response.define_shared_variable(
+	:default_encoding_format,
+	:utf8,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_response.define_slot_access(
+	:status_code,
+	## The status code to be returned, as an integer.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_response.define_slot_access(
+	:reason_phrase,
+	## The reason phrase returned, as an string.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_response.define_slot_access(
+	:response_filename,
+	## If a file is to be served, this is the name of the file
+	## (takes precedence over response_object).
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_response.define_slot_access(
+	:response_object,
+	## If the response consists of a text string or other object,
+	## this is that object.  N.B.: currently, there is only support
+	## for strings.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_server_response.define_slot_access(
+	:connection_manager,
+	## The mss_http_server_connection_manager that is initiating self.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+_method mss_http_server_response.new(a_connection, a_conn_mgr)
+	## 
+	## 
+
+	_return _clone.init(a_connection, a_conn_mgr)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_server_response.init(a_connection, a_conn_mgr)
+	## 
+	##
+
+	.http_version << "1.0"
+	# Assume failure, until success is achieved.
+	_self.set_status_code(500)
+	.connection << a_connection
+	.connection_manager << a_conn_mgr
+	
+	_self.set_header_field("Content-Type", "text/plain")
+	_if (a_server << _self.server) _isnt _unset
+	_then
+		_self.set_header_field("Server", a_server.server_identifier_string)
+		_self.set_header_field("Date", a_server.date_time_string())
+	_endif 
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_response.server
+	## 
+	## Return the mss_http_server_engine initiating this.
+	##
+
+	_if .connection_manager _isnt _unset
+	_then
+		_return .connection_manager.server
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_response.request
+	## 
+	## Return the mss_http_server_request initiating this.
+	##
+
+	_if .connection_manager _isnt _unset
+	_then
+		_return .connection_manager.request
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_response.set_status_code(code)
+	## 
+	## Set self's status_code to CODE (an integer).  If there is a 
+	## matching reason_phrase identified, set that too.
+	##
+
+	.status_code << code
+	msg_key << write_string("sc_", code).as_symbol()
+	_if _self.message_handler.has_message?(msg_key)
+	_then
+		.reason_phrase << _self.message(msg_key)
+	_endif
+	_return code
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_response.write_response_on(s)
+	## 
+	## Write the complete response on stream S, which must be a
+	## binary stream.
+	##
+
+	_try 
+		_if .response_filename _isnt _unset
+		_then
+			_return _self.write_filename_response_on(s)
+		_endif
+		
+		_if .response_object _isnt _unset
+		_then
+			# Figure content length.  This will need to be made more
+			# generic if anything other than text strings are supported.
+			# For now, just use the string length, with LFs converted to
+			# CRLFs.
+			v << .response_object.size
+			v +<< .response_object.occurrences_of(newline_char)
+			_self.set_header_field("Content-Length", v)
+		_endif
+		
+		_self.write_header_on(s)
+		
+		_if .response_object _isnt _unset
+		_then
+			# Build the response body.  This will need to be made more
+			# generic if anything other than text strings are supported.
+			_self.write_response_string_on(s, .response_object)
+		_endif
+		s.flush()
+	_when magik_prim_error
+		# If the connection closes (presumably from the client side)
+		# while writing, don't worry about it.
+	_endtry
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_response.status_line()
+	## 
+	## Return the status line: http_version, status_code, and
+	## reason_phrase.
+	##
+	
+	_return write_string("HTTP/", _self.http_version, " ", _self.status_code, " ", _self.reason_phrase)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_response.write_header_on(s)
+	## 
+	## Write header content on stream S, which must be a binary stream.
+	##
+
+	crlf << byte_vector.new_with(13, 10)
+	str << _self.status_line()
+	s.put_ascii_chars(str)
+	s.put_subseq(crlf)
+
+	# Put these types at the end of the header.
+	defer_types << equality_set.new_with("connection")
+	defer << rope.new()
+	
+	_for i, j _over .header_fields.fast_keys_and_elements()
+	_loop
+		str << write_string(i, ": ", j)
+		_if defer_types.includes?(i.lowercase)
+		_then
+			defer.add_last(str)
+			_continue
+		_endif 
+		s.put_ascii_chars(str)
+		s.put_subseq(crlf)
+	_endloop
+	_for i _over defer.fast_elements()
+	_loop
+		s.put_ascii_chars(i)
+		s.put_subseq(crlf)
+	_endloop
+	
+	s.put_subseq(crlf)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_response.write_response_string_on(s, str)
+	## 
+	## Write a string STR on binary output stream S.
+	##
+
+
+	rs << str.read_stream()
+	# Uli Naedelin
+	# Use by default utf8 text encoding for response string
+	l_tc << text_converter.new(_self.default_encoding_format, _true)
+	l_tc.set_input(str)
+	_loop
+		_if l_tc.run() _isnt :writing
+		_then
+			_leave
+		_endif
+		s.put_vec(l_tc.copy_output())
+	_endloop
+	s.put_vec(l_tc.copy_output())
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_response.write_filename_response_on(s)
+	## 
+	## Write appropriate headers and the file to be transferred
+	## (identified by the response_filename slot) to binary stream S.
+	##
+
+	s2 << _unset 
+	_try 
+		fstat << file_status.new(.response_filename)
+		s2 << external_binary_input_stream.new(.response_filename)
+	_when error
+		_self.default_not_found_response()
+		_return _self.write_response_on(s)
+	_endtry
+
+	_if s2 _is _unset
+	_then
+		_return
+	_endif
+	_self.set_header_field("Content-Length", fstat.size)
+
+	_self.set_status_code(200)
+	_self.write_header_on(s)
+	_protect
+		_loop
+			_if (in << s2.get_n(1024)) _is _unset _orif
+			    in.size = 0
+			_then
+				_leave
+			_endif
+			s.put_subseq(in)
+		_endloop
+	_protection
+		s2.close()
+	_endprotect
+	s.flush()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_response.default_not_found_response(_optional fname)
+	##
+	## Set self up to produce a default Not Found response for file
+	## name FNAME.
+	##
+
+	_if fname _is _unset
+	_then
+		_if (req << _self.request) _isnt _unset
+		_then
+			fname << req.url
+		_else
+			fname << .response_filename
+		_endif
+	_endif
+	
+	.response_filename << _unset
+	_self.set_status_code(404)
+
+	nl << newline_char
+	s2 << internal_text_output_stream.new()
+	s2.write("<html><head><title>", _self.status_code, " ", _self.reason_phrase, "</title></head>", nl)
+	s2.write("<body text=#000000 bgcolor=#ffffff>", nl)
+	s2.write("<blockquote>", nl)
+	s2.write("<H2>Not Found</H2>", nl)
+	s2.write("The requested URL <code>", fname, "</code> was not found on this server.", nl, nl)
+	s2.write("<p>", nl, "</blockquote>", nl)
+	# Must be >512 characters for IE to see the message.
+	_for i _over 1.upto(7)
+	_loop 
+		s2.write("<!-- random comments so that this is at least 512 bytes for IE to display it -->", nl)
+	_endloop 
+	s2.write("</body></html>")
+	
+	_self.set_header_field("Cache-Control", "private,max-age=0")
+	_self.set_header_field("Content-Type", "text/html")
+	_self.set_header_field("Connection", "Close")
+	.response_object << s2.string
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_response.default_server_error_response(str)
+	## 
+	## Set self up to produce a default Internal Server Error
+	## response with string STR.
+	##
+
+	_self.set_status_code(500)
+	# Must be at least 512 characters for IE to see the message.
+	_loop
+		_if str.size < 513
+		_then
+			str << write_string(str, newline_char, "".spaces(80))
+		_else
+			_leave 
+		_endif
+	_endloop
+	
+	_self.response_object << str
+	_self.set_header_field("Cache-Control", "private,max-age=0")
+	_self.set_header_field("Content-Type", "text/plain")
+	_self.set_header_field("Connection", "Close")
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_response.default_client_timeout_response(_optional str)
+	## 
+	## Set self up to produce a default Client Timeout
+	## response with string STR.
+	##
+
+	_self.set_status_code(408)
+	_if str _isnt _unset
+	_then
+		_self.response_object << str
+	_else
+		_self.response_object << _self.reason_phrase.write_string
+	_endif 
+	_self.set_header_field("Cache-Control", "private,max-age=0")
+	_self.set_header_field("Content-Type", "text/plain")
+	_self.set_header_field("Connection", "Close")
+	
+_endmethod
+$

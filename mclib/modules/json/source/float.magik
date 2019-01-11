@@ -1,0 +1,36 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method float.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self in JSON notation to OUT_STREAM
+
+	_dynamic !print_float_precision! << 10
+	_if _self = 0
+	_then
+		out_stream.write("0.0")
+		_return 
+	_endif 
+	_local temp << _self.write_string.substitute_character(%0,space_char).trim_spaces().substitute_character(space_char,%0)
+
+	_if temp.last _is %.
+	_then
+		temp << temp.slice(1,temp.size-1)
+	_endif
+
+	_if temp.first _is %.
+	_then
+		temp << write_string("0",temp)
+	_endif
+	
+	out_stream.write(temp)
+_endmethod
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method float.convert_to_json()
+	_return _self
+_endmethod
+$
+

@@ -1,0 +1,212 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={database_validation})
+##
+## mss_aggregator_conflict_detector
+##
+## Subclass of conflict_detector which is used specifically for
+## aggregating data across different alternatives.
+##
+
+def_slotted_exemplar(:mss_aggregator_conflict_detector,
+{
+	{:true_parent_view, _unset, :readable},
+	{:true_base_view, _unset, :readable}
+},
+{:conflict_detector})
+$
+
+_pragma(classify_level=advanced, topic={database_validation})
+_method mss_aggregator_conflict_detector.new(a_view, true_parent_view, true_base_view)
+	## 
+	## Create a new conflict_detector to operate on A_VIEW.
+	## TRUE_PARENT_VIEW is the view being aggregated from, and
+	## TRUE_BASE_VIEW is the view that serves as the base for that
+	## parent (differences in TRUE_PARENT_VIEW relative to
+	## TRUE_BASE_VIEW will ultimately be copied in to A_VIEW).
+	##
+
+	_return _clone.init(a_view, true_parent_view, true_base_view)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={database_validation})
+_method mss_aggregator_conflict_detector.init(a_view, true_parent_view, true_base_view)
+	## 
+	## Initialise a new detector.
+	##
+
+	_super.init(a_view)
+	.true_parent_view << true_parent_view
+	.true_base_view << true_base_view
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={database_validation})
+_method mss_aggregator_conflict_detector.init_views()
+	##
+	## Open all the relevant views (child, base, parent). The views
+	## must not already be open (use terminate() to reset them)
+	##
+
+	_if .child_view _isnt _unset _orif
+	    .base_view _isnt _unset _orif
+	    .parent_view _isnt _unset
+	_then
+		_return
+	_endif
+
+	ok? << _false
+	_protect 
+		.child_view << .this_view.replicate()
+		.child_view.go_to_checkpoint(_self.pre_merge_checkpoint_name, :readonly, _false)
+
+		.parent_view << .true_parent_view.replicate()
+		.base_view << .true_base_view.replicate()
+
+		ok? << _true
+	_protection
+		_if _not ok?
+		_then
+			_self.terminate()
+		_endif
+	_endprotect
+
+	_self.have_post_mortem(_true)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={database_validation})
+_method mss_aggregator_conflict_detector.do_merge_and_cleanup()
+	## 
+	## Run the merge itself. The first result is the result merge()
+	## would have returned, the second is either a rope of conflict
+	## records for the operator, or _unset, in which case no operator
+	## intervention is needed. This method sorts out the checkpoint
+	## states so subesquent enquiries yield the right state
+	## information. This method does NOT terminate _self's views:
+	## the caller should do this when they are no longer of use.
+	##
+	## The new version will consist of self's changes since its
+	## base version combined with the differences in self's
+	## true_parent_view slot relative to self's true_base_view slot.
+	##
+
+	_return _self.do_merge_and_cleanup_for()
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={database_validation})
+_method mss_aggregator_conflict_detector.do_merge_and_cleanup_for()
+	## 
+	## Run the merge itself. The first result is the result merge()
+	## would have returned, the second is either a rope of conflict
+	## records for the operator, or _unset, in which case no operator
+	## intervention is needed. This method sorts out the checkpoint
+	## states so subesquent enquiries yield the right state
+	## information. This method does NOT terminate _self's views:
+	## the caller should do this when they are no longer of use.
+	##
+	## The new version will consist of self's changes since its
+	## base version combined with the differences in self's
+	## true_parent_view slot relative to self's true_base_view slot.
+	##
+	## Unlike superclass, there are no optional parameters.
+	##
+
+	_dynamic !auth_context!
+
+	_if (view << .this_view.auth_view) _isnt _unset
+	_then
+		view.disable_table_controls()
+	_endif
+	
+	# Perform the raw merging of data.
+	_self.init_views()
+	changed? << .this_view.int!mss_aggregator_merge(_self.pre_merge_checkpoint_name, .parent_view, .base_view)
+
+	#
+	# changed? reflects whether the parent had changed since base. If
+	# not, there can't be any conflicts, so just tidy up.
+	#
+	_if _not changed?
+	_then
+		.this_view.remove_checkpoint(_self.pre_merge_checkpoint_name)
+		_return _false, _unset
+	_endif
+
+	.state << :pre_cleanup
+	
+	#
+	# ramp up self to go and look for conflicts
+	#
+	roots << _self.force_cleanup(_true)
+
+	_if roots.size _is 0
+	_then roots << _unset
+	_else roots << _self.this_views_roots(roots)
+	_endif
+
+	_return _true, roots
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={database_validation})
+_method mss_aggregator_conflict_detector.prepare_for_cleanup(_optional check_conflict_flag?)
+	## 
+	## Unlike superclass, can't rely on prims to only report
+	## conflict changes (I think).  So, force that grunt work to be
+	## performed each time, by ignoring the setting of
+	## CHECK_CONFLICT_FLAG?.
+	##
+
+	_return _super.prepare_for_cleanup()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={database_validation})
+_method mss_aggregator_conflict_detector.refind_roots()
+	## 
+	## This is generally impossible, because any pre/post merge
+	## checkpoints cannot be guaranteed to be generated from a
+	## merge of self's current true_parent_view and true_base_view
+	## slots.
+	##
+
+	_return _self.refind_roots_for()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={database_validation})
+_method mss_aggregator_conflict_detector.refind_roots_for()
+	## 
+	## This is generally impossible, because any pre/post merge
+	## checkpoints cannot be guaranteed to be generated from a
+	## merge of self's current true_parent_view and true_base_view
+	## slots.
+	##
+
+	# Also, note that there is currently no way that a GUI could
+	# get things to this point (I hope), but if in the future such
+	# a GUI is ever attempted for allowing operator intervention of
+	# conflicts during aggregation, gently remind the developer...
+	condition.raise(:error, :string,
+			"Illegal method call: mss_aggregator_conflict_detector.refind_roots()")
+	
+_endmethod
+$

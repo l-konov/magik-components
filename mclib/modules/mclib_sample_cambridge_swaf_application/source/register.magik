@@ -1,0 +1,29 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-09 11:26:55 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-23-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+smallworld_product.register_application( :mclib_cam_db_swaf_professional,
+					 :application,
+					 :resource_module_name, :mclib_sample_cambridge_swaf_application,
+					 :html_help_file_name, "swafPro",
+					 :html_help_resource_module_name, :swaf_professional_application,
+					 :description, "Professional application with MCLIB items",
+					 :external_name, "Professional - Cambridge with Mclib",
+					 :ace_name, :|Electricity|,
+					 :default_application_coordinate_system_name, :uk_british_national_grid,
+					 :application_coordinate_system_unit, :mm
+		   )
+$

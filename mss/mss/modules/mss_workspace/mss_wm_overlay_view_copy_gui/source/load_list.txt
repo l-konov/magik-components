@@ -1,0 +1,2 @@
+mss_wm_overlay_view_copy_framework.magik
+mss_wm_overlay_view_copy_plugin.magik

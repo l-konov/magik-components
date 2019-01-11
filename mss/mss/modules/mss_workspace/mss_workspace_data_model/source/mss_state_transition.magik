@@ -1,0 +1,373 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_state_transition
+##
+## A state transition represents a progression between two
+## states in a workflow that describes the life cycle of a
+## job or design.
+##
+
+# Implementation note: this is not a datastore record - all
+# configuration for a workflow is defined in code.  The
+# following implementation is structured so that this could be
+# changed in the future.
+
+def_slotted_exemplar(:mss_state_transition,
+{
+	{:workflow, _unset, :readable},
+	{:record_type, _unset, :readable},
+	{:from_state_name, _unset, :readable},
+	{:to_state_name, _unset, :readable},
+	{:auth_groups, _unset, :readable},
+	{:pre_run_methods, _unset, :readable},
+	{:post_run_methods, _unset, :readable},
+	{:properties, _unset, :readable}
+},
+{:mss_workspace_record_mixin})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_state_transition.new(workflow, record_type, from_state_name, to_state_name,
+				 auth_groups, pre_run_methods, post_run_methods, _gather properties)
+	## 
+	## Create and return a new state transition for the given
+	## WORKFLOW.
+	## - RECORD_TYPE identifies what type of record this applies
+	##   to - it may be :job or :design.
+	## - FROM_STATE_NAME and TO_STATE_NAME identify the from and
+	##   to states.
+	## - AUTH_GROUPS is a vector of auth group names that can
+	##   perform this transition.  It may also have the following
+	##   special values:
+	##     - _unset : anybody can perform the transition.
+	##     - :none  : nobody can perform the transition.  This is
+	##                different than an empty vector, as this
+	##                setting will prevent even members of the
+	##                system_admin group from performing it.
+	## - PRE_RUN_METHODS is a vector of methods that will be
+	##   called on the record undergoing a state transition, before
+	##   the transition is performed.  These will be run before the
+	##   update transaction starts.
+	## - POST_RUN_METHODS is a vector of methods that will be
+	##   called on the record undergoing a state transition, after
+	##   the transition is performed.  These will be run as part of
+	##   the update transaction which is setting the new state value.
+	##   Therefore, the configurer must ensure that these methods are
+	##   sufficiently quick so as to not interfere with contention
+	##   for the short transaction database.
+	## - PROPERTIES is a series of key/value pairs, which may
+	##   contain the following keys:
+	##   - :require_confirmation? - if true, then the user must confirm
+	##        the state transition before it is performed.
+	##   - :merge_data? - if true, then the design data is merged before
+	##        the state transition is performed.
+	##   - :post_data? - if true, then the design data is posted after
+	##        the state transition is complete.  Note that if this is
+	##        true, then merge_data? is also assumed to be true.
+	##   - :post_complete_state - if specified, a transition to this
+	##        state will automatically be performed after the design
+	##        data has been successfully posted.  Note that it is the
+	##        configurers responsibility to define this state transition.
+	##   - :post_fail_state - if specified, a transition to this
+	##        state will automatically be performed after an attempt
+	##        to post the design data fails.  Note that it is the
+	##        configurers responsibility to define this state transition.
+	##
+
+	_if _not workflow.is_kind_of?(mss_workflow)
+	_then
+		_self.user_error(:no_workflow)
+	_endif
+	new_rec << _clone.init(workflow, record_type, from_state_name, to_state_name,
+			       auth_groups, pre_run_methods, post_run_methods, _scatter properties)
+	workflow.add_state_transition(new_rec)
+	
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_private _method mss_state_transition.init(workflow, record_type, from_state_name, to_state_name,
+					   auth_groups, pre_run_methods, post_run_methods, _gather properties)
+	## 
+	## 
+
+	.workflow << workflow
+	.record_type << record_type
+	.from_state_name << from_state_name
+	.to_state_name << to_state_name
+	.auth_groups << auth_groups
+	_if .auth_groups _is _unset _orif
+	    .auth_groups _is :none
+	_then
+		# Leave as-is.
+	_else
+		# Convert to an equality set.
+		.auth_groups << equality_set.new_from(.auth_groups)
+	_endif 
+	.pre_run_methods << pre_run_methods
+	.post_run_methods << post_run_methods
+	.properties << property_list.new_with(_scatter properties)
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_state_transition.perform_state_transition(rec, parms)
+	## 
+	## Perform self's state transition on job or design record REC.
+	## Note that the dynamic !mss_workspace_initiator! must be set
+	## to the object that is initiating this process.
+	##
+
+	_dynamic !mss_scheduler_initiator!
+	
+	# N.B.: this is explicitly not performing authorisation checks
+	# - system level processes may call this directly in order to
+	# perform transitions that are not normally allowed by the auth
+	# system.  If you want to call this with an authorisation wrapper,
+	# use mss_workspace_manager_engine.perform_state_transition()
+	# instead. 
+	
+	_if rec.source_collection.name _is :mss_design
+	_then 
+		# If REC is the active design, then ensure that work is saved.
+		_if (ad << mss_workspace_manager_engine.active_design) _isnt _unset _andif 
+		    rec.id = ad.id
+		_then
+			mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+		_endif
+
+		# Enforce singularity rules.
+		rec.validate_singular_state(.to_state_name)
+	_endif
+	
+	merge_data? << _self.get_property(:merge_data?).default(_false)
+	post_data? << _self.get_property(:post_data?).default(_false)
+	require_confirmation? << (_not post_data?) _and
+				 _self.get_property(:require_confirmation?).default(_false)
+
+	_if require_confirmation? _is _true
+	_then 
+		# Get confirmation before performing transition.
+		_if condition.raise(:mss_question, :string,
+				    _self.message(:confirm_state_change, rec.short_description, .from_state_name, .to_state_name),
+				    :button_labels, {_self.message(:ok), _self.message(:cancel)},
+				    :button_values, {:ok, :cancel}) _is :cancel
+		_then
+			!abort!()
+		_endif 
+	_endif
+	
+	_if merge_data? _is _true _orif
+	    post_data? _is _true
+	_then
+		# In order to merge or post data, REC must be a design, and it
+		# must be the active design.
+		rec.ensure_active_design()
+		
+		# Get confirmation before posting.
+		_if post_data? _is _true _andif
+		    condition.raise(:mss_question, :string, _self.message(:confirm_post),
+				    :button_labels, {_self.message(:ok), _self.message(:cancel)},
+				    :button_values, {:ok, :cancel}) _is :cancel
+		_then
+			!abort!()
+		_endif 
+
+		# At this point, perform a merge, and do not carry on if
+		# conflicts are found.  This is done intentionally: even though
+		# the following post_design() work will of course do a merge,
+		# by also doing the merge here we'll get conflicts dealt with
+		# before going too deep in the process.  Also, in the future,
+		# the post_design() may be handled by an application server.
+		gui_handler << parms[:gui_handler]
+		md_parms << property_list.new_with(:gui_handler, gui_handler,
+						   :during_post?, _true)
+		
+		# Just in case the above methods changed anything...
+		rec.ensure_active_design()
+		merge_ok?? << mss_workspace_manager_engine.merge_design(md_parms)
+		_if merge_ok?? _isnt _true
+		_then
+			# If we're waiting to handle conflicts at this point, give up.
+			_return _false
+		_endif
+	_endif
+
+	ok? << _false 
+	_protect 
+		# Perform the pre_run_methods outside of any transaction
+		# (although the configurer is of course free to put any updates
+		# they want within these methods, with whatever handling is
+		# appropriate for the action being performed).
+		_for meth_name _over .pre_run_methods.fast_elements()
+		_loop
+			rec.perform(meth_name, _self, parms)
+		_endloop
+		ok? << _true 
+	_protection
+		_if _not ok?
+		_then
+			_self.perform_pre_run_recovery(rec, parms)
+		_endif
+	_endprotect 
+
+	ok? << _false 
+	_protect 
+		# Do the status update and all post_run_methods in a transaction.
+		trans << mss_workspace_transaction.new(rec.source_view, _self,
+						       :|int!perform_state_transition_update_and_post_run()|,
+						       {rec, parms})
+		trans.run()
+
+		ok? << _true
+	_protection
+		_if _not ok?
+		_then
+			_self.perform_post_run_recovery(rec, parms)
+		_endif
+	_endprotect
+
+	# If REC is the active design, then reopen it to ensure that
+	# the mode (readonly/write) is set appropriately.  Defend
+	# against anything changing in the post_run_methods.
+	_if rec.is_valid? _andif
+	    (ad << mss_workspace_manager_engine.active_design) _isnt _unset _andif 
+	    rec.id = ad.id
+	_then
+		_handling mss_information _with procedure
+
+		# The following forces commits on all datasets, just in case
+		# the configurer has left anything hanging in the state
+		# transition methods.
+		mss_workspace_manager_engine.save_vmds_state()
+		mss_workspace_manager_engine.open_design(ad)
+	_endif
+
+	_if post_data? _is _true _andif
+	    mss_workspace_manager_engine.use_scheduler_for_post? _andif
+	    !mss_scheduler_initiator! _is _unset 
+	_then
+		# Defer the work to a task scheduler.  Be sure to close the
+		# design, since the task scheduler will grab it so that it can
+		# get writable access during the post process.
+		mss_workspace_manager_engine.open_design(_unset)
+		gui_handler << parms[:gui_handler]
+		mss_workspace_manager_engine.submit_post_design_task(
+			rec, 
+			property_list.new_with(:post_complete_state, _self.get_property(:post_complete_state),
+					       :post_fail_state, _self.get_property(:post_fail_state)))
+		_if gui_handler _isnt _unset
+		_then
+			gui_handler.show_message(_self.message(:scheduled_task_submitted, rec.short_description))
+		_endif
+		
+	_elif post_data? _is _true
+	_then
+		# At this point, perform a merge and post, and do not carry on if
+		# conflicts are found.
+		gui_handler << parms[:gui_handler]
+		pd_parms << property_list.new_with(:gui_handler, gui_handler,
+						   :during_post?, _true)
+		
+		# Just in case the above methods changed anything...
+		rec.ensure_active_design()
+
+		# Note that if any errors happen during the posting process, it
+		# makes for a nasty jam, since the state transition updates
+		# have already been performed against the short transaction
+		# database.  The following tries to get out of it using the
+		# post_fail_state property.
+		post_ok?? << _false 
+		_protect 
+			post_ok?? << mss_workspace_manager_engine.post_design(pd_parms)
+		_protection
+			_if post_ok?? _isnt _true
+			_then
+				_if (pfs << _self.get_property(:post_fail_state)) _isnt _unset
+				_then
+					next_trans << .workflow.get_state_transition(.record_type, rec.status, pfs)
+					next_trans.perform_state_transition(rec, parms)
+				_endif 
+			_endif
+		_endprotect
+		
+		_if post_ok?? _isnt _true
+		_then
+			# If we're waiting to handle conflicts at this point, give up.
+			_return _false
+		_endif
+
+		# There may be a post_complete_state: if so, transition to it.
+		_if (pcs << _self.get_property(:post_complete_state)) _isnt _unset
+		_then
+			next_trans << .workflow.get_state_transition(.record_type, rec.status, pcs)
+			next_trans.perform_state_transition(rec, parms)
+		_endif 
+	_endif
+
+	_return ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_state_transition.int!perform_state_transition_update_and_post_run(rec, parms)
+	## 
+	## Perform the parts of a state transition that go in a
+	## transaction.
+	##
+
+	# First, update the status value.
+	dr << rec.detached()
+	dr.status << .to_state_name
+	rec << dr.source_collection.update(dr)
+
+	# Next, run all post-run methods.
+	_for meth_name _over .post_run_methods.fast_elements()
+	_loop
+		_if rec.is_valid?
+		_then 
+			rec.perform(meth_name, _self, parms)
+		_endif 
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_state_transition.perform_pre_run_recovery(rec, parms)
+	## 
+	## Called after a failure while processing self's
+	## pre_run_methods.  Ideally those pre_run_methods should take
+	## care of their own recovery, but in particularly complex
+	## cases the configurer may perform additional work here.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_state_transition.perform_post_run_recovery(rec, parms)
+	## 
+	## Called after a failure while processing self's
+	## post_run_methods.  Ideally those post_run_methods should take
+	## care of their own recovery, but in particularly complex
+	## cases the configurer may perform additional work here.
+	##
+	
+_endmethod
+$

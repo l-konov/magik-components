@@ -1,0 +1,100 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_works.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to either roads or other road works,
+	## depending on the correlation mode.
+	##
+
+	_if cat _is :default
+	_then 
+		_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+		    corr_rwo.source_collection.name _is :min_road _andif
+		    corr_geom.geom_category _is :linear
+		_then
+			_return _true
+		_endif
+		_return _false
+	_elif cat _is :road_works
+	_then
+		_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+		    corr_rwo.source_collection.name _is :road_works _andif
+		    corr_geom.geom_category _is :point
+		_then
+			_return _true
+		_endif
+		_return _false
+	_endif 
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_works.mss_validate_parent_road_works(ptrule)
+	##
+	## Demonstration of a Pre Release action
+	##
+	## Validate that the pointing rule PTRULE has correlated on a
+	## road_works to use as the parent for self.
+	##
+
+	_if ptrule.user_data[:correlated_road_works] _isnt _unset
+	_then
+		# Already correlated.
+		_return
+	_endif
+	
+	_if (geom << ptrule.pdr_data[:last_correlation_geometry]) _is _unset _orif
+	    (geom_rwo << geom.rwo) _is _unset _orif
+	    geom_rwo.source_collection _isnt _self.source_collection
+	_then
+		condition.raise(:user_error, :string,
+				"Must correlate on a parent Road Works")
+	_endif
+
+	# Store away the correlated road_works, to forge a parent join later.
+	ptrule.user_data[:correlated_road_works] << geom_rwo
+
+	# Keep the pointing rule suspended for the duration of this
+	# one-shot PDR.  However, once that PDR is done, re-enabled it
+	# to allow the next pointing to prompt for attributes and insert.
+	ptrule.one_shot_properties[:suspended?] << _true
+	ptrule.one_rule_properties[:suspended?] << _false
+
+	# Set correlation category back to the default - this will
+	# cause the next pointing to snap to roads, rather than road works.
+	ptrule.one_rule_properties[:correlation_category] << :default
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_works.mss_relate_parent_road_works(ptrule)
+	##
+	## Demonstration of a Release action
+	##
+	## Relate self as the child of a road_works object previously
+	## correlated in pointing rule PTRULE.
+	## 
+
+	_if (parent << ptrule.user_data[:correlated_road_works]) _is _unset
+	_then
+		# This should not happen when properly paired with
+		# the mss_validate_parent_road_works() method.
+		condition.raise(:user_error, :string,
+				"Must correlate on a parent Road Works")
+	_endif
+	_self.road_works << parent
+	
+_endmethod
+$

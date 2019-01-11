@@ -1,0 +1,13 @@
+cam_mss_workspace	1
+
+description
+	Cambridge DB glue code for mss_workspace
+end
+
+requires
+	mss_workspace
+	cam_db_mss_wm_overlay_view
+	cam_db_mss_workspace_data_model
+	cam_db_mss_workspace_manager
+	cam_db_mss_workspace_tracking
+end

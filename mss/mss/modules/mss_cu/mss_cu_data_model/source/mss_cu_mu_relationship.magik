@@ -1,0 +1,131 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_mu_relationship
+##
+## A mss_cu_mu_relationship is the intersection record that
+## links a parent mss_cu_operation (associated with a Macro
+## Unit type of mss_cu_definition) to one or more child
+## mss_cu_operations. 
+##
+
+def_slotted_exemplar(:mss_cu_mu_relationship,
+{},
+{:mss_cu_ds_record})
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_mu_relationship.parent_cu_code_and_operation
+	## 
+	## 
+
+	_if (rec << _self.p_mss_cu_operation_definition) _isnt _unset
+	_then
+		_return rec.cu_code_and_operation
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_mu_relationship.child_cu_code_and_operation
+	## 
+	## 
+
+	_if (rec << _self.c_mss_cu_operation_definition) _isnt _unset
+	_then
+		_return rec.cu_code_and_operation
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_mu_relationship.cu_code
+	## 
+	## This is derived from the child operation definition.
+	##
+
+	_if (rec << _self.c_mss_cu_operation_definition) _isnt _unset
+	_then
+		_return rec.cu_code
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_mu_relationship.operation
+	## 
+	## This is derived from the child operation definition.
+	##
+
+	_if (rec << _self.c_mss_cu_operation_definition) _isnt _unset
+	_then
+		_return rec.operation
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_mu_relationship.description
+	## 
+	## This is derived from the child operation definition.
+	##
+
+	_if (rec << _self.c_mss_cu_operation_definition) _isnt _unset
+	_then
+		_return rec.description
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_relationship.general_validator()
+	## 
+	## Ensure that the combination of c_mss_cu_operation_definition_id and
+	## p_mss_cu_operation_definition_id is unique.  Ensure that the
+	## parent CU is a Macro Unit type of CU.
+	##
+
+	pred << predicate.eq(:c_mss_cu_operation_definition_id, _self.c_mss_cu_operation_definition_id) _and
+		predicate.eq(:p_mss_cu_operation_definition_id, _self.p_mss_cu_operation_definition_id)
+	_for i _over _self.source_collection.select(pred).fast_elements()
+	_loop
+		_if i.id ~= _self.id
+		_then
+			_self.user_error(:duplicate_cu_mu_relationship)
+		_endif
+	_endloop
+
+	_if (op << _self.p_mss_cu_operation_definition) _is _unset _orif
+	    (cu << op.mss_cu_definition) _is _unset _orif
+	    cu.usage ~= mss_cu_engine.macro_unit_usage_value
+	_then
+		_self.user_error(:parent_is_not_macro_unit)
+	_endif
+	
+	_return _true
+	
+_endmethod
+$

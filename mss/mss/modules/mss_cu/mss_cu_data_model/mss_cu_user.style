@@ -1,0 +1,275 @@
+#% text_encoding = utf8
+#Style Dump
+#V3.2
+_package sw
+
+_block
+!current_package!.define_variable(:bc,_unset)
+!current_package!.define_variable(:c,_unset)
+!current_package!.define_variable(:cbt,_unset)
+!current_package!.define_variable(:cell_ec,_unset)
+!current_package!.define_variable(:cell_nc,_unset)
+!current_package!.define_variable(:cell_vc,_unset)
+!current_package!.define_variable(:crs,_unset)
+!current_package!.define_variable(:crs?,_unset)
+!current_package!.define_variable(:fbc,_unset)
+!current_package!.define_variable(:fc,_unset)
+!current_package!.define_variable(:fd,_unset)
+!current_package!.define_variable(:ffc,_unset)
+!current_package!.define_variable(:g,_unset)
+!current_package!.define_variable(:gat,_unset)
+!current_package!.define_variable(:gc,_unset)
+!current_package!.define_variable(:gh,_unset)
+!current_package!.define_variable(:glt,_unset)
+!current_package!.define_variable(:gpt,_unset)
+!current_package!.define_variable(:grt,_unset)
+!current_package!.define_variable(:gtt,_unset)
+!current_package!.define_variable(:hc,_unset)
+!current_package!.define_variable(:l,_unset)
+!current_package!.define_variable(:lbt,_unset)
+!current_package!.define_variable(:lh,_unset)
+!current_package!.define_variable(:nd,_unset)
+!current_package!.define_variable(:np,_unset)
+!current_package!.define_variable(:r,_unset)
+!current_package!.define_variable(:rlt,_unset)
+!current_package!.define_variable(:rmit,_unset)
+!current_package!.define_variable(:rmt,_unset)
+!current_package!.define_variable(:rm_id,_unset)
+!current_package!.define_variable(:rst,_unset)
+!current_package!.define_variable(:sh,_unset)
+!current_package!.define_variable(:sid,_unset)
+!current_package!.define_variable(:sr,_unset)
+!current_package!.define_variable(:stk,_unset)
+!current_package!.define_variable(:sw,_unset)
+!current_package!.define_variable(:syt,_unset)
+!current_package!.define_variable(:t,_unset)
+!current_package!.define_variable(:tbt,_unset)
+!current_package!.define_variable(:xh,_unset)
+!current_package!.define_variable(:xlt,_unset)
+_endblock
+$
+rst << !current_dsview!.collections[:sw_gis!rwo_style]
+glt << !current_dsview!.collections[:sw_gis!gis_line_style]
+gat << !current_dsview!.collections[:sw_gis!gis_area_style]
+gtt << !current_dsview!.collections[:sw_gis!gis_text_style]
+gpt << !current_dsview!.collections[:sw_gis!gis_point_style]
+grt << !current_dsview!.collections[:sw_gis!gis_raster_style]
+syt << !current_dsview!.collections[:sw_gis!symbol_component]
+!loader!.n_read<<10
+$
+xlt << !current_dsview!.collections[:sw_gis!crosshatch_layer]
+cbt << colour_bundle_table.open(!current_dsview!,"default")
+cbt.bundle_for({100,0,0})
+lbt <<  !current_dsview!.collections[:sw_gis!line_bundle]
+tbt <<  !current_dsview!.collections[:sw_gis!text_bundle]
+rlt <<  !current_dsview!.collections[:sw_gis!raster_style_layer]
+rmt <<  !current_dsview!.collections[:sw_gis!range_map]
+rmit << !current_dsview!.collections[:sw_gis!range_map_item]
+!loader!.n_read<<20
+$
+
+lh << !style_load_caches!
+np << {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+nd << {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0}
+stk << hash_table.new(10)
+
+_global crs << _proc @crs(table, style_name, rwo_name, app_name, style_type, scale, sub_code, geom_code,
+			  style_method, draw_method, style_id)
+		       _dynamic !overwrite_styles?!
+		       _dynamic !loader!
+
+		       m << _allresults !loader!.mapping_for(style_name, rwo_name, app_name, style_type, scale)
+
+		       _if m.size < 1 _then _return _endif
+		       v << m.concatenation(m, {sub_code, geom_code, style_method, draw_method, style_id, _unset })
+
+		       _if !overwrite_styles?!
+		       _then res << table.insert_or_update(v)
+		       _else res << table.insert(v)
+		       _endif
+		       _if res _isnt _unset _then !loader!.n_loaded+<<1 _endif
+_endproc
+$
+!loader!.n_read<<45
+$
+
+_global gh << _proc @gh(id)
+		       _global lh
+
+		       _for c _over lh.fast_elements()
+		       _loop
+		           _if (sid << c[id]) _isnt _unset _then _return sid _endif
+		       _endloop
+		       _return 0
+_endproc
+$
+!loader!.n_read<<58
+$
+
+_global sh << _proc @sh(id, sid)
+		       _global lh
+
+		       _local tc
+		       _for c _over lh.fast_elements()
+		       _loop
+		           _if c.size < 10000 _then tc << c; _leave _endif
+		       _finally
+		           lh.add_last(tc << equality_hash_table.new(500))
+		       _endloop
+		       _return (tc[id] << sid)
+_endproc
+$
+!loader!.n_read<<74
+$
+
+t<<tbt.insert({_unset,"plain",4.000,1.000,1,_unset}).text_id
+sh(395049,t)
+c<<cbt.bundle_for({100,0,0}).colour_id
+!loader!.n_read<<80
+$
+sh(98773,c)
+ffc<<cbt.bundle_for({100,100,100}).colour_id
+sh(21494,ffc)
+sid<<gat.insert({_unset,"",nd,_true,100,"",ffc,0,_false,0,_false,0,_unset}).style_id
+sh(395050,sid)
+sid<<gtt.insert({_unset,"",nd,t,c,sid,_true,64,_unset}).style_id
+sh(395055,sid)
+crs(rst,"Default","mss_cu_work_point","annotation","highlight","Auto",0,6,"","",sid,_unset)
+!loader!.n_read<<90
+$
+c<<cbt.bundle_for({0,0,0}).colour_id
+sh(4496,c)
+sid<<gtt.insert({_unset,"",nd,gh(395049),c,0,_true,64,_unset}).style_id
+sh(395060,sid)
+crs(rst,"Default","mss_cu_work_point","annotation","normal","Auto",0,6,"","",sid,_unset)
+l<<lbt.insert({_unset,"solid",np,"butt","miter",1,_unset}).line_id
+sh(395061,l)
+sid<<glt.insert({_unset,"",nd,l,1,0,_unset}).style_id
+!loader!.n_read<<100
+$
+sh(395070,sid)
+sid<<gat.insert({_unset,"",nd,_false,0,"",1,0,_true,sid,_false,0,_unset}).style_id
+sh(395071,sid)
+crs(rst,"Default","mss_cu_work_point","extent","highlight","Auto",0,1,"","",sid,_unset)
+fc<<cbt.bundle_for({56,56,56}).colour_id
+sh(107729,fc)
+sid<<glt.insert({_unset,"",nd,gh(395061),fc,0,_unset}).style_id
+sh(395080,sid)
+!loader!.n_read<<110
+$
+sid<<gat.insert({_unset,"",nd,_false,0,"",gh(4496),0,_true,sid,_false,0,_unset}).style_id
+sh(395081,sid)
+crs(rst,"Default","mss_cu_work_point","extent","normal","Auto",0,1,"","",sid,_unset)
+crs? << !loader!.create_sym?("mss_cu_work_point")
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+sw<<!current_dsview!.create_world("gis symbols","mss_cu_work_point",:units, :um)
+!current_world! << sw
+_endif
+!loader!.n_read<<122
+$
+!current_world!<<!current_dsview!.world("gis symbols","mss_cu_work_point")
+sr<<sector_rope.new_with(sector.new_with(coordinate(0.00000000000,0.00000000000)))
+fd<<!current_dsview!.geometry_field_for(:symbol_definition,:name)
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g<<text.new_with_sectors(fd,sr,"mss_cu_work_point")
+g.just<<22
+_endif
+!loader!.n_read<<133
+$
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g.meta_data_id<<0
+syt.insert({"mss_cu_work_point",1,6,g.text_id,0,_unset})
+_endif
+!loader!.n_read<<141
+$
+sr<<sector_rope.new_with(sector.new_with(coordinate(0.00000000000,0.00000000000)))
+fd<<!current_dsview!.geometry_field_for(:symbol_definition,:datum)
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g<<simple_point.new_with_sectors(fd,sr)
+_endif
+!loader!.n_read<<150
+$
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g.meta_data_id<<0
+syt.insert({"mss_cu_work_point",2,3,g.point_id,0,_unset})
+_endif
+!loader!.n_read<<158
+$
+sr<<sector_rope.new_with(sector.new_with(coordinate(-5000.00000000,-5000.00000000),coordinate(-5000.00000000,5000.00000000),
+coordinate(5000.00000000,5000.00000000),coordinate(5000.00000000,-5000.00000000),
+coordinate(-5000.00000000,-5000.00000000)))
+fd<<!current_dsview!.geometry_field_for(:symbol_definition,:boundary)
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g<<simple_area.new_with_sectors(fd,sr)
+_endif
+!loader!.n_read<<169
+$
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g.meta_data_id<<0
+syt.insert({"mss_cu_work_point",3,1,g.area_id,0,_unset})
+_endif
+!loader!.n_read<<177
+$
+sr<<sector_rope.new_with(sector.new_with(coordinate(-5000.00000000,5000.00000000),coordinate(5000.00000000,5000.00000000),
+coordinate(5000.00000000,-5000.00000000),coordinate(-5000.00000000,-5000.00000000),
+coordinate(-5000.00000000,5000.00000000)))
+fd<<!current_dsview!.geometry_field_for(:symbol_definition,:symbol_area)
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+g<<simple_area.new_with_sectors(fd,sr)
+_endif
+!loader!.n_read<<188
+$
+_if crs?
+_then
+_dynamic !current_dsview!,!current_world!,!style_load_hash!,!loader!,!overwrite_styles?!
+ffc<<cbt.bundle_for({75,75,75}).colour_id
+sh(21498,ffc)
+l<<lbt.insert({_unset,"solid",np,"butt","miter",0,_unset}).line_id
+sh(395082,l)
+sid<<glt.insert({_unset,"",nd,l,gh(21498),0,_unset}).style_id
+sh(395083,sid)
+sid<<gat.insert({_unset,"",nd,_true,100,"",ffc,0,_true,sid,_false,0,_unset}).style_id
+sh(395084,sid)
+g.meta_data_id<<sid
+syt.insert({"mss_cu_work_point",4,1,g.area_id,sid,_unset})
+_endif
+!loader!.n_read<<204
+$
+sid<<gpt.insert({_unset,"fixed_size()",nd,0,0,_false,0.2000,0,{-1.000,-1.000,1.000,1.000},
+1,"mss_cu_work_point",_unset}).style_id
+sh(395089,sid)
+crs(rst,"Default","mss_cu_work_point","location","highlight","Auto",0,3,"","",sid,_unset)
+!loader!.n_read<<210
+$
+sid<<gpt.insert({_unset,"fixed_size()",nd,0,0,_false,0.2000,0,{-1.000,-1.000,1.000,1.000},
+0,"mss_cu_work_point",_unset}).style_id
+sh(395094,sid)
+crs(rst,"Default","mss_cu_work_point","location","normal","Auto",0,3,"","",sid,_unset)
+l<<lbt.insert({_unset,"solid",np,"butt","miter",0,_unset}).line_id
+sh(395095,l)
+sid<<glt.insert({_unset,"",nd,l,1,0,_unset}).style_id
+sh(395096,sid)
+!loader!.n_read<<220
+$
+crs(rst,"Default","mss_cu_work_point","route","highlight","Auto",0,2,"","",sid,_unset)
+sid<<glt.insert({_unset,"",nd,gh(395095),gh(107729),0,_unset}).style_id
+sh(395101,sid)
+crs(rst,"Default","mss_cu_work_point","route","normal","Auto",0,2,"","",sid,_unset)
+
+$

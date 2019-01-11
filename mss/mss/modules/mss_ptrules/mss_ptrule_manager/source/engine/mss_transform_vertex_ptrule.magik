@@ -1,0 +1,293 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_transform_vertex_ptrule
+##
+## Pointing rule to transform a single vertex of a chain or area.
+##
+
+def_slotted_exemplar(:mss_transform_vertex_ptrule,
+{
+	{:main_geometry, _unset, :readable}
+},
+{:mss_transform_ptrule})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.core_default_properties
+	## 
+	## 
+
+	_local pl << _super.core_default_properties.copy()
+	pl[:do_manifold_interaction?] << _true
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.disconnect_before_transform?
+	## 
+	## If true, the geometry will be disconnected at the node being moved.
+	##
+
+	_return .manager.get_option(:move_disconnect_before_transform?).default(_false)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.draw_connected_geometries?
+	##
+	## Not required here - this subclass takes care of it.
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.int!press(a_window, pos)
+	## 
+	## 
+
+	# Ensure that seg probes are enabled.
+	pdr << .pdr_data
+	tr << a_window.user_data.trail
+	tr.clear_one_shot_probe()
+	tr.set_one_shot_probe(:seg, _true)
+	
+	_protect
+		.main_geometry << _unset 
+		_super.int!press(a_window, pos)
+	_protection 
+		tr.clear_one_shot_probe()
+	_endprotect
+
+	# The following manipulations adjust the initial correlation
+	# data to the nearest vertex of the selection.
+	_if (mg << .main_geometry) _isnt _unset
+	_then
+		v1 << mg.vertex_near(pdr[:start_pos])
+		pdr[:int!rotation_offset] << v1 - pdr[:start_pos]
+		pdr[:start_pos] << v1
+		pdr[:last_pos] << v1
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.int!drag(a_window, pos)
+	## 
+	## 
+
+	_dynamic !mss_transform_override! << .pdr_data[:start_pos]
+
+	_super.int!drag(a_window, pos)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.int!release(a_window, pos)
+	## 
+	## 
+
+	_dynamic !current_world!
+	_dynamic !current_dsview!
+	_dynamic !mss_transform_override! << .pdr_data[:start_pos]
+	
+	_if _self.disconnect_before_transform?
+	_then
+		# If the near node exists, disconnect there.  Note that in this
+		# case, current_selection must be a single element.
+		_if (near_node << .pdr_data[:near_node]) _isnt _unset
+		_then
+			cur_geom << .current_selection.an_element()
+			!current_world! << cur_geom.world
+			!current_dsview! << cur_geom.source_view
+			cur_geom.disconnect_from_manifold_at(near_node)
+		_endif
+	_endif 
+
+	_super.int!release(a_window, pos)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.perform_transform()
+	## 
+	## Perform the work of transforming all elements.
+	##
+
+	_super.perform_transform()
+	
+	# After the transform is complete, ensure that all geometries
+	# bounds are correct.  This will normally be true, but may not
+	# be so if multiple top-level geometries share a link that has
+	# a single non-node vertex transformed.
+	recalc_geoms << equality_set.new()
+	_for a_geom _over .current_selection.fast_elements()
+	_loop
+		_if _not a_geom.is_valid? _then _continue _endif
+		recalc_geoms.add(a_geom)
+		recalc_geoms.add_all(a_geom.all_connected_geometry())
+	_endloop
+	
+	recalc_polys << equality_set.new()
+	_for a_geom _over recalc_geoms.fast_elements()
+	_loop
+		_if a_geom.class_name _is :area
+		_then
+			_for i _over a_geom.polygons(_false)
+			_loop
+				recalc_polys.add(i)
+			_endloop 
+		_endif 
+		(new_bounds, changed?) << a_geom.calculate_bounds()
+		_if changed? _is _true
+		_then
+			a_geom.bounds_changed()
+		_endif
+	_endloop
+	
+	# Perform the same bounds-updating-if-needed on each polygon.
+	# This caters to the specific case where a link is shared
+	# between multiple polygons, and a non-node vertex on that link
+	# was transformed.
+	_for a_poly _over recalc_polys.fast_elements()
+	_loop
+		(new_bounds, changed?) << a_poly.calculate_bounds()
+		_if changed? _is _true
+		_then
+			a_poly.bounds_changed()
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.figure_current_selection_from_map(a_window, pos, cs)
+	##
+	## Given the current map selection CS, initialize self's
+	## selection information.
+	##
+
+	r << rope.new()
+	_for test_geom _over cs.fast_elements()
+	_loop 
+		_if {:area, :linear}.includes?(test_geom.geom_category)
+		_then
+			r.add_last(test_geom)
+			_if r.size > 1
+			_then
+				condition.raise(:user_error, :string, _self.message(:single_geometry_from_map))
+			_endif
+		_endif
+	_endloop 
+
+	_if r.size = 1
+	_then
+		# Do a sanity check here: it is possible that the user has
+		# selected a geometry that is way off the map, has forgotten
+		# about it, and is now pointing to a different geometry
+		# expecting to transform it.  If POS is too far away from the
+		# selected geometry (relative to the screen size), raise an error.
+		sel_geom << r[1]
+		dist << pos.distance_to(r[1])
+
+		# Tolerance for this is 100 pixels.
+		tol_dist << a_window.world_for(coordinate.new(0, 0)).
+			    distance_to(a_window.world_for(coordinate.new(100, 0)))
+		_if dist > tol_dist
+		_then
+			condition.raise(:user_error, :string, _self.message(:pointing_too_far_from_geom))
+		_endif 
+		_super.figure_current_selection_from_map(a_window, pos, r)
+		_self.add_connected_geometry_to_current_selection()
+	_else
+		_self.figure_current_selection_from_pointing(a_window, pos)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.figure_current_selection_from_pointing(a_window, pos)
+	##
+	## Initialize self's selection information from a correlated
+	## geometry at the specified pointing.
+	##
+
+	_super.figure_current_selection_from_pointing(a_window, pos)
+	_self.add_connected_geometry_to_current_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.add_connected_geometry_to_current_selection()
+	## 
+	## 
+
+	# If connected at a geometry node, then add all connected
+	# geometry at the node.
+	test_corr_geom << .main_geometry << .current_selection.an_element()
+	corr_info << _self.get_correlation_information(_unset, _unset, :select)
+	adj_pos << corr_info[:adj_pos]
+	
+	_if (v1 << test_corr_geom.vertex_near(adj_pos)) _isnt _unset _andif 
+	    (near_node << test_corr_geom.nearest_node(v1, 1.5)) _isnt _unset
+	_then
+		_if _self.disconnect_before_transform? _is _false
+		_then
+			_for addl_geom _over near_node.top_level_geoms()
+			_loop
+				_if addl_geom ~= test_corr_geom
+				_then
+					.current_selection.add(addl_geom)
+				_endif
+			_endloop
+		_endif 
+	_endif
+	.pdr_data[:near_node] << near_node
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_vertex_ptrule.single_geometry_ok?(test_corr_geom)
+	## 
+	## Return true if TEST_CORR_GEOM is OK for transforming.
+	## Otherwise, returns false plus a reason code.
+	##
+
+	_if _not {:area, :linear}.includes?(test_corr_geom.geom_category)
+	_then
+		_return _false, :wrong_category
+	_endif
+
+	corr_info << _self.get_correlation_information(_unset, _unset, :select)
+	adj_pos << corr_info[:adj_pos]
+	_if test_corr_geom.vertex_near(adj_pos) _is _unset
+	_then
+		_return _false, :no_vertex
+	_endif
+	
+	_return _super.single_geometry_ok?(test_corr_geom)
+	
+_endmethod
+$

@@ -1,0 +1,240 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_design.mss_cu_work_points()
+	##
+	## Return a collection of mss_cu_work_point objects associated
+	## with self.  This automatically also includes work points in
+	## parent and child designs.
+	##
+
+	s << equality_set.new()
+	_if (wpt << mss_cu_engine.work_point_table) _is _unset
+	_then
+		_return s
+	_endif
+	
+	des_ids << mss_cu_work_point.mss_design_ids_for_uniqueness_check(_self)
+	_for i _over des_ids.fast_elements()
+	_loop
+		pred << predicate.eq(:mss_design_id, i)
+		s.add_all(wpt.select(pred))
+	_endloop
+
+	_return s
+
+_endmethod
+$
+	
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_design.delete_mss_cu_work_points(a_transition, parms)
+	## 
+	## This state transition function will delete all
+	## mss_cu_work_point records associated with self.
+	## A_TRANSITION is the mss_state_transition initiating this,
+	## and PARMS is a property list of parameters passed  to the
+	## perform_state_transition() method. 
+	##
+	
+	_self.perform_as_writable_active_design(:|int!delete_mss_cu_work_points()|,
+						a_transition, parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_design.int!delete_mss_cu_work_points(a_transition, parms)
+	##
+	## Perform work of delete_mss_cu_work_points() method.
+	## Refer to that method for comments.
+	##
+	
+	_for i _over _self.mss_cu_work_points().fast_elements()
+	_loop
+		_if i.is_valid?
+		_then
+			i.delete()
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_design.delete_all_cu_references(a_transition, parms)
+	## 
+	## This state transition function will delete all
+	## mss_cu_reference records.  A_TRANSITION is the mss_state_transition
+	## initiating this, and PARMS is a property list of parameters passed
+	## to the perform_state_transition() method.
+	##
+
+	_self.perform_as_writable_active_design(:|int!delete_all_cu_references()|,
+						a_transition, parms)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_design.int!delete_all_cu_references(a_transition, parms)
+	##
+	## Perform work of delete_all_cu_references() method.
+	## Refer to that method for comments.
+	##
+	
+	# Get all mss_cu_reference records for self and all parent designs.
+	_for track_data _over _self.tracked_records(_true, _unset, _unset, :mss_cu_reference).fast_elements()
+	_loop
+		_if (cu_rec << track_data[2]) _is _unset _orif
+		    _not cu_rec.is_valid?
+		_then
+			_continue
+		_endif
+		cu_rec.delete()
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_design.delete_non_material_cu_references(a_transition, parms)
+	## 
+	## This state transition function will delete all
+	## mss_cu_reference records which are not of the material type
+	## (i.e. labor, equipment).  A_TRANSITION is the mss_state_transition
+	## initiating this, and PARMS is a property list of parameters passed
+	## to the perform_state_transition() method.
+	##
+
+	_self.perform_as_writable_active_design(:|int!delete_non_material_cu_references()|,
+						a_transition, parms)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_design.int!delete_non_material_cu_references(a_transition, parms)
+	##
+	## Perform work of delete_non_material_cu_references() method.
+	## Refer to that method for comments.
+	##
+	
+	tt << text_translator.translator_for_enumerator(:mss_cu_usage_type)
+	mat_value << tt.translation_for_value("Material")
+	
+	# Get all mss_cu_reference records for self and all parent designs.
+	_for track_data _over _self.tracked_records(_true, _unset, _unset, :mss_cu_reference).fast_elements()
+	_loop
+		_if (cu_rec << track_data[2]) _is _unset _orif
+		    _not cu_rec.is_valid?
+		_then
+			_continue
+		_endif
+		_if (real_rec << track_data[1]) _is _unset
+		_then
+			# CUs without a real record get deleted.
+			cu_rec.delete()
+			_continue
+		_endif
+			
+		_if (cu_def << mss_cu_engine.cu_definition_for_code(cu_rec.cu_code)) _is _unset
+		_then
+			# If there is no definition, it should be deleted.
+			cu_rec.delete()
+			_continue
+		_endif
+		_if cu_def.usage ~= mat_value
+		_then
+			cu_rec.delete()
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_design.process_cu_state_transition(a_transition, parms)
+	## 
+	## This state transition function will retrieve all
+	## mss_cu_reference records, and perform the
+	## mss_process_cu_state_transition() function on each record
+	## associated with each CU.  A_TRANSITION is the mss_state_transition
+	## initiating this, and PARMS is a property list of parameters passed
+	## to the perform_state_transition() method.
+	##
+
+	_self.perform_as_writable_active_design(:|int!process_cu_state_transition()|,
+						a_transition, parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_design.int!process_cu_state_transition(a_transition, parms)
+	##
+	## Perform work of process_cu_state_transition() method.
+	## Refer to that method for comments.
+	##
+	
+	# Get all mss_cu_reference records for self and all parent designs.
+	_for track_data _over _self.tracked_records(_true, _unset, _unset, :mss_cu_reference).fast_elements()
+	_loop
+		_if (real_rec << track_data[1]) _is _unset _orif
+		    _not real_rec.is_valid?
+		_then
+			_continue
+		_endif
+		_if (cu_rec << track_data[2]) _is _unset _orif
+		    _not cu_rec.is_valid?
+		_then
+			_continue
+		_endif
+		
+		real_rec.mss_process_cu_state_transition(cu_rec, a_transition, parms)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_design.disassociate_cu_references(a_transition, parms)
+	## 
+	## This state transition function will retrieve all
+	## mss_cu_reference records, and disassociate them from this
+	## design.  Intended for use by data maintenance-type jobs
+	## which are regularly reused.
+	##
+
+	_self.perform_as_writable_active_design(:|int!disassociate_cu_references()|,
+						a_transition, parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_design.int!disassociate_cu_references(a_transition, parms)
+	##
+	## Perform work of disassociate_cu_references() method.
+	## Refer to that method for comments.
+	##
+	
+	# Get all mss_cu_reference records for self.
+	_for track_data _over _self.tracked_records(_false, _unset, _unset, :mss_cu_reference).fast_elements()
+	_loop
+		_if (cu_rec << track_data[2]) _is _unset _orif
+		    _not cu_rec.is_valid?
+		_then
+			_continue
+		_endif
+		cu_rec.mss_design_id << 0
+	_endloop
+	
+_endmethod
+$

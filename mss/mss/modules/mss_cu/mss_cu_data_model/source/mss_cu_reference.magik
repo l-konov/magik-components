@@ -1,0 +1,211 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_reference
+##
+## A record that tracks the existence of a Compatible Unit
+## related to any database record.
+##
+
+def_slotted_exemplar(:mss_cu_reference,
+{},
+{:mss_record_tracking_ds_record, :mss_cu_record_mixin})
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+mss_cu_reference.define_shared_constant(
+	:mss_complex_key_table_name,
+	## Table name used to store complex key values.
+	:mss_cu_reference_complex_key,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_reference.mss_complex_key_record
+	## 
+	## The record used to store complex key values.
+	##
+
+	_return _self.mss_cu_reference_complex_key
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_reference.mss_track_record?()
+	##
+	## These should never be tracked.
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_reference.mss_cus_allowed?()
+	##
+	## CUs cannot have more CUs as associated objects.
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_reference.make_sysid()
+	## 
+	## Use a separate mss_cu_reference UVA for
+	## generating these values.
+	##
+
+	_return _self.source_view.uvas[:mss_cu_reference].get()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_cu_reference.field_scores_for_index
+	##
+	## Returns a vector containing appropriate scores for each
+	## field to be used in index selection for a predicate
+	## selection.
+	##
+	## All other things being equal, prefer the index on record_id,
+	## as the index on mss_design_id will return potentially many
+	## results. 
+	##
+	## This implementation defines a method on the actual class so
+	## that subsequent calls will use that.
+	##
+
+	v << _self.physical_fields.copy()
+	_for i,f _over v.keys_and_elements()
+	_loop
+		v[i] << _if f.name _is :record_id
+			_then >> 8
+			_elif f.name _is :mss_design_id
+			_then >> 4
+			_elif f.type.enumerator _is _unset
+			_then >> 5
+			_else >> 3
+			_endif
+	_endloop
+	_self.define_shared_constant(:field_scores_for_index, v, _false)
+	_self.dd!add_derived_method(:field_scores_for_index)
+	
+	>> v
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_reference.new(rec, design, cu_attrs)
+	## 
+	## Create and return a new record to associate a CU reference
+	## to any database record REC, in the mss_design record DESIGN
+	## (optional).  CU_ATTRS is a property list of attributes for
+	## the new mss_cu_reference record.
+	##
+	## This can be called on the exemplar.
+	##
+
+	_if (tid << rec.mss_tid) _is _unset _orif
+	    tid <= 0
+	_then
+		_self.user_error(:no_tid, rec)
+	_endif 
+	_if (track_tbl << _self.source_collection) _is _unset
+	_then
+		track_tbl << rec.source_view.collections[_self.class_name]
+	_endif
+	ndr << track_tbl.new_detached_record()
+	ndr.record_tid << tid
+	_if design _isnt _unset
+	_then
+		_if design.species _is 1.species
+		_then
+			ndr.mss_design_id << design
+		_else 
+			ndr.mss_design_id << design.id
+		_endif 
+	_else
+		ndr.mss_design_id << 0
+	_endif
+
+	# Set default for mss_cu_work_point_id if needed.
+	_if cu_attrs[:mss_cu_work_point_id] _is _unset
+	_then
+		cu_attrs[:mss_cu_work_point_id] << 0
+	_endif
+	
+	_for attr_name _over {:mss_cu_work_point_id, :cu_code, :operation, :work_point_number,
+			      :quantity, :unit_multiplier}.fast_elements()
+	_loop
+		attr_val << cu_attrs[attr_name]
+		ndr.perform(attr_name.with_chevron, attr_val)
+	_endloop
+	ndr.maintain_work_point_for_insert(rec)
+	
+	_return _self.insert_tracking_record(rec, ndr)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_reference.mss_design
+	## 
+	## Return the mss_design record that owns self.
+	##
+
+	_return mss_workspace_manager_engine.design_table.at(_self.mss_design_id)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_reference.maintain_work_point_for_insert(rec)
+	##
+	## This currently does nothing: it is possible that at some
+	## point I'll maintain the mss_cu_work_point_id to point to the
+	## work point associated with self, but for now this is
+	## done on-the-fly.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_reference.mss_cu_work_point()
+	## 
+	## Return the mss_cu_work_point record associated with self.
+	##
+
+	_if (des << _self.mss_design) _is _unset _orif
+	    (tbl << mss_cu_engine.work_point_table) _is _unset 
+	_then
+		_return _unset
+	_endif
+	ids << mss_cu_work_point.mss_design_ids_for_uniqueness_check(des)
+	wpn << _self.work_point_number
+	_for i _over ids.fast_elements()
+	_loop
+		pred << predicate.eq(:mss_design_id, i) _and
+			predicate.eq(:work_point_number, wpn)
+		_if (rec << tbl.select(pred).an_element()) _isnt _unset
+		_then
+			_return rec
+		_endif
+	_endloop
+	_return _unset
+	
+_endmethod
+$

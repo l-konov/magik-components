@@ -1,0 +1,52 @@
+#% text_encoding = iso8859_1
+# Filename: K2890_0.magik
+# Patch-Number: 2890
+# Fixes-Bug-Numbers: 2890
+# Reinhard Hahn
+# Date: 21.09.2011
+# Product: Assistenten: 
+# Topic:  
+# Release-Notes:
+# Benutzer der Assistenten starten häufig neue Assistenten ohne
+# die alten zu stoppen. Im Prinzip kann man im
+# Assistentenstapel wieder zurück auf frühere Assistenten. Da
+# diese Funktion aber kaum genutzt wird, begrenzen wir die
+# Stapeltiefe auf maximal 3 Assistenten, zugunsten eines
+# geringeren Speicherverbrauchs.
+
+sw!patch_software(:mss_ptrule_manager,1)
+$
+
+_package user
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.init(name, a_framework)
+	## 
+	## 
+
+	_super.init(name, a_framework)
+
+	.current_mgf << _unset
+	.current_map_view << _unset
+	.enabled? << _false
+	
+# OLD:
+#	.ptrule_stack << limited_stack.new(100)
+# END
+# NEW:
+	.ptrule_stack << limited_stack.new(3)
+# END
+	.correlation_information << property_list.new()
+	.construction_manager << _unset 
+	.probes << rope.new_for(10)
+
+	_self.init_interaction_modes()
+	_self.init_options()
+	
+	_return _self
+	
+_endmethod
+$
+
+sw!declare_custom_patch(2890,0,"Assistenten: Maximale Stapeltiefe auf 3 verkleinern")
+$

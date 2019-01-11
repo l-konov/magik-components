@@ -1,0 +1,10 @@
+mss_cu_engine	1
+
+description
+	MSS compatible units processing engine
+end
+
+requires
+	mss_core_changes
+	mss_cu_data_model
+end

@@ -1,0 +1,28 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method dd_record_mixin.mss_cu_tracking_trigger(type, old_rec)
+	##
+	## Delete CUs when a record that owns CUs is deleted.
+	##
+
+	_if type _is :delete
+	_then
+		_if _self.mss_cus_allowed?()
+		_then
+			_for i _over mss_cu_reference.tracking_records_for(_self).elements()
+			_loop
+				i.delete()
+			_endloop
+		_endif 
+	_endif 
+	
+_endmethod
+$

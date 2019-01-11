@@ -1,0 +1,342 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - February 2006
+##
+_package mclib
+$
+
+########################################################################
+##
+## This file contains a useful tool to read/display the contents
+## of ACE user-data information (like bookmarks).
+##
+## By default the ACE database and the sw_gis!user_data* tables
+## are inspected. However, in the new() method any other database
+## or "database directory" can be specified to be used.
+## It is also possible to edit (and later update) the contents of any
+## user data entry. By default the program notepad will be used to edit
+## the text but in the new() method a command can be specified that
+## should be used to start a program to edit a text file.
+## Or the class constant :default_edit_command can be redefined to
+## specify the executable that should be launched to edit text.
+##
+## To start the dialog, the minimum command line is:
+##	MagikSW> sf!ace_user_data_reader.open()
+## This will open/read the :sw_gis!user_data_[info|text] tables
+## in ACE top.
+##
+## To use Emacs instead of notepad to view/change files, this command
+## line can be used (assuming the executable is in the searchpath):
+##	MagikSW> sf!ace_user_data_reader.open(
+##			_unset, _unset, "gnuclientw.exe" )
+##
+## The class will open a stand-alone dialog - it might be possible to
+## also embed the dialog somewhere else by building a plugin subclass
+## of this class.
+########################################################################
+
+
+_pragma(classify_level=debug)
+def_slotted_exemplar( :sf!ace_user_data_reader,
+{
+	{ :data_dir,  _unset },
+	{ :data_text, _unset },
+	{ :ace_names, _unset }
+},
+{ :sf!ds_text_dir_reader } )
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+##
+## Default data repository that will be inspected.
+## Works hand-in-hand with class constant repository_postfixes,
+## which provides the postfixes to identify information and
+## data entries.
+##
+sf!ace_user_data_reader.define_shared_constant( :default_data_repository,
+	:|sw_gis!user_data|,
+	:public )
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+##
+## Postfixes for the passed/given text directory name.
+## (see also code in ds_text_directory.names())
+##
+sf!ace_user_data_reader.define_shared_constant( :repository_postfixes,
+	{ :|_info|, :|_text| },
+	:private )
+$
+
+
+##
+##	P U B L I C   A P I
+##	___________________
+##
+
+_pragma(classify_level=debug)
+_method sf!ace_user_data_reader.new(
+		_optional a_db_view, a_repository_name, an_edit_command )
+
+	## Creates and returns a new instance of _self.
+	##
+	## A_DB_VIEW:
+ 	##	A handle on an ACE database view;
+	##	defaults to gis_program_manager.ace_top_view
+	## A_REPOSITORY_NAME:
+	##	A prefix-name for data repository tables. The tables
+	##	<A_REPOSITORY_NAME>_info and <A_REPOSITORY_NAME>_text must
+	##	exist in A_DB_VIEW (see class constant repository_postfixes
+	##	to where the table name postfixes are defined).
+	##	Defaults to :sw_gis!user_data.
+	## AN_EDIT_COMMAND:
+	##	A command that is executed to edit a (text) file;
+	##	by default the actual file name/path is appended at
+	##	the end of this string.
+	##	Defaults to "notepad" (see class constant default_edit_command)
+
+	>> _clone.init( a_db_view, a_repository_name, an_edit_command )
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ace_user_data_reader.activate_in( a_container )
+
+	## Callback to build a dialog in a stand-alone frame
+
+	_self.build_gui( a_container )
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method sf!ace_user_data_reader.title
+
+	## Returns the title for the dialog frame
+
+	_local view << _self.transaction_view
+
+	>> _self.message( :frame_title, _unset,
+			  view.external_name,
+			  view.alternative_path_name() )
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method sf!ace_user_data_reader.build_gui( a_container, _optional xml_element )
+
+	## Generic callback to but the dialog contents in A_CONTAINER
+
+	_local headers   << { _self.message( :ace_name_header ),
+			      _self.message( :ace_id_header ),
+			      _self.message( :size_header ),
+			      _self.message( :data_name_header ) }
+	_local header_ss << { { :align, :centre, :bold, headers[ 1 ] },
+				 { :align, :centre, :bold, headers[ 2 ] },
+				 { :align, :centre, :bold, headers[ 3 ] },
+				 { :align, :centre, :bold, headers[ 4 ] } }
+	_local pnl       << panel.new( a_container )
+
+	_self.gui_items[ :tree_item ] <<
+		tree_item.new( pnl,
+			:model,			 _self,
+			:aspect,		 :directory_entries,
+			:data_selector,		 :|get_directory_entries()|,
+			:select_notifier,	 :|selection()|,
+			:double_click_notifier,  :|edit_leaf_entry()|,
+			:mode,			 :one,
+			:message_on_no_data?,	 _true,
+			:resize?,                _true,
+			:column_selectabilities, { _false, _false,
+						   _false, _true },
+			:column_alignments,      { :left, :right,
+						   :right, :left },
+			:row_headings_alignment, :centre,
+			:col_resize_values,      { 0, 0, 0, 1 },
+			:distribute_spare_width, :initial_extend,
+			:column_headings,        headers,
+			:column_headings_styled_strings, header_ss )
+
+	pnl.start_row()
+
+	_self.add_action_widgets_in( pnl )
+
+	>> a_container
+_endmethod
+$
+
+
+##
+##	P R I V A T E   A P I
+##	_____________________
+##
+
+
+_pragma(classify_level=restricted)
+_private _method sf!ace_user_data_reader.validate_text_dir_info(
+			 a_repository_name )
+
+	## Ensure that the current database view contains the
+	## necessary/referenced tables...
+
+	_local view      << _self.transaction_view
+	_local tables    << view.collections
+	_local postfixes << _self.repository_postfixes
+	_local tbl_prfx  << _if a_repository_name _is _unset
+			    _then >> _self.default_data_repository
+			    _else >> a_repository_name
+			    _endif
+
+	.data_dir  << tables[ tbl_prfx + postfixes[ 1 ] ]
+	.data_text << tables[ tbl_prfx + postfixes[ 2 ] ]
+
+	_if .data_dir _is _unset _orif
+	    .data_text _is _unset
+	_then
+		condition.raise( :sf!no_such_user_data_repository,
+				 :view,      view.external_name,
+				 :data_name, tbl_prfx )
+	_endif
+
+	.ace_names << hash_table.new()
+	_for a_rec _over tables[ :sw_gis!ace ].default( {} ).fast_elements()
+	_loop
+		.ace_names[ a_rec.id ] << a_rec.name.as_charvec()
+	_endloop
+_endmethod
+$
+
+##
+##	G U I - R E L A T E D   C A L L B A C K S
+##	_________________________________________
+##
+
+
+_pragma(classify_level=restricted)
+_method sf!ace_user_data_reader.get_directory_entries()
+
+	## Build a display list for the datastore text directory.
+
+	_local tbl_name << .data_text.name
+	_local list     << _self.dir_list
+	_local ss       << styled_string.new(
+				   :value, :ace_name, :tab, :space,
+				   :value, :ace_id, :tab, :space, :space,
+				   :value, :size, :tab, :space,
+				   :value, :name )
+	_local data
+	_local entry
+	_local str
+
+	list.empty()
+
+	_for a_dir_rec _over .data_dir.fast_elements()
+	_loop
+		data_recs << .data_text.all_at( a_dir_rec.id )
+
+		_if data_recs.empty? _then _continue _endif
+
+		data << ds_text_area.new( _self.transaction_view, tbl_name )
+
+		entry << display_tree.new( a_dir_rec.detached(),
+			     property_list.new_with(
+				 :ace_name, .ace_names[ a_dir_rec.ace_id ].
+					        default( "" ),
+				 :ace_id,   a_dir_rec.id,
+				 :name,     a_dir_rec.name.as_charvec(),
+				 :data,     data,
+				 :leaf?,    _true,
+				 :size,     data.read( a_dir_rec.id ).
+					        string.size ) )
+		entry.styled_string << ss
+		list.add( entry )
+	_endloop
+
+	>> list
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method sf!ace_user_data_reader.get_leaf_entry_text( an_entry )
+
+	## Returns the text associated with the data named AN_ENTRY.
+
+	>> an_entry.value[ :data ].read( an_entry.key.id )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method sf!ace_user_data_reader.view_ds_text()
+
+	## Print the text associated to the current selection
+	## at the terminal (in the Emacs buffer).
+
+	_dynamic !output!
+
+	_local data << _self.get_leaf_entry_text( _self.selection )
+
+	!output!.write( data.string, newline_char )
+	!output!.flush()
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ace_user_data_reader.get_file_name_and_data_for( entry )
+
+	## Returns a file name and the data string for the reference entry.
+
+	>> write_string( entry.name, %_, entry.id ),
+	   _self.get_leaf_entry_text( _self.selection )
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_private _method sf!ace_user_data_reader.update_text_dir_entry( data )
+
+	## Delete the exsting entry and write it again.
+
+	_local sel   << _self.selection
+	_local entry << sel.key
+	_local dta   << sel.value( :data )
+
+	dta.store( entry.id, data.string )
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method sf!ace_user_data_reader.delete_ds_text()
+
+	## Delete the currently seleted entry.
+
+	_local entry << _self.selection.key.attached()
+	_local info  << entry.name.as_charvec()
+	#
+	# Delete all text records first, then the reference entry...
+	#
+	.data_text.remove_all_at( entry.id )
+	entry.delete()
+	#
+	# Returns undo-date information...
+	#
+	>> property_list.new_with(
+		   :function, _self.message( :delete ),
+		   :operand,  info )
+_endmethod
+$

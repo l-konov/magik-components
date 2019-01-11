@@ -1,0 +1,1269 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_job_design_plugin.magik
+##
+## GUI plugin for handling functions related to maintaining job
+## and design data for MSS workspace functionality.
+##
+
+def_slotted_exemplar(:mss_wm_job_design_plugin,
+{
+	{:selected_job, _unset, :readable},
+	{:selected_design, _unset, :readable}
+},
+{:mss_application_databus_plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_job_design_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:selected_job, :selected_design, :selected_jobs_and_designs, :set_active_design},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_job_design_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_job_design_plugin.define_shared_constant(
+	:application_databus_producer_data_types,
+	{:goto_request, :geometry_to_highlight},
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+##
+## Sets the name of the statusbar pane which will be used to
+## display merge/post status info. Defaults to
+## :status_info. 
+##
+mss_wm_job_design_plugin.def_property(
+	:status_info_statusbar_pane_name,
+	:type, :symbol,
+	:default_value, :status_info)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_plugin.set_application_status_info_text(status_str)
+	## 
+	## Set the status info on the statusbar of self's owning application.
+	##
+
+	_if (app << _self.application) _isnt _unset _andif
+	    (st_info_key << _self.status_info_statusbar_pane_name) _isnt _unset
+	_then
+		app.update_statusbar(st_info_key, :text, status_str)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_plugin.trail
+	##
+	## Request the trail from the application databus.
+	##
+
+	_for info _over _self.application_databus_request_all_data(:map_trail)
+	_loop
+		# Just in case there are any other (custom) things producing
+		# trails, specifically get one that is managed by an actual
+		# map. 
+		_if info[1].is_kind_of?(map)
+		_then 
+			_return info[2], info[1]
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_plugin.editor_manager
+	## 
+	## Return an editor manager for editing records.
+	##
+
+	_return _self.application.get_service_provider(:editor_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_plugin.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_plugin.selected_job
+	## 
+	## Ensure record is valid before returning it.
+	##
+
+	_if .selected_job _isnt _unset _andif
+	    _not .selected_job.is_valid?
+	_then
+		.selected_job << _unset
+	_endif
+	_return .selected_job
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_plugin.selected_design
+	## 
+	## Ensure record is valid before returning it.
+	##
+
+	_if .selected_design _isnt _unset _andif
+	    _not .selected_design.is_valid?
+	_then
+		.selected_design << _unset
+	_endif
+	_return .selected_design
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.pre_activation()
+	## 
+	## 
+
+	mss_workspace_manager_engine.add_dependent(_self, :active_design, :overlay_design_data)
+	mss_workspace_manager_engine.view.add_dependent(_self, :view)
+	mss_workspace_manager_engine.view.add_observer(_self, {:update, :pre_delete},
+						       {:mss_job, :mss_design})
+	
+	_self.manage_actions_for_active_design()
+	_self.manage_actions_for_overlay_design()
+	_self.manage_actions_for_selected_job()
+	_self.manage_actions_for_selected_design()
+	_self.manage_actions_for_selected_jobs_and_designs()
+	
+	_super.pre_activation()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.terminate()
+	## 
+	## 
+
+	mss_workspace_manager_engine.remove_dependent(_self, :active_design, :overlay_design_data)
+	mss_workspace_manager_engine.view.remove_dependent(_self, :view)
+	mss_workspace_manager_engine.view.remove_observer(_self, {:update, :pre_delete},
+							  {:mss_job, :mss_design})
+
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.init_actions()
+	## 
+	## 
+	
+	_self.add_action(sw_action.new(:new_job_and_design,
+				       :short_help_text, _self.message(:new_job_and_design_sh),
+				       :engine, _self,
+				       :action_message, :|new_job_and_design()|))
+	_self.add_action(sw_action.new(:new_job,
+				       :short_help_text, _self.message(:new_job_sh),
+				       :engine, _self,
+				       :action_message, :|new_job()|))
+	_self.add_action(sw_action.new(:new_top_level_design,
+				       :short_help_text, _self.message(:new_top_level_design_sh),
+				       :engine, _self,
+				       :enabled?, _false,
+				       :action_message, :|new_top_level_design()|))
+	_self.add_action(sw_action.new(:new_sub_design,
+				       :short_help_text, _self.message(:new_sub_design_sh),
+				       :engine, _self,
+				       :enabled?, _false,
+				       :action_message, :|new_sub_design()|))
+
+	_self.add_action(sw_action.new(:open_design,
+				       :short_help_text, _self.message(:open_design_sh),
+				       :engine, _self,
+				       :enabled?, _false,
+				       :action_message, :|open_design()|))
+	_self.add_action(sw_action.new(:close_design,
+				       :short_help_text, _self.message(:close_design_sh),
+				       :engine, _self,
+				       :enabled?, _false,
+				       :action_message, :|close_design()|))
+	_self.add_action(sw_action.new(:merge_design,
+				       :short_help_text, _self.message(:merge_design_sh),
+				       :engine, _self,
+				       :enabled?, _false,
+				       :action_message, :|merge_design()|))
+
+	_self.add_action(sw_action.new(:goto_selected_design,
+				       :short_help_text, _self.message(:goto_selected_design_sh),
+				       :engine, _self,
+				       :image, {:goto_object, :ui_resources},
+				       :action_message, :|goto_selected_design()|))
+	_self.add_action(sw_action.new(:highlight_selected_design,
+				       :short_help_text, _self.message(:highlight_selected_design_sh),
+				       :engine, _self,
+				       :image, {:highlight_object, :ui_resources},
+				       :action_message, :|highlight_selected_design()|))
+	_self.add_action(sw_action.new(:edit_selected_job,
+				       :short_help_text, _self.message(:edit_selected_job_sh),
+				       :engine, _self,
+				       :image, {:edit_object, :ui_resources},
+				       :action_message, :|edit_selected_job()|))
+	_self.add_action(sw_action.new(:edit_selected_design,
+				       :short_help_text, _self.message(:edit_selected_design_sh),
+				       :engine, _self,
+				       :action_message, :|edit_selected_design()|))
+	_self.add_action(sw_action.new(:edit_active_job,
+				       :short_help_text, _self.message(:edit_active_job_sh),
+				       :engine, _self,
+				       :action_message, :|edit_active_job()|))
+	_self.add_action(sw_action.new(:edit_active_design,
+				       :short_help_text, _self.message(:edit_active_design_sh),
+				       :engine, _self,
+				       :action_message, :|edit_active_design()|))
+	_self.add_action(sw_action.new(:delete_selected_jobs,
+				       :short_help_text, _self.message(:delete_selected_jobs_sh),
+				       :engine, _self,
+				       :action_message, :|delete_selected_jobs()|))
+	_self.add_action(sw_action.new(:delete_selected_designs,
+				       :short_help_text, _self.message(:delete_selected_designs_sh),
+				       :engine, _self,
+				       :action_message, :|delete_selected_designs()|))
+	
+	_self.add_action(sw_action.new(:overlay_selected_design,
+				       :short_help_text, _self.message(:overlay_selected_design_sh),
+				       :engine, _self,
+				       :enabled?, _false,
+				       :action_message, :|overlay_selected_design()|))
+	_self.add_action(sw_action.new(:clear_overlay_design,
+				       :short_help_text, _self.message(:clear_overlay_design_sh),
+				       :engine, _self,
+				       :action_message, :|clear_overlay_design()|))
+	_self.add_action(sw_action.new(:copy_overlay_design_data,
+				       :short_help_text, _self.message(:copy_overlay_design_data_sh),
+				       :engine, _self,
+				       :action_message, :|copy_overlay_design_data()|))
+
+	# Actions for managing secondary overlays.
+	_for i _over 2.upto(mss_wm_overlay_swdp_manager.max_number_of_overlays)
+	_loop
+		ii << i.write_string
+		_self.add_action(sw_action.new(:overlay_selected_design_ + ii,
+					       :caption, _self.message(:overlay_selected_design_n, i),
+					       :short_help_text, _self.message(:overlay_selected_design_n_sh, i),
+					       :engine, _self,
+					       :enabled?, _false,
+					       :action_message, {:|overlay_selected_design()|, i}))
+		_self.add_action(sw_action.new(:clear_overlay_design_ + ii,
+					       :caption, _self.message(:clear_overlay_design_n, i),
+					       :short_help_text, _self.message(:clear_overlay_design_n_sh, i),
+					       :engine, _self,
+					       :action_message, {:|clear_overlay_design()|, i}))
+	_endloop
+		
+	_self.add_action(sw_action.new(:aggregate_selected_designs,
+				       :short_help_text, _self.message(:aggregate_selected_designs_sh),
+				       :engine, _self,
+				       :action_message, :|aggregate_selected_designs()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :selected_job
+	_then
+		.selected_job << data
+		_self.manage_actions_for_selected_job()
+	_elif data_type_name _is :selected_design
+	_then
+		.selected_design << data
+		_self.manage_actions_for_selected_design()
+	_elif data_type_name _is :selected_jobs_and_designs
+	_then
+		_self.manage_actions_for_selected_jobs_and_designs(data)
+	_elif data_type_name _is :set_active_design
+	_then
+		_self.open_design(data[1])
+	_endif 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_dynamic !dsst_operation!
+	_dynamic !mss_workspace_view_operation!
+	
+	_if who _is mss_workspace_manager_engine
+	_then 
+		_if what _is :active_design
+		_then
+			_self.manage_actions_for_active_design()
+		_elif what _is :overlay_design_data
+		_then
+			_self.manage_actions_for_overlay_design()
+		_endif
+
+	_elif who _is mss_workspace_manager_engine.view
+	_then
+		_if {:insert, :update, :pre_delete}.includes?(what)
+		_then
+			tbl << data[1]
+			data_rec << data[2]
+			_if tbl.name _is :mss_job _andif
+			    data_rec = _self.selected_job
+			_then
+				_if what _is :pre_delete
+				_then
+					.selected_job << _unset
+				_endif
+				_self.manage_actions_for_selected_job()
+			_elif tbl.name _is :mss_design _andif
+			      data_rec = _self.selected_design
+			_then
+				_if what _is :pre_delete
+				_then
+					.selected_design << _unset
+				_endif
+				_self.manage_actions_for_selected_design()
+			_endif
+		_elif what _is :view
+		_then
+			_if !dsst_operation! _is :start_transaction _orif
+			    !mss_workspace_view_operation! _is :rollforward
+			_then
+				# Don't refresh during a planned rollforward operation.
+				_return
+			_endif
+			
+			# After a failed transaction, re-get all records and update
+			# actions in case anything looks out-of-place.
+			.selected_job << _self.selected_job
+			.selected_design << _self.selected_design
+			_self.manage_actions_for_active_design()
+			_self.manage_actions_for_selected_job()
+			_self.manage_actions_for_selected_design()
+		_endif
+		
+	_elif who _is _self.get_dialog(:mss_wm_job_design_attribute_prompter)
+	_then
+		_if what _is :new_job
+		_then
+			# For now, no actions need to be taken when inserting a new job
+			# (without a design).
+		_elif what _is :new_design
+		_then
+			# Highlight and open the new design.
+			_self.application_databus_make_data_available(:geometry_to_highlight, data[1])
+			_self.open_design(data[1])
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.manage_actions_for_selected_job()
+	## 
+	## 
+
+	a << _self.action(:new_top_level_design)
+	_if (sel_job << _self.selected_job) _is _unset
+	_then
+		a.enabled? << _false
+		a.caption << _self.message(:new_top_level_design)
+	_else
+		a.enabled? << _true
+		a.caption << _self.message(:new_top_level_design_for, sel_job.short_description)
+	_endif 
+
+	_self.action(:edit_selected_job).enabled? << sel_job _isnt _unset
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.manage_actions_for_selected_design()
+	## 
+	## 
+
+	a1 << _self.action(:new_sub_design)
+	a2 << _self.action(:open_design)
+	_if (sel_design << _self.selected_design) _is _unset
+	_then
+		a1.enabled? << _false
+		a1.caption << _self.message(:new_sub_design)
+		a2.enabled? << _false
+		a2.caption << _self.message(:open_design)
+	_else
+		a1.enabled? << _true
+		a1.caption << _self.message(:new_sub_design_for, sel_design.short_description)
+		a2.enabled? << _true
+		a2.caption << _self.message(:open_design_for, sel_design.short_description)
+	_endif 
+
+	_self.action(:goto_selected_design).enabled? << sel_design _isnt _unset 
+	_self.action(:highlight_selected_design).enabled? << sel_design _isnt _unset 
+	_self.action(:edit_selected_design).enabled? << sel_design _isnt _unset
+	_self.action(:overlay_selected_design).enabled? << sel_design _isnt _unset
+
+	_for i _over 2.upto(mss_wm_overlay_swdp_manager.max_number_of_overlays)
+	_loop
+		ii << i.write_string
+		_if (a << _self.action(:overlay_selected_design_+ ii)) _isnt _unset
+		_then 
+			a.enabled? << sel_design _isnt _unset
+		_endif 
+	_endloop 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.manage_actions_for_selected_jobs_and_designs(_optional selection)
+	## 
+	## Enable actions based on the multiple jobs and designs
+	## contained in the display_tree_selection SELECTION.
+	##
+
+	a_dsj << _self.action(:delete_selected_jobs)
+	a_dsd << _self.action(:delete_selected_designs)
+	a_asd << _self.action(:aggregate_selected_designs)
+
+	_if selection _is _unset _andif
+	    (selection << _self.databus_request_data(:selected_jobs_and_designs)) _is _unset
+	_then
+		a_dsj.enabled? << _false
+		a_dsd.enabled? << _false
+		a_asd.enabled? << _false
+		_return 
+	_endif 
+
+	# Enabling deletion for jobs and designs is a bit tricky,
+	# because only a subset of the ones selected may be deletable.
+	# The approach here is to enable the action if anything is
+	# deletable, and the processing will stop at the first one that
+	# can't be deleted (each in its own transaction).
+	
+	e_dsj? << _false
+	_for i _over selection.fast_elements()
+	_loop
+		_if (rec << i.value[:job]) _isnt _unset _andif
+		    rec.is_valid?
+		_then
+			e_dsj? << rec.validate_delete_for_state?() _andif
+				  rec.validate_delete_for_authorisation?()
+		_endif
+		_if e_dsj? _then _leave _endif
+	_endloop 
+	a_dsj.enabled? << e_dsj?
+
+	e_dsd? << _false
+	_for i _over selection.fast_elements()
+	_loop
+		_if (rec << i.value[:design]) _isnt _unset _andif
+		    rec.is_valid?
+		_then
+			e_dsd? << rec.validate_delete_for_child_designs?() _andif 
+				  rec.validate_delete_for_state?() _andif
+				  rec.validate_delete_for_authorisation?()
+		_endif
+		_if e_dsd? _then _leave _endif
+	_endloop 
+	a_dsd.enabled? << e_dsd?
+	
+	_self.manage_action_aggregate_selected_designs(selection)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.manage_action_aggregate_selected_designs(_optional selection)
+	## 
+	## Manage the aggregate_selected_designs action.  SELECTION, if
+	## provided, is a selection of job/designs.
+	##
+
+	a_asd << _self.action(:aggregate_selected_designs)
+	_if (ad << mss_workspace_manager_engine.active_design) _is _unset
+	_then
+		a_asd.enabled? << _false
+		_return 
+	_endif 
+
+	_if selection _is _unset _andif
+	    (selection << _self.databus_request_data(:selected_jobs_and_designs)) _is _unset
+	_then
+		a_asd.enabled? << _false
+		_return 
+	_endif 
+
+	# If there is ANY selected design that is not the active
+	# design, that is good enough to enable the action.  It may not
+	# be permitted due to workflow limitations, but it is more
+	# informative to let the action be enabled, and then tell the
+	# user why it can't be done for a specific selected design.
+	e_asd? << _false
+	_for i _over selection.fast_elements()
+	_loop
+		_if (rec << i.value[:design]) _isnt _unset _andif
+		    rec.is_valid?
+		_then
+			_if rec ~= ad
+			_then
+				e_asd? << _true
+			_endif 
+		_endif
+		_if e_asd? _then _leave _endif
+	_endloop 
+	a_asd.enabled? << e_asd?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.manage_actions_for_active_design()
+	## 
+	## 
+
+	ad << mss_workspace_manager_engine.active_design
+	_self.action(:close_design).enabled? << ad _isnt _unset
+	_self.action(:merge_design).enabled? << ad _isnt _unset
+	_self.action(:edit_active_job).enabled? << ad _isnt _unset
+	_self.action(:edit_active_design).enabled? << ad _isnt _unset
+	_self.manage_action_aggregate_selected_designs()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.manage_actions_for_overlay_design()
+	## 
+	## Update actions to reflect the current state of overlay
+	## design data.
+	##
+
+	odd << mss_workspace_manager_engine.overlay_design_data
+
+	# N.B.: not disabling any action, even though it could make
+	# sense to disable the clear_overlay_design_N action if overlay
+	# N does not exist... this is done in case these ever get
+	# out-of-sync, and clearing an overlay that is already cleared
+	# is basically a NOP anyways.
+	a << _self.action(:clear_overlay_design)
+	_if (ovl_data << odd[1]) _isnt _unset _andif
+	    (ovl_des << ovl_data[:design]) _isnt _unset _andif
+	    ovl_des.is_valid?
+	_then
+		capt << _self.message(:clear_overlay_design_by_name, ovl_des.short_description)
+	_else
+		capt << _self.message(:clear_overlay_design)
+	_endif
+	a.caption << capt
+	
+	_for i _over 2.upto(mss_wm_overlay_swdp_manager.max_number_of_overlays)
+	_loop
+		ii << i.write_string
+		_if (a << _self.action(:clear_overlay_design_+ ii)) _is _unset
+		_then 
+			_continue
+		_endif
+		_if (ovl_data << odd[i]) _isnt _unset _andif
+		    (ovl_des << ovl_data[:design]) _isnt _unset _andif
+		    ovl_des.is_valid?
+		_then
+			capt << _self.message(:clear_overlay_design_n_by_name, i, ovl_des.short_description)
+		_else
+			capt << _self.message(:clear_overlay_design_n, i)
+		_endif
+		a.caption << capt
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.bring_application_forward(app)
+	## 
+	## Ensure that the application APP is brought to the front.
+	##
+
+	_if app _isnt _unset _andif
+	    (tf << app.top_frame) _isnt _unset
+	_then
+		tf.activate()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.ensure_selected_job()
+	##
+	## Ensure that a job has been selected.
+	##
+
+	_if (sel_job << _self.selected_job) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_job))
+	_endif
+	_return sel_job
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.ensure_selected_design()
+	##
+	## Ensure that a design has been selected.
+	##
+
+	_if (sel_design << _self.selected_design) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_design))
+	_endif
+	_return sel_design
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.ensure_selected_jobs()
+	##
+	## Ensure that at least one job has been selected.
+	##
+
+	_if (selection << _self.databus_request_data(:selected_jobs_and_designs)) _is _unset
+	_then
+		selection << {}
+	_endif
+
+	# Note that this is structured to preserve ordering, but also
+	# avoid duplicates.
+	r << rope.new()
+	s << equality_set.new()
+	_for i _over selection.fast_elements()
+	_loop
+		_if (rec << i.value[:job]) _isnt _unset _andif
+		    rec.is_valid? _andif
+		    _not s.includes?(rec)
+		_then
+			r.add_last(rec)
+			s.add(rec)
+		_endif
+	_endloop
+	
+	_if r.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_jobs))
+	_endif
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.ensure_selected_designs()
+	##
+	## Ensure that at lease one design has been selected.
+	##
+
+	_if (selection << _self.databus_request_data(:selected_jobs_and_designs)) _is _unset
+	_then
+		selection << {}
+	_endif
+
+	# Note that this is structured to preserve ordering, but also
+	# avoid duplicates.
+	r << rope.new()
+	s << equality_set.new()
+	_for i _over selection.fast_elements()
+	_loop
+		_if (rec << i.value[:design]) _isnt _unset _andif
+		    rec.is_valid? _andif
+		    _not s.includes?(rec)
+		_then
+			r.add_last(rec)
+			s.add(rec)
+		_endif
+	_endloop
+	
+	_if r.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_designs))
+	_endif
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.ensure_active_design()
+	##
+	## Ensure that an active design exists.
+	##
+
+	_if (ad << mss_workspace_manager_engine.active_design) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_design))
+	_endif
+	_return ad
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.mss_wm_job_design_attribute_prompter
+	## 
+	## 
+
+	_if (m << _self.get_dialog(:mss_wm_job_design_attribute_prompter)) _is _unset
+	_then
+		m << mss_wm_job_design_attribute_prompter.new(:mss_wm_job_design_attribute_prompter, _self)
+		_self.cache_dialog(:mss_wm_job_design_attribute_prompter, m)
+		m.activate_relative_to(_self.top_frame, "", _self.top_frame, 50, 50)
+		m.add_dependent(_self)
+	_else
+		m.activate()
+	_endif
+	_return m
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.new_job_and_design()
+	## 
+	## Activate a mss_wm_job_design_attribute_prompter to create a
+	## new job and design.
+	##
+
+	mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+	m << _self.mss_wm_job_design_attribute_prompter
+	m.set_mode(:job_and_design)
+	m.title << m.message(:title_job_and_design)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.new_job()
+	## 
+	## Activate a mss_wm_job_design_attribute_prompter to create a
+	## new job.
+	##
+
+	mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+	m << _self.mss_wm_job_design_attribute_prompter
+	m.set_mode(:job)
+	m.title << m.message(:title_job)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.new_top_level_design()
+	## 
+	## Activate a mss_wm_job_design_attribute_prompter to create a
+	## new top level design.
+	##
+
+	mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+	rec << _self.ensure_selected_job()
+	m << _self.mss_wm_job_design_attribute_prompter
+	m.set_mode(:design, rec)
+	m.title << m.message(:title_design, rec.short_description)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.new_sub_design()
+	## 
+	## Activate a mss_wm_job_design_attribute_prompter to create a
+	## new sub design.
+	##
+
+	mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+	rec << _self.ensure_selected_design()
+	m << _self.mss_wm_job_design_attribute_prompter
+	m.set_mode(:sub_design, _unset, rec)
+	m.title << m.message(:title_sub_design, rec.short_description)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.open_design(_optional rec)
+	##
+	## Make REC the active design (defaults to selected design).
+	##
+
+	_local me << _self 
+	_if rec _is _unset
+	_then
+		rec << _self.ensure_selected_design()
+	_endif
+
+	ok? << _false 
+	_protect
+		_handling mss_information _with
+		_proc(cond)
+			_import me
+			me.set_application_status_info_text(cond.report_contents_string)
+			me.status_string << cond.report_contents_string
+		_endproc
+
+		_self.set_application_status_info_text(_self.message(:opening_design, rec.short_description))
+		_self.status_string << _self.message(:opening_design, rec.short_description)
+		
+		mss_workspace_manager_engine.open_design(rec)
+		_self.set_application_status_info_text("")
+		_self.status_string << ""
+		
+		mss_workspace_manager_engine.check_writable_status()
+		ok? << _true 
+	_protection
+		_if _not ok?
+		_then
+			# Only blank this out if not OK - if processing completed OK,
+			# it may be displaying a useful message for user (from the
+			# check_writable_status() call).
+			_self.set_application_status_info_text("")
+			_self.status_string << ""
+		_endif
+	_endprotect 
+	
+	# Goto the design if possible, but don't raise any warning if
+	# there is nothing to goto.
+	_block
+		_handling no_bounds_for_goto _with procedure
+		_self.goto_design(rec)
+	_endblock 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.goto_design(rec)
+	## 
+	## Goto the design record REC.
+	##
+
+	app << _self.application
+	_if (sc_name << app.get_primary_spatial_context_name_for(rec)) _is _unset
+	_then
+		# Just do a goto on the record itself.
+		_self.application_databus_make_data_available(:goto_request, {rec})
+	_else
+		# Do spatial context handling, to allow designs in non-GIS worlds.
+		sc << app.get_spatial_context_for_record(rec, sc_name)
+		_self.application_databus_make_data_available(:goto_request, {sc})
+	_endif
+
+	# May consider doing this, but it is also potentially
+	# disruptive to the user...
+	#_self.bring_application_forward(app)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.close_design()
+	##
+	## Close the active design.
+	##
+
+	_self.set_application_status_info_text("")
+	mss_workspace_manager_engine.close_design()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.merge_design()
+	##
+	## Merge all datasets associated with the active design. 
+	##
+
+	rec << _self.ensure_active_design()
+	mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel),
+				_self.message(:confirm_merge_design, rec.short_description)) _is _false
+	_then
+		_return
+	_endif
+
+	_block
+		_handling db_conversion_info _with
+		_proc(cond)
+			cond.report_on(!error_output!)
+		_endproc
+		
+		mss_workspace_manager_engine.merge_design(
+			property_list.new_with(:gui_handler, _self))
+	_endblock
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.goto_selected_design()
+	## 
+	## Goto the design currently selected in the result_list.
+	##
+
+	rec << _self.ensure_selected_design()
+	_self.goto_design(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.highlight_selected_design()
+	## 
+	## Highlight the design currently selected in the result_list.
+	##
+
+	rec << _self.ensure_selected_design()
+	_self.application_databus_make_data_available(:geometry_to_highlight, rec)
+
+	# May consider doing this, but it is also potentially
+	# disruptive to the user...
+	#_self.bring_application_forward(_self.application)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.edit_selected_job()
+	## 
+	## Edit the job currently selected in the result_list.
+	##
+
+	rec << _self.ensure_selected_job()
+	_self.edit_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.edit_selected_design()
+	## 
+	## Edit the design currently selected in the result_list.
+	##
+
+	rec << _self.ensure_selected_design()
+	_self.edit_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.edit_active_job()
+	##
+	## Activate an editor for the active job.
+	##
+
+	_if (ad << mss_workspace_manager_engine.active_design) _is _unset _orif
+	    (aj << ad.mss_job) _is _unset 
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_job))
+	_endif
+	_self.edit_object(aj)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.edit_active_design()
+	##
+	## Activate an editor for the active design.
+	##
+
+	ad << _self.ensure_active_design()
+	_self.edit_object(ad)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.edit_object(rec)
+	## 
+	## Activate the editor for record REC.
+	##
+
+	_if (ed_man << _self.editor_manager) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_editor_manager))
+	_endif
+
+	an_editor << ed_man.edit_object(rec)
+	_if an_editor _isnt _unset _andif
+	    (app << an_editor.application) _isnt _unset _andif
+	    an_editor.floating? _isnt _true 
+	_then
+		# Bring the application to the forefront.
+		_self.bring_application_forward(app)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.delete_selected_jobs()
+	## 
+	## Delete the jobs currently selected in the result_list.
+	##
+
+	recs << _self.ensure_selected_jobs()
+	_for rec _over recs.fast_elements()
+	_loop 
+		_self.check_active_design_deletion(rec.mss_designs)
+		rec.validate_delete()
+	_endloop 
+	
+	_if recs.size = 1
+	_then
+		conf_msg << _self.message(:confirm_delete_job, recs.an_element().short_description)
+	_else
+		conf_msg << _self.message(:confirm_delete_jobs, recs.size)
+	_endif
+	
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel), conf_msg) _is _false
+	_then
+		_return
+	_endif 
+
+	# Note that each deletion will run in its own transaction.  At
+	# this point, all expected error-causing situations will have
+	# been detected, but if anything unexpected shows up part-way
+	# through, let each individual transaction that worked up to
+	# that point stand (note that design alternatives associated
+	# with those deleted designs are irrevocably gone at this
+	# point, so there is no use rolling back to before those
+	# designs were deleted).
+	_protect
+		_self.status_string << _self.message(:deleting_records)
+		_for rec _over recs.fast_elements()
+		_loop 
+			mss_workspace_manager_engine.delete_job(rec)
+		_endloop
+	_protection
+		_self.status_string << ""
+	_endprotect 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.delete_selected_designs()
+	## 
+	## Delete the designs currently selected in the result_list.
+	##
+
+	recs << _self.ensure_selected_designs()
+	_for rec _over recs.fast_elements()
+	_loop 
+		_self.check_active_design_deletion({rec})
+		rec.validate_delete()
+	_endloop
+
+	_if recs.size = 1
+	_then
+		conf_msg << _self.message(:confirm_delete_design, recs.an_element().short_description)
+	_else
+		conf_msg << _self.message(:confirm_delete_designs, recs.size)
+	_endif
+	
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel), conf_msg) _is _false
+	_then
+		_return
+	_endif
+
+	# Note that each deletion will run in its own transaction
+	# (c.f. similar processing in delete_selected_jobs()).
+	_protect
+		_self.status_string << _self.message(:deleting_records)
+		_for rec _over recs.fast_elements()
+		_loop 
+			mss_workspace_manager_engine.delete_design(rec)
+		_endloop
+	_protection
+		_self.status_string << ""
+	_endprotect 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.check_active_design_deletion(recs)
+	## 
+	## Check that no design in RECS is the active design.
+	##
+
+	_if (ad << mss_workspace_manager_engine.active_design) _is _unset
+	_then
+		_return
+	_endif
+	_for i _over recs.fast_elements()
+	_loop
+		_if i = ad
+		_then
+			condition.raise(:user_error, :string, _self.message(:cannot_delete_active_design))
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.overlay_selected_design(_optional seq_no)
+	## 
+	## Create an overlay of the design currently selected in the
+	## result_list.  This adds a new dataset manager for it, which
+	## is customized to deal with replicated view data from that
+	## design. 
+	##
+
+	rec << _self.ensure_selected_design()
+	_protect
+		_self.status_string << _self.message(:overlaying_design, rec.short_description)
+		mss_workspace_manager_engine.overlay_design(rec, seq_no)
+	_protection 
+		_self.status_string << ""
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.clear_overlay_design(_optional seq_no)
+	## 
+	## Clear all overlay designs.
+	##
+
+	_protect
+		_self.status_string << _self.message(:clearing_overlay_design)
+		mss_workspace_manager_engine.overlay_design(_unset, seq_no)
+	_protection 
+		_self.status_string << ""
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.copy_overlay_design_data()
+	## 
+	## Activate a menu to copy overlay design data.
+	##
+
+	_if (m << _self.get_dialog(:mss_wm_overlay_view_copy_framework)) _is _unset
+	_then
+		m << mss_wm_overlay_view_copy_framework.new(:mss_wm_overlay_view_copy_framework, _self)
+		_self.cache_dialog(:mss_wm_overlay_view_copy_framework, m)
+		m.activate_relative_to(_unset, m.message(:title), _self.top_frame, 50, 50)
+		m.add_dependent(_self)
+	_else
+		m.activate(_unset, m.message(:title))
+	_endif
+	_return m
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_plugin.aggregate_selected_designs()
+	##
+	## Aggregate the designs currently selected in the result_list
+	## into the active design.
+	##
+
+	ad << _self.ensure_active_design()
+	recs << _self.ensure_selected_designs()
+
+	# In the case of sub-designs, require the parent to be
+	# processed, and ensure that any item is only processed once.
+	to_do_rope << rope.new()
+	to_do_set << equality_set.new()
+	_for rec _over recs.fast_elements()
+	_loop
+		_for parent_rec _over rec.ordered_design_path.fast_elements()
+		_loop
+			_if to_do_set.includes?(parent_rec)
+			_then
+				_continue
+			_endif
+			_if ad.validate_aggregate_from(parent_rec, _true) _is _true
+			_then
+				to_do_rope.add_last(parent_rec)
+				to_do_set.add(parent_rec)
+			_endif
+		_endloop 
+	_endloop
+
+	_if to_do_rope.size = 1
+	_then
+		conf_msg << _self.message(:confirm_aggregate_design, to_do_rope.an_element().short_description)
+	_else
+		conf_msg << _self.message(:confirm_aggregate_designs, to_do_rope.size)
+	_endif
+	
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel), conf_msg) _is _false
+	_then
+		_return
+	_endif
+
+	# Clear the map selection, as a geometry can temporarily become
+	# invalid part-way through this process, and if it is selected,
+	# it will try to draw itself without its proper complement of
+	# links and nodes.
+	_self.application_databus_make_data_available(:set_map_selection, {_self, geometry_set.new()})
+	
+	_protect
+		_for rec _over to_do_rope.fast_elements()
+		_loop 
+			_self.status_string << _self.message(:aggregating_design, rec.short_description, ad.short_description)
+			mss_workspace_manager_engine.aggregate_design(ad, rec)
+		_endloop
+	_protection
+		_self.status_string << ""
+	_endprotect 
+	
+_endmethod
+$

@@ -1,0 +1,232 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_definition
+##
+## Definition record for a compatible unit.
+##
+
+def_slotted_exemplar(:mss_cu_definition,
+{},
+{:mss_cu_ds_record})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_definition.general_validator()
+	##
+	## Disallow names that include %* or %?.
+	##
+	## Ensure that self's cu_code is unique with respect to any
+	## other CU that overlaps self's effective_date and
+	## obsolete_date. 
+	##
+	## Disallow changing to a non Macro Unit usage if self has
+	## child MUs.
+	##
+	
+	cu_code << _self.cu_code.default("").as_charvec()
+	_if cu_code.includes?(%*) _orif
+	    cu_code.includes?(%?)
+	_then
+		_self.user_error(:invalid_cu_code_special_chars)
+	_endif
+	
+	my_eff << _self.effective_date
+	my_obs << _self.obsolete_date
+	_if my_eff _isnt _unset _andif
+	    my_obs _isnt _unset _andif
+	    my_eff > my_obs
+	_then
+		_self.user_error(:invalid_eff_obs_date)
+	_endif
+	
+	recs << _self.source_collection.select(predicate.eq(:cu_code, _self.cu_code))
+	_for i _over recs.fast_elements()
+	_loop
+		_if i.id = _self.id
+		_then
+			_continue 
+		_endif
+		_self.user_error(:duplicate_cu_code, _self.cu_code)
+	_endloop
+
+	_if _self.usage ~= mss_cu_engine.macro_unit_usage_value
+	_then
+		_for i _over _self.mss_cu_operation_definitions.fast_elements()
+		_loop
+			_if i.c_mss_cu_mu_relationships.an_element() _isnt _unset
+			_then
+				_self.user_error(:usage_must_be_macro_unit)
+			_endif
+		_endloop
+	_endif
+	
+	_return _super.general_validator()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_definition.update_trigger(_gather args)
+	## 
+	## If the cu_code changes, forward that change on to
+	## substructure that cares about it.
+	##
+
+	_super.update_trigger(_scatter args)
+	old_rec << args[2]
+	_if (new_cu_code << _self.cu_code) ~= old_rec.cu_code
+	_then
+		_for i _over _self.mss_cu_facility_relationships.fast_elements()
+		_loop
+			dr << i.detached()
+			dr.cu_code << new_cu_code
+			dr.source_collection.update(dr)
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_definition.effective_for_date?(a_date)
+	## 
+	## Return true is self is effective on A_DATE, based on
+	## effective_date and obsolete_date attributes.
+	##
+
+	_if (d << _self.effective_date) _isnt _unset _andif
+	    d > a_date
+	_then
+		_return _false
+	_endif
+	_if (d << _self.obsolete_date) _isnt _unset _andif
+	    d < a_date
+	_then
+		_return _false
+	_endif
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_definition.clone_with_substructure()
+	## 
+	## Create and return a copy of self with all substructure
+	## cloned also.
+	##
+
+	tbl << _self.source_collection
+
+	# Figure a unique number to append to self's cu_code
+	n << 2
+	fld_size << tbl.all_fields[:cu_code].type.size
+	root_name << _self.cu_code.as_charvec()
+	_loop
+		n_str << write_string("_", n)
+		proposed_cu_code << "".concatenation(root_name.truncate(fld_size - n_str.size), n_str)
+		_if tbl.select(predicate.eq(:cu_code, proposed_cu_code)).an_element() _is _unset
+		_then
+			# Got a unique value.
+			_leave
+		_endif
+
+		# Increment and try again.
+		n +<< 1
+	_endloop
+
+	ndr << _self.detached()
+	ndr.cu_code << proposed_cu_code
+
+	new << tbl.insert(ndr)
+
+	_for i _over _self.mss_cu_facility_relationships.fast_elements()
+	_loop
+		ndr << i.detached()
+		ndr.cu_code << proposed_cu_code
+		ndr.mss_cu_definition_id << new.id
+		new_child << ndr.source_collection.insert(ndr)
+		_for j _over i.mss_cu_facility_attributes.fast_elements()
+		_loop
+			ndr << j.detached()
+			ndr.mss_cu_facility_relationship_id << new_child.id
+			ndr.source_collection.insert(ndr)
+		_endloop
+	_endloop
+	_for i _over _self.mss_cu_group_definitions.fast_elements()
+	_loop
+		new.mss_cu_group_definitions.add(i)
+	_endloop
+	_for i _over _self.mss_cu_operation_definitions.fast_elements()
+	_loop
+		ndr << i.detached()
+		ndr.mss_cu_definition_id << new.id
+		ndr.source_collection.insert(ndr)
+	_endloop	
+
+	_return new
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_definition.valid_operation_names()
+	## 
+	## Return an equality_set of all operation names that are valid for
+	## self.
+	##
+
+	res << equality_set.new()
+	_for i _over _self.mss_cu_operation_definitions.fast_elements()
+	_loop
+		res.add(i.operation.as_charvec())
+	_endloop
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_definition.operation_definition_for(an_operation)
+	## 
+	## Return self's mss_cu_operation_definition record for which
+	## the operation value is equal to AN_OPERATION.
+	##
+
+	_return _self.mss_cu_operation_definitions.select(
+			predicate.eq(:operation, an_operation, :ci)).an_element()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_definition.facility_relationships_for(rec, _optional operation)
+	## 
+	## Return self's mss_cu_facility_relationship records which
+	## have a table_code appropriate for REC (a database record),
+	## and optionally for the given OPERATION.
+	##
+
+	_if rec _is _unset _orif
+	    (fac_def << mss_cu_facility_definition.get_for_target_table(rec.source_collection)) _is _unset
+	_then
+		_return {}
+	_endif
+	pred << predicate.eq(:table_code, fac_def.id)
+	_if operation _isnt _unset
+	_then
+		pred _and<< predicate.eq(:operation, operation)
+	_endif
+	_return _self.mss_cu_facility_relationships.select(pred)
+			
+_endmethod
+$

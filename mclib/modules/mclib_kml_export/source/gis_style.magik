@@ -1,0 +1,39 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-03-22 21:49:26 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_style.kml_style()
+	## Backstop - return a KML style for me.  This version does nothing
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _unset 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_style.kml_image_file_name(_optional name_suffix)
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	res <<  write_string(_self.id,%.,name_suffix.default(""),".png")
+	>> res
+_endmethod
+$

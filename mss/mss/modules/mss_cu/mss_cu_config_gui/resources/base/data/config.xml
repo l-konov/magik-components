@@ -1,0 +1,48 @@
+<config>
+  <plugins>
+    <plugin name="versions" class_name="version_management_plugin">
+      <properties>
+        <property name="type" value="mss_config"/>
+        <property name="conflict_viewer_name" value="conflict_viewer_dialog"/>
+      </properties>
+    </plugin>
+
+    <plugin name="editor_manager" class_name="mss_config_editor_manager">
+      <properties>
+        <property name="editor_gui_definition_module_name" value="mss_config_editor"/>
+        <property name="editor_config_definition_module_name" value="mss_config_editor"/>
+        <property name="default_editor_class" value="mss_config_object_editor"/>
+      </properties>
+    </plugin>
+
+    <plugin name="explorer" class_name="explorer_plugin">
+      <properties>
+        <property name="model_config_definition_file_name"   value="explorer_model_config.xml"/>
+        <property name="model_config_definition_module_name" value="mss_cu_config_gui"/>
+        <property name="floating_gui_definition_module_name" value="swaf_professional_application"/>
+        <property name="floating_gui_definition_file_name"   value="floating_explorer_view_gui.xml"/>
+        <property name="embedded_gui_definition_module_name" value="swaf_professional_application"/>
+        <property name="embedded_gui_definition_file_name"   value="embedded_explorer_view_gui.xml"/>
+        <property name="expose_embedded_selection"           value="true"/>
+        <property name="expose_floating_selection"           value="true"/>
+      </properties>
+      <export>
+        <toolbar source_name="find"/>
+	<toolbar source_name="advanced_find"/>
+      </export>
+      <find_engine>
+        <categories>
+        </categories>
+        <engine plugin_name="search_engine"/>
+        <default_text id ="find_text"/>
+      </find_engine>
+    </plugin>
+
+    <plugin name="cu_property_config" class_name="mss_cu_property_config_plugin"/>
+    <plugin name="cu_group_config" class_name="mss_cu_group_config_plugin"/>
+    <plugin name="cu_job_type_config" class_name="mss_cu_job_type_config_plugin"/>
+    <plugin name="cu_mu_config" class_name="mss_cu_mu_config_plugin"/>
+    <plugin name="cu_cost_group_config" class_name="mss_cu_cost_group_config_plugin"/>
+    <plugin name="cu_import_export_config" class_name="mss_cu_import_export_config_plugin"/>
+  </plugins>
+</config>

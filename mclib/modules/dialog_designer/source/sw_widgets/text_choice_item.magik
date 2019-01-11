@@ -1,0 +1,310 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## TEXT_CHOICE_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+text_choice_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :values,:string,
+					  :strings,:string,
+					  :representation_message,:string,
+					  :change_selector,:string,
+					  :is_combo_box,:boolean
+						),
+				  :public)
+$
+
+# Define hidden properties for this class.
+_pragma(classify_level=restricted, topic={dialog_designer})
+text_choice_item.define_shared_constant(:hidden_properties,
+	property_list.new_with(:driven_ws,:string),:public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.dd_properties()
+	## 
+	##  Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over text_choice_item.dd_properties.fast_keys_and_elements()
+	_loop
+		
+		props[k] << e
+	_endloop
+
+	_if _self.is_combo_box _is _true 
+	_then
+		props.remove_key(:representation_message)
+	_endif
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+	
+	>> 40 + _self.label_width
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.default_min_height
+	## 
+	## Return the minimum default rendering height.
+	
+	vts << vtext_style.new(_self.font)
+	>> vts.box_coordinates("Ab").bounds.height.rounded - 2
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	tci << _self.new(rc,_unset,
+		     :row,row,:col,col,
+		     :col_alignment,:fill,
+		     :row_alignment,:top)
+	tci.is_combo_box << _false
+
+	>> tci
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	>> _self.new(parent,props[:label],_scatter props)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	!dialog_element_footprints![pbb.deep_copy()] << _self
+
+	# Adjust when there's label 
+	lab_w << _self.label_width
+	pbb.xmin +<< lab_w
+	w -<< lab_w
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+	canv.draw(pbb.boundary,ls)
+
+	ri << smallworld_product.get_raster_image(:choice_item_down,:dialog_designer)
+	canv.render_raster(ri,pbb.xmax-15,pbb.ymin+1,_false)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	lab << _self.message_from_keyed_message(_self.label)
+	canv.draw_text(ts,pbb.xmin+2-lab_w,pbb.ymax-2,lab)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.gui_messages(txt)
+	## 
+	## Write SELF's messages to the text stream TXT.
+
+	txt.write(%:,_self.get_property(:dialog_element_id),%tab,_self.value,%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	obj_type << _if _self.is_combo_box.default(_false)
+		    _then
+			    >> "combo_box_item"
+		    _else
+			    >> "text_choice_item"
+		    _endif
+
+	txt.write(%tab,".items[:",_self.dialog_element_id, "] << " + obj_type + ".new(",parent_id,%,,%",
+		  _self.label.default(""),%",%,,%newline, %tab*3,":model,   _self")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		( gui_name,gui_value)  << _self.gui_name_and_value(n,v)
+
+		_if gui_name _is _unset 
+		_then
+			_continue 
+		_endif
+
+		txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)
+	_endloop
+
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, _self.message(",km[1],%))
+		_else
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, ",%",km[2],%")
+		_endif
+	_endif 
+		
+	txt.write(" )",%newline)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.dd_values_to_items(pv)
+	## 
+	## Generate a the text vector code for the value & items of SELF.
+
+	txt << ""
+
+	_if _self.is_combo_box.default(_false)
+	_then 
+		txt << write_string(%{,%",%")
+
+		_for v _over _self.values.split_by(%,).fast_elements()
+		_loop
+			txt +<< write_string(%,,%",v,%")
+		_endloop
+	
+	_elif _self.strings.default("").size > 0
+	_then
+		vals << _self.values.split_by(%,)
+		strs << _self.strings.split_by(%,)
+
+		min_size << min(vals.size,strs.size)
+		
+		_for i _over 1.upto(min_size)
+		_loop
+			txt +<< write_string(",{:|",vals[i],"|,",%",strs[i],%",%})
+		_endloop
+	_elif (rm << _self.representation_message).default("").size > 0
+	_then
+		vals << _self.values.split_by(%,)
+		
+		_for i _over 1.upto(vals.size)
+		_loop
+			str << vals[i].perform(rm.as_symbol())
+
+			txt +<< write_string(",{:|",vals[i],"|,",%",str,%",%})
+		_endloop
+	_else
+		txt << write_string(%{,%",%")
+
+		_for v _over _self.values.split_by(%,).fast_elements()
+		_loop
+			txt +<< write_string(%,,%",v,%")
+		_endloop
+	_endif
+
+	>> _if txt.size>1
+	   _then
+		   >> "{" + txt.slice_to_end(2) + "}"
+	   _else
+		   >> "{}"
+	   _endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.is_combo_box
+	## 
+	## Return the IS_COMBO_BOX property.
+	.properties << .properties.default(property_list.new())
+	>> .properties[:is_combo_box]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.is_combo_box << new_val
+	## 
+	## Set the IS_COMBO_BOX property.
+	.properties << .properties.default(property_list.new())
+	.properties[:is_combo_box] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.driven_ws << new_val
+	## 
+	## Store the id of the driven window_stack in SELF's properties.
+	
+	.properties[:driven_ws] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.hidden_xml_properties(txt,n_tabs)
+	## 
+	## If set, write id of the driven window_stack to the XML
+	## stream txt.
+
+	_if (dw_id << .properties[:driven_ws].default("")) <> ""
+	_then
+		txt.write((n_tabs+1)*%tab,%<,
+			  "property name=",%",:driven_ws,%",
+			  " value=",%",dw_id,%",
+			  "/>",%newline)
+		
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+text_choice_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_choice_item.set_logical_properties(_optional all?)
+	##
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_if all?.default(_false)
+	_then
+		_self.change_selector << _self.dialog_element_id + "_changed()"
+	_endif
+
+_endmethod
+$
+
+
+

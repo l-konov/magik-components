@@ -1,0 +1,10 @@
+message_usages.magik
+
+mss_ptrule_gui_plugin.magik
+mss_ptrule_find_all_dialog.magik
+mss_ptrule_find_plugin.magik
+mss_ptrule_framework.magik
+mss_ptrule_framework_plugin.magik
+mss_ptrule_options_menu.magik
+mss_ptrule_plugin.magik
+mss_ptrule_specials_plugin.magik

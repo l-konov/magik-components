@@ -1,0 +1,114 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef_config_framework_plugin
+##
+## Plugin devoted to embedding an mss_ptdef_config_menu within a
+## main application framework.
+##
+
+def_slotted_exemplar(:mss_ptdef_config_framework_plugin,
+{
+},
+{:plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+## Name of the gui definition file.  Defaults to "gui.xml".
+mss_ptdef_config_framework_plugin.define_property(
+	:gui_definition_file_name,
+	:string,
+	"Name of the gui definition file",
+	_false, _false, "gui.xml")
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+## Name of the module in which the gui definition is located.
+mss_ptdef_config_framework_plugin.define_property(
+	:gui_definition_module_name,
+	:string,
+	"Name of module in which gui definition is located")
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+## Name of the config definition file.  Defaults to "config.xml".
+mss_ptdef_config_framework_plugin.define_property(
+	:config_definition_file_name,
+	:string,
+	"Name of the config definition file",
+	_false, _false, "config.xml")
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+## Name of the module in which the config definition is located.
+mss_ptdef_config_framework_plugin.define_property(
+	:config_definition_module_name,
+	:string,
+	"Name of module in which config definition is located")
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_framework_plugin.gui_definition_module_name
+	## 
+	## Use property (if defined), otherwise just use module name.
+	##
+
+	_return _self.property(:gui_definition_module_name).default(_self.module_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_framework_plugin.config_definition_module_name
+	## 
+	## Use property (if defined), otherwise just use module name.
+	##
+
+	_return _self.property(:config_definition_module_name).default(_self.module_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_framework_plugin.init_actions()
+	## 
+	## Create an action for activating the framework.
+	##
+	
+	_self.add_action(sw_action.new(:activate_mss_ptdef_config_menu,
+				       :engine, _self,
+				       :action_message, :|activate_dialog()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_framework_plugin.activate_dialog()
+	## 
+	## Activate the framework.
+	##
+
+	_if (m << _self.get_dialog(:mss_ptdef_config_menu)) _is _unset
+	_then
+		m << mss_ptdef_config_menu.new(
+			     :mss_ptdef_config_menu, _unset,
+			     :config_definition_module_name, _self.config_definition_module_name,
+			     :config_definition_file_name, _self.config_definition_file_name,
+			     :gui_definition_module_name, _self.gui_definition_module_name,
+			     :gui_definition_file_name, _self.gui_definition_file_name)
+			     
+		_self.cache_dialog(:mss_ptdef_config_menu, m)
+	_endif
+	m.activate(_unset, m.message(:mss_ptdef_config_menu))
+	m.top_frame.minimized? << _false
+	
+_endmethod
+$

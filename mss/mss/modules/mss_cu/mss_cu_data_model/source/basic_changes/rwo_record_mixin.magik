@@ -1,0 +1,71 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, usage={subclassable})
+_method rwo_record_mixin.clone( _optional context )
+	##
+	## Return a new record which is a copy of this record, with a
+	## new key. The new record is created in this record's source
+	## collection, unless !current_dsview! has been set to another
+	## dataset, in which case, the record is inserted in a
+	## collection with the same name in that dataset.
+	##
+	## This method will only work if the collection has system
+	## generated keys, otherwise unset will be returned.
+	##
+	## CONTEXT - may be passed to indicate the context in which the
+	## clone is being performed. this is ignored by this
+	## implementation, but may be used by subclasses where special
+	## behaviour is required in certain situations.
+	##
+
+	# 2005/04/24 TM  Also clone mss_cu_reference records.
+	# 2009/08/10 TM  Integrated with TSB 123, P122321_3e.
+	# 2011/04/25 TM  Updated for V4.2 compatibility.
+	
+	(target_view, target_collection) << _if !current_dsview! _isnt _unset
+					    _then
+						    >> !current_dsview!, _self.target_collection
+					    _else
+						    >> _self.source_view, _self.source_collection
+					    _endif 
+		      
+	new_record << _unset
+	
+	ok? << target_view.start_lwt()
+	_protect 
+		new_record << target_collection.insert(_self)
+		_if new_record _isnt _unset
+		_then 
+			_for jf _over _self.join_fields( _false )
+			_loop
+				_if jf.join_type _is :text
+				_then
+					value << _self.perform( jf.name )
+					_if value _isnt _unset
+					_then 
+						new_record.perform( jf.chevronned_name, value )
+					_endif
+				_endif
+			_endloop
+		_endif 
+
+		# TM START CHANGE
+		_self.mss_clone_cu_references(new_record)
+		# TM END CHANGE
+		
+		ok? << _true 
+	_protection
+		target_view.end_lwt( ok? )
+	_endprotect
+	
+	>> new_record
+	
+_endmethod
+$

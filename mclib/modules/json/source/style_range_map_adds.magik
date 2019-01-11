@@ -1,0 +1,30 @@
+#% text_encoding = iso8859_1
+_package sw
+
+##
+##> Name:         style_range_map_adds.magik
+##
+##> Application:  ?
+##
+##> Description:  ?
+##
+##> Author:       Uli Nädelin
+##
+##> Date:         20. Feb 2017
+##
+## Copyright (C)  GIT HydroS Consult GmbH. 
+##                Freiburg, Germany.
+##                http://www.hydrosconsult.de  
+##                All Rights Reserved.
+##
+
+_pragma(classify_level=restricted, topic={style_range_map})
+_method style_range_map.convert_to_json(a_stream)
+	## 
+	## 
+	_super(range_map_mixin).write_as_json(a_stream)
+_endmethod
+$
+
+
+

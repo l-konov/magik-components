@@ -1,0 +1,339 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_geometry_changed_in_replica?(a_geom, parent_geom_rwo, parent_geom)
+	## 
+	## Return true if A_GEOM - which is a geometry from a replica
+	## view mananged by a mss_wm_overlay_swdp_manager should be
+	## considered to be changed.  PARENT_GEOM_RWO and PARENT_GEOM are
+	## the corresponding RWO and geometry from the original view.  Note
+	## that only geometries that are normally considered to be changed
+	## are visible/hittable/selectable by the mss_wm_overlay_swdp_manager.
+	##
+	## Backstop processing returns false if self is equal to
+	## PARENT_GEOM_RWO, and if A_GEOM (and substructure) is equal
+	## to PARENT_GEOM (and substructure).  Subclasses may change
+	## this to examine additional substructure if appropriate.
+	##
+
+	_if _not a_geom.all_substructure_equals?(parent_geom)
+	_then
+		_return _true
+	_endif
+	_return (_not _self.validation_equals?(parent_geom_rwo))
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ovc_consistency_roots(mode, engine, target_dataset)
+	## 
+	## Return a collection of all top-level records that should be
+	## transferred for an overlay view copy operation.  MODE is
+	## always :insert_update (in the future, it may include :delete).
+	## ENGINE is the mss_wm_overlay_view_copy_engine doing the
+	## work, and TARGET_DATASET is the dataset that self is going
+	## to be copied into.
+	##
+	## Default processing is to use all of self's consistency_roots(),
+	## or simply use self if self has no consistency roots.
+	##
+	## Refer to the administration guide for more information on
+	## customizing this method, as it is likely that some sort of
+	## adaptation is required to suit your particular data model.
+	##
+
+	_dynamic !mss_ovc_top_level_records!
+
+	r << rope.new()
+	_if !mss_ovc_top_level_records! _is _unset
+	_then
+		!mss_ovc_top_level_records! << equality_set.new()
+	_endif
+
+	_if !mss_ovc_top_level_records!.includes?(_self)
+	_then
+		_return r
+	_endif
+	!mss_ovc_top_level_records!.add(_self)
+	
+	_for top_rec _over _self.consistency_roots()
+	_loop
+		r.add_all_last(top_rec.mss_ovc_consistency_roots(mode, engine, target_dataset))
+	_endloop
+
+	_if r.size = 0
+	_then 
+		r.add_last(_self)
+	_endif 
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ovc_prepare_to_replace_substructure(engine, target_dataset)
+	## 
+	## Prepare to replace self's substructure in the database view
+	## TARGET_DATASET for an overlay view copy operation.  ENGINE
+	## is the mss_wm_overlay_view_copy_engine doing the work.
+	##
+	## Return a rope of records that are defined as
+	## consistency_ref? = true.
+	##
+	## Default processing is to use prepare_to_replace_substructure().
+	##
+
+	# Remove tracking records and CUs first: if self is actually
+	# from TARGET_DATASET, it will be deleted.
+	_self.mss_substructure_prepare_to_replace_tracking_records(target_dataset)
+	_self.mss_substructure_prepare_to_replace_cus(target_dataset)
+	
+	refs << _self.prepare_to_replace_substructure(target_dataset)
+	_return refs
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_substructure_prepare_to_replace_tracking_records(target_dataset)
+	## 
+	## Prepare to replace tracking records for self and all
+	## substructure of self into TARGET_DATASET.
+	##
+
+	_self.mss_prepare_to_replace_tracking_records(target_dataset)
+	_for rec _over _self.one_level_substructure()
+	_loop
+		_if rec.is_geometry?
+		_then
+			_continue
+		_endif
+		rec.mss_substructure_prepare_to_replace_tracking_records(target_dataset)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_prepare_to_replace_tracking_records(target_dataset)
+	## 
+	## Prepare to replace tracking records for self into TARGET_DATASET.
+	##
+
+	_if (tr_ex << get_global_value(:mss_workspace_tracking_record)) _isnt _unset
+	_then
+		_if _self.mss_track_record?()
+		_then
+			_for rel_rec _over tr_ex.tracking_records_for(_self).fast_elements()
+			_loop
+				rel_rec.prepare_to_replace_substructure(target_dataset)
+			_endloop 
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_substructure_prepare_to_replace_cus(target_dataset)
+	## 
+	## Prepare to replace CUs for self and all substructure of self
+	## into TARGET_DATASET. 
+	##
+
+	_self.mss_prepare_to_replace_cus(target_dataset)
+	_for rec _over _self.one_level_substructure()
+	_loop
+		_if rec.is_geometry?
+		_then
+			_continue
+		_endif
+		rec.mss_substructure_prepare_to_replace_cus(target_dataset)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_prepare_to_replace_cus(target_dataset)
+	## 
+	## Prepare to replace CUs for self into TARGET_DATASET.
+	##
+
+	_if (cu_ex << get_global_value(:mss_cu_reference)) _isnt _unset
+	_then
+		_if _self.mss_cus_allowed?()
+		_then
+			_for rel_rec _over cu_ex.tracking_records_for(_self).fast_elements()
+			_loop
+				rel_rec.prepare_to_replace_substructure(target_dataset)
+			_endloop 
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ovc_clone_substructure_into(engine, target_dataset)
+	## 
+	## Clone self into TARGET_DATASET as part of an overlay view
+	## copy operation.  ENGINE is the mss_wm_overlay_view_copy_engine
+	## doing the work.
+	##
+	## Return a rope of records that are defined as
+	## consistency_ref? = true.
+	##
+	## Default processing is to use clone_substructure_into().
+	##
+
+	refs << _self.clone_substructure_into(target_dataset)
+	_if (props << engine.copy_parameters) _is _unset
+	_then
+		_return refs
+	_endif 
+
+	r_trs? << props[:reassign_tracking_records?]
+	c_trs? << props[:copy_tracking_records?]
+	r_cus? << props[:reassign_cus?]
+	c_cus? << props[:copy_cus?]
+
+	_if r_trs? _is _true _orif
+	    c_trs? _is _true
+	_then
+		_self.mss_substructure_clone_tracking_records(target_dataset, props)
+	_endif
+	
+	_if r_cus? _is _true _orif
+	    c_cus? _is _true
+	_then
+		_self.mss_substructure_clone_cus(target_dataset, props)
+	_endif 
+
+	_return refs
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_substructure_clone_tracking_records(target_dataset, props)
+	## 
+	## Clone tracking records for self and all substructure of self into
+	## TARGET_DATASET.
+	##
+
+	_self.mss_clone_tracking_records(target_dataset, props)
+	_for rec _over _self.one_level_substructure()
+	_loop
+		_if rec.is_geometry?
+		_then
+			_continue
+		_endif
+		rec.mss_substructure_clone_tracking_records(target_dataset, props)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_clone_tracking_records(target_dataset, props)
+	## 
+	## Clone tracking records for self into TARGET_DATASET.
+	##
+
+	_if (target_rec << _self.corresponding_record(target_dataset)) _is _unset
+	_then
+		_return
+	_endif
+	
+	_if (tr_ex << get_global_value(:mss_workspace_tracking_record)) _isnt _unset
+	_then
+		r_trs? << props[:reassign_tracking_records?]
+		t_did << props[:to_design_id]
+		f_dids << props[:all_from_design_ids]
+		
+		_if target_rec.mss_track_record?()
+		_then
+			_for rel_rec _over tr_ex.tracking_records_for(_self).fast_elements()
+			_loop
+				rel_rec.clone_substructure_into(target_dataset)
+				_if r_trs? _is _true _andif
+				    t_did _isnt _unset _andif 
+				    f_dids _isnt _unset _andif
+				    (target_rel_rec << rel_rec.corresponding_record(target_dataset)) _isnt _unset _andif
+				    f_dids.includes?(target_rel_rec.mss_design_id)
+				_then
+					target_rel_rec.mss_design_id << t_did
+				_endif
+			_endloop 
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_substructure_clone_cus(target_dataset, props)
+	## 
+	## Clone CUs for self and all substructure of self into
+	## TARGET_DATASET.
+	##
+
+	_self.mss_clone_cus(target_dataset, props)
+	_for rec _over _self.one_level_substructure()
+	_loop
+		_if rec.is_geometry?
+		_then
+			_continue
+		_endif
+		rec.mss_substructure_clone_cus(target_dataset, props)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method dd_record_mixin.mss_clone_cus(target_dataset, props)
+	## 
+	## Clone CUs for self into TARGET_DATASET.
+	##
+
+	_if (target_rec << _self.corresponding_record(target_dataset)) _is _unset
+	_then
+		_return
+	_endif
+	
+	_if (cu_ex << get_global_value(:mss_cu_reference)) _isnt _unset
+	_then
+		r_cus? << props[:reassign_cus?]
+		t_did << props[:to_design_id]
+		f_dids << props[:all_from_design_ids]
+		
+		_if target_rec.mss_cus_allowed?()
+		_then
+			_for rel_rec _over cu_ex.tracking_records_for(_self).fast_elements()
+			_loop
+				rel_rec.clone_substructure_into(target_dataset)
+				_if r_cus? _is _true _andif
+				    t_did _isnt _unset _andif 
+				    f_dids _isnt _unset _andif
+				    (target_rel_rec << rel_rec.corresponding_record(target_dataset)) _isnt _unset _andif
+				    f_dids.includes?(target_rel_rec.mss_design_id)
+				_then
+					target_rel_rec.mss_design_id << t_did
+				_endif
+			_endloop 
+		_endif
+	_endif
+	
+_endmethod
+$

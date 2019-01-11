@@ -1,0 +1,17 @@
+mss_workspace	1
+
+description
+	MSS workspace
+end
+
+requires
+	mss_core_changes
+	mss_wm_job_design_plugin
+	mss_wm_recent_designs_plugin
+	mss_wm_state_transition_plugin
+	mss_swaf_changes
+	mss_workspace_data_model
+	mss_workspace_editors
+	mss_workspace_manager
+	mss_workspace_manager_gui
+end

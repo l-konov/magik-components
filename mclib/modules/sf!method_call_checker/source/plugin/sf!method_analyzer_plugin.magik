@@ -1,0 +1,73 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA})
+##
+## This plugin provides an action that can be placed in an XML
+## file to launch the Method Analyzer GUI from an application.
+##
+def_slotted_exemplar( :sf!method_analyzer_plugin,
+{
+},
+{ :plugin } )
+$
+
+
+_pragma(classify_level=advanced, topic={Cornerstine})
+_method sf!method_analyzer_plugin.init_actions()
+
+	## Provide an action to launch the user GUI.
+
+	_for an_action _over { :activate_dialog }.fast_elements()
+	_loop
+	    _self.add_action(
+		sw:sw_action.new( an_action,
+			:engine,  _self,
+			:caption, _self.message( an_action ),
+			:tooltip, _self.message( an_action + :|_tt| ),
+			:short_help_text, _self.message( an_action + :|_sht| ),
+			:action_message,  { an_action.with_parentheses,
+					    :standalone_gui,
+					    _self.message( :title ) }
+			) )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method sf!method_analyzer_plugin.activate_dialog( a_dialog_name, a_title )
+
+	## Activate method checker GUI as dialog...
+
+	_if ( dlg << _self.get_dialog( a_dialog_name ) ) _is _unset
+	_then		
+		dlg << mclib:sf!method_analyzer_framework.new( _unset, _self )
+
+		# Cache the dialog
+		_self.cache_dialog( a_dialog_name, dlg )		
+	_endif
+
+	# Activate it and use the specified frame title...
+	dlg.activate( a_title )
+_endmethod
+$

@@ -1,0 +1,49 @@
+#% text_encoding = iso8859_1
+_package mclib
+
+
+#-------------------------------------------------------------------------------
+#
+# The information and design as detailed in this document is the property of
+# General Electric Company, and/or their Associates, and must be returned on demand.
+# It is issued on the strict condition that except with our written permission
+# it must not be reproduced, copied or communicated in part or in whole to any
+# third party, nor be used for any purpose other than that stated in the
+# particular enquiry, order or contract with which it is issued.
+#
+# The reservation of copyright in this document extends from each date
+# appearing thereon and in respect of the subject matter as it appeared at the
+# relevant date.
+#
+# Copyright 2000-2006 General Electric Company. All Rights Reserved. This software
+# product may only be used strictly in accordance with the applicable written License Agreement.
+#
+#------------------------------------------------------------------------------
+
+transient_dataset.define_shared_constant(:dataset_instance_metadata, 
+	property_list.new_with(
+	    :kml_samples, property_list.new_with(
+			       :collections, property_list.new_with(
+						     :placemark,
+						     property_list.new_with(
+							     :fields, property_list.new_with(
+									      :id, {:physical, :ds_int, :key, _unset,
+										    :external_name, "Object ID"},
+									      :name, {:physical, :extdb_string, :nonman, 32.
+										      :external_name, "Name"},
+									      :snippet,  {:physical, :extdb_string, :nonman, 32,
+											  :external_name, "Snippet"},
+									      :description, {:physical, :extdb_string, :nonman, 256,
+											     :external_name, "Description"},
+									      :point, {:geometry, :simple_point,:nonman,
+										       :external_name, "Point"},
+									      :line, {:geometry, :simple_chain,:nonman,
+										      :external_name, "Line"},
+									      :area, {:geometry, :simple_area,:nonman,
+										      :external_name, "Area"}
+										    ),
+							     :exemplar, kml_rwo_record)
+							   ))),:private)
+$
+
+							 

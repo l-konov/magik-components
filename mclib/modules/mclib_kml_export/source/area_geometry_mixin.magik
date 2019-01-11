@@ -1,0 +1,82 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-17 13:46:27 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-23-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method area_geometry_mixin.as_kml_entity(_optional height)
+	## 
+	## 
+	##
+
+	# (03-23-2006 Brad Sileo): created.
+	_dynamic !print_float_precision! << 12
+	polys << rope.new()
+	_for a_polygon _over _self.polygons()
+	_loop
+		new_polygon << a_polygon.projected_for_kml()
+		kml << new_polygon.int!as_kml_entity(height)
+		polys.add(kml)
+	_endloop
+	res << simple_xml_thing.new("MultiGeometry",polys)
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method area_geometry_mixin.int!as_kml_entity(_optional height)
+	## 
+	## 
+	##
+
+	# (03-23-2006 Brad Sileo): created.
+	>> simple_xml_thing.new("Polygon",_self.kml_polygon_elements(height))
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method area_geometry_mixin.kml_polygon_elements(_optional height)
+	## returns each outerBoundary and InnerBoundary element of my polygon
+	## 
+	##
+
+	# (03-23-2006 Brad Sileo): created.
+	res << rope.new()
+	(outs,ins) << _self.outers_and_inners
+	_for a_out _over outs.fast_elements()
+	_loop
+		rings << _self.kml_linear_rings_for(a_out,height)
+		res.add_last(simple_xml_thing.new("outerBoundaryIs",rings))
+	_endloop
+	_for a_in _over ins.fast_elements()
+	_loop
+		rings << _self.kml_linear_rings_for(a_in,height)
+		res.add_last(simple_xml_thing.new("innerBoundaryIs",rings))
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method area_geometry_mixin.kml_linear_rings_for(sectors, _optional height)
+	## 
+	## 
+	##
+
+	# (03-23-2006 Brad Sileo): created.
+	coords << sectors.as_kml_coords(height)
+	>> {simple_xml_thing.new("LinearRing",{coords})}
+_endmethod
+$

@@ -1,0 +1,906 @@
+#% text_encoding = utf8
+_block
+
+o << case_object.new_from_archive(
+                                  {1,
+                                  "mss_design",
+                                  write_string("Design"),
+                                  "mss_design",
+                                  _unset,{0,0,0},0} ,0.00000000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("owner", "Owner", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("status", "Status", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_job_id", "Job ID", :physical)
+
+
+an_f << o.add_field("comments_id", "comments_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("mss_design_id", "Parent Design ID", :physical)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("last_update_user", "Last Update User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_time", "Last Update Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("short_description", "Short Description", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,48)
+an_f.print_width << 48
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("extent", "Extent", :geometric)
+an_f.mandatory? << False
+an_f.archive_default_value << true
+an_f.priority << 0
+an_f.set_geometry_type(:simple_area)
+
+
+an_f << o.add_field("annotation", "Annotation", :geometric)
+an_f.priority << 0
+an_f.set_geometry_type(:text)
+an_f.set_text_method_name("annotation_text")
+
+
+an_f << o.add_field("comments", "Comments", :text)
+an_f.archive_text_join_field(:comments_id)
+
+
+an_f << o.add_field("mss_job", "Job", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {23,
+                                  "mss_design_archive",
+                                  write_string("Design Archive"),
+                                  "mss_design_archive",
+                                  _unset,{0,0,0},0} ,42624.0000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("owner", "Owner", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("status", "Status", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_job_id", "Mss Job Id", :physical)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("comments_id", "comments_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("mss_design_id", "Parent Design ID", :physical)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("last_update_user", "Last Update User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_time", "Last Update Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("last_delete_user", "Last Delete User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_delete_time", "Last Delete Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("comments", "Comments", :text)
+an_f.archive_text_join_field(:comments_id)
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {43,
+                                  "mss_design_history",
+                                  write_string("Design History"),
+                                  "mss_design_history",
+                                  _unset,{0,0,0},0} ,21312.0000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("mss_job_id", "Job ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("mss_design_id", "Design ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|ds_byte|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("owner", "Owner", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("status", "Status", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_user", "Last Update User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_time", "Last Update Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << True
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {60,
+                                  "mss_job",
+                                  write_string("Job"),
+                                  "mss_job",
+                                  _unset,{0,0,0},0} ,0.00000000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+
+
+an_f << o.add_field("title", "Title", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("type", "Type", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+
+
+an_f << o.add_field("status", "Status", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.editor_name << "readonly_field_editor"
+
+
+an_f << o.add_field("start_date", "Start Date", :physical)
+an_f.archive_set_field_type_to(:|ds_date|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << False
+an_f.archive_unset_value << date
+
+
+an_f << o.add_field("end_date", "End Date", :physical)
+an_f.archive_set_field_type_to(:|ds_date|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << False
+an_f.archive_unset_value << date
+
+
+an_f << o.add_field("singular_children?", "Allow Only One Approved Design?", :physical)
+an_f.archive_set_field_type_to(:|ds_bool|,_unset)
+an_f.print_width << 10
+an_f.archive_default_value << true
+
+
+an_f << o.add_field("comments_id", "comments_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("last_update_user", "Last Update User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_time", "Last Update Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("comments", "Comments", :text)
+an_f.archive_text_join_field(:comments_id)
+
+
+an_f << o.add_field("mss_designs", "Designs", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {81,
+                                  "mss_job_archive",
+                                  write_string("Job Archive"),
+                                  "mss_job_archive",
+                                  _unset,{0,0,0},0} ,42624.0000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("title", "Title", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("type", "Type", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("status", "Status", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("start_date", "Start Date", :physical)
+an_f.archive_set_field_type_to(:|ds_date|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << False
+an_f.archive_unset_value << date
+
+
+an_f << o.add_field("end_date", "End Date", :physical)
+an_f.archive_set_field_type_to(:|ds_date|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << False
+an_f.archive_unset_value << date
+
+
+an_f << o.add_field("singular_children?", "Allow Only One Approved Design?", :physical)
+an_f.archive_set_field_type_to(:|ds_bool|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << true
+
+
+an_f << o.add_field("comments_id", "comments_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("last_update_user", "Last Update User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_time", "Last Update Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_delete_user", "Last Delete User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_delete_time", "Last Delete Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.editor_name << "readonly_field_editor"
+an_f.mandatory? << True
+
+
+an_f << o.add_field("comments", "Comments", :text)
+an_f.archive_text_join_field(:comments_id)
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {103,
+                                  "mss_job_history",
+                                  write_string("Job History"),
+                                  "mss_job_history",
+                                  _unset,{0,0,0},0} ,21312.0000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("mss_job_id", "Job ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|ds_byte|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("type", "Type", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("status", "Status", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_user", "Last Update User", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("last_update_time", "Last Update Time", :physical)
+an_f.archive_set_field_type_to(:|ds_time|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << True
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {119,
+                                  "mss_ws_related_document",
+                                  write_string("Workspace Related Document"),
+                                  "mss_ws_related_document",
+                                  _unset,{0,0,0},0} ,21312.0000000, -13500.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("record_tid", "Record TID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("record_id", "Record ID", :physical)
+an_f.archive_set_field_type_to(:|gen_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("rootdir_id", "Root Directory ID", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,40)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("usage_id", "Usage ID", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,40)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << 0
+
+
+an_f << o.add_field("comments_id", "comments_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("filename_id", "filename_id", :physical)
+an_f.archive_set_field_type_to(:|text_id|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+an_f.archive_default_value << 0
+an_f.set_generator_method_name("dd!zero()")
+
+
+an_f << o.add_field("comments", "Comments", :text)
+an_f.archive_text_join_field(:comments_id)
+
+
+an_f << o.add_field("filename", "Filename", :text)
+an_f.archive_text_join_field(:filename_id)
+
+
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {136,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_job", "mss_design")
+r.add_default_join_names()
+r.join_name << "mss_job_to_mss_design"
+r.reverse_join_name << "mss_design_to_mss_job"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((0.0),(-375*2.0**4),(0.0),(-375*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_design, :mss_job_id, :mss_job, :id, 136)
+case_object.archive_join_field_info(:mss_design, :mss_job, 136, :child)
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_job, :mss_designs, 136, :parent)
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_design,
+                                            {"name",
+                                            "owner",
+                                            "status",
+                                            "comments",
+                                            "mss_job",
+                                            "extent",
+                                            "annotation",
+                                            "last_update_user",
+                                            "last_update_time"})
+case_visible_fields_object.new_from_archive(:description, 
+                                            :mss_design,
+                                            {"short_description"})
+case_object.archived_indices(:mss_design, {"owner"}, {})
+case_object.archived_indices(:mss_design, {"mss_job_id"}, {136})
+case_object.archived_indices(:mss_design, {"mss_design_id"}, {})
+case_object.archive_aspect_field(:mss_design, :mss_job, :mss_job, :name)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_design_archive,
+                                            {"name",
+                                            "owner",
+                                            "status",
+                                            "comments",
+                                            "last_update_user",
+                                            "last_update_time",
+                                            "last_delete_time",
+                                            "last_delete_user"})
+case_object.archived_indices(:mss_design_archive, {"owner"}, {})
+case_object.archived_indices(:mss_design_archive, {"mss_design_id"}, {})
+case_object.archived_indices(:mss_design_archive, {"mss_job_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_design_history,
+                                            {"mss_job_id",
+                                            "mss_design_id",
+                                            "operation",
+                                            "name",
+                                            "owner",
+                                            "status",
+                                            "last_update_user",
+                                            "last_update_time"})
+case_object.archived_indices(:mss_design_history, {"owner"}, {})
+case_object.archived_indices(:mss_design_history, {"mss_job_id"}, {})
+case_object.archived_indices(:mss_design_history, {"mss_design_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_job,
+                                            {"name",
+                                            "title",
+                                            "type",
+                                            "status",
+                                            "start_date",
+                                            "end_date",
+                                            "singular_children?",
+                                            "comments",
+                                            "last_update_user",
+                                            "last_update_time"})
+case_object.archived_indices(:mss_job, {"name"}, {})
+case_object.archived_indices(:mss_job, {"start_date"}, {})
+case_object.archived_indices(:mss_job, {"end_date"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_job_archive,
+                                            {"name",
+                                            "title",
+                                            "type",
+                                            "status",
+                                            "start_date",
+                                            "end_date",
+                                            "singular_children?",
+                                            "comments",
+                                            "last_update_user",
+                                            "last_update_time",
+                                            "last_delete_user",
+                                            "last_delete_time"})
+case_object.archived_indices(:mss_job_archive, {"name"}, {})
+case_object.archived_indices(:mss_job_archive, {"start_date"}, {})
+case_object.archived_indices(:mss_job_archive, {"end_date"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_job_history,
+                                            {"mss_job_id",
+                                            "operation",
+                                            "name",
+                                            "type",
+                                            "status",
+                                            "last_update_user",
+                                            "last_update_time"})
+case_object.archived_indices(:mss_job_history, {"name"}, {})
+case_object.archived_indices(:mss_job_history, {"mss_job_id"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_ws_related_document,
+                                            {"record_tid",
+                                            "record_id",
+                                            "rootdir_id",
+                                            "usage_id",
+                                            "filename",
+                                            "comments"})
+case_object.archived_indices(:mss_ws_related_document, {"record_id"}, {})
+
+_endblock
+$
+
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$

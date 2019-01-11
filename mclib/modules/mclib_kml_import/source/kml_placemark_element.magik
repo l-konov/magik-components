@@ -1,0 +1,126 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:41:20 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:kml_placemark_element,
+                             {},
+			     {:kml_element})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_placemark_element.rwo_set(a_collection_or_dataset)
+	## Returns the rwo_set with me in it.
+	##
+
+	# (08-08-2007 Brad Sileo): created.
+	target_cs << coordinate_system.new_proj_long_lat(:wgs84,:degree)
+	wrld << pseudo_world.new(target_cs)
+	res << rwo_set.new()
+	
+	_if a_collection_or_dataset.is_kind_of?(universal_dataset)
+	_then
+		a_collection << kml_rwo_record.default_collection(a_collection_or_dataset)
+	_else
+		a_collection << a_collection_or_dataset
+	_endif
+	
+	_if (name_elem << _self.element_matching_name(:name)) _isnt _unset 
+	_then
+		name <<  name_elem.elements.an_element()
+	_else
+		name << ""
+	_endif
+	
+	_if (snippet_elem << _self.element_matching_name(:|Snippet|)) _isnt _unset 
+	_then
+		snippet <<  snippet_elem.elements.an_element()
+	_else
+		snippet << ""
+	_endif
+	
+	_if (desc_elem << _self.element_matching_name(:description)) _isnt _unset 
+	_then
+		desc <<  desc_elem.elements.an_element()
+	_else
+		desc << ""
+	_endif
+	
+	geoms << geometry_set.new()
+	_for a_elem _over _self.elements.fast_elements()
+	_loop
+		geoms.add_all(a_elem.geometry_set())
+	_endloop
+
+	# Do the polygons
+	_if ( an_area << _self.element_matching_name(:|Polygon|)) _isnt _unset
+	_then
+		geoms.add_all( an_area.geometry_set() )
+	_endif 
+
+	# Do the styles
+	_if (style_url_elem << _self.element_matching_name(:|styleUrl|) ) _isnt _unset 
+	_then
+		style_url << style_url_elem.elements.an_element()
+
+		_if style_url _isnt _unset _andif
+		    _not style_url.empty? _andif
+		    style_url[1] = %#
+		_then
+			style_url << style_url.slice_to_end(2)
+		_endif
+	_endif
+		
+
+	# get geoms and set them
+	values << {a_collection.size+1,name,snippet,desc, style_url}
+	rec << a_collection.insert(values)
+	
+	_for a_point _over  geoms.select(:geom_dimension,0).fast_elements()
+	_loop
+		pt << uds_simple_point.new(rec.field(:point),a_point)
+		rec.point << pt
+	_endloop
+	
+	_for a_line _over  geoms.select(:geom_dimension,1).fast_elements()
+	_loop
+		pt << uds_simple_chain.new(rec.field(:line),a_line)
+		rec.line << pt
+	_endloop
+	
+	_for a_area _over  geoms.select(:geom_dimension,2).fast_elements()
+	_loop
+		
+		pt << uds_simple_area.new(rec.field(:area),a_area)
+		rec.area << pt
+	_endloop 
+
+	res.add(rec)
+	
+	>> res
+_endmethod
+$

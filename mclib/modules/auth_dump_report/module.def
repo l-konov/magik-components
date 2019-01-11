@@ -1,0 +1,12 @@
+mclib_auth_dump_report	4001
+
+description
+	Support for dumping the auth database to XML and XHTML
+end
+
+requires
+	authorisation
+	authorisation_magik_gui
+	mclib_xslt_reports
+	mclib_package
+end

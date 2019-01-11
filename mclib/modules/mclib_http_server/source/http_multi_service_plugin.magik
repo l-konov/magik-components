@@ -1,0 +1,136 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-09-29 19:23:19 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## Provides a service with multiple instances for the HTTP
+## listener. This will hold a collection of identical service
+## plugins to do some processign which may take a bit of
+## time. This allows for several requests to a service t be
+## active at once.
+def_slotted_exemplar(:http_multi_service_plugin,
+                      {
+			      {:plugin_holder,_unset}
+		      },
+		      {:plugin})
+$
+
+http_multi_service_plugin.define_property(:actual_class_name,:symbol,
+				   "Class name to use with me",
+				   _true,_true,_unset)
+$
+http_multi_service_plugin.define_property(:instance_count,:integer,
+				   "Number of instances ot hold in my queue",
+				   _true,_true,3)
+$
+
+
+_pragma(classify_level=restricted)
+_method http_multi_service_plugin.process_plugin_data(a_element)
+	## 
+	## 
+	##
+
+	# (09-29-2006 Brad Sileo): created.
+	.plugin_holder << aq << atomic_queue.new(_self.instance_count)
+	_if( ex << get_global_value( _self.actual_class_name )) _is _unset
+	_then
+		condition.raise( :no_such_framework_component_class,
+				 :component_name, _self.actual_class_name )
+	_else
+		a_component << ex.new( _self.name, _self )
+		_if a_component _isnt _unset
+		_then
+			a_component.process_initialisation_data(a_element)
+		_endif
+		_for i _over 1.upto(_self.instance_count)
+		_loop
+			aq.put(a_component)
+			a_component << a_component.copy()
+		_endloop 
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_multi_service_plugin.get_plugin_for_path(_optional some_path_elements)
+	## returns self, as this implementation does not support nested cheildren
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	>> _self 
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method http_multi_service_plugin.mclib_df!children(_optional a_context)
+	## returns the items under me - my properties as well as the
+	## properties on my actual plugins.
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	res << _super.mclib_df!children(a_context)
+	# need to get the real plugin here and use it....without locking?
+	_if .plugin_Holder _isnt _unset 
+	_then
+		pu << .plugin_holder.get()
+		res.add_all_last(pu.mclib_df!children(a_context))
+		.plugin_holder.put(pu)
+	_endif 
+	>> res
+_endmethod
+$
+_pragma(classify_level=basic)
+_method http_multi_service_plugin.mclib_df!styled_string(_optional a_context)
+	## returns a string describing me.
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> styled_string.new(write_string(_self.name.write_string,
+					   %space,%(,_self.message(:multi_service),%)))
+_endmethod
+$
+_pragma(classify_level=basic)
+_method http_multi_service_plugin.do_run(a_connection, params,path)
+	## Run the request on the next available plugin in me. If none
+	## available, we block until one is.
+	## 
+	##
+
+	# (09-29-2006 Brad Sileo): created.
+	pu << .plugin_holder.get()
+	_protect _locking pu
+		 pu.do_run(a_connection,params,path)
+	_protection
+		.plugin_holder.put(pu)
+	_endprotect
+_endmethod
+$

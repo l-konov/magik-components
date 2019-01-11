@@ -1,0 +1,275 @@
+_package sw
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method object.graphviz_method_usages(output_format,output_file_name,_optional filter_type)
+	## 
+	## if_ve_acp.graphviz_method_usages("png","c:\temp\if_ve_acp_method_usages.png")
+
+	_for mt _over _self.method_table.local_methods(_true)
+	_loop
+		show(mt)
+	_endloop
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method smallworld_product.graphviz_application_def_xml_file_hierarchy(output_format,output_directory,_optional filter_type)
+	## 
+	## smallworld_product.graphviz_application_def_xml_file_hierarchy("png","C:\abovenet\xml_hierarchy_graphs",:dot)
+
+	_local module_name , file_root_name
+	_local module_name_list << equality_set.new()
+	_local file_to_module_lut << equality_hash_table.new()
+	_local module_file_list
+	
+	_for app_def _over _self.application_definitions.fast_elements()
+	_loop
+		module_name_list.add(module_name << app_def.resource_module_name)
+
+		_local files << sw_module_manager.module(module_name).resource_files(:data)
+
+		_for a_file _over files.fast_elements()
+		_loop
+			_if a_file.matches?("*.xml") _andif
+			    _not a_file.includes?(space_char)
+			_then
+				file_root_name << a_file.split_by(%.).first
+				_if (file_module_list << file_to_module_lut[file_root_name]) _is _unset 
+				_then
+					file_module_list << file_to_module_lut[file_root_name] << equality_set.new()
+				_endif
+
+				file_module_list.add(module_name)
+			_endif
+		_endloop
+	_endloop 
+
+	_for prod _over _self.customisation_products.fast_elements()
+	_loop
+		_for a_module _over prod.defined_modules.fast_elements()
+		_loop
+			module_name_list.add(a_module.name)
+		_endloop
+
+		_local files << sw_module_manager.module(module_name).resource_files(:data)
+
+		_for a_file _over files.fast_elements()
+		_loop
+			_if a_file.matches?("*.xml") _andif
+			    _not a_file.includes?(space_char)
+			_then
+				file_root_name << a_file.split_by(%.).first
+				_if (file_module_list << file_to_module_lut[file_root_name]) _is _unset 
+				_then
+					file_module_list << file_to_module_lut[file_root_name] << equality_set.new()
+				_endif
+
+				file_module_list.add(module_name)
+			_endif
+		_endloop
+	_endloop 
+
+
+	_for a_xml_file , i_module_name_list _over file_to_module_lut.fast_keys_and_elements()
+	_loop
+		_local full_xml_file_name , a_framework_config , framework_node_tooltip , framework_node_id
+		_local framework_configs << equality_hash_table.new()
+
+		_for i_module_name _over i_module_name_list.fast_elements()
+		_loop
+			_try
+				full_xml_file_name << smallworld_product.get_data_file(write_string(a_xml_file,".xml"),i_module_name)
+				
+			_when resource_not_found_in_module_error
+				_continue 
+			_endtry
+			
+			a_framework_config << framework_configuration.new_from_file(full_xml_file_name)
+
+			framework_node_tooltip << full_xml_file_name
+			framework_node_id      << write_string(i_module_name,".",a_xml_file)
+
+			framework_configs[framework_node_id] << {a_framework_config,framework_node_tooltip,a_xml_file}
+		_endloop
+
+		_local output_filename << system.pathname_down(output_directory,write_string(a_xml_file,"_xml.",output_format))
+		_self.graphviz_xml_file_hierarchy(framework_configs,output_format,output_filename,filter_type)
+	_endloop
+
+
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method smallworld_product.graphviz_xml_file_hierarchy(framework_configs,output_format,output_filename,_optional filter_type)
+	## 
+	
+	_global dg
+
+	dg << dot_graph.new("XMLFileHierarchy")
+
+	_local module_name
+	_local full_xml_file_name
+	_local a_framework_config , base_framework_config
+	_local framework_node_tooltip , framework_node_id
+	_local base , base_framework_node_tooltip , base_framework_node_id
+	_local plugin_node_label , plugin_node_id
+	_local a_node , an_edge
+	_local framework_type
+
+	_local int_str << internal_text_output_stream.new()
+	
+	# make sure we find each unique reference to a
+	# framework_configuration.  Because multiple applications XML
+	# files might inherit from as single base configuration file,
+	# we need to do this first step to find single unique instances
+	# of each.
+	_loop
+		# keeps scanning over the framework_configs and asking each for
+		# a .base.  At some point we will reach an iteration where
+		# framework_configs does not increase in size and at that point
+		# we leave the outside loop.  This might not be the most
+		# efficient, but I cannot find a method like :all_bases() which
+		# would recursively return all parent bases.
+
+		_local pre_scan_count << framework_configs.size
+
+		# need to do a .copy() here so that we don't get strange
+		# results because we are actually adding now keys/elements to
+		# framework_configs. 
+		_for fc_node_id , fc_info _over framework_configs.copy().fast_keys_and_elements()
+		_loop
+			(a_framework_config,framework_node_tooltip,framework_type) << (_scatter fc_info)
+			
+			_if (base << a_framework_config.attributes[:base]) _isnt _unset
+			_then
+				(module_name,a_xml_file) << (_scatter base.split_by(%.))
+				
+				full_xml_file_name << smallworld_product.get_data_file(write_string(a_xml_file,".xml"),module_name)
+				base_framework_config << framework_configuration.new_from_file(full_xml_file_name)
+				
+				base_framework_node_tooltip << full_xml_file_name
+				base_framework_node_id      << write_string(module_name,".",a_xml_file)
+				
+				framework_configs[base_framework_node_id] << {base_framework_config,base_framework_node_tooltip,a_xml_file}
+			_endif 
+		_endloop
+
+		_if framework_configs.size = pre_scan_count
+		_then
+			_leave 
+		_endif
+	_endloop
+
+
+	# now make suitable edges between each framework_configuration
+	# and its base (if it exists) and all of its local
+	# plugin_configuration children.
+	_for fc_node_id , fc_info _over framework_configs.fast_keys_and_elements()
+	_loop
+		(a_framework_config,framework_node_tooltip,framework_type) << (_scatter fc_info)
+
+		_if (base << a_framework_config.attributes[:base]) _isnt _unset
+		_then
+			(module_name,a_xml_file) << (_scatter base.split_by(%.))
+			
+			full_xml_file_name << smallworld_product.get_data_file(write_string(a_xml_file,".xml"),module_name)
+			base_framework_config << framework_configuration.new_from_file(full_xml_file_name)
+			
+			base_framework_node_tooltip << full_xml_file_name
+			base_framework_node_id      << write_string(module_name,".",a_xml_file)
+
+			an_edge << dg.create_edge({base_framework_node_id,fc_node_id})
+			
+		_endif 
+
+					 
+		_local defs << rope.new_from_iter(a_framework_config,:local_plugin_definitions|()|)
+		_local label_proc
+		
+		_if _not defs.empty?
+		_then
+			# if we have actual plugin definitions, then we treat this as a
+			# "config" type configuration and report plugins.
+			label_proc << _proc(a)
+					      >> a.attributes[:name]
+				      _endproc
+
+		_else
+			# if we do not have any plugin definitions, then treat it like
+			# a "gui" type configuration and report XML elements.
+			defs << a_framework_config.xml_elements
+
+			label_proc << _proc(a)
+					      >> _if a.attributes[:name] _isnt _unset
+						 _then
+							 >> write_string(a.type," (name=",a.attributes[:name],")")
+						 _elif a.attributes[:collection_name] _isnt _unset
+						 _then 
+							 >> write_string(a.type," (",a.attributes[:collection_name],")")
+						 _else
+							 >> write_string(a.type)
+						 _endif
+				      _endproc 
+		_endif
+
+
+		_local width << (defs.size.sqrt / 2.0).truncated.max(1)
+		
+		defs << sorted_collection.new_from(defs,
+						   _proc(a,b)
+							   _import label_proc
+							   
+							   >> label_proc(a) _cf label_proc(b)
+						   _endproc)
+		
+		_local previous_node_id << fc_node_id
+
+		_local table , tr , td
+
+		table << simple_xml_thing.new("table")
+		table.attributes[:border] << "0"
+		table.attributes[:cellborder] << "1"
+		table.attributes[:cellspacing] << "0"
+		table.attributes[:cellpadding] << "1"
+		table.elements.add_last(tr << simple_xml_thing.new("tr"))
+		tr.elements.add_last(td << simple_xml_thing.new("td"))
+		td.attributes[:colspan] << width.max(1)
+		td.elements.add_last(fc_node_id)
+		table.elements.add_last(tr << simple_xml_thing.new("tr"))
+		tr.elements.add_last(td << simple_xml_thing.new("td"))
+		td.attributes[:colspan] << width.max(1)
+		td.elements.add_last(framework_node_tooltip)
+
+
+		_for count , x _over defs.fast_keys_and_elements()
+		_loop
+			_if ((count-1) _mod width) _is 0
+			_then
+				# start a new row
+				table.elements.add_last(tr << simple_xml_thing.new("tr"))
+			_endif
+
+			tr.elements.add_last(td << simple_xml_thing.new("td"))
+
+			td.elements.add_last(label_proc(x))
+
+			td.attributes[:bgcolor] << "pink"
+		_endloop
+		
+		int_str.reset()
+
+		simple_xml.write_element_on(int_str,table)
+
+		a_node << dg.create_node(fc_node_id)
+		_local html_string << int_str.string
+		_local idx << html_string.index_of(%>)
+		a_node.set_attribute(:label,write_string(%<,html_string.slice_to_end(idx+1),%>))
+		a_node.set_attribute(:shape,"none")
+
+	_endloop 
+
+	# then continuously loop to find parent/child relationships. 
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+
+	system.do_command(write_string("START ",output_filename))
+_endmethod
+$

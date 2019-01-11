@@ -1,0 +1,91 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method application_mixin.mss_get_spatial_context_for_record_and_geometry(a_record, context_name, geoms)
+	##
+	## Returns a spatial_context.  Processing is similar to a subset
+	## of get_spatial_context_for_record(), except that instead of
+	## considering all_geometry() of A_RECORD, only the geometries
+	## in the collection GEOMS are considered.
+	##
+
+	_if (spatial_context_def << _self.get_spatial_context_definition(context_name)) _isnt _unset
+	_then
+		(ace_name, universe_name, display_properties) << (_scatter spatial_context_def)
+	_else
+		ace_name << ""
+		display_properties << property_list.new()
+	_endif 
+
+	# N.B.: I may yet decide to change this to use A_RECORD's
+	# spatial context if it serves one up via the get_spatial_context()
+	# method... but I'm also guessing that this will return a
+	# less-precise result than is desired, since this call is
+	# targeting a specific subset of geometry.  So for now, just
+	# set A_CONTEXT to unset, rather than trying to initialize it
+	# from anywhere.
+	a_context << _unset
+
+	
+	_if a_context _is _unset _andif
+	    (_not a_record.is_rwo? _orif 
+	     _self.collection_is_accessible_in_ace?(a_record.source_collection, ace_name))
+	_then
+		geom_sets << equality_hash_table.new()
+		_for a_geom _over geoms.fast_elements()
+		_loop
+			_if a_geom.world.universe_name = universe_name
+			_then
+				_if (gs << geom_sets[a_geom.world]) _is _unset
+				_then
+					gs << geom_sets[a_geom.world] << equality_geometry_set.new()
+				_endif 
+				gs.add(a_geom)
+			_endif
+		_endloop  
+		
+		_if _not geom_sets.empty?
+		_then
+			a_context << spatial_context.new(context_name, a_record)
+			_for property_name, string_value _over display_properties.keys_and_elements()
+			_loop
+				a_context.set_display_property_as_string(property_name, string_value)
+			_endloop 
+			
+			_for a_world, a_geom_set _over geom_sets.keys_and_elements()
+			_loop
+				_if (description << a_world.name) _is _unset
+				_then
+					description << a_world.universe_name
+				_endif 
+				a_context.add_element(a_world, a_geom_set, _unset, ace_name, description)
+			_endloop 
+		_endif 
+	_endif
+
+	_return a_context
+	
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method application_mixin.editor_manager
+	## 
+	## Return the editor manager service provider.
+	##
+
+	# N.B.: this is required for any conflict_dialog which
+	# has a parent_model that is an application, rather than a
+	# version_management_plugin. 
+
+	_return _self.get_service_provider(:editor_manager)
+	
+_endmethod
+$

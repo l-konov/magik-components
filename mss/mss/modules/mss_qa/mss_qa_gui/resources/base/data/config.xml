@@ -1,0 +1,6 @@
+<config>
+  <plugins>
+    <plugin name="mss_qa_engine" class_name="mss_qa_engine"/>
+    <plugin name="mss_qa_processor_plugin" class_name="mss_qa_processor_plugin"/>
+  </plugins>
+</config>

@@ -1,0 +1,399 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_RECORDSET_GUI_COMPONENT - tabular list for record sets.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_recordset_gui_component,{},:dd_tabular_list)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_recordset_gui_component.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :dialog_element_id,     :string,
+					  :dialog_description,    :string,
+					  :mode,                  {:none,:one,:many},
+					  :retain_headings?,      :boolean,
+					  :message_on_no_data?,   :boolean,
+					  :auto_redraw?,          :boolean,
+					  :grid_lines?,           :boolean,
+					  :column_allow_groupby?, :boolean,
+					  :ds_name,               :string,
+					  :ds_collection,         :string),
+				  :public)
+$
+ 
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_recordset_gui_component.define_shared_constant(:dd_lister_properties,
+	{ :auto_redraw? },
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_recordset_gui_component.define_shared_constant(:dd_tree_item_properties,
+	{ :mode,
+	  :grid_lines?,
+	  :row,
+	  :col,
+	  :column_allow_groupby?,
+	  :message_on_no_data?,
+	  :retain_headings? },
+	:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_recordset_gui_component.define_shared_constant(:dd_boolean_defaults,
+	property_list.new_with(:auto_redraw? ,           "True",
+			       :grid_lines?,           "False",
+			       :column_allow_groupby?, "True",
+			       :message_on_no_data?,   "False",
+			       :retain_headings?,      "True"),
+	:public) 
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_recordset_gui_component.define_shared_constant(:has_logical_properties?,_false,:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << property_list.new()
+
+	_for k,e _over dd_recordset_gui_component.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.new_dialog_default(rc,row,col)
+	## 
+	## Return a placeholder object that will serve for rendering
+	## and gathering the attributes for a recordset_gui_component
+	## instance.
+	
+	ddrgc <<  _self.new(rc,
+			   :mode,                  :one,
+			   :col_alignment,         :fill,
+			   :row_alignment,         :fill,
+			   :height,                50,
+			   :row,row,:col,col)
+
+	_for k,e _over _self.dd_boolean_defaults.fast_keys_and_elements()
+	_loop
+		ddrgc.perform(k.with_chevron,e)
+	_endloop
+
+	ddrgc.data_source << rwo_set.new()
+	ddrgc.column_allow_groupby? << _true
+	ddrgc.grid_lines? << _true
+	ddrgc.message_on_no_data? << _true
+	ddrgc.retain_headings? << _true
+
+	ddrgc.visible_field_names << "Field_1,Field_2,..."
+	ddrgc.column_alignments << "Left,Left,Left"
+	
+	>> ddrgc
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.gui_code(txt)
+	## 
+	## Write the GUI code for SELF to the TXT stream.
+
+	txt.write(%tab,".items[:",_self.dialog_element_id,
+		  "] << recordset_gui_component.new(:",_self.dialog_element_id,%,,"_self")
+
+	_for n _over _self.dd_lister_properties.elements()
+	_loop
+		v << .properties[n]
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+
+	dsn << _if _self.ds_name.default("").empty?
+	       _then
+		       >> gis_program_manager.databases.an_element().name
+	       _else
+		       >> _self.ds_name
+	       _endif 
+	ds << gis_program_manager.databases[dsn.as_symbol()]
+	
+	_if ds _isnt _unset 
+	_then
+		dscn << _if _self.ds_collection.default("").empty?
+			_then
+				>> ds.collections.an_element().name
+			_else
+				>> _self.ds_collection
+			_endif 
+		dsc << ds.collections[dscn.as_symbol()]
+
+		_if dsc _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":data_source,gis_program_manager.databases[:",dsn,"].collections[:",dscn,%])
+		_endif 
+	_endif
+
+	txt.write(" )",%newline)
+
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",
+		  _self.dialog_element_id+"_ti] << .items[:",
+		  _self.dialog_element_id,"].build_gui(",parent_id)
+
+	_for n _over _self.dd_tree_item_properties.elements()
+	_loop
+		v << _self.perform(n)
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+	txt.write(%,,%newline,%tab*3,":model,_self")
+	txt.write(" )",%newline)
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.dialog_footprint(_optional bb)
+	## 
+	## Adjust the standard footprint calculated for SELF so the
+	## width fully captures the visible_field_names.
+	
+	(r,c,h,w,pbb) << _super.dialog_footprint(bb)
+
+	# Account for Headings.
+	headings << _self.visible_field_names.default("").split_by(%,)
+	vts << vtext_style.new(_self.font)
+
+	hx << pbb.xmin+2
+	hy << pbb.ymin+1
+	
+	_for i _over 1.upto(headings.size)
+	_loop
+		txt << headings[i]
+		
+		h_bb << vts.box_coordinates(txt).bounds
+		h_bb << pixel_bounding_box.new(hx,hy,hx+h_bb.width.floor,hy+h_bb.height.floor-3)
+		hx +<< h_bb.width + 1
+	_endloop
+
+	pbb << pixel_bounding_box.new(pbb.xmin,pbb.ymin,hx,pbb.ymax)
+
+	>> (r,c,h,pbb.width,pbb)
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+
+	_dynamic !dialog_element_footprints!
+	
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![pbb] << _self
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	# Render Headings.
+	headings << _self.visible_field_names.default("").split_by(%,)
+	justifications << _self.column_alignments.default("").split_by(%,)
+	vts << vtext_style.new(_self.font)
+
+	hx << pbb.xmin+2
+	hy << pbb.ymin+1
+	
+	_for i _over 1.upto(headings.size)
+	_loop
+		txt << headings[i]
+		
+		h_bb << vts.box_coordinates(txt).bounds
+		h_bb << pixel_bounding_box.new(hx,hy,hx+h_bb.width.floor,hy+h_bb.height.floor-3)
+
+		_self.draw_column_header(canv,h_bb,txt,%L)
+		hx +<< h_bb.width + 1
+	_endloop
+
+	# Fill in rest of header line
+	_if hx < pbb.xmax - 1
+	_then
+		h_bb << pixel_bounding_box.new(hx,hy,pbb.xmax-2,hy+h_bb.height.floor-1)
+		_self.draw_column_header(canv,h_bb,"",:left)
+	_endif
+
+	# Render the icon so the user knows it is NOT a tabular list.
+	ras << smallworld_product.get_raster_image(:recordset,_self.module_name)
+	canv.render_raster(ras,pbb.centre.x-8,pbb.centre.y,_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.new_with_xml_properties(parent,props)
+	## 
+	## Return new instance of SELF with properties PROPS, placing
+	## in the gui_layout_manager object PARENT (eg. a rowcol)
+
+	row << props[:row].as_number()
+	col << props[:col].as_number()
+
+	res << _self.new_dialog_default(parent,row,col)
+
+	_for p,pv _over props.keys_and_elements()
+	_loop
+		res.perform(p.with_chevron,pv)
+	_endloop
+	
+	>> res
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.dd_class_name
+	## 
+	## Supersede the actual class name to keep the code more readable.
+	>> "recordset"
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.data_source
+	## 
+	## Return the :data_source property.
+	>> _self.properties[:data_source]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.data_source << val
+	## 
+	## Set the :data_source property.
+	_self.properties[:data_source] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.listed_field_names
+	## 
+	## Return the :listed_field_names property.
+	>> _self.properties[:listed_field_names]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.listed_field_names << val
+	## 
+	## Set the :listed_field_names property.
+	_self.properties[:listed_field_names] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.visible_field_names
+	## 
+	## Return the :visible_field_names property.
+	>> _self.properties[:visible_field_names]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.visible_field_names << val
+	## 
+	## Set the :visible_field_names property.
+	_self.properties[:visible_field_names] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.auto_redraw?
+	## 
+	## Return the :auto_redraw? property.
+	>> _self.properties[:auto_redraw?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.auto_redraw? << val
+	## 
+	## Set the :auto_redraw? property.
+	_self.properties[:auto_redraw?] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.retain_headings?
+	## 
+	## Return the :retain_headings? property.
+	>> _self.properties[:retain_headings?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.retain_headings? << val
+	## 
+	## Set the :retain_headings? property.
+	_self.properties[:retain_headings?] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.ds_name
+	## 
+	## Return the :ds_name property.
+	>> _self.properties[:ds_name]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.ds_name << val
+	## 
+	## Set the :ds_name property.
+	_self.properties[:ds_name] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.ds_collection
+	## 
+	## Return the :ds_collection property.
+	>> _self.properties[:ds_collection]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_recordset_gui_component.ds_collection << val
+	## 
+	## Set the :ds_collection property.
+	_self.properties[:ds_collection] << val
+_endmethod
+$

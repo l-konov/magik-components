@@ -1,0 +1,46 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## FRAME - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+frame.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :title,:string,
+					  :minimizable?,:boolean,
+					  :maximizable?,:boolean,
+					  :resizable?,:boolean
+						),
+				  :public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method frame.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over frame.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+

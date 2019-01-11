@@ -1,0 +1,5 @@
+<config>
+  <plugins>
+    <plugin name="mss_wm_overlay_view_copy_plugin" class_name="mss_wm_overlay_view_copy_plugin"/>
+  </plugins>
+</config>

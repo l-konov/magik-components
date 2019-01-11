@@ -1,0 +1,45 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-08-08 22:12:27 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-12-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method simple_number_mixin.as_hex_string(_optional pad_length)
+	## Returns a hex string to represent me.
+	## If PAD_LENGTH is specified, 0 pad to that size
+	##
+
+	# (03-12-2005 Brad Sileo): created.
+	val << ""
+	numericbasedata << "0123456789ABCDEF"
+	num << _self.truncated
+	_loop
+		_if num < 1
+		_then
+			_leave 
+		_endif
+		#int(((DecimalValue/OutputBase)-int(DecimalValue/OutputBase))*OutputBase+1.5)
+		 x << (((num/16) - (num/16).truncated) * 16+1.5).truncated
+		 val << numericbasedata[X]+val
+		 num << (num/16).truncated
+	_endloop
+	pad_length << pad_length.default(val.size)
+	_if pad_length > val.size
+	_then
+		val << write_string(%0 * (pad_length - val.size),val)
+	_endif
+	>> val
+_endmethod
+$

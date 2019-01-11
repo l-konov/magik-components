@@ -1,0 +1,194 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+## Currently CST does not offer a class that can display fixed text.
+## It would have been nice to simply subcass class sw:help_display,
+## but it uses a default font and several methods would have to
+## be redefined to support a user-defined font and to disable all
+## features we do not want/need.
+##
+## This class is a subclass of model and provides the known behavior
+## to create a new instance and to display a GUI.
+## By default a text will be displayed with a fixed font in a window
+## with 20 rows and 80 columns (the contents can't be edited).
+##
+## To display a text use callback display_text()
+## The frame title can be set by calling title<<
+## The font can be changed by calling font<<
+## It is possible to enable/disable editing via callback edit?<<
+##
+
+
+_pragma(classify_level=advanced, topic={UI})
+def_slotted_exemplar( :sf!fixed_font_text_display,
+{
+	{ :properties, _unset }
+},
+{ :model } )
+$
+
+
+_pragma(classify_level=advanced, topic={UI})
+_method sf!fixed_font_text_display.new( _optional p_rows, p_cols, p_font,
+					p_edit? )
+
+	## Create a new instance of _self.
+	#
+	# The default values for missing/_unset parameters are
+	# specified in the init() method.
+
+	>> _self.init( p_rows, p_cols, p_font, p_edit? )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={UI})
+_method sf!fixed_font_text_display.activate_in( p_frame )
+
+	## Build _self's GUI - it's just a text window.
+
+	_local l_props << .properties
+
+	l_props[ :window ] << 
+		sw:text_window.new( p_frame,
+				    l_props[ :rows ], l_props[ :cols ], _unset,
+				    :editable?, l_props[ :editable? ] )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={UI})
+_method sf!fixed_font_text_display.font << p_font
+
+	## This callback allows to change the currently used font
+	## for the display of text.
+
+	.properties[ :font ] << p_font.default( sw:font )
+
+	_self.update_window_property( :font )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={UI})
+_method sf!fixed_font_text_display.edit? << p_boolean
+
+	## This callback enables or disables 
+
+	.properties[ :editable? ] << p_boolean _is _true
+
+	_self.update_window_property( :editable? )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={UI})
+_method sf!fixed_font_text_display.display_text( p_string )
+
+	## API callback to update/display the passed string in _self.
+	## If _self's frame is not yet displayed it will be activated.
+
+	_local l_props << .properties
+	_local l_window
+
+	_self.activate()
+
+	_if ( l_window << l_props[ :window ] ) _is _unset _then _return _endif
+	#
+	# This property setting will ensure that the window will
+	# become visible (on top of all other Smallworld windows)...
+	#
+	l_window.top_frame.set_property( :always_visible?, _true )
+
+	_self.update_window_property( :font )
+
+	l_window.contents << p_string
+
+	_if sw:system.window_system _is :win32
+	_then
+		#
+		# For some reason the newly set text will always be selected/
+		# highlighted - which is a tad annoying. The next command
+		# will de-select whatever is selected.
+		#
+		l_window.actual.send_message_EM (:EM_SETSEL, -1, 0)
+	_endif
+	#
+	# Because this window should not stay on top "all the time",
+	# we wait 'a moment' to disable the 'on-top' property.
+	# disabling this property immediately will prevent the
+	# window from being displayed as top-most window.
+	#
+	_proc @set_visible_status( p_window )
+		_thisthread.sleep( 750 )
+		p_window.top_frame.set_property( :always_visible?, _false )
+	_endproc.fork_at( _thisthread.low_background_priority, l_window )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={UI})
+_private _method sf!fixed_font_text_display.init( p_rows, p_cols, p_font,
+						  p_edit? )
+
+	## Initialise and return _self.
+	##
+	## Any of passed parameters can be _unset - in which case
+	## these default values are used:
+	## - ROWS:	20
+	## - COLS:	80
+	## - FONT:	a fixed font with the default point size.
+	## - EDITABLE?:	_false
+
+	_super.init()
+
+	_if p_font _is _unset
+	_then
+		p_font << sw:font.new_usage( :fixed )
+	_endif
+		
+	.properties << sw:property_list.new_with(
+			       :rows,	   p_rows.default( 20 ),
+			       :cols,	   p_cols.default( 80 ),
+			       :font,	   p_font,
+			       :editable?, p_edit? _is _true )
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={UI})
+_private _method sf!fixed_font_text_display.update_window_property(
+			 p_prop_name )
+
+	## Helper method to update properties of the window.
+
+	_local l_props << .properties
+	_local l_window
+
+	_if ( l_window << l_props[ :window ] ) _isnt _unset
+	_then
+		l_window.actual.perform( p_prop_name.with_chevron,
+					 l_props[ p_prop_name ] )
+	_endif
+_endmethod
+$

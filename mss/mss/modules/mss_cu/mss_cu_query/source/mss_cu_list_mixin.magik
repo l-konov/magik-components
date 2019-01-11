@@ -1,0 +1,147 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_list_mixin
+##
+## Mixin to provide shared behavior of in-place editing and
+## validation for plugins that maintain a tree_item of cu_list
+## data. 
+##
+
+def_mixin(:mss_cu_list_mixin)
+$
+
+# N.B.: in-place editing of the cu_code field is not currently
+# enabled, for various reasons:
+# - It causes complexity due to this being the sort key for the
+#   cu_list on the subclasses that use this.  Therefore, an
+#   update would have to consist of a remove and insert, or
+#   something else that re-sorts the list.
+# - It would have to be validated to be a legitimate CU code,
+#   and this may be difficult to use (users can't remember the
+#   code from a large list of candidates).
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_list_mixin.define_shared_constant(
+	:editable_cu_field_names,
+	## Names of fields on the mss_cu_holder that can be edited in place.
+	{:operation, :work_point_number, :quantity, :unit_multiplier},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_list_mixin.cu_list_editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## 
+
+	# Ensure editing is permitted.
+	ed << _unset 
+	_if _not _self.editable_cu_field_names.includes?(value_id) _then _return _endif
+	
+	# Try to re-use an existing editor.
+	_if (ed_hash << a_tree.value[:in_place_editors]) _isnt _unset _andif
+	    (ed << ed_hash[value_id]) _isnt _unset 
+	_then
+		_return ed
+	_endif 
+
+	_if value_id _is :operation
+	_then
+		# Build a pick-list of operations that apply to this one.
+		cu_holder << a_tree.key
+		_if (cu_def << cu_holder.cu_definition) _is _unset
+		_then
+			cands << equality_set.new()
+		_else
+			cands << cu_def.valid_operation_names()
+		_endif
+		cands.add("")
+		cands.add(cu_holder.operation.default(""))
+		items << rope.new()
+		_for i _over cands.fast_elements()
+		_loop
+			items.add({i, i})
+		_endloop
+		ed << in_place_choice_editor.new(an_agent, :items, items)
+	_else 
+		ed << in_place_value_editor.new(an_agent)
+		_if value_id _is :quantity
+		_then
+			ed.manager << numeric_value_manager.new_with_properties(
+					      :integer?, _true)
+		_elif value_id _is :unit_multiplier
+		_then 
+			ed.manager << numeric_value_manager.new_with_properties(
+					      :integer?, _false,
+					      :precision, 2)
+		_endif
+	_endif
+
+	_if ed _isnt _unset
+	_then
+		_if (ed_hash << a_tree.value[:in_place_editors]) _is _unset
+		_then
+			ed_hash << a_tree.value[:in_place_editors] << property_list.new()
+		_endif
+		ed_hash[value_id] << ed
+	_endif
+	_return ed
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_list_mixin.cu_list_value_changed(a_tree, value_id, new_value, old_value)
+	## 
+	## 
+
+	_if old_value = new_value
+	_then
+		_self.background_refresh_cu_list()
+		_return
+	_endif 
+
+	_if value_id _is :unit_multiplier
+	_then
+		# Force it to be a floating point value.
+		_if new_value.species _is 1.species
+		_then
+			new_value << new_value.as_float
+			a_tree.value[value_id] << new_value
+		_endif
+	_endif
+	cu_holder << a_tree.key
+	cu_holder.update_attributes_from(property_list.new_with(value_id, new_value))
+	_self.background_refresh_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_list_mixin.background_refresh_cu_list()
+	##
+	## Refresh cu_list in a background thread.
+	##
+	
+	# What the heck?  In cases where the first element of the
+	# display tree is :bold, the in-place editor decides that the
+	# value to be edited will also be bold.  Also, forcing things
+	# to be right here by calling the :refresh changed notification
+	# in this thread doesn't work, presumably because some
+	# subsequent junk is setting the style back to :bold.  So,
+	# refresh in a background thread.
+	_proc(model)
+		_thisthread.sleep(10)
+		model.changed(:cu_list, :refresh)
+	_endproc.fork_at(_thisthread.low_background_priority, _self)
+	
+_endmethod
+$

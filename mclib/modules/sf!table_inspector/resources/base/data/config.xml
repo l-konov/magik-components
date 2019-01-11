@@ -1,0 +1,87 @@
+<!--
+    This file configures the plugins that are available to the
+    table inspector framework (mclib:sf!table_inspector).
+-->
+
+<config>
+    <plugins>
+        <plugin name="databases" class_name="mclib:sf!database_view_selector">
+	    <properties>
+		<property name="database_sort_field"
+			  value="magik_string" />
+		<property name="database_list_fields"
+			  value="{ :ext_name, :name, :alternative, :mode, :class }" />
+		<property name="database_list_width"
+			  value="450" />
+		<property name="database_list_rows"
+			  value="15" />
+		<property name="database_list_colored_entries?"
+			  value="true" />
+	    </properties>
+	</plugin>
+
+        <plugin name="tables" class_name="mclib:sf!table_lister">
+	    <properties>
+		<property name="allow_filtering?"    value="true" />
+		<property name="show_stripes?"       value="true" />
+		<property name="sort_tables_by"      value="name" />
+		<property name="auto_refresh?"       value="true" />
+		<property name="show_empty_tables?"  value="false" />
+		<property name="show_table_size?"    value="true" />
+		<property name="show_system_tables?" value="false" />
+	    </properties>
+	</plugin>
+
+        <plugin name="records" class_name="mclib:sf!record_lister">
+	    <properties>
+		<property name="double_click_action" value="edit_object" />
+		<property name="allow_filtering?"    value="true" />
+		<property name="show_stripes?"       value="true" />
+	    </properties>
+	</plugin>
+
+        <plugin name="editor" class_name="mclib:sf!table_inspector_editor_manager">
+	    <properties>
+		<property name="editor_config_definition_file_name"
+			  value="sf!inspector_editor_config.xml"/>
+		<property name="editor_gui_definition_file_name"
+			  value="sf!inspector_editor_gui.xml"/>
+		<property name="default_editor_class"
+			  value="mclib:sf!table_inspector_editor"/>
+		<property name="default_ace_name"
+			  value="default"/>
+	    </properties>
+	</plugin>
+
+        <plugin name="options" class_name="mclib:sf!table_inspector_options">
+	    <properties>
+		<property name="local_editor_manager_name" value="editor"/>
+		<property name="field_collection_strategy" value="all_fields"/>
+
+		<property name="dd_phys_field?"    value="true"/>
+		<property name="dd_geom_field?"    value="true"/>
+		<property name="dd_join_field?"    value="true"/>
+		<property name="dd_derived_field?" value="true"/>
+		<property name="internal_field?"   value="false"/>
+
+		<property name="dd_phys_field_pattern"
+			  value="*"/>
+		<property name="dd_geom_field_pattern"
+			  value="* !meatball"/>
+		<property name="dd_join_field_pattern"
+			  value="*"/>
+		<property name="dd_derived_field_pattern"
+			  value="* !*_code"/>
+		<property name="internal_field_pattern"
+			  value="* !ds!version !*_id"/>
+
+		<property name="record_selection?"		value="false"/>
+		<property name="application_coordinate_system?"	value="true"/>
+		<property name="ace_context?"			value="true"/>
+		<property name="map_trail?"			value="true"/>
+
+		<property name="lister_bucket_size" value="75"/>
+	    </properties>
+	</plugin>
+    </plugins>
+</config>

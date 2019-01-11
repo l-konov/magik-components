@@ -1,0 +1,835 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_mu_config_plugin
+##
+## Plugin to allow display and editing of Compatible Unit
+## Macro Unit (MU) definitions.
+##
+##
+
+def_slotted_exemplar(:mss_cu_mu_config_plugin,
+{
+	{:sorter, _unset, :readable},
+	{:mu_list, _unset, :readable},
+	{:cu_mu_list, _unset, :readable},
+	{:all_cu_list, _unset, :readable}
+},
+{:mss_cu_general_config_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.init(name, a_framework)
+	##
+	##
+
+	_super.init(name, a_framework)
+	_self.set_option(:filter_mu_code, _self.message(:default_filter_mu_code))
+	_self.set_option(:filter_cu_code, _self.message(:default_filter_cu_code))
+	.sorter << sorted_collection.new(10, _self.standard_sort_proc)
+	.mu_list << rope.new()
+	.cu_mu_list << rope.new()
+	.all_cu_list << rope.new()
+	
+	_return _self
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:refresh,
+				       :engine, _self, :action_message, :|refresh()|))
+	_self.add_action(sw_action.new(:edit_selected_cu_mu_relationship,
+				       :engine, _self,
+				       :action_message, :|edit_selected_cu_mu_relationship()|))
+	_self.add_action(sw_action.new(:add_cus_to_mu,
+				       :engine, _self,
+				       :action_message, :|add_cus_to_mu()|))
+	_self.add_action(sw_action.new(:remove_cus_from_mu,
+				       :engine, _self,
+				       :action_message, :|remove_cus_from_mu()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.build_gui(a_container)
+	## 
+	## 
+
+	main_p << panel.new(a_container)
+	main_p.border_width << main_p.border_height << 0
+	main_p.height_spacing << 0
+	main_p.width_spacing << 0
+	main_p.resize_x? << main_p.resize_y? << _true
+	main_p.tab_label << _self.message(:tab_label)
+	.items[:top_panel] << main_p
+
+	ps << :|perform_safely()|
+	go << :|get_option()|
+	so << :|set_option()|
+
+	pw << paned_window.new(main_p, :side_by_side?, _true, :resize_x?, _true, :resize_y?, _true,
+			       :col_resize_values, {50, 50})
+
+	p << panel.new(pw)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << p.resize_y? << _true
+
+	p.start_row()
+	.items[:filter_mu_code] <<
+		text_item.new(p, _self.message(:filter_mu_code),
+			      :display_length, 12,
+			      :model, _self,
+			      :aspect, :filter_mu_code,
+			      :change_selector, {ps, so, :filter_mu_code},
+			      :value_selector, {go, :filter_mu_code})
+
+	.items[:perform_mu_filter] <<
+		button_item.new_safe(p, _self.message(:perform_mu_filter),
+				     _self, :|perform_mu_filter()|,
+				     :min_width, 75)
+	
+	p.start_row()
+	.items[:mu_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :mu_list,
+			      :data_selector, :mu_list,
+			      :key_equals_proc, tree.valid_key_equals_proc,
+			      :select_notifier, {ps, :|mu_list_select()|},
+			      :height_in_chars, 6,
+			      :column_widths, {100, 60, 140},
+			      :column_headings, {_self.message(:ch_cu_code),
+						 _self.message(:ch_operation),
+						 _self.message(:ch_description)},
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	.items[:mu_list].popup_menu << _self.framework.popup_for_child(.items[:mu_list], "cu_mu_config_1")
+
+	p.start_row()
+	label_item.new(p, _self.message(:cu_mu_list_header))
+
+	p.start_row()
+	.items[:cu_mu_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :cu_mu_list,
+			      :data_selector, :cu_mu_list,
+			      :key_equals_proc, tree.valid_key_equals_proc,
+			      :select_notifier, {ps, :|cu_mu_list_select()|},
+			      :double_click_notifier, {ps, :|cu_mu_list_double_click()|},
+			      :height_in_chars, 12,
+			      :column_widths, {100, 60, 55, 55, 110},
+			      :column_headings, {_self.message(:ch_cu_code),
+						 _self.message(:ch_operation),
+						 _self.message(:ch_quantity),
+						 _self.message(:ch_unit_multiplier),
+						 _self.message(:ch_description)},
+			      :column_allow_sort?, _false,
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	.items[:cu_mu_list].popup_menu << _self.framework.popup_for_child(.items[:cu_mu_list], "cu_mu_config_2")
+	
+	p2 << panel.new(pw)
+	p2.border_width << p2.border_height << 2
+	p2.height_spacing << 2
+	p2.width_spacing << 6
+	p2.resize_x? << p2.resize_y? << _true
+
+	p2.start_row()
+	.items[:filter_cu_code] <<
+		text_item.new(p2, _self.message(:filter_cu_code),
+			      :display_length, 12,
+			      :model, _self,
+			      :aspect, :filter_cu_code,
+			      :change_selector, {ps, so, :filter_cu_code},
+			      :value_selector, {go, :filter_cu_code})
+
+	.items[:perform_all_cu_filter] <<
+		button_item.new_safe(p2, _self.message(:perform_all_cu_filter),
+				     _self, :|perform_all_cu_filter()|,
+				     :min_width, 75)
+
+	p2.start_row()
+	.items[:all_cu_list] <<
+		tree_item.new(p2,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :all_cu_list,
+			      :data_selector, :all_cu_list,
+			      :key_equals_proc, tree.valid_key_equals_proc,
+			      :select_notifier, {ps, :|all_cu_list_select()|},
+			      :height_in_chars, 16,
+			      :column_widths, {100, 60, 140},
+			      :column_headings, {_self.message(:ch_cu_code),
+						 _self.message(:ch_operation),
+						 _self.message(:ch_description)},
+			      :column_allow_sort?, _false,
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	.items[:all_cu_list].popup_menu << _self.framework.popup_for_child(.items[:all_cu_list], "cu_mu_config_3")
+
+	_return main_p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.field_accessor(p_new_val, p_field_name, p_tree)
+	## 
+	## Handler method to dynamically get a field value for a
+	## display tree.
+	## 
+
+	my_rec << p_tree.key
+	_if _not my_rec.is_valid?
+	_then
+		_if p_field_name _is :cu_code
+		_then
+			_return _self.message(:deleted)
+		_else
+			_return ""
+		_endif 
+	_endif 
+
+	_return my_rec.perform(p_field_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.pre_activation()
+	## 
+	## 
+
+	mss_cu_engine.view.add_dependent(_self, :view, :mode)
+	_super.pre_activation()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.post_activation()
+	## 
+	## 
+
+	_super.post_activation()
+	_self.manage_actions_for_mu_list_selection()
+	_self.manage_actions_for_cu_mu_list_selection()
+	_self.manage_actions_for_all_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.terminate()
+	## 
+	## 
+
+	mss_cu_engine.view.remove_dependent(_self, :view, :mode)
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_super.note_change(who, what, _scatter data)
+	_if who _is mss_cu_engine.view
+	_then
+		_if what _is :mode
+		_then
+			_self.manage_actions_for_mode_change()
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.set_proxy_actions_for_active_page(a_page, pl)
+	## 
+	## Set any proxy actions in property list PL when A_PAGE
+	## becomes the current page on the main tab control.
+	## 
+
+	_if a_page _is .items[:top_panel]
+	_then
+		pl[:refresh] << _self.action(:refresh)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.figure_mu_filter_predicate()
+	## 
+	## Determine a predicate to use for filtering the mu_list.
+	##
+
+	pred << predicate.eq(:usage, mss_cu_engine.macro_unit_usage_value)
+
+	_if (x << _self.get_option(:filter_mu_code).default("")) ~= ""
+	_then
+		_if x.last _isnt %*
+		_then
+			x << write_string(x, %*)
+		_endif
+		_if pred _is _unset
+		_then
+			pred << predicate.wild(:cu_code, x, :ci)
+		_else
+			pred _and<< predicate.wild(:cu_code, x, :ci)
+		_endif
+	_endif
+
+	_if pred _is _unset
+	_then
+		pred << predicate
+	_endif
+	_return pred
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.figure_all_cu_filter_predicate()
+	## 
+	## Determine a predicate to use for filtering the all_cu_list.
+	##
+
+	_return _super.figure_filter_predicate()
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.perform_mu_filter()
+	## 
+	## Perform mu filtering based on predicate entered.
+	##
+
+	_self.status_string << _self.message(:filtering)
+	(new_list, max_exceeded?) << _self.set_mu_list()
+	_if max_exceeded? _is _true
+	_then 
+		_self.status_string << _self.message(:filter_complete_max, .mu_list.size, .mu_list.size)
+	_else
+		_self.status_string << _self.message(:filter_complete, .mu_list.size)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.set_mu_list()
+	## 
+	## Build the list of all MU-type CUs.
+	##
+
+	# Note: this is intentionally structured so that the sorter is
+	# only used to build the all_cu_list initially - the all_cu_list itself
+	# is just a rope, not a sorted collection.  This is done mainly
+	# for performance reasons in cases where a very large list of
+	# CUs may be displayed.
+	sc << .sorter
+	sc.empty()
+
+	tbl << mss_cu_engine.view.collections[:mss_cu_definition]
+	sstr << {:value, :cu_code, :tab,
+		 :value, :operation, :tab,
+		 :value, :description}
+	field_generator << handler.new(_self, :|field_accessor()|)
+	max_to_do << _self.max_to_report
+	max_exceeded? << _false
+
+	pred << _self.figure_mu_filter_predicate()
+	_for i _over tbl.select(pred).fast_elements()
+	_loop @outer
+		_if (cu_code << i.cu_code) _is _unset
+		_then
+			_continue
+		_endif
+		_for j _over i.mss_cu_operation_definitions.fast_elements()
+		_loop
+			_if sc.size >= max_to_do
+			_then
+				max_exceeded? << _true
+				_leave @outer
+			_endif
+			op << j.operation.default("")
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code), op}, j})
+		_endloop 
+	_endloop
+
+	cus << .mu_list
+	cus.empty()
+	_for i _over sc.fast_elements()
+	_loop
+		rec << i[2]
+		dt << display_tree.new(rec, field_generator)
+		dt.styled_string << sstr
+		cus.add(dt)
+	_endloop
+	
+	_self.changed(:mu_list, :refresh)
+	_return .mu_list, max_exceeded?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.perform_all_cu_filter()
+	## 
+	## Perform filtering based on predicate entered.
+	##
+
+	_self.status_string << _self.message(:filtering)
+	(new_list, max_exceeded?) << _self.set_all_cu_list()
+	_if max_exceeded? _is _true
+	_then 
+		_self.status_string << _self.message(:filter_complete_max, .all_cu_list.size, .all_cu_list.size)
+	_else
+		_self.status_string << _self.message(:filter_complete, .all_cu_list.size)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.set_all_cu_list()
+	## 
+	## Build the list of all CUs.
+	##
+
+	# Note: this is intentionally structured so that the sorter is
+	# only used to build the all_cu_list initially - the all_cu_list itself
+	# is just a rope, not a sorted collection.  This is done mainly
+	# for performance reasons in cases where a very large list of
+	# CUs may be displayed.
+	sc << .sorter
+	sc.empty()
+
+	tbl << mss_cu_engine.view.collections[:mss_cu_definition]
+	sstr << {:value, :cu_code, :tab,
+		 :value, :operation, :tab,
+		 :value, :description}
+	field_generator << handler.new(_self, :|field_accessor()|)
+	max_to_do << _self.max_to_report
+	max_exceeded? << _false
+
+	pred << _self.figure_all_cu_filter_predicate()
+	_for i _over tbl.select(pred).fast_elements()
+	_loop @outer
+		_if (cu_code << i.cu_code) _is _unset
+		_then
+			_continue
+		_endif
+		_for j _over i.mss_cu_operation_definitions.fast_elements()
+		_loop
+			_if sc.size >= max_to_do
+			_then
+				max_exceeded? << _true
+				_leave @outer
+			_endif
+			op << j.operation.default("")
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code), op}, j})
+		_endloop 
+	_endloop
+
+	cus << .all_cu_list
+	cus.empty()
+	_for i _over sc.fast_elements()
+	_loop
+		rec << i[2]
+		dt << display_tree.new(rec, field_generator)
+		dt.styled_string << sstr
+		cus.add(dt)
+	_endloop
+	
+	_self.changed(:all_cu_list, :refresh)
+	_return .all_cu_list, max_exceeded?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.mu_list_select(selection, user_sel?)
+	## 
+	## 
+
+	_self.manage_actions_for_mu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.manage_actions_for_mode_change()
+	## 
+	## 
+	
+	_self.manage_actions_for_cu_mu_list_selection()
+	_self.manage_actions_for_all_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.manage_actions_for_mu_list_selection()
+	## 
+	## 
+
+	sel_mu? << _self.selected_mu _isnt _unset 
+	_self.set_cu_mu_list()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.set_cu_mu_list()
+	## 
+	## Update the cu_mu_list based on the selected MU.
+	##
+
+	cus << .cu_mu_list
+	cus.empty()
+	_if (sel_mu << _self.selected_mu) _isnt _unset
+	_then
+		sc << .sorter
+		sc.empty()
+		sstr << {:value, :cu_code, :tab,
+			 :value, :operation, :tab,
+			 :value, :quantity, :tab,
+			 :value, :unit_multiplier, :tab,
+			 :value, :description}
+		field_generator << handler.new(_self, :|field_accessor()|)
+		_for i _over sel_mu.c_mss_cu_mu_relationships.fast_elements()
+		_loop
+			_if (c_op_def << i.c_mss_cu_operation_definition) _is _unset _orif
+			    (cu_code << i.cu_code) _is _unset 
+			_then
+				_continue
+			_endif
+			op << c_op_def.operation.default("")
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code), op}, i})
+		_endloop
+
+		_for i _over sc.fast_elements()
+		_loop
+			rec << i[2]
+			dt << display_tree.new(rec, field_generator)
+			dt.styled_string << sstr
+			cus.add(dt)
+		_endloop
+	_endif 
+
+	_self.changed(:cu_mu_list, :refresh)
+	_return .cu_mu_list
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.selected_mu
+	## 
+	## 
+
+	_if (ti << .items[:mu_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		rec << sel.key
+		_if rec _isnt _unset _andif
+		    _not rec.is_valid?
+		_then
+			rec << _unset
+		_endif
+		_return rec, sel
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.cu_mu_list_select(selection, user_sel?)
+	## 
+	## 
+
+	_self.manage_actions_for_cu_mu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.cu_mu_list_double_click(selection)
+	##
+	## Edit the CU-MU relationship.
+	##
+
+	_if (rec << selection.key) _isnt _unset _andif
+	    rec.is_valid?
+	_then
+		_self.edit_selected_cu_mu_relationship(rec)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.manage_actions_for_cu_mu_list_selection()
+	## 
+	## 
+
+	w? << mss_cu_engine.view.writable?
+	sel_cu_mu_count << _self.selected_cu_mus.size
+	_self.action(:remove_cus_from_mu).enabled? << w? _andif sel_cu_mu_count > 0
+	_self.action(:edit_selected_cu_mu_relationship).enabled? << sel_cu_mu_count = 1
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.all_cu_list_select(selection, user_sel?)
+	## 
+	## 
+
+	_self.manage_actions_for_all_cu_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.manage_actions_for_all_cu_list_selection()
+	## 
+	## 
+
+	w? << mss_cu_engine.view.writable?
+	sel_mu? << _self.selected_mu _isnt _unset
+	any_all_cu_sel? << _self.any_all_cu_selection?
+	_self.action(:add_cus_to_mu).enabled? << w? _andif sel_mu? _andif any_all_cu_sel?
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.any_all_cu_selection?
+	## 
+	## Return true if anything selected in all_cu_list.
+	##
+
+	_if (ti << .items[:all_cu_list]) _isnt _unset
+	_then
+		_for i _over ti.selection.fast_elements()
+		_loop
+			_if i.key.is_valid?
+			_then
+				_return _true
+			_endif
+		_endloop
+	_endif 
+	_return _false 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.selected_cu_mus
+	## 
+	## Return selected records in cu_mu_list.
+	##
+
+	r << rope.new()
+	_if (ti << .items[:cu_mu_list]) _isnt _unset
+	_then
+		_for i _over ti.selection.fast_elements()
+		_loop
+			_if _not (rec << i.key).is_valid? _then _continue _endif
+			r.add_last(rec)
+		_endloop
+	_endif 
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.selected_cu_mu
+	## 
+	## Return the single selected record in the cu_mu_list.
+	##
+
+	all_sel << _self.selected_cu_mus
+	_if all_sel.size = 1
+	_then
+		_return all_sel.an_element()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.selected_all_cus
+	## 
+	## Return selected records in all_cu_list.
+	##
+	
+	r << rope.new()
+	_if (ti << .items[:all_cu_list]) _isnt _unset
+	_then
+		_for i _over ti.selection.fast_elements()
+		_loop
+			_if _not (rec << i.key).is_valid? _then _continue _endif
+			r.add_last(rec)
+		_endloop
+	_endif 
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.refresh()
+	## 
+	## Refresh the contents of various lists being displayed.
+	##
+
+	# The mu_list can be big enough that it is not efficient to
+	# re-run the query, so just weed out invalid data.
+	any_change? << _false
+	cul << .mu_list
+	_for i _over cul.size.downto(1)
+	_loop
+		_if _not (test_rec << cul[i].key).is_valid?
+		_then
+			cul.remove_nth(i)
+			any_change? << _true
+		_endif
+	_endloop
+
+	_if any_change?
+	_then 
+		_self.changed(:mu_list, :refresh)
+	_endif
+
+	_self.set_cu_mu_list()
+	
+	# The all_cu_list can be big enough that it is not efficient to
+	# re-run the query, so just weed out invalid data.
+	any_change? << _false
+	cul << .all_cu_list
+	_for i _over cul.size.downto(1)
+	_loop
+		_if _not (test_rec << cul[i].key).is_valid?
+		_then
+			cul.remove_nth(i)
+			any_change? << _true
+		_endif
+	_endloop
+
+	_if any_change?
+	_then 
+		_self.changed(:all_cu_list, :refresh)
+	_endif
+
+	_self.status_string << ""
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.edit_selected_cu_mu_relationship(_optional rec)
+	## 
+	## Edit the selected CU-MU relationship record.
+	##
+
+	_if rec _is _unset _andif
+	    (rec << _self.selected_cu_mu) _is _unset
+	_then
+		_self.user_error(:no_selected_cu_mu)
+	_endif
+	_self.framework.activate_editor_for_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.add_cus_to_mu()
+	## 
+	## Add the CUs selected in the all_cu_list to the current MU.
+	##
+
+	_if (rec << _self.selected_mu) _is _unset
+	_then
+		_self.user_error(:no_selected_mu)
+	_endif
+	_if (cus << _self.selected_all_cus).size = 0
+	_then
+		_self.user_error(:no_selected_all_cus)
+	_endif
+
+	r << rope.new()
+	_for i _over cus.fast_elements()
+	_loop
+		r.add_last({i, 1, _unset})
+	_endloop 
+	trans << custom_record_transaction.new(rec.source_view, rec, :|add_child_macro_units()|, {r},
+					       _self.message(:add_cus_to_mu))
+	trans.run()
+
+	_self.set_cu_mu_list()
+	_self.status_string << ""
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_mu_config_plugin.remove_cus_from_mu()
+	## 
+	## Remove the CUs selected in the cu_mu_list from the current MU.
+	##
+
+	_if (rec << _self.selected_mu) _is _unset
+	_then
+		_self.user_error(:no_selected_mu)
+	_endif
+	_if (cus << _self.selected_cu_mus).size = 0
+	_then
+		_self.user_error(:no_selected_cu_mus)
+	_endif
+
+	r << rope.new()
+	_for i _over cus.fast_elements()
+	_loop
+		r.add_last(record_transaction.new_delete(i, ""))
+	_endloop
+	trans << dataset_transaction.new(r, _self.message(:remove_cus_from_mu))
+	trans.run()
+
+	_self.set_cu_mu_list()
+	_self.status_string << ""
+	
+_endmethod
+$

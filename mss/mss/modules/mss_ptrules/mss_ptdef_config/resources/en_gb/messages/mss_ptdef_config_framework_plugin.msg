@@ -1,0 +1,3 @@
+#% text_encoding = iso8859_1
+
+:activate_mss_ptdef_config_menu	:en_gb	Pointing Definition Configuration...

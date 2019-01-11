@@ -1,0 +1,9 @@
+graphviz_engine	4000
+
+description
+	Magik wrapper for the Graphviz utility
+end
+
+requires
+	graphviz_dot_file_generator
+end

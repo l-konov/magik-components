@@ -1,0 +1,361 @@
+###############################################################################################
+_pragma(classify_level=basic)
+##
+## Allows the user to browse the rose categories, and view the
+## classes in tha category,and select and dump a category or
+## some classes
+##
+def_slotted_exemplar(:rr_dumper_menu,{{:controller,_unset,:readable},
+                                      {:current_category,:unset,:readable},
+				      {:list,_unset,:readable},
+				      {:selection,_unset,:readable},
+				      {:cat_path,_unset,:readable},
+				      {:items,_unset,:readable},
+				      {:dump_path,_unset,:readable},
+				      {:class_list,_unset,:readable},
+				      {:class_selection,_unset,:readable}
+		     },:model)
+$
+
+
+_method rr_dumper_menu.new()
+	## 
+	## 
+
+	_return _clone.init()
+_endmethod
+$
+
+_method rr_dumper_menu.init()
+	## 
+	##
+
+	.controller << rr_dumper.new()
+	.current_category << .controller.logical_view
+	.items << hash_table.new()
+	.list << rope.new()
+	.cat_path << rope.new()
+	.class_list << rope.new()
+	.class_selection << rope.new()
+	.dump_path << ""
+
+	_self.setup_list()
+
+	_return _self 
+_endmethod
+$
+
+_method rr_dumper_menu.setup_list()
+	## 
+	##
+
+	.list.empty()
+	.selection << _unset
+
+	temp_list << sorted_set.new(_unset,
+				    _proc(a,b)
+					    >> a.name _cf b.name
+				    _endproc)
+
+	cats << .current_category.categories
+
+	_for i _over range (1,cats.count)
+	_loop
+		temp_list.add(cats.getat(i))
+	_endloop
+
+	_for i _over temp_list.fast_elements()
+	_loop
+		.list.add(i)
+	_endloop 
+
+	_self.changed(:list)
+	
+	
+_endmethod
+$
+
+_method rr_dumper_menu.setup_class_list()
+	## 
+	##
+
+	.class_list.empty()
+	.class_selection.empty()
+
+	temp_list << sorted_set.new(_unset,
+				    _proc(a,b)
+					    >> a.name _cf b.name
+				    _endproc)
+
+	_for i _over .controller.classes_in_category(.current_category).elements()
+	_loop
+		temp_list.add(i)
+	_endloop
+
+	_for i _over temp_list.fast_elements()
+	_loop
+		.class_list.add(i)
+	_endloop 
+
+	_self.changed(:class_list)
+	
+	
+_endmethod
+$
+
+
+_method rr_dumper_menu.activate_in(a_frame)
+	## 
+	## 
+
+	p << panel.new(a_frame)
+
+	_self.title << "Category/File Dumper"
+
+	t << label_item.new(p,"?",:aspect,:path_string,:model,_self )
+
+	p.start_row()
+
+	b1 << button_item.new(p,"Dump Dir",_self,:|do_get_dump_dir()|)
+	l1 << label_item.new(p,"??",:aspect,:dump_path,:model,_self)
+
+	p.start_row()
+	
+	rc1 << rowcol.new(p,3,3)
+
+	label_item.new(rc1,"Categories/Packages",:row,1,:col,1)
+	label_item.new(rc1,"Classes",:row,1,:col,2)
+
+	##### category section
+	
+	.items[:list] << list_view.new(_self,rc1,:list,:item_selected|()|,:name,6,40,:one)
+	.items[:list].window.resize? << _true
+	.items[:list].row << 2
+	.items[:list].col << 1
+
+
+	p1 << panel.new(rc1)
+	p1.row << 3
+	p1.col << 1
+	
+	.items[:up_butt] << button_item.new(p1,"Up",_self,:|level_up()|)
+	
+	.items[:dump_cat_butt] << button_item.new_safe(p1,"Dump Category",_self,:|do_dump_cat()|)
+	
+	### class section
+
+	.items[:class_list] << list_view.new(_self,rc1,:class_list,:class_selected|()|,:name,6,40,:many)
+	.items[:class_list].window.resize? << _true
+	.items[:class_list].row << 2
+	.items[:class_list].col << 2
+
+
+	p2 << panel.new(rc1)
+	p2.row << 3
+	p2.col << 2
+	
+	.items[:dump_class_butt] << button_item.new_safe(p2,"Dump Classes",_self,:|do_dump_classes()|)
+
+	p.start_row()
+
+	button_item.new(p,"Settings",_self,:|do_settings()|)
+	button_item.new(p,"Quit",_self,:|quit()|)
+
+	_self.changed(:path_string)
+_endmethod
+$
+
+_method rr_dumper_menu.path_string
+	## 
+	##
+
+	str << ">> "
+
+	_for i _over .cat_path.elements()
+	_loop
+		str +<< i.name
+		str +<< " | "
+	_endloop
+	
+	str +<< .current_category.name
+
+	_return str
+	
+_endmethod
+$
+
+_method rr_dumper_menu.item_selected(p_index,_optional p_modifier)
+	## 
+	##
+
+	_if p_index _is _unset
+	_then
+		.selection << _unset
+		_return 
+	_endif
+
+	.selection << .list.nth(p_index)
+
+	_if p_modifier _is :double_click
+	_then
+		_self.level_down()
+	_endif
+	
+_endmethod
+$
+
+_method rr_dumper_menu.class_selected(p_index_set)
+	## 
+	##
+
+	.class_selection.empty()
+	
+	_for i _over p_index_set.elements()
+	_loop 
+		.class_selection.add(.class_list.nth(i)) 
+	_endloop 
+_endmethod
+$
+
+_method rr_dumper_menu.level_down()
+	## 
+	## 
+
+	_self.busy? << _true
+	
+	_if (a_cat << .selection) _isnt _unset 
+	_then
+		.cat_path.add_last(.current_category)
+		_self.current_category << a_cat
+	_endif
+
+	_self.busy? << _false 
+_endmethod
+$
+
+_method rr_dumper_menu.level_up()
+	## 
+	##
+
+	_self.busy? << _true 
+
+	_if .cat_path.size > 0
+	_then
+		a_cat << .cat_path.remove_last()
+		_self.current_category << a_cat
+	_endif
+
+	_self.busy? << _false 
+_endmethod
+$
+
+_method rr_dumper_menu.current_category << a_cat
+	## 
+	## 
+
+	.current_category << a_cat
+
+	_self.setup_list()
+
+	_self.changed(:path_string)
+
+	_self.setup_class_list()
+	
+_endmethod
+$
+
+
+
+_method rr_dumper_menu.quit()
+
+	.controller.quit()
+
+	_super.quit()
+
+_endmethod
+$
+
+
+_method rr_dumper_menu.do_get_dump_dir()
+	## open a directory chooser
+
+	_if (dir << .top_frame.actual.select_directory()) = "."
+	_then
+		#user pressed cancel
+		.dump_path << ""
+	_else
+		.dump_path << dir
+	_endif
+	
+	_self.changed(:dump_path)
+	
+_endmethod
+$
+
+_method rr_dumper_menu.do_dump_cat()
+	##
+	## dump the currently selected category to the target directory
+	##
+
+	_if .dump_path = ""
+	_then
+		_self.show_alert("No Target Dir Set")
+		_return
+		
+	_elif .selection _is _unset
+	_then
+		_self.show_alert("No category Selected")
+		_return
+	_else
+		_if (ok? << _self.show_question("Continue","Cancel",
+						"Have you set your controller's settings?")) _is _true
+		_then
+			.controller.dump_category(.selection,.dump_path)
+		_endif
+	_endif 
+
+_endmethod
+$
+
+
+_method rr_dumper_menu.do_dump_classes()
+	## dump the currently selected classes to the target directory
+
+	_if .dump_path = ""
+	_then
+		_self.show_alert("No Target Dir Set")
+		_return
+		
+	_elif .class_selection.empty?
+	_then
+		_self.show_alert("No Classes Selected")
+		_return
+	_else
+		_if (ok? << _self.show_question("Continue","Cancel",
+						"Have you set your controller's settings?")) _is _true
+		_then
+			_for i _over .class_selection.elements()
+			_loop 
+				.controller.do_class(i,.dump_path)
+			_endloop 
+		_endif
+	_endif 
+
+_endmethod
+$
+
+_method rr_dumper_menu.do_settings()
+	## 
+	## activate the settings menu
+	##
+
+	_if (sm << .items[:settings_menu]) _isnt _unset
+	_then
+		sm.quit()
+		.items[:settings_menu] << _unset 
+	_endif
+
+	.items[:settings_menu] << rr_dumper_settings_menu.open(.controller)
+	
+_endmethod
+$

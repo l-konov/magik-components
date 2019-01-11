@@ -1,0 +1,9 @@
+cam_db_image_mss_open_swaf	1
+
+description
+	mss_open_swaf image module for Cambridge demo database
+end
+
+requires
+	cam_db_swaf_mss_demo
+end

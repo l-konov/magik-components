@@ -1,0 +1,33 @@
+<config base="authorisation_magik_gui.config.xml">
+    <plugins>
+       <plugin name="auth_dump" class_name="mclib:auth_dump_plugin"/>
+       <plugin name="authorisation_groups"  class_name="authorisation_groups_plugin">
+       <property_pages>
+          <page page_name="authorisation_group_general_properties_page"/>
+          <page page_name="authorisation_group_rights_properties_page"/>
+          <page page_name="authorisation_group_alternatives_properties_page"/>
+	  <!-- Swapin the clone page -->
+          <!--page page_name="authorisation_group_tables_properties_page"/-->
+          <page page_name="auth_table_access_clone_page"/>
+       </property_pages>
+    </plugin>
+      <plugin name="explorer" class_name="explorer_plugin">
+       <properties>
+        <property name="expose_embedded_selection" value="true"/>
+	 <property name="expose_floating_selection" value="true"/>
+	 <property name="editor_manager_name"       value="editor_manager"/>
+	 <property name="model_config_definition_file_name"   value="explorer_model_config.xml"/>
+	 <property name="model_config_definition_module_name" value="auth_admin_application"/>
+	 <property name="floating_gui_definition_module_name" value="explorer_plugin"/>
+	 <property name="floating_gui_definition_file_name"   value="floating_explorer_view_gui.xml"/>
+	 <property name="floating_config_definition_module_name" value="explorer_plugin"/>
+	 <property name="floating_config_definition_file_name"   value="floating_explorer_view_config.xml"/>
+	 <property name="embedded_gui_definition_module_name" value="swaf_professional_application"/>
+	 <property name="embedded_gui_definition_file_name"   value="embedded_explorer_view_gui.xml"/>
+	 <property name="embedded_config_definition_module_name" value="swaf_professional_application"/>
+	 <property name="embedded_config_definition_file_name"   value="embedded_explorer_view_config.xml"/>
+      </properties>
+    </plugin>
+    </plugins>
+
+</config>

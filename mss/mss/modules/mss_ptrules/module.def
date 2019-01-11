@@ -1,0 +1,17 @@
+mss_ptrules	1
+
+description
+	MSS pointing rules
+end
+
+requires
+	mss_core_changes
+	mss_swaf_changes
+	mss_config_editor
+	mss_map_trail
+	mss_ptdef_config
+	mss_ptdef_data_model
+	mss_ptrule_attribute_dialog
+	mss_ptrule_manager
+	mss_ptrule_plugin
+end

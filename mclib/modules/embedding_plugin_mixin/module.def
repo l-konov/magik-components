@@ -1,0 +1,9 @@
+mclib_embedding_plugin_mixin		4000
+
+description
+	Provides a mixin that allows a plugin to embed its GUI in a framework dynbamically or to launch it standalone with no framework.
+end
+
+requires
+	mclib_package
+end

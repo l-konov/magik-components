@@ -1,0 +1,127 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_annotation.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to roads.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    corr_rwo.source_collection.name _is :min_road _andif
+	    corr_geom.geom_category _is :linear
+	_then
+		_return _true
+	_endif
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_annotation.mss_ptrule_text_for(fd, ptrule)
+	## 
+	## If there is no road, return a default string.
+	##
+
+	_if _self.min_road _is _unset
+	_then
+		_return "??"
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_annotation.mss_select_parent_min_road(ptrule)
+	## 
+	## This action can be bound to a hotkey to select the parent
+	## min_road while dragging.
+	##
+
+	# Only run this operation if the hotkey is pressed during a PDR.
+	_if ptrule.manager.pdr_running_ptrule _is _unset
+	_then
+		_return
+	_endif
+
+	# Look for a correlated road.
+	_if (parent_geom << ptrule.pdr_data[:last_correlation_geometry]) _is _unset
+	_then
+		condition.raise(:user_error, :string, "No road at this location")
+	_endif
+	parent_rwo << ptrule.user_data[:parent_min_road] << parent_geom.rwo
+
+	# The following trick will force the anno to be parallel with
+	# the line, upright.
+	pdr << ptrule.pdr_data
+	angle << parent_geom.sectors.angle_near(pdr[:last_pos])
+	angle << angle.normalise(-0.5 * (1.0.pi), 0.5 * (1.0.pi))
+	rot_center << pdr[:start_pos]
+	pdr[:rotate_transform] << transform.translate(-rot_center.x, -rot_center.y).
+				  rotate(angle).
+				  translate(rot_center.x, rot_center.y)
+	pdr[:transform] << pdr[:rotate_transform] * pdr[:translate_transform]
+	
+	ptrule.detached_geometry.string << parent_rwo.text_for(:annotation_text)
+
+	_if (a_map_view << ptrule.manager.current_map_view) _isnt _unset
+	_then
+		ptrule.redraw_drag_sectors(a_map_view.window)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_annotation.mss_ensure_parent_min_road(ptrule)
+	## 
+	## Pre-release action to ensure that a parent min_road is identified.
+	##
+
+	_if ptrule.parent_ptrule _isnt _unset
+	_then
+		# Assume that the parent ptrule will hold the owning min_road.
+		_return
+	_endif
+	
+	_if (parent_rwo << ptrule.user_data[:parent_min_road]) _is _unset
+	_then
+		condition.raise(:user_error, :string, "The road to be annotated has not been identified.")
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method road_annotation.mss_ptrule_post_insert_activity(ptrule)
+	## 
+	## Called immediately after self (a database record) is
+	## inserted, using pointing rule PTRULE.
+	##
+
+	# First, get owning road from the parent pointing rule, if
+	# applicable.  Otherwise, get it from correlation information.
+	_if (parent_ptrule << ptrule.parent_ptrule) _isnt _unset _andif
+	    (cr << parent_ptrule.current_record) _isnt _unset _andif
+	    cr.source_collection.name _is :min_road
+	_then
+		parent_rwo << cr
+	_else 
+		parent_rwo << ptrule.user_data[:parent_min_road]
+	_endif
+	_if parent_rwo _is _unset
+	_then
+		condition.raise(:user_error, :string, "No road identified for placing annotation.")
+	_endif 
+	_self.min_road << parent_rwo
+	
+_endmethod
+$
+

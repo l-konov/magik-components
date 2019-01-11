@@ -1,0 +1,135 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+##
+## mss_config_in_place_combo_field_editor
+##
+## In-place field editor for handling pseudo-enumerated fields
+## where a combo_box_item is suitable.
+##
+
+def_slotted_exemplar(:mss_config_in_place_combo_field_editor,
+{
+	{:field_item, _unset, :writable}
+},
+{:in_place_combo_editor, :in_place_field_editor_mixin})
+$
+
+_pragma(classify_level=advanced)
+_method mss_config_in_place_combo_field_editor.readonly?
+	## 
+	## Conflict resolution: returns the readonly? status defined by
+	## in_place_field_editor_mixin. 
+	##
+
+	_return _super(in_place_field_editor_mixin).readonly?
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_config_in_place_combo_field_editor.readonly? << a_value
+	## 
+	## Conflict resolution: calls the readonly?<< method defined by
+	## in_place_field_editor_mixin. 
+	##
+	
+	_return _super(in_place_field_editor_mixin).readonly? << a_value
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_config_in_place_combo_field_editor.items
+	## 
+	## Return the items - copied from in_place_choice_field_editor.
+	##
+
+	result << rope.new()
+	# we need an entry in the choice_item to represent unset
+	result.add({_unset, ""})
+	
+	fd << .field_item.field_descriptor
+	answer << _self.editor_work_record().match_string(fd, "")
+	
+	unsorted_values << equality_hash_table.new()
+	_if answer.responds_to?(:|get()|)
+	_then
+		# answer is a stream
+		_loop
+			_if (next << answer.get()) _is _unset
+			_then
+				_leave
+				answer.close()
+			_endif
+			unsorted_values[next.write_string] << next
+		_endloop
+	_else
+		# answer is a collection
+		_for a_value _over answer.fast_elements()
+		_loop
+			unsorted_values[a_value.write_string] << a_value
+		_endloop
+	_endif
+
+	sorted_keys << sorted_collection.new_from(unsorted_values.keys, :strings_with_numbers)
+	unset_value << fd.unset_value
+	_for a_key _over sorted_keys.fast_elements()
+	_loop
+		# Do not include the unset value which is already available as
+		# a blank string.
+		val << unsorted_values[a_key]
+		_if val <> unset_value
+		_then
+			result.add_last({val, a_key})
+		_endif
+	_endloop
+
+	_return result
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method mss_config_in_place_combo_field_editor.manage_actions()
+	##
+	## Manages the actions for this editor_field - copied from
+	## in_place_choice_field_editor.
+	##
+
+	_super.manage_actions()
+
+	enabled? << _not _self.readonly?
+	_self.action(:value).enabled? << enabled? 
+	_self.action(:sub_dialog).enabled? << enabled?
+
+	# Assume that the list of items displayed by this field editor
+	# can change on-the-fly: for example, changing a table name
+	# will dynamically change the list of geometry fields for that
+	# table.  So, unlike the standard in_place_choice_field_editor,
+	# explicitly re-generate the list of items.
+	_if enabled?
+	_then
+		_self.set_items(_self.items)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_config_in_place_combo_field_editor.set_items(new_items)
+	##
+	## Set the items in the subdialog to NEW_ITEMS.
+	##
+	
+	_self.sub_dialog.items << new_items
+	
+_endmethod
+$

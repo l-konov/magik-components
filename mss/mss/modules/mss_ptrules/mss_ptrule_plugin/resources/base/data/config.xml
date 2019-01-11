@@ -1,0 +1,8 @@
+<config>
+  <plugins>
+    <plugin name="ptrule_plugin" class_name="mss_ptrule_plugin"/>
+    <plugin name="construction" class_name="mss_ptrule_construction_plugin"/>
+    <plugin name="specials" class_name="mss_ptrule_specials_plugin"/>
+    <plugin name="find" class_name="mss_ptrule_find_plugin"/>
+  </plugins>
+</config>

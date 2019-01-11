@@ -1,0 +1,131 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={geometry})
+_method sector_rope.angle_near(a_point_geom, _optional max_dist, tol_vec)
+	##
+	## Find the point on the path of self nearest to A_POINT_GEOM.
+	## (MAX_DIST and TOL_VEC are as described in the segpoint_near()
+	## method).  Return the angle of self at that nearest point; the
+	## nearest point; and the distance to that nearest point.
+	##
+
+	(nearest_pt, dist, index, sec, t_val) << _self.segpoint_near(a_point_geom, max_dist, tol_vec)
+	_if index _isnt _unset _andif
+	    t_val _isnt _unset
+	_then
+		_if _self.degenerate?
+		_then
+			angle << 0.0
+		_else 
+			angle << _self[index[2].abs].direction(t_val, index[1].abs).theta
+		_endif 
+	_endif
+	
+	_return angle, nearest_pt, dist
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={trail})
+_method sector_rope.concatenate_geometries(geoms)
+	##
+	## Concatenates all supplied geometries with self.  Copied from
+	## map_trail. 
+	##
+	
+	# NOTE: FOR NOW THIS IS AN N-SQUARED ALGORITHM!
+	#       A MORE SOPHISTICATED TECHNIQUE SHOULD
+	#       BE IMPLEMENTED AT SOME TIME
+	
+	_if geoms _is _unset _orif
+	    (n_geoms << geoms.size) = 0
+	_then
+		_return _false
+	_endif
+	
+	processed? << equality_hash_table.new(n_geoms)
+	total_processed << 0
+	_for pass _over range(1, n_geoms)
+	_loop
+		n_processed << 0
+		_for geom _over geoms.fast_elements()
+		_loop
+			_if processed?[geom] _is _true
+			_then
+				_continue
+			_endif 
+			
+			sr << geom.sectors
+			_if _self.append_sectors(sr) _orif 
+			    _self.prepend_sectors(sr)
+			_then
+				processed?[geom] << _true
+				n_processed +<< 1
+				total_processed +<< 1
+				_if total_processed = n_geoms
+				_then
+					_return _true
+				_endif 
+			_endif 
+		_endloop
+		_if n_processed = 0
+		_then
+			_return _false
+		_endif 
+	_endloop
+	
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={trail})
+_method sector_rope.extend_at_start(dist)
+	## 
+	## Extend self by distance DIST at the start: if the first
+	## sector is an actual sector, it is adjusted; otherwise, a new
+	## sector is added.
+	##
+
+	c1 << _self.first_coord
+	ang << _self.angle_near(c1)
+	c2 << transform.rotate(ang).convert(coordinate.new(-dist, 0)) + c1
+	_if _self.first.is_class_of?(sector)
+	_then
+		_self.first[1] << c2
+	_else
+		_self.prepend_sectors(sector_rope.new_with(sector.new_with(c2, c1)))
+	_endif
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={trail})
+_method sector_rope.extend_at_end(dist)
+	## 
+	## Extend self by distance DIST at the end: if the last
+	## sector is an actual sector, it is adjusted; otherwise, a new
+	## sector is added.
+	##
+
+	c1 << _self.last_coord
+	ang << _self.angle_near(c1)
+	c2 << transform.rotate(ang).convert(coordinate.new(dist, 0)) + c1
+	_if _self.last.is_class_of?(sector)
+	_then
+		_self.last[_self.last.size] << c2
+	_else
+		_self.append_sectors(sector_rope.new_with(sector.new_with(c1, c2)))
+	_endif
+	_return _self
+	
+_endmethod
+$

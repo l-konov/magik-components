@@ -1,0 +1,146 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_holder_aggregator.magik
+##
+## Class used to aggregate a set of mss_cu_holders.
+##
+
+def_slotted_exemplar(:mss_cu_holder_aggregator,
+{
+	{:children, _unset}
+},
+{:mss_cu_holder})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_holder_aggregator.init(pl, copy_from)
+	## 
+	## 
+
+	_super.init(pl, copy_from)
+	.children << rope.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.add_child(a_child)
+	## 
+	## 
+
+	_if .children.size = 0
+	_then
+		# For first child, set several attributes from it.
+		_for slot_name _over {:cu_job_type, :cu_cost_group, :cu_definition, :cu_operation_definition,
+				      :cu_code, :operation, :work_point_number, :custom_data}.fast_elements()
+		_loop
+			_self.perform_private(slot_name.with_chevron, a_child.perform(slot_name))
+		_endloop
+	_endif
+	_return .children.add_last(a_child)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.sum_children(attr)
+	## 
+	## Return a sum of the value ATTR for all of self's children.
+	##
+
+	v << 0
+	_for i _over .children.fast_elements()
+	_loop
+		v +<< i.perform(attr).default(0)
+	_endloop
+	_return v
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.quantity
+	## 
+	## This is not directly meaningful for an aggregated element.
+	##
+
+	_return _unset 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.unit_multiplier
+	## 
+	## This is not directly meaningful for an aggregated element.
+	## 
+
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.true_or_calculated_unit_multiplier
+	## 
+	## This is not directly meaningful for an aggregated element.
+	## 
+
+	_return _unset, _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.combined_quantity
+	## 
+	## Sum this value from self's children.
+	##
+
+	_return _self.sum_children(:combined_quantity)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.material_total_cost
+	## 
+	## Sum this value from self's children.
+	##
+
+	_return _self.sum_children(:material_total_cost)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.labor_total_cost
+	## 
+	## Sum this value from self's children.
+	##
+
+	_return _self.sum_children(:labor_total_cost)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder_aggregator.total_cost
+	## 
+	## Sum this value from self's children.
+	##
+
+	_return _self.sum_children(:total_cost)
+	
+_endmethod
+$

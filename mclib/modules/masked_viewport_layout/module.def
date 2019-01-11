@@ -1,0 +1,10 @@
+mclib_masked_viewport_layout	4000	
+
+description
+	A layout viewport that supports masking the display
+end
+
+requires
+	layout_engine
+	mclib_package
+end

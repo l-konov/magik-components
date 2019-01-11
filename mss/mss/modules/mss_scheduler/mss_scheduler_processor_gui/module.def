@@ -1,0 +1,12 @@
+mss_scheduler_processor_gui	1
+
+description
+	MSS scheduler processor GUI
+end
+
+requires
+	mss_component_framework
+	mss_scheduler_data_model
+	mss_scheduler_editor
+	mss_scheduler_engine
+end

@@ -1,0 +1,202 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-08-07 23:35:51 brad.sileo>
+##
+## Created By: Brad Sileo, TenSails
+## Date: 02-10-2005
+## Copyright 2005 Brad Sileo, TenSails
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## defines a proxy object for use with database records. This
+## objects holds a real database record as its proxy, but
+## offers support for overriding fields on that record within
+## this pseudo object.  With this in place, you can use this
+## object in place of the real record in any collection or
+## displays and the overridden field values are used as appropriate.
+def_slotted_exemplar(:pseudo_rwo,
+                          {
+				  {:override_fields,_unset}
+			  },
+			  {:proxy, :rwo_record_mixin})
+$
+
+_pragma(classify_level=basic, topic={mclib})
+## Holds the set of fields that are overridded
+pseudo_rwo.define_slot_externally_readable(:override_fields,_true)
+$
+
+_pragma(classify_level=basic, topic={mclib})
+_method pseudo_rwo.init(an_object)
+	## Create a new instance of me as a pseudo of an_object
+	## 
+	##
+
+	# (02-10-2005 Brad Sileo, TenSails): created.
+	.override_fields << property_list.new()
+	>> _super.init(an_object)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mclib})
+_method pseudo_rwo.override_field(a_field_name,a_value)
+	## Change the value for this pseudo's A_FIELD_NAME to A_VALUE. This
+	## not effect the original record in the database.
+	## No type checking is done on the data - the user is expected
+	## to make sure appropriate types are included for whatever
+	## context this might be used in.
+	## if you override a mapped field, then this will set both the
+	## mapping owner and the real field for it. It is generally
+	## best to set the mapping owner, such as :location and let it
+	## handle setting the true target field for you.
+
+	# (02-10-2005 Brad Sileo, TenSails): created.
+	# If it is a mapped geometry field, then we set both the
+	# mapping owner and the mapped field value.
+	_if (fd << _self.field(a_field_name)) _isnt _unset _andif 
+	    fd.is_geometry? _andif
+	    fd.mapped?
+	_then
+		mapped_field_name << _self.perform(fd.map_discriminator_method)
+		fd << _self.field(mapped_field_name)
+		.override_fields[fd.name] << a_value
+	_endif
+	.override_fields[a_field_name] << a_value
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_method pseudo_rwo.does_not_understand(a_message,private?)
+	## Handles my override lookups, or calls the super if there is
+	## no override for the requested method name
+	## 
+	##
+
+	# (02-10-2005 Brad Sileo, TenSails): created.
+	#debug show("OV on? ",_self, " for ",a_message.selector)
+	_if .override_fields.includes_key?(a_message.selector)
+	_then
+		#debug show("Using OV on ",_self, " for ",a_message.selector)
+		_return .override_fields[a_message.selector]
+		
+	_endif
+	>> _super.does_not_understand(a_message,private?)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method pseudo_rwo.responds_to?(message, _optional private?)
+	## handles checking my real object as well.
+	## 
+	##
+
+	# (12-16-2004 Brad Sileo, TenSails): created.
+	>> .real_subject.responds_to?(message, private?) _orif
+		_super.responds_to?(message, private?)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method pseudo_rwo.geometry_fields
+	## force this to my subject record since the version on
+	## rwo_recoerd_mixin may not work without a the current_dsview dynamic
+	## 
+	##
+
+	# (02-14-2005 Brad Sileo): created.
+	>> .real_subject.geometry_fields
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method pseudo_rwo.authorised_geometry_fields
+	##
+	## Returns geometry fields that are authorised with greater
+	## than 'none' access.
+	##
+	#
+	# Backstop is simply .geometry_fields - rwo_record will
+	# implement the real thing.
+	#
+	>>  .real_subject.authorised_geometry_fields
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_iter _method pseudo_rwo.all_geometry(_optional including_meatball?)
+ 	## Yields each geometry object currently owned by _self. Only
+ 	## geometries which are authorised with at least select access
+ 	## will be yielded. 
+ 	##
+ 	## For advanced users: unless including_meatball? is true,
+ 	## meatballs are ignored.
+ 	##
+ 	## Swaps in my overrides as needed
+ 	## 
+ 	##
+ 	# (02-10-2005 Brad Sileo, TenSails): created.
+ 	_for a_geom _over .real_subject.all_geometry()
+ 	_loop
+ 		_loopbody(.override_fields[a_geom.descriptor.name].default(a_geom))
+ 	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_method pseudo_rwo.show_on(a_stream)
+	## Display details of me and my subject
+	## 
+	##
+
+	# (02-14-2005 Brad Sileo): created.
+	a_stream.write(_self.class_name,%()
+	.real_subject.show_on(a_stream)
+	a_stream.write(%))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_method pseudo_rwo.attributes_to_print()
+	## handles showing me with my overrides on A_STREAM
+	## 
+	##
+
+	# (02-14-2005 Brad Sileo): created.
+	>> .override_fields.keys
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mclib})
+_method pseudo_rwo.print_on(a_stream)
+	## handles printing me
+	## 
+	##
+
+	# (02-14-2005 Brad Sileo): created.
+	_self.show_on(a_stream)
+	a_stream.write(%newline)
+	_if _self.is_valid?
+	_then
+		_self.print_attributes_on(a_stream)
+	_endif
+_endmethod
+$

@@ -1,0 +1,2 @@
+register.magik
+message_usages.magik

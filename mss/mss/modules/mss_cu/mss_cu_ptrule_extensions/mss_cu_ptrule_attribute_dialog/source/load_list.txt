@@ -1,0 +1,4 @@
+message_usages.magik
+
+mss_cu_ptrule_attribute_dialog.magik
+mss_cu_ptrule_editor_plugin.magik

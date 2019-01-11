@@ -1,0 +1,319 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_work_point
+##
+## A record that tracks the existence of a Work Point used to
+## aggregate Compatible Unit records.
+##
+
+def_slotted_exemplar(:mss_cu_work_point,
+{},
+{:mss_cu_rwo_record})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.make_sysid()
+	## 
+	## Use a separate mss_cu_reference UVA for
+	## generating these values.
+	##
+
+	_return _self.source_view.uvas[:mss_cu_reference].get()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_work_point.mss_design
+	## 
+	## Return the mss_design record that owns self.
+	##
+
+	_return mss_workspace_manager_engine.design_table.at(_self.mss_design_id.default(0))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_work_point.job_and_design_full_name
+	## 
+	## Return the corresponding value from self's mss_design.
+	##
+
+	_if (des << _self.mss_design) _isnt _unset
+	_then
+		_return des.job_and_design_full_name
+	_else
+		_return ""
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_work_point.annotation_text
+	## 
+	## Annotate work_point_number attribute.
+	##
+
+	_return _self.work_point_number.default("").as_charvec()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule, mss_cu})
+_method mss_cu_work_point.mss_ptrule_correlation_score(cat, corr_geom)
+	##
+	## Prefer not to correlate on work points, if there are better
+	## options (i.e. anything in the client data partitions).
+	##
+
+	_return -999
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_work_point.derived_work_point_number()
+	## 
+	## Return a string for self's work_point_number attribute.
+	##
+
+	_return write_string(_self.prefix.default(""), _self.number.default(""))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.insert_trigger(_gather args)
+	## 
+	## Set work_point_number attribute based on other attributes.
+	##
+
+	_super.insert_trigger(_scatter args)
+	_self.set_mss_design_id()
+	_self.work_point_number << _self.derived_work_point_number()
+	_self.validate_unique_work_point_number()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.update_trigger(_gather args)
+	## 
+	## Set work_point_number attribute based on other attributes.
+	## 
+
+	_super.update_trigger(_scatter args)
+	new_wpn << _self.derived_work_point_number().default("")
+	old_wpn << _self.work_point_number.default("")
+	old_rec << args[2]
+	_if new_wpn ~= old_wpn
+	_then
+		_self.work_point_number << new_wpn
+		_self.validate_unique_work_point_number()
+		_if new_wpn ~= "" _andif
+		    old_wpn ~= ""
+		_then 
+			_self.transfer_mss_cu_references(old_rec)
+		_endif 
+		_self.update_text_fields()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.set_mss_design_id()
+	## 
+	## Set the mss_design_id attribute based on the active design.
+	##
+
+	_if (ad << mss_cu_engine.active_design) _isnt _unset
+	_then
+		_self.mss_design_id << ad.id
+	_else
+		_self.mss_design_id << 0
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.mss_design_ids_for_uniqueness_check(_optional des)
+	## 
+	## Return an equality_set of all mss_design_id values which
+	## must be checked to examine the uniqueness of self's
+	## work_point_number value.  If DES is passed in, this
+	## mss_design record is used - otherwise, self's mss_design is
+	## used. 
+	##
+
+	s << equality_set.new()
+	_if des _is _unset
+	_then
+		_if (des << _self.mss_design) _is _unset
+		_then
+			# If there is no design, then no duplicate validations can be
+			# carried out.
+			_return s
+		_endif
+	_endif
+	
+	_for i _over des.ordered_design_path.fast_elements()
+	_loop
+		s.add(i.id)
+	_endloop
+	_for i _over des.ordered_sub_designs(_false).fast_elements()
+	_loop
+		s.add(i.id)
+	_endloop
+	_return s
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.validate_unique_work_point_number()
+	## 
+	## Ensure that self's work_point_number is unique with respect
+	## to all parent and child designs.
+	##
+
+	wpn << _self.work_point_number
+	_for i _over _self.mss_design_ids_for_uniqueness_check().fast_elements()
+	_loop
+		pred << predicate.eq(:mss_design_id, i) _and
+			predicate.eq(:work_point_number, wpn)
+		_for j _over _self.source_collection.select(pred).fast_elements()
+		_loop
+			_if j.id ~= _self.id
+			_then
+				_self.user_error(:duplicate_work_point_number, wpn)
+			_endif
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+_method mss_cu_work_point.mss_ovc_consistency_roots(mode, engine, target_dataset)
+	## 
+	## Do not permit work points to be copied by default.  May be
+	## redefined, but that may also require additional
+	## customization for application-specific business processes
+	## and data validation (i.e. this can create duplicate work
+	## point numbers, and the work point that is transferred is
+	## still associated with the original design).
+	##
+
+	_self.user_error(:mss_ovc_not_allowed)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.mss_cu_references()
+	## 
+	## If there is an active design, and if self belongs to that
+	## active design, then this returns all mss_cu_reference
+	## objects in the design that refer to self.
+	##
+
+	r << rope.new()
+	_if (ad << mss_cu_engine.active_design) _is _unset _orif
+	    _not (my_ids << _self.mss_design_ids_for_uniqueness_check()).includes?(ad.id)
+	_then
+		_return r
+	_endif
+
+	_for ds_name _over mss_cu_engine.active_design_dataset_names.fast_elements()
+	_loop
+		_if (dbv << gis_program_manager.cached_dataset(ds_name)) _is _unset _then _continue _endif
+		_if (tbl << dbv.collections[:mss_cu_reference]) _is _unset _then _continue _endif
+		_for des_id _over my_ids.fast_elements()
+		_loop 
+			pred << predicate.eq(:mss_design_id, des_id) _and
+				predicate.eq(:work_point_number, _self.work_point_number)
+			r.add_all_last(tbl.select(pred))
+		_endloop
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_work_point.transfer_mss_cu_references(old_rec)
+	## 
+	## Update all mss_cu_references owned by OLD_REC to become
+	## owned by self.
+	##
+
+	r << old_rec.mss_cu_references()
+
+	# Do one pass to check writable.
+	_for i _over r.fast_elements()
+	_loop
+		_if _not (dbv << i.source_view).writable?
+		_then 
+			_self.user_error(:cu_reference_view_readonly, dbv.external_name)
+		_endif 
+	_endloop
+
+	# Do the actual updates.
+	wpn << _self.work_point_number
+	_for i _over r.fast_elements()
+	_loop
+		dr << i.detached()
+		dr.work_point_number << wpn
+		dr.source_collection.update(dr)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_work_point.mss_cu_dataset_group_for_transaction(pl)
+	##
+	## Work points can require multiple dataset groups when updating.
+	##
+
+	_if pl[:action] _isnt :update
+	_then
+		_return _unset
+	_endif
+	
+	_if (ad << mss_cu_engine.active_design) _is _unset
+	_then
+		_return _unset
+	_endif
+
+	s << equality_set.new()
+	s.add(_self.source_view)
+	_for ds_name _over mss_cu_engine.active_design_dataset_names.fast_elements()
+	_loop
+		_if (dbv << gis_program_manager.cached_dataset(ds_name)) _isnt _unset
+		_then
+			s.add(dbv)
+		_endif
+	_endloop
+	_if s.size > 1
+	_then
+		_return dataset_group.new(s)
+	_else 
+		_return _unset
+	_endif 
+	
+_endmethod
+$

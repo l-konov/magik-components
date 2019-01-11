@@ -1,0 +1,9 @@
+mclib_dynamic_applications	4000
+
+description
+	Supports a dynamic applications which can load modules before starting
+end
+
+requires
+	mclib_package
+end

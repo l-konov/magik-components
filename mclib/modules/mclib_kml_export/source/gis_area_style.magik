@@ -1,0 +1,38 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-17 12:13:25 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-23-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_area_style.kml_style()
+	## returns a KML for me.
+	## !GEARTH_DIRECTORY! is the value expected in the KML file, which might
+	## be a URL or a full path
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _if (fs << _self.actual_fill_style) _isnt _unset
+	_then
+		>> fs.kml_style()
+	   _elif (ls << _self.actual_outline) _isnt _unset 
+	   _then
+		   >> ls.kml_style()
+	   _elif (ls << _self.actual_line_style) _isnt _unset 
+	   _then
+		   >> ls.kml_style()
+	   _endif 
+_endmethod
+$

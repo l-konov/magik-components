@@ -1,0 +1,8 @@
+mclib_sorted_collection		1
+
+description
+	API extension for core class sw:sorted_collection that allows sorting of several fields and uses compiled Magik in sorting procedures.
+end
+
+requires
+end

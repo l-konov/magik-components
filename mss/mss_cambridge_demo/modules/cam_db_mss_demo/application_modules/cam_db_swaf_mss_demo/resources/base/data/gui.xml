@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  gui.xml for the MSS Demo SWAF application  -->
+<gui base="cam_db_swaf_professional_application.gui">
+
+    <!-- ACCELERATORS -->
+    <accelerators>
+
+        <!-- DIALOGS -->
+        <accelerator id="plot_a"                        name="plotting.quick_preview"/>
+        <accelerator id="activate_version_management_a" name="versions.activate_version_management"/>
+        <accelerator id="activate_explorer_a"           name="explorer.start_explorer"/>
+        <accelerator id="activate_bookmark_dialog_a"    name="maps.map_gui_bookmark_dialog"/>
+
+        <accelerator id="copy_to_clipboard_a"           name="maps.map_copy_to_clipboard"/>
+
+	<!-- VERSION MANAGEMENT -->
+	<accelerator id="undo_a"                        name="undo"/>
+	<accelerator id="redo_a"                        name="redo"/>
+
+	<accelerator id="edit_object_a"                 name="editor_manager.edit_object"/>
+
+	<!-- MAP REFRESH -->
+	<accelerator id="refresh_a2"                    name="maps.view_refresh"/>
+	<accelerator id="refresh_a"                     name="maps.view_refresh"/>
+	<accelerator id="interrupt_refresh_a"           name="maps.view_interrupt_refresh"/>
+
+	<!-- INTERACTION MODES -->
+	<accelerator id="interaction_mode_a"            name="maps.map_gui_interaction_mode"/>
+
+	<!-- TRAIL -->
+	<accelerator id="set_trail_to_selection_a"      name="maps.map_set_trail_to_selection"/>
+        <accelerator id="trail_undo_a"                  name="maps.trail_undo"/>
+        <accelerator id="trail_redo_a"                  name="maps.trail_redo"/>
+
+	<!-- MSS_PTRULE -->
+        <accelerator id="complete_ptrule_a"             name="mss_ptrule_manager.complete_ptrule"/>
+        <accelerator id="hotkey_1_a"                    name="mss_ptrule_manager.hotkey_1"/>
+        <accelerator id="hotkey_2_a"                    name="mss_ptrule_manager.hotkey_2"/>
+        <accelerator id="hotkey_3_a"                    name="mss_ptrule_manager.hotkey_3"/>
+        <accelerator id="hotkey_4_a"                    name="mss_ptrule_manager.hotkey_4"/>
+        <accelerator id="hotkey_5_a"                    name="mss_ptrule_manager.hotkey_5"/>
+
+    </accelerators>
+
+    <menu name="menubar" type="menubar">
+	<submenu name="file" mnemonic_id="file_m">
+	    <action name="mss_workspace_manager_plugin.activate_mss_workspace_manager_framework"/>
+	    <submenu name="recent_designs" role="mss_recent_designs"/>
+	    <separator/>
+	    <action name="mss_wm_job_design_plugin.new_job_and_design"/>
+	    <action name="mss_wm_job_design_plugin.edit_active_job"/>
+	    <action name="mss_wm_job_design_plugin.edit_active_design"/>
+	    <action name="mss_wm_job_design_plugin.close_design"/>
+	    <action name="mss_wm_job_design_plugin.merge_design"/>
+	    <separator/>
+	    <submenu name="st_active_design" role="mss_active_design_state_transitions"/>
+	    <separator/>
+	    <action name="versions.activate_version_management" mnemonic_id="activate_version_management_m"/>
+	    <action name="versions.commit" mnemonic_id="commit_m" />
+	    <action name="versions.rollback" mnemonic_id="rollback_m"/>
+	    <separator/>
+	    <action name="plotting.quick_preview" mnemonic_id="quick_plot_preview_m"/>
+	    <separator/>
+	    <action name="exit" mnemonic_id="exit_m"/>
+	</submenu>
+	<submenu name="edit" mnemonic_id="edit_m"/>
+	<submenu name="view" mnemonic_id="view_m"/>
+	<submenu name="trail" mnemonic_id="trail_m"/>
+	<submenu name="tools" mnemonic_id="tools_m"/>
+	<submenu name="window" mnemonic_id="window_m" role="new_document_actions"/>
+	<submenu name="applications">
+	    <action name="mss_cu_report_fw_pi.activate_mss_cu_report_framework"/>
+	    <separator/>
+	    <action name="mss_bulk_update_fw_pi.activate_mss_bulk_update_framework"/>
+	    <action name="mss_qa_processor_fw_pi.activate_mss_qa_processor_framework"/>
+	</submenu>
+	<submenu name="administration">
+	    <action name="mss_ptdef_config.activate_mss_ptdef_config_menu"/>
+	    <action name="mss_cu_config_fw_pi.activate_mss_cu_config_framework"/>
+	    <separator/>
+	    <action name="mss_scheduler_processor_fw_pi.activate_mss_scheduler_processor_framework"/>
+	    <action name="mss_scheduler_processor_fw_pi.activate_mss_scheduler_review_framework"/>
+	    <separator/>
+	    <action name="mss_http_server_fw_pi.activate_mss_http_server_framework"/>
+	</submenu>
+	<submenu name="help" mnemonic_id="help_m"/>
+    </menu> <!-- menubar -->
+
+    <toolbar name="trail">
+	<action name="maps.map_set_trail_to_selection"/>
+        <action name="maps.trail_undo"/>
+        <action name="maps.trail_redo"/>
+        <action name="mss_map_trail_addon.extend_parallel"/>
+        <action name="mss_map_trail_addon.offset_parallel"/>
+	<action name="maps.trail_close"/>
+	<action name="maps.trail_reverse"/>
+	<action name="maps.trail_delete_coordinate"/>
+	<action name="maps.trail_clear"/>
+	<pulldown mode="switch" execute="yes">
+	    <action name="maps.trail_circle"/>
+	    <action name="maps.trail_arc_thru_points"/>
+	    <action name="maps.trail_circular_centre_point_arc"/>
+	    <action name="maps.trail_centre_point_arc"/>
+	    <action name="maps.trail_tangent_arc"/>
+	    <action name="map_trail.fillet"/>
+	    <action name="maps.trail_rational_b_spline"/>
+            <action name="maps.trail_swap_arc"/>
+	    <action name="maps.trail_flip_arc"/>
+	    <action name="map_trail.adjust_tangent_arc"/>
+	    <action name="maps.trail_uncurve"/>
+	</pulldown>
+	<pulldown mode="switch" execute="yes">
+	    <action name="maps.trail_rectangle"/>
+	    <action name="map_trail.drag_trail_rectangle"/>
+	    <action name="map_trail.append"/>
+	    <action name="map_trail.divide"/>
+	    <action name="map_trail.offset"/>
+	    <action name="map_trail.buffer"/>
+	    <action name="maps.trail_generalise"/>
+	    <!-- <action name="maps.trail_angle"/> -->
+	</pulldown>
+	<pulldown mode="switch" execute="yes">
+	    <action name="maps.trail_z_on"/>
+	    <action name="maps.trail_z_off"/>
+	    <action name="maps.trail_mark"/>
+	</pulldown>
+	<action name="maps.trail_dynamics_on_self"/>
+	<action name="maps.trail_lock_angle"/>
+	<action name="maps.trail_lock_length"/>
+
+    </toolbar>
+
+    <work_area>
+        <paned_window side_by_side="yes" dynamic="no" cell_spacing="no">
+	    <plugin plugin_name="document_manager" stretch="1">
+                <document plugin_name="maps" map_type="geographic" />
+            </plugin>
+	    <separator side_by_side="true" minimise_direction="right"/>  
+
+                <!-- note: role viewport_mapping means Layouts is allowed to build panes inside this tab -->
+                <tab_box role="viewport_mapping">
+		    <!-- these roles are used by the pane_manager to allow 
+		         the user to switch the visibility of these tabs -->
+                    <plugin plugin_name="object_control"           role="object_control"/>
+                    <plugin plugin_name="editor_manager"           role="editor_manager"/>
+                    <plugin plugin_name="mss_ptrule_gui"           role="mss_ptrule_gui"/>
+<!--                <plugin plugin_name="analysis"                 role="network_analysis"/>  -->
+                    <paned_window side_by_side="no" role="viewers" tab_label_id="viewers">
+                      <plugin plugin_name="spatial_context_viewer" stretch="0.5">
+                        <properties>
+                            <property name="width" value="300"/>
+                            <property name="height" value="300"/>
+                        </properties>
+                      </plugin>
+	    	      <plugin plugin_name="overviewer" stretch="0.5">
+                        <properties>
+                            <property name="width" value="300"/>
+                            <property name="height" value="300"/>
+                        </properties>
+		      </plugin>
+                    </paned_window>
+                </tab_box>
+        </paned_window>
+    </work_area>
+
+</gui>

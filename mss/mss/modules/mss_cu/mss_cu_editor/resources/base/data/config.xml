@@ -1,0 +1,7 @@
+<config>
+  <plugins>
+    <plugin name="field_lister" class_name="object_editor_field_lister"/>
+    <plugin name="cu_editor" class_name="mss_cu_editor_plugin"/>
+    <plugin name="rwo_specials" class_name="rwo_specials_plugin"/>
+  </plugins>
+</config>

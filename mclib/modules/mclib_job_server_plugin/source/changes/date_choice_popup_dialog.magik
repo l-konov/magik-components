@@ -1,0 +1,58 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package sw
+$
+
+# FIXME: revisit at 4.1.1 as this may be addressed.
+_pragma(classify_level=restricted)
+_method date_choice_popup_dialog.ok( _optional p_delay? )
+	## Parameters    : [P_DELAY?]: if _true, a small delay will be
+	##                    build in. This is suitable if ok() is
+	##                    called after a click, when it is
+	##                    disturbing if the click does not seem to happen.
+	##                    It defaults to _false.
+	## Returns       : -
+	## Function      : Calls the ok notifier, if this has been set.
+	##                 This should only be called when the user provoked an
+	##                 event that should positively close the popup frame
+	##                 (e.g. user pressed Escape; not just an
+	##                 arbitrary lose focus). The popup will be closed.
+
+	_super.ok( p_delay? )
+	# BEGIN MCLIB
+	# prevent the traceback that happens in core job_server when
+	# attempting to set the repeating info
+#	.owner.agent.stop_edit( _false )
+	_if .owner _isnt _unset _andif
+		.owner.responds_to?(:agent) _andif
+		.owner.agent _isnt _unset 
+	_then
+		.owner.agent.stop_edit( _false )
+	_endif
+	# END MCLIB
+_endmethod 
+$

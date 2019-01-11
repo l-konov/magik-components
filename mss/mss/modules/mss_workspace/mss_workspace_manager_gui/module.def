@@ -1,0 +1,15 @@
+mss_workspace_manager_gui	1
+
+description
+	MSS workspace manager GUI
+end
+
+requires
+	mss_workspace_data_model
+	mss_wm_conflict_dialog
+	mss_wm_job_design_plugin
+	mss_wm_overlay_view_copy_gui
+	mss_wm_recent_designs_plugin
+	mss_wm_search_plugin
+	mss_wm_state_transition_plugin
+end

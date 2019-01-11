@@ -1,0 +1,200 @@
+<template name="default">
+       <files>
+          <file name="manifold_tree">
+           <file_name>manifold_tree.html</file_name>
+	   <stylesheet_name>case_dump_manifold_list.xsl</stylesheet_name>
+         </file>
+	 <file name="object_tree">
+           <file_name>object_tree.html</file_name>
+	   <stylesheet_name>case_dump_object_list.xsl</stylesheet_name>
+         </file>
+         <file name="metadata">
+           <file_name>case_dump_metadata.html</file_name>
+	   <stylesheet_name>case_dump_metadata.xsl</stylesheet_name>
+         </file>
+         <file name="field_type_tree">
+           <file_name>field_types_tree.html</file_name>
+	   <stylesheet_name>case_dump_field_types_list.xsl</stylesheet_name>
+         </file>
+	 <file name="manifold">
+	   <stylesheet_name>case_dump_manifold.xsl</stylesheet_name>
+	   <collection name="sw_gis!case_manifold" prefix="manifold_" file_name_property="name" />
+         </file>
+	 <file name="field_type">
+	   <stylesheet_name>case_dump_field_type.xsl</stylesheet_name>
+	   <collection name="sw_gis!case_field_type" prefix="field_type_" file_name_property="name" />
+         </file>
+	 <file name="objects">
+	   <stylesheet_name>case_dump_object.xsl</stylesheet_name>
+	   <collection name="sw_gis!case_object" prefix="object_" file_name_property="name" />
+         </file>
+       </files>
+       <collections>
+          <!-- collection soc="soc_name" dataset="dataset_name" name="coll_name"/-->
+	  <!-- fields -->
+	     <!-- field name="field_name to include"-->
+          <collection name="sw_gis!case_object">
+	     <fields>
+	       <field name="id"/>
+	       <field name="ex_name"/>
+	       <field name="e_name"/>
+	       <field name="name"/>
+	       <field name="text"/>
+	       <field name="fields"/>
+	       <field name="trigger_recs"/>	       
+	       <field name="indices"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!case_field">
+	    <fields>
+	      <field name="type"/>
+	      <field name="name"/>
+	      <field name="e_name"/>
+	      <field name="geometry_type_rec"/>
+	      <field name="manifold_rec"/>
+	      <field name="trigger_rec"/>
+	      <field name="field_type_rec"/>
+	      <field name="mandatory?_rec"/>
+	      <field name="default_value_rec"/>
+	      <field name="unset_value_rec"/>
+	      <field name="editor_rec"/>
+	      <field name="priority_rec"/>
+	    </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_trigger">
+	     <fields>
+	       <field name="type"/>
+	       <field name="method_name"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_priority">
+	     <fields>
+	       <field name="priority"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_manifold">
+	     <fields>
+	       <field name="manifold"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_manifold">
+	     <fields>
+	       <field name="number"/>
+	       <field name="name"/>
+	       <field name="text"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_object_index">
+	     <fields>
+	       <field name="fields"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_type">
+	     <fields>
+	       <field name="name"/>
+	       <field name="enumerated?"/>
+	       <field name="scalar?"/>
+	       <field name="storage_class"/>
+	       <field name="domains"/>
+	       <field name="enumerator"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_enumerator">
+	     <fields>
+	       <field name="name"/>
+	       <field name="val_id"/>
+	       <field name="field_vals"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_enumerator_value">
+	     <fields>
+	       <field name="val_id"/>
+	       <field name="map_val"/>
+	       <field name="value"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_geometry_type">
+	     <fields>
+	       <field name="type"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_ft">
+	     <fields>
+	       <field name="field_type"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_mandatory?">
+	     <fields>
+	       <field name="mandatory?"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_unset_value">
+	     <fields>
+	       <field name="unset_value"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_editor">
+	     <fields>
+	       <field name="editor"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_field_def_value">
+	     <fields>
+	       <field name="default_value"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_object_visible_field">
+	     <fields>
+	       <field name="id"/>
+	       <field name="function"/>
+	       <field name="visible_case_fields"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_object_trigger">
+	     <fields>
+	       <field name="method_name"/>
+	     </fields>
+	  </collection>
+          <collection name="sw_gis!case_object_editor">
+	     <fields>
+	       <field name="editor"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!case_field_manifold">
+	     <fields>
+	       <field name="id"/>
+	       <field name="manifold"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!case_field_domain">
+	     <fields>
+	       <field name="id"/>
+	       <field name="name"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!case_domain">
+	     <fields>
+	       <field name="ft_name"/>
+	       <field name="name"/>
+	       <field name="type"/>
+	       <field name="field_type"/>
+	       <field name="value_recs"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!domain_value_set">
+	     <fields>
+	       <field name="val_id"/>
+	       <field name="map_val"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!case_relationship">
+	     <fields>
+	       <field name="type"/>
+	       <field name="child_join_field"/>
+	       <field name="object1"/>
+	       <field name="object2"/>
+	       <field name="parent_join_field"/>
+	     </fields>
+	  </collection>
+       </collections>
+</template>

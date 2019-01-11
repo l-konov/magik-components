@@ -1,0 +1,336 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+
+_pragma(classify_level=restricted)
+## Class which represents an XMI Foundation.Core.Class element
+def_slotted_exemplar(:uml_model,
+{
+   {:name, _unset},
+   {:generalizations, _unset},
+   {:packages, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=basic)
+## The name of this model
+uml_model.define_slot_access(:name, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## The generalizations in this model
+uml_model.define_slot_access(:generalizations, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+## The packages in this model
+uml_model.define_slot_access(:packages, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_method uml_model.new(name)
+   ## Creates a new XMI (empty) model
+   ##
+   ## name : string
+   ##
+   ## returns : uml_model
+   
+   _return _clone.init(name)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_private _method uml_model.init(name)
+   ## Inits self
+   ##
+   ## name : string
+   ##
+   ## returns uml_model -- self, but inited
+
+   _self.name << name
+   _self.generalizations << rope.new()
+   _self.packages << property_list.new()
+
+   _dynamic !current_package! << package.all_packages[:sw]
+   # add object (all attrs and params are this type)
+   _self.include_class(method_table.class_for_name(:object))
+   
+   _return _self 
+_endmethod
+$
+
+_pragma(classify_level=deprecated)
+_method uml_model.new_for_class(class, name, _optional max_levels)
+   ## Create a new model based on one class
+   ##
+   ## class : method_table or object -- the class on which to base
+   ##   this model.
+   ##
+   ## returns : uml_model 
+
+   model << _self.new(name)
+
+   _if _not class.is_class_of?(method_table)
+   _then
+      # exemplar
+      class << class.method_table
+   _endif
+
+   levels_to_go << _unset
+   _if max_levels _isnt _unset 
+   _then
+      levels_to_go << max_levels - 1
+   _endif
+   
+   model.include_class(class, levels_to_go)
+   
+   _return model
+   
+_endmethod
+$
+
+_pragma(classify_level=deprecated)
+_method uml_model.new_for_package(a_package, name, _optional max_levels)
+   ## 
+   ## 
+
+   model << _self.new(name)
+
+   _if a_package.is_class_of?(:symbol)
+   _then
+      a_package << package.all_packages[a_package]
+   _endif
+
+   levels_to_go << _unset
+   _if max_levels _isnt _unset 
+   _then
+      levels_to_go << max_levels - 1
+   _endif
+
+   
+   _for an_mt _over each_class()
+   _loop
+      _if an_mt.metadata[:exemplar_global].package _is a_package
+      _then
+	 model.include_class(an_mt, levels_to_go)
+      _endif
+   _endloop
+
+   _return model
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_iter _method uml_model.owned_elements()
+   ## Interates of all the elements this model directly owns
+   ## 
+
+   _for a_package _over _self.packages.fast_elements()
+   _loop
+      _loopbody(a_package)
+   _endloop
+
+   _for a_gen _over _self.generalizations.fast_elements()
+   _loop
+      _loopbody(a_gen)
+   _endloop
+   
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method uml_model.number_of_classes_and_interfaces
+   ## returns : integer -- the number of classes and interfaces in
+   ##   this model.
+   ## 
+
+   classes_and_interfaces << 0
+
+   _for a_pack _over _self.packages.fast_elements()
+   _loop
+      classes_and_interfaces +<< a_pack.number_of_classes_and_interfaces
+   _endloop
+
+   _return classes_and_interfaces
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method uml_model.get_object_class()
+   ## returns : uml_interface -- the uml_class which represents object.
+   ## 
+
+   _dynamic !current_package! << package.all_packages[:sw]
+   _return _self.get_class(method_table.class_for_name(:object))
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.model
+   ## Returns self
+   ## 
+
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.xmi_id
+   ## returns : string -- a unique identifer this UML model
+   ## 
+
+   _return _self.safen_xmi_id(char16_vector.concatenation("magik_model-",
+							  _self.name))
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.abstract? 
+   ## returns : boolean -- is this model abstract?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.private?
+   ## returns : boolean -- is this model private?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.get_class(an_mt)
+   ## Gets a particular uml_interface
+   ##
+   ## an_mt : method_table -- the magik class representing the
+   ##   uml_interface in which you are interested.
+   ##
+   ## returns : uml_interface -- the uml_interface in which you
+   ##   are interested
+
+   _local eg << an_mt.metadata[:exemplar_global]
+   _local pack << eg.package
+
+   _return _self.packages[pack].get_class(an_mt)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.include_class(an_mt, _optional levels_to_go)
+   ## Directive to include the specified class.
+   ##
+   ## an_mt : method_table -- the method_table of the class you
+   ##   would like included.
+   ## levels_to_go : integer -- the number of super classes to
+   ##   include in this model.  Default: all
+   ##
+   ## returns : unset
+
+   # find out what package this class is in.
+   _local eg << an_mt.metadata[:exemplar_global]
+   _local pack << eg.package
+
+   _self.include_package(pack)
+   _local xmi_pack << _self.get_package(pack)
+   
+   xmi_pack.include_class(an_mt, levels_to_go)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.get_package(a_package)
+   ## returns : uml_package -- the uml_package which represents
+   ## the magik packges passsed in.
+   ## 
+
+   _return _self.packages[a_package]
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.include_package(a_package)
+   ## Directive to include the specified package in this model
+   ##
+   ## a_package : package -- the package to include
+   ##
+   ## returns : unset
+
+   _if _not _self.packages.includes_key?(a_package)
+   _then
+      _self.packages[a_package] << uml_package.new(_self, a_package)
+   _endif
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.add_generalization(parent_xmi_class, child_xmi_class)
+   ## Add a generalization relationship to this model.
+   ##
+   ## parent_xmi_class : uml_interface -- the superclass
+   ## child_xmi_class : uml_interface -- the subclass
+   ##
+   ## returns : uml_generalization -- the new generalization
+   
+   _return _self.generalizations.add_last(xmi_generalization.new(
+					     _self, 
+					     parent_xmi_class,
+					     child_xmi_class))
+   
+_endmethod
+$
+
+_pragma(classify_level=debug)
+_method uml_model.export_to_file(filename)
+   ## export self to a file
+   ## 
+
+   _local out << xmi_11_uml_13_output_stream.new_file(filename)
+   _protect
+      out.write_prolog()
+      out.start_xmi_doc("Magik XMI Exporter", "1.0")
+      out.write_uml_model(_self)
+      out.end_xmi_doc()
+   _protection
+      out.close()
+   _endprotect
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_model.export_on(an_uml_output_stream)
+   ## export self
+   ## 
+   an_uml_output_stream.write_uml_model(_self)
+_endmethod
+$

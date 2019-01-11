@@ -1,0 +1,3 @@
+$
+message_handler.new(:mss_bu_editor_field_lister).set_uses_list({:object_editor_field_lister})
+$

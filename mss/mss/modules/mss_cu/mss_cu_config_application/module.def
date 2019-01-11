@@ -1,0 +1,9 @@
+mss_cu_config_application	1
+
+description
+	Top level application for MSS Compatible Units configuration menu
+end
+
+requires
+	mss_cu_config_gui
+end

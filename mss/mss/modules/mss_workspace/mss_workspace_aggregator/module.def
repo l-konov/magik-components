@@ -1,0 +1,8 @@
+mss_workspace_aggregator	1
+
+description
+	MSS workspace tools for aggregating designs.
+end
+
+requires
+end

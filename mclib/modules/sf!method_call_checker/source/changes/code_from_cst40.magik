@@ -1,0 +1,96 @@
+#% text_encoding = iso8859_1
+##
+## This file contains the one method from CST 4.0 that allows
+## to use package-prefixed class names in the class constant
+## :component_installation_data.
+## Previous versions were only able to use classes from the
+## currently active package.
+##
+## The contents of this file must not be classified as free software.
+##
+_package sw
+$
+
+
+_pragma(classify_level=basic)
+_global _constant get_global_value <<
+_proc @get_global_value( name_or_global )
+	## Returns the value of the global variable specified by
+	## NAME_OR_GLOBAL.
+	##
+	## This can be a global variable such as @user:fred, a symbol
+	## such as :fred, or a string "fred" or "user:fred". In the
+	## case of a smbol or a string without a package qualifier,
+	## !current_package! will be used to find the global.
+	##
+	## If there is no such global, returns unset.
+	
+	_if @global_variable.is_class_of?(name_or_global)
+	_then
+		_return name_or_global.value
+	_endif
+	
+	_if (i << name_or_global.index_of(%:)) _isnt _unset
+	_then
+		nog << name_or_global.write_string
+		pkg << package(nog.slice(1, i-1).as_symbol())
+		name << nog.slice_to_end(i+1).as_symbol()
+	_else
+		name << name_or_global.as_symbol()
+	_endif
+	
+	_if pkg _is _unset _then pkg << !current_package! _endif
+	>> pkg[name]
+_endproc
+$
+
+
+_pragma(classify_level=advanced, topic={frameworks})
+_method component_framework.add_component( key, class_name )
+	## 
+	## Makes a new instance of the component class and adds
+	## it to the list of components.
+	##
+	## KEY - a unique name for this component in this framework, or
+	## _unset or "". If _unset or "" then a new unique name will be generated.
+	##
+	## CLASS_NAME - the name of the component class.
+	##
+	## Raises:
+	##	:editor_no_such_component_class (error)
+	##
+	## Returns:
+	##	the new component. The name of this component is its key.
+	##
+
+	_if key _is _unset _orif key = ""
+	_then
+		# build a unique name for the component based on its class_name
+		i << 1
+
+		key << _loop
+			       key << write_string( class_name, i ).as_symbol()
+			       _if _self.component(key) _is _unset
+			       _then
+				       _leave _with key 
+			       _else
+				       i +<< 1
+			       _endif
+		       _endloop 
+	_else 
+		key << key.as_symbol()
+	_endif
+	
+
+	_if( ex << get_global_value( class_name )) _is _unset
+	_then
+		condition.raise( :no_such_framework_component_class,
+				 :component_name, class_name )
+	_else
+		a_component << ex.new( key, _self ) 
+		.components[key] << a_component
+	_endif 
+
+	>> a_component
+_endmethod
+$

@@ -1,0 +1,29 @@
+mss_cu_record_mixin.magik
+mss_cu_ds_record.magik
+mss_cu_rwo_record.magik
+
+# Objects in mss_cu data model
+mss_cu_cost_group.magik
+mss_cu_cost_group_item.magik
+mss_cu_definition.magik
+mss_cu_facility_attribute.magik
+mss_cu_facility_relationship.magik
+mss_cu_group_definition.magik
+mss_cu_job_type.magik
+mss_cu_mu_relationship.magik
+mss_cu_operation_definition.magik
+
+# Objects in client partitions
+mss_cu_reference.magik
+mss_cu_reference_complex_key.magik
+mss_cu_work_point.magik
+
+# Objects that are not datastore records, but essential to data model
+mss_cu_facility_definition.magik
+mss_cu_holder.magik
+mss_cu_holder_aggregator.magik
+mss_cu_placeholder.magik
+
+# Basic changes to enable CU cloning
+additions/
+basic_changes/

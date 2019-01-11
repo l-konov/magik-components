@@ -1,0 +1,290 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-11 09:16:49 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-03-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+## Manages rwo_predicates on an application so that it's
+## possible to set and unset predicates as necessary, without
+## others clobbering them.
+##
+def_slotted_exemplar(
+:rwo_predicates_plugin,
+{
+	{:predicates, _unset},
+	{:located_ace_names,_unset}
+},
+{:plugin})
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+rwo_predicates_plugin.define_shared_constant(:databus_consumer_data_types,
+					     {:rendering_filter,
+					      :ace_context},
+					     :public)
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+rwo_predicates_plugin.define_property(:ace_name,
+				      :symbol,
+				      "The name of the ACE I control, or unset to manage any active ACE",
+				      _true,_true,_unset)
+$
+
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_private _method rwo_predicates_plugin.init(name, framework, _optional properties)
+	## Setup my slots and return them
+	##
+	.predicates << hash_table.new()
+	.located_ace_names << set.new()
+	>> _super.init(name,framework,properties)
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.ace_controls
+	## Returns the current ace control from my application
+	## 
+	##
+
+	# (03-02-2005 Brad Sileo): created.
+	>> _if _self.ace_name _is _unset 
+	_then
+		>> _self.known_ace_controls
+	_else
+		>> {_self.application.get_ace_control_for(_self.ace_name)}
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.known_ace_controls
+	## returns all ACE Controlss I have heard of
+	## 
+	##
+
+	# (03-02-2005 Brad Sileo): created.
+	_if .located_ace_names.empty?
+	_then
+		.located_ace_names.add(_self.ace_name.default(_self.application.ace_name))
+	_endif
+	res << rope.new()
+	_for a_ace _over .located_ace_names.fast_elements()
+	_loop
+		res.add(_self.application.get_ace_control_for(a_ace))
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.add_rwo_predicate(owner, rwo_name, a_predicate, _optional no_refresh?)
+	# Sep/2004 (marek01)
+	#
+	## Add a new predicate to me, requested by OWNER, filtering
+	## RWO_NAME with A_PREDICATE
+	##
+	_if .predicates[owner] _is _unset
+	_then
+		.predicates[owner] << hash_table.new()
+	_endif
+	
+	.predicates[owner][rwo_name] << a_predicate
+	_if no_refresh? _isnt _true 
+	_then
+		_self.refresh_rwo_predicates()
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.remove_rwo_predicate(owner, _optional rwo_name)
+	# Sep/2004 (marek01)
+	#
+	## if RWO_NAME is unset, all predicates form OWNER are cleared
+	##
+	#debug show(_self,"Remove ",owner,rwo_name)
+	_if .predicates[owner] _isnt _unset
+	_then
+		_if rwo_name _is _unset 
+		_then
+			old << .predicates.remove_key(owner)
+			keys << old.keys
+		_else
+			keys << rwo_name
+			.predicates[owner].remove_key(rwo_name)
+			_if .predicates[owner].empty?
+			_then
+				.predicates.remove_key(owner)
+			_endif
+		_endif 
+	_endif
+
+	_self.refresh_rwo_predicates(keys)
+_endmethod
+$
+
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.refresh_rwo_predicates(_optional removed_types)
+	# Sep/2004 (marek01)
+	#
+	## REMOVED_TYPES is a list of rwo_types removed. We make sure to police them in the ace_control
+	##
+	_if removed_types _isnt _unset 
+	_then
+		_for a_key _over removed_types.fast_elements()
+		_loop
+			_self.do_on_ace_controls({:|remove_rwo_predicate()|,a_key})
+		_endloop
+	_endif
+	
+	new_preds << hash_table.new()
+
+	_for a_hash _over .predicates.fast_elements()
+	_loop
+		_for table_name, the_pred _over a_hash.fast_keys_and_elements()
+		_loop
+			_if new_preds[table_name] _isnt _unset
+			_then
+				new_preds[table_name] << new_preds[table_name] _and the_pred
+			_else
+				new_preds[table_name] << the_pred
+			_endif
+		_endloop
+	_endloop
+
+	_for table_name, the_pred _over new_preds.fast_keys_and_elements()
+	_loop
+		_self.do_on_ace_controls({:|add_rwo_predicate()|,table_name, the_pred})
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.do_on_ace_controls(something)
+	## Execute something against all of relevant ace controls
+	## 
+	##
+
+	# (03-02-2005 Brad Sileo): created.
+	_for a_ac _over _self.ace_controls.fast_elements()
+	_loop
+		something.send_to(a_ac)
+	_endloop 
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.reset_rwo_predicates()
+	# Sep/2004 (marek01)
+	#
+	## Clear all predicates managed by me.
+	##
+
+	_for a_hash _over .predicates.fast_elements()
+	_loop
+		_for table_name _over a_hash.fast_keys()
+		_loop
+			_self.do_on_ace_controls({:|remove_rwo_predicate()|,table_name})
+		_endloop
+	_endloop
+
+	.predicates.empty()
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.sw_databus_data_available(data_type_name,data, _optional producer)
+	## Handles incoming rwo_predicate requests form the databus
+	## if DATA is unset, we clear all predicates from the producer
+	## DATA is:
+	##    rwo_type - required
+	##    predicate - required - any complex predicate to filter
+	##                          the RWOs with
+	##    ace_name - optional - If specified, a symbol and I only accept the
+	##                change if this matches my ace_name
+
+	# (03-02-2005 Brad Sileo): created.
+	_if data_type_name _is :rendering_filter
+	_then
+		_self.process_rwo_predicate_request(data,producer)
+	_elif data_type_name _is :ace_context
+	_then
+		_self.handle_ace_context_change(_scatter data)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.handle_ace_context_change(a_map, a_ace_name)
+	## See if we should deal with this change and if so, apply my predicates
+	## We only care about a new ace_context when we are not
+	## assigned ot a specific ace. In that case, we have to pickup
+	## the new ACE and refresh our predicates so they are applied
+	## to it.
+	##
+
+	# (03-02-2005 Brad Sileo): created.
+	_if _self.ace_name _is _unset
+	_then
+		.located_ace_names.add(a_ace_name)
+		_self.refresh_rwo_predicates()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=basic,topic=dd,usage=external)
+_method rwo_predicates_plugin.process_rwo_predicate_request(data,producer, _optional no_refresh?)
+	## Establishes a new predicate on me for RWO_TYPE filters the
+	## display using PRED. The predicate is assigned from 
+	## NO_REFRESH? is passed along to the add_rwo_predicate method
+	##
+
+	# (03-02-2005 Brad Sileo): created.
+	_if data _is _unset 
+	_then
+		_self.remove_rwo_predicate(producer)
+	_elif data.an_element().class_name _is :symbol
+	_then
+		# it is a single request
+		_if data.size < 3 _orif
+		    data[3] = _self.ace_name
+		_then 
+			_self.add_rwo_predicate(producer,data[1],data[2],no_refresh?)
+		_endif
+	_else
+		# Its a collection of requests, so do them all
+		_for a_item _over data.fast_elements()
+		_loop
+			_self.process_rwo_predicate_request(a_item,producer, _true)
+		_endloop
+		_self.refresh_rwo_predicates()
+	_endif 
+_endmethod
+$

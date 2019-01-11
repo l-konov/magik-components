@@ -1,0 +1,137 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+_pragma(classify_level=advanced)
+## Class which represents a XMI attribute
+def_slotted_exemplar(:uml_attribute,
+{
+   {:owner, _unset},
+   {:slot_desc, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=advanced)
+## The magik slot descriptor for this attribute
+uml_attribute.define_slot_access(:slot_desc, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## The owner UML class or interface
+uml_attribute.define_slot_access(:owner, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.new(owner, a_slot_desc)
+   ## Creates a new XMI attribute
+   ##
+   ## owner : xmi... -- the xmi object which owns this one
+   ## a_slot_desc : slot_descriptor
+   ##
+   ## return : uml_attribute
+
+   _return _clone.init(owner, a_slot_desc)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_private _method uml_attribute.init(owner, a_slot_desc)
+   ## 
+   ## 
+
+   _self.owner << owner
+   _self.slot_desc << a_slot_desc
+   
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.xmi_id
+   ## returns : string -- a unique identifer this UML attribute
+   ##
+   _return _self.safen_xmi_id(char16_vector.concatenation(_self.owner.xmi_id,
+							  "-attrib-",
+							  _self.name))
+_endmethod
+$
+_pragma(classify_level=basic)
+_method uml_attribute.name
+   ## Returns : string -- the name of the slot
+   ## 
+
+   _return _self.slot_desc.slot_name.as_charvec()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.private?
+   ## returns : string -- the visibility of this slot
+   ## 
+
+   _return _true 
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.abstract?
+   ## returns : string -- is this attribute abstract?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.scope
+   ## returns : string -- what is the scope of this attribute
+   ## 
+
+   _return "instance"
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.type
+   ## returns : string -- what is the type of this attribute
+   ## 
+   # TODO: perhaps a hint from this attribute author could make
+   # this a bit  more precise?
+   
+   _return _self.owner.model.get_object_class()
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.export_on(an_uml_output_stream)
+   ## Export this attribute 
+   ##
+   
+   an_uml_output_stream.write_uml_attribute(_self)
+_endmethod
+$

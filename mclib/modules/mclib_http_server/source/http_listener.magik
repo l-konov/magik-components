@@ -1,0 +1,383 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     This library is free software; you can redistribute it and/or
+##     modify it under the terms of the GNU Lesser General Public
+##     License as published by the Free Software Foundation; either
+##     version 2.1 of the License, or (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+##     Lesser General Public License for more details.
+##
+##     You should have received a copy of the GNU Lesser General Public
+##     License along with this library; if not, write to the Free Software
+##     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## An application class to provide an HTTP listner in
+## Magik. The configuration fo this application will provide
+## the actual services in the server, with each plugin
+## providing a specific service as a subclass of http_service_plugin
+def_slotted_exemplar(:http_listener,
+                      {
+			      {:tcp_stream,_unset},
+			      {:thread,_unset},
+			      {:plugin_tree,_unset}
+		      },
+		      {:application,
+		       @mclib:plugin_threading_mixin,
+		       @mclib:action_property_mixin})
+$
+
+_pragma(classify_level=basic)
+# The path on the server for the request
+http_listener.define_property(:port,:integer,
+				 "Port to listen on",
+				 _true,_true,80)
+$
+
+_pragma(classify_level=basic)
+# The path on the server for the request
+http_listener.define_property(:auto_run?,:boolean,
+				 "start listening at application startup",
+				 _true,_true,_false)
+$
+
+_pragma(classify_level=basic)
+# The path on the server for the request
+http_listener.define_property(:asynchronous?,:boolean,
+				 "Do we use separate threads for requests?",
+				 _true,_true,_true)
+$
+
+_pragma(classify_level=basic)
+# The path on the server for the request
+http_listener.define_property(:thread_engines,:object,
+				 "Threading support",
+				 _true,_true,_unset)
+$
+
+
+
+_pragma(classify_level=basic)
+_method http_listener.run_engine_standard()
+	## Starts my listener process on my port and loops pulling
+	## connections out and processing them.
+	## 
+	##
+
+	# (06-16-2006 Brad Sileo): created.
+	_protect
+		_self.manage_actions()
+		_thisthread.set_name(:http_listener_on_ + _self.port.write_string.as_symbol())
+		.tcp_stream << sw:tcpip_connection_stream.new(_self.port,
+							      :input_class,external_text_input_stream,
+							      :output_class,external_binary_output_stream
+							  )
+		_loop
+			#debug write("Wait")
+			a_conn << .tcp_stream.get()
+			#debug write("GOT conn")
+			_self.process_connection(a_conn)
+			#debug write("Done processing in listener")
+		_endloop
+	_protection
+		_if .tcp_stream _isnt _unset 
+		_then
+			.tcp_stream.close()
+		_endif
+	_endprotect 
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method http_listener.process_connection(a_connection)
+	## startup processing the connection. spawning a background
+	## thread first if we are asynchronous
+	## 
+	##
+
+	# (06-16-2006 Brad Sileo): created.
+	_if _self.asynchronous?
+	_then
+		_proc@http_request(me, a_connection)
+			me.int!process_connection(a_connection)
+		_endproc.fork_at(3,_self,a_connection)
+	_else
+		_self.int!process_connection(a_connection)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.int!process_connection(a_connection)
+	## Handles the processing of a single connection stream
+	## A_CONNECTION, which is a tcpip_connection object
+	## 
+	##
+
+	# (06-16-2006 Brad Sileo): created.
+	#debug write("processing ",a_connection)
+	_self.process_command_line(a_connection)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.process_command_line(a_connection)
+	## Runs the actual command in A_CONNECTION by reading i the
+	## HTTP rerquest header and other headers, finding the
+	## appropriate plguin, and run()ing it to generate a result.
+	## Returns a 404 error if the requested service can not be located.
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	inp << a_connection.input
+	line1 << inp.get_line()
+	_if line1 _is _unset 
+	_then
+		_return 
+	_endif
+	space1 << line1.index_of(%space)
+	space2 << line1.index_of(%space,space1+1)
+	cmd << line1.slice(1,space1-1)
+	end_cmd << line1.index_of(%?,space1)
+	params << _unset
+	_if end_cmd _is _unset 
+	_then
+		end_cmd << space2
+	_else
+		params << _self.process_parameter_string(line1.slice(end_cmd+1,space2))
+	_endif
+	path << line1.slice(space1+1,end_cmd-1)
+	pu << _self.get_plugin_for_request(cmd,path)
+	_thisthread.set_name(:http_process_ + cmd.lowercase.as_symbol())
+	_if pu _is _unset 
+	_then
+		_self.send_error(404,a_connection.output)
+	_else
+		_protect
+			_handling magik_prim_error _with
+			_proc(cond)
+				write("Stream Lost")
+			_endproc
+			_handling does_not_understand _with
+			_proc(cond)
+				write(cond)
+				cond.continue_handling()
+			_endproc
+			_handling coordinate_out_of_range _with _proc(cond)
+			_endproc
+			_return pu.do_run(a_connection,params,path)
+		_protection
+			_try
+				a_connection.close()
+			_when error
+				# Must already be gone
+			_endtry 
+		_endprotect 
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.process_parameter_string(a_string)
+	## Parse out the data in a parameter string (after the ? in the
+	## HTTP request GET) and return a property_list with the results.
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	pairs << a_string.split_by(%&)
+	parameters << property_list.new()
+	_for a_pair _over pairs.fast_elements()
+	_loop
+		_if a_pair.index_of(%=) _is _unset 
+		_then
+			_continue 
+		_endif
+		name << a_pair.slice(1,a_pair.index_of(%=)-1).as_symbol()
+		value << a_pair.slice_to_end(a_pair.index_of(%=)+1)
+		_if (cur_val << parameters[name]) _is _unset 
+		_then
+			parameters[name] << value
+		_elif cur_val.is_kind_of?(set)
+		_then 
+			cur_val.add(value)
+		_else
+			parameters[name] << set.new_with(cur_val, value)
+		_endif
+	_endloop
+	>> parameters
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method http_listener.get_plugin_for_request(cmd,path)
+	## Find the plugin which handles a request for type CMD on PATH
+	## CMD is currently ignored, and would normally be "GET, POST,
+	## or some other supported HTTP request type.
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	path << path.lowercase
+	elements << path.split_by(%/)
+	>> _self.get_plugin_for_path(elements.first.as_symbol(),elements.slice_to_end(2))
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method http_listener.get_plugin_for_path(a_name, _optional sub_paths)
+	## returns the plugin in me which represts the service called
+	## A_NAME. SUB_PATHS are passed along and represent additional
+	## path items after the service, so a request for
+	## /test/service/item might call this method with
+	##   (name, {service,item} such that the plugin called :name will be
+	## passed the {service,item} vector to work out what should be
+	## returned as the actual plugin to handle the request. 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	this_plugin << _self.plugin(a_name)
+	_if this_plugin _is _unset 
+	_then
+		_return _unset 
+	_endif
+	>> this_plugin.get_plugin_for_path(sub_paths)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.send_error(code,out)
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	# Headers in response not implemented yet
+	out.put_ascii_chars(write_string("Error ",code))
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method http_listener.permission_to_terminate?()
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	_if _self.engine_status() _is :running
+	_then
+		condition.raise(:termination_aborted,:object,_self,:reason,"Stop the engine first")
+	_endif
+	_super.permission_to_terminate?()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.restart()
+	## 
+	## 
+	##
+
+	# (06-18-2006 Brad Sileo): created.
+	_self.interrupt_engine()
+	_self.run_engine()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.init_actions()
+	## Create the actions on me
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	_super.init_actions()
+	_self.thread_engines << property_list.new()
+	_self.build_threading_actions()
+	_self.add_property_action(:port)
+	_self.add_run_disabled_action(_self.action(:port))
+	_self.add_action(sw_action.new(:restart,
+				       :engine,_self,
+				       :action_message,:restart|()| ,
+				       :toolbar_control,:image_button_item ,
+				       :image,:resume,
+				       :caption,_self.message(:restart  ),
+				       :short_help_text,_self.message(:restart_sh  ),
+				       :tooltip,_self.message(:restart_tt)  )
+	      )
+	_self.manage_actions()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.set_property(name,value)
+	## Sets one of my properties, offering a warning if this change
+	## needs the server to restart to take effect.
+	## 
+	##
+
+	# (07-12-2006 Brad Sileo): created.
+	_if _self.property_change_requires_restart?(name,value)
+	_then
+		condition.raise(:mclib_http_requires_restart,:name,name)
+	_endif
+	>> _super.set_property(name,value)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.property_change_requires_restart?(name,new_value)
+	## Returns true if a change to the properttyy called NAME to
+	## NEW_VALUE requirews a restart of the server to take effect.
+	## 
+	##
+
+	# (07-12-2006 Brad Sileo): created.
+	tags << {:port}
+	>> _self.thread_engines _isnt _unset _andif
+		_self.engine_status() _is :running _and
+		tags.includes?(name)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.manage_actions()
+	## Update the visibility of my actions
+	## 
+	##
+
+	# (07-13-2006 Brad Sileo): created.
+	es << _self.engine_status()
+	running? << es _is :running
+	
+	_self.action(:restart).enabled? << running?
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_listener.interrupt_engine(_optional a_tag)
+	## Stop the currently running server
+	## 
+	##
+
+	# (07-13-2006 Brad Sileo): created.
+	_super.interrupt_engine(a_tag)
+	_self.manage_actions()
+_endmethod
+$
+

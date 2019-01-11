@@ -1,0 +1,567 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## The task of this class is to store the analyzed Magik code that was
+## read from a file into a format that can be filtered and sorted
+## and finally displayed to the user.
+## This class will perform all filtering (and ordering) of the
+## the internal data and provide an external representation of
+## the data for other components.
+##
+def_slotted_exemplar( :sf!data_gatherer,
+{
+	{ :file_list,     _unset },
+	{ :class_list,    _unset },
+	{ :call_data,     _unset },
+	{ :filtered_data, _unset },
+	{ :ignore_data,   _unset },
+	{ :last_change,   _unset }
+},
+{ :sw_component, :sf!component_mixin } )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_slot_access( :file_list, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_slot_access( :class_list, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_slot_access( :call_data, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_slot_access( :filtered_data, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_shared_constant( :ignore_data_file_name,
+	"ignore_list.txt",
+	:public )
+$
+
+
+##
+##	R E D E F I N E D   M E T H O D S
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_shared_constant( :databus_consumer_data_types,
+	{
+		:reset_statistics,
+		:method_data,
+		:display_data_request
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_gatherer.define_shared_constant( :databus_producer_data_types,
+	{
+		:display_data_gathered,
+		:edit_file
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_gatherer.init_actions()
+
+	## Define the available actions.
+
+	_local use_ignore_list? << _false
+
+	_self.add_action(
+		_self.sf!create_standard_action_for( :use_ignore_list, _true,
+			:enabled?, _true,
+			:value,    use_ignore_list?,
+			:value_change_message, :|ignore_list_used?<<|,
+			:toolbar_control,      :image_toggle_item ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :edit_ignore_list, _false,
+			:enabled?, use_ignore_list?,
+			:image,    { :edit_object, :ui_resources } ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_gatherer.sw_databus_data_available( data_type_name, data )
+
+	## Listen on the databus for any information that might
+	## be of interest to us...
+
+	_if data_type_name _is :method_data
+	_then
+		_self.store_data( data )
+
+	_elif data_type_name _is :reset_statistics
+	_then
+		_self.file_list.empty()
+		_self.class_list.empty()
+		_self.call_data.empty()
+
+	_elif data_type_name _is :display_data_request
+	_then
+		_self.gather_data_for_display( _scatter data )
+
+		_self.databus_make_data_available( :display_data_gathered,
+			{ _self.filtered_data, _not _self.call_data.empty? } )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_gatherer.sw_databus_data_requested( data_type_name )
+
+	## React on requests for data from the databus...
+
+	>> _self.call_data
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_gatherer.build_in_framework( a_container )
+
+	## Create the widgets in the main GUI that can change
+	## _self's behavior.
+
+	_local ctn << _self.framework.
+		      get_gui_container_for( :action_container )
+	_local ctl
+
+	ctn << ctn.items.an_element()
+	ctl << _self.action( :edit_ignore_list ).
+	       place_control_on( ctn, :dialog )
+	ctl.row << 2 ; ctl.col << 1
+
+	>> a_container
+_endmethod
+$
+
+
+##
+##	A C T I O N   C A L L B A C K S
+##	_______________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_gatherer.edit_ignore_list()
+
+	## Puts the request on the databus to edit the 'ignore list' file.
+
+	_local path << _self.get_ignore_file_path()
+
+	_if path _isnt _unset
+	_then
+		_self.databus_make_data_available( :edit_file, { path } )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_gatherer.ignore_list_used?<< a_boolean
+
+	## Widget callback when the 'edit ignore list' toggle
+	## is changed.
+
+	_self.action( :edit_ignore_list ).enabled? << a_boolean
+_endmethod
+$
+
+
+##
+##	P R I V A T E   I N T E R F A C E
+##	_________________________________
+##
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.init( _gather args )
+
+	## Initialize and return _self.
+
+	.file_list     << sw:sorted_collection.new()
+	.class_list    << sw:sorted_collection.new()
+	.call_data     << sw:equality_hash_table.new()
+	.filtered_data << sw:rope.new()
+	.ignore_data   << sw:equality_hash_table.new()
+
+	_self.read_ignore_data_file( _true )
+
+	>> _super.init( _scatter args )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.read_ignore_data_file(
+			 _optional delete_existing_data?, a_path )
+
+	## This method reads all data from the 'ignore list' file.
+	## Information in this file should be specified in two columns.
+	## The first one contains class names,
+	## the second one contains method names.
+	## Both column can contain wildcard characters (? or *).
+	## The two columns should be separated by either spaces or tabs.
+	## When a line in the file starts with a # it is ignored.
+
+	_local res  << .ignore_data
+	_local path
+	_local strm
+	_local line
+	_local data
+	_local ref
+
+	#
+	# Try to locate the file that contains the method calls
+	# which should be ignored...
+	#
+	_if a_path _is _unset
+	_then
+		a_path << _self.get_ignore_file_path()
+		_if a_path _is _unset _then _return _endif
+	_endif
+
+	#
+	# Delete any existing data - unless the caller did
+	# not want this...
+	#
+	_if delete_existing_data? _isnt _false _then res.empty() _endif
+
+	_protect
+	    strm << sw:external_text_input_stream.new( a_path )
+
+	    _loop
+		    line << strm.get_line()
+		    _if line _is _unset _then _leave _endif
+
+		    #
+		    # Ignore lines starting with a #...
+		    #
+		    _if line.empty? _orif
+			line.first = %#
+		    _then
+			    _continue
+		    _endif
+
+		    #
+		    # Lines with less than 2 items will be ignored...
+		    #
+		    data << _self.get_words_from_string( line )
+		    _if data.size < 2 _then _continue _endif
+
+		    _if ( ref << res[ data[ 2 ] ] ) _isnt _unset
+		    _then
+			    ref[ data[ 1 ] ] << _unset
+		    _else
+			    res[ data[ 2 ] ] <<
+				    sw:equality_hash_table.new_with(
+					    data[ 1 ], _unset )
+		    _endif
+	    _endloop
+	_protection
+	    _if strm _isnt _unset
+	    _then
+		    strm.close()
+		    .last_change << sw:file_status.new( a_path ).modify_time 
+	    _endif
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.get_ignore_file_path()
+
+	## Try to locate the 'ignore file' in the resource
+	## directory of self's module.
+
+	>> _try
+		   >> smallworld_product.get_data_file(
+			      _self.ignore_data_file_name,
+			      _self.module_name )
+	   _when error
+	   _endtry
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.ignore_data
+
+	## Check if the 'ignore file' has been changed.
+	## If that is the case, re-read all information from it;
+	## else simply return the data that was read previously.
+
+	_if _self.action( :use_ignore_list ).value _isnt _true
+	_then
+		_return sw:equality_hash_table
+	_endif
+
+	_local path << _self.get_ignore_file_path()
+	_local lc   << sw:file_status.new( path ).modify_time
+
+	_if .last_change <> lc
+	_then
+		_self.read_ignore_data_file( _true, path )
+	_endif
+
+	>> .ignore_data
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.get_words_from_string( a_string )
+
+	## This method implements this functionality:
+	## <string>.split_at( <whitespace> ).
+
+	_local str << a_string.trim_spaces()
+	_local res << sw:rope.new()
+	_local pos << 0
+	_local start << 1
+	_local new
+
+	_for a_chr _over str.fast_elements()
+	_loop
+		pos +<< 1
+		_if a_chr.white_space? _andif
+		    start < pos
+		_then
+			new << str.slice( start, pos - 1 ).trim_spaces()
+			_if _not new.empty?
+			_then
+				res.add_last( new )
+				start << pos
+			_endif
+		_endif
+	_endloop
+
+	_if start < str.size
+	_then
+		new << str.subseq( start ).trim_spaces()
+		_if _not new.empty? _then res.add_last( new ) _endif
+	_endif
+
+	>> res
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.store_data( method_data )
+
+	## Update _self's data structures with the information passed.
+	## METHOD_DATA is an instance of mclib:sf!method_call_stats.
+
+	_local file      << method_data[ :source_file ]
+	_local cl_name   << method_data[ :class_name ].as_charvec()
+	_local meth_name << method_data[ :method_name ].as_charvec()
+	_local lookup
+
+	lookup << _self.file_list
+	_if _not lookup.includes?( file ) _then lookup.add( file ) _endif
+
+	lookup << _self.class_list
+	_if _not lookup.includes?( cl_name ) _then lookup.add( cl_name ) _endif
+
+	lookup << _self.call_data
+	_if lookup.includes_key?( cl_name )
+	_then
+		lookup[ cl_name ][ meth_name ] << method_data
+	_else
+		lookup[ cl_name ] <<
+			sw:equality_hash_table.new_with( meth_name, method_data )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.gather_data_for_display(
+		_optional a_class_filter_vec, a_method_filter_vec,
+		a_min_call_count, sort_method_names? )
+
+	## Provide a list of display_tree objects from all available
+	## data that is filtered according to the request.
+	##
+	## A_CLASS_FILTER_VEC:
+	##	A vector with patterns/strings that determine which
+	##	class names should appear in the provided list.
+	##	An empty vector would mean that no filter is applied.
+	##
+	## A_METHOD_FILTER_VEC:
+	##	A vector with patterns/strings that determine which
+	##	method names should appear in the provided list.
+	##	An empty vector would mean that no filter is applied.
+	##
+	## A_MIN_CALL_COUNT:
+	##	A positive integer that determines how often
+	##	a method must have been called to appear in the list.
+	##
+	## SORT_METHOD_NAMES?:
+	##	A Boolean that determines if the methods in the list
+	##	should be sorted (alphabetically ascending) or appear
+	##	in the order they occurred in the code.
+
+	_local result   << _self.filtered_data
+	_local all_data << _self.call_data
+	_local lookup
+	_local meth_data
+
+	_if a_class_filter_vec _is _unset _then a_class_filter_vec << {} _endif
+	_if a_method_filter_vec _is _unset _then a_method_filter_vec << {} _endif
+	sort_method_names? << sort_method_names? _is _true
+
+	lookup << _self.ignore_data
+
+	result.empty()
+
+	_for a_cl_name _over _self.matching_class_names( a_class_filter_vec )
+	_loop
+		data << all_data[ a_cl_name ]
+		_for a_meth_name _over _self.find_method_matches(
+					       data, a_method_filter_vec,
+					       sort_method_names? )
+		_loop
+			_if _self.ignore_match?( lookup, a_cl_name, a_meth_name )
+			_then
+				_continue
+			_endif
+
+			meth_data << data[ a_meth_name ].deep_copy()
+			meth_data[ :call_stats ].
+				remove_call_info( a_min_call_count, lookup )
+
+			result.add( meth_data )
+		_endloop
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _iter _method sf!data_gatherer.matching_class_names(
+			       a_class_filter_vec )
+
+	## Returns all class names that match a pattern from
+	## A_CLASS_FILTER_VEC.
+
+	_for a_string _over _self.class_list.fast_elements()
+	_loop
+		_if _self.does_match?( a_string, a_class_filter_vec )
+		_then
+			_loopbody( a_string )
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _iter _method sf!data_gatherer.find_method_matches(
+			       class_data, a_filter_vec, sort_by_name? )
+
+	## Returns all method names belonging to CLASS_DATA
+	## that match a pattern from A_FILTER_VEC.
+	## The Boolean SORT_BY_NAME? determines if the returned
+	## methods are sorted alphabetically or in the order in
+	## which they appear in the code.
+
+	_local new_list << sw:sorted_collection.new()
+	_local a_string
+
+	_if sort_by_name?
+	_then
+		new_list.sort_by( :first )
+	_else
+		new_list.sort_by( :last )
+	_endif
+
+	_for info _over class_data.fast_elements()
+	_loop
+		new_list.add( { info[ :method_name ], info[ :line_number ] } )
+	_endloop
+
+	_for info _over new_list.fast_elements()
+	_loop
+		a_string << info.first
+		_if _self.does_match?( a_string, a_filter_vec )
+		_then
+			_loopbody( a_string )
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.does_match?( a_string, a_filter_vec )
+
+	## Returns a Boolean value that indicates if A_STRING
+	## matches any pattern in A_FILTER_VEC.
+	##
+	## If A_FILTER_VEC is empty this method will return _true.
+
+	_for a_pattern _over a_filter_vec.fast_elements()
+	_loop
+		_if a_string.matches?( a_pattern )
+		_then
+			_return _true
+		_endif
+	_endloop
+
+	>> a_filter_vec.empty?
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_gatherer.ignore_match?(
+			 ignore_call_info, a_class_name, a_method_name )
+
+	## This method decides if a class/method combination should
+	## *not* be displayed because it appears in the ignore list.
+
+	_local tbl
+
+	>> ( tbl << ignore_call_info[ a_method_name ] ) _isnt _unset _andif
+	   ( tbl.includes_key?( a_class_name ) _orif
+	     tbl.includes_key?( :|*| ) )
+_endmethod
+$

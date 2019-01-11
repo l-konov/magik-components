@@ -1,0 +1,569 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_overlay_view_copy_plugin
+##
+## Plugin for providing main GUI for mss_wm_overlay_view_copy_framework.
+##
+
+# N.B.: overlay_design_data on mss_workspace_manager_engine is
+# structured so that multiple overlays are possible.  However,
+# this GUI only deals with a single overlay.  If there is more
+# demand for this sort of thing in the future, the GUI can be
+# extended to handle it.
+
+def_slotted_exemplar(:mss_wm_overlay_view_copy_plugin,
+{
+	{:items, _unset, :readable},
+	{:engine, _unset, :readable},
+	{:map_selection_list, _unset, :readable}
+},
+{:mss_application_databus_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+mss_wm_overlay_view_copy_plugin.define_shared_constant(
+	:application_databus_consumer_data_types,
+	{:map_selection},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	_self.set_option(:select_unchanged_geometry?, _false)
+	.engine << mss_wm_overlay_view_copy_engine.new()
+	.map_selection_list << sorted_collection.new(10, _proc(a, b)
+								 _return a.value[:external_name] _cf b.value[:external_name]
+						     _endproc)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.overlay_design_data
+	## 
+	## Obtain this from mss_workspace_manager_engine.
+	##
+
+	_return mss_workspace_manager_engine.overlay_design_data
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.current_overlay_design_data
+	## 
+	## Obtain this from element 1 of overlay_design_data.
+	##
+
+	_return _self.overlay_design_data[1]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.current_overlay_design
+	## 
+	## Obtain this from the design property of the
+	## current_overlay_design_data property list.
+	##
+
+	_if (pl << _self.current_overlay_design_data) _isnt _unset _andif
+	    (rec << pl[:design]) _isnt _unset _andif
+	    rec.is_valid?
+	_then
+		_return rec
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.pre_activation()
+	## 
+	## Manage dependency with mss_workspace_manager_engine, and
+	## refresh self when activated.
+	##
+
+	_super.pre_activation()
+	mss_workspace_manager_engine.add_dependent(_self)
+	_self.refresh()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.on_deactivation()
+	## 
+	## Manage dependency with mss_workspace_manager_engine.
+	## 
+
+	mss_workspace_manager_engine.remove_dependent(_self)
+
+	# Deselect this option when closing the menu, as it is
+	# generally not useful for other applications, and it is a
+	# significant performance hit.
+	_self.select_unchanged_geometry? << _false 
+	_super.on_deactivation()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.note_change(who, what, data)
+	## 
+	## If overlay_design_data changes, refresh self.
+	##
+
+	_if what _is :overlay_design_data
+	_then
+		# Deselect this option when overlay design data changes.
+		_self.select_unchanged_geometry? << _false 
+		_self.refresh()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:copy_map_selection,
+				       :short_help_text, _self.message(:copy_map_selection_sh),
+				       :image, {:add_to_selection, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|copy_map_selection()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.build_gui(container, _optional xml_element)
+	## 
+	## 
+
+	_if xml_element _is _unset
+	_then
+		gui_type << "header"
+	_else
+		gui_type << xml_element.attributes["gui_type"].default("header")
+	_endif
+
+	_if gui_type = "header"
+	_then
+		_return _self.build_gui_header(container, xml_element)
+	_elif gui_type = "map_selection"
+	_then
+		_return _self.build_gui_map_selection(container, xml_element)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.build_gui_header(container, _optional xml_element)
+	## 
+	## Build the header portion of the GUI.
+	##
+	
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.start_row()
+	label_item.new(p, _self.current_overlay_design_string,
+		       :model, _self,
+		       :aspect, :current_overlay_design_string)
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.build_gui_map_selection(container, _optional xml_element)
+	## 
+	## Build the map selection portion of the GUI.
+	##
+	
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:map_selection_tab_label)
+
+	ps << :|perform_safely()|
+	go << :|get_option()|
+
+	p.start_row()
+	label_item.new(p, _self.message(:map_selection_header))
+
+	p.start_row()
+	.items[:select_unchanged_geometry?] <<
+		toggle_item.new(p, _self.message(:select_unchanged_geometry?),
+				:value, _self.get_option(:select_unchanged_geometry?),
+				:model, _self,
+				:aspect, :select_unchanged_geometry?,
+				:value_selector, {go, :select_unchanged_geometry?},
+				:change_selector, {ps, :|select_unchanged_geometry?<<|})
+	
+	p.start_row()
+	.items[:map_selection_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :map_selection_list,
+			      :data_selector, :map_selection_list,
+			      :height_in_chars, 10,
+			      :column_widths, {60, 90, 240},
+			      :column_headings, {_self.message(:msch_count),
+						 _self.message(:msch_dataset_name),
+						 _self.message(:msch_external_name)},
+			      :distribute_spare_width, :always,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.status_string << x
+	## 
+	## Forward a status string update to the databus.
+	##
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.manage_actions_for_map_selection()
+	## 
+	## Manage actions when map_selection changes.
+	##
+
+	_self.action(:copy_map_selection).enabled? << .map_selection_list.size > 0
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## If map_selection is available, refresh self based on that selection.
+	##
+
+	_if data_type_name _is :map_selection
+	_then
+		(owner, geoms) << (_scatter data)
+		_self.refresh_map_selection(geoms)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.current_overlay_design_string
+	## 
+	## Return a string describing the design that is currently
+	## being overlaid.
+	##
+
+	_if (rec << _self.current_overlay_design) _is _unset 
+	_then
+		_return _self.message(:overlay_design_string_none)
+	_else
+		_return _self.message(:overlay_design_string, rec.short_description)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.refresh()
+	## 
+	## Update all GUI aspects of self.
+	##
+
+	_self.changed(:current_overlay_design_string)
+	_self.refresh_map_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.refresh_map_selection(_optional map_sel)
+	## 
+	## Refresh the state of self, based on the map selection
+	## MAP_SEL (defaults to the application databus map selection).
+	##
+
+	_if map_sel _is _unset
+	_then
+		data << _self.application_databus_request_data(:map_selection)
+		_if data _isnt _unset
+		_then
+			(junk, map_sel) << (_scatter data)
+		_endif
+	_endif
+	_if map_sel _is _unset
+	_then
+		map_sel << equality_geometry_set.new()
+	_endif
+
+	# Update tree_item displaying selection data.
+	msl << .map_selection_list
+	msl.empty()
+	addn << mss_workspace_manager_engine.active_design_dataset_names
+	odd << _self.current_overlay_design_data
+	_if (od << _self.current_overlay_design) _isnt _unset _andif
+	    (od_ds << odd[:datasets]) _isnt _unset 
+	_then
+		# The views to process are the intersection of the active
+		# design datasets, and the replicated datasets associated with ODD.
+		ds_to_do << rope.new()
+		_for i _over addn.fast_elements()
+		_loop
+			_if od_ds[i] _isnt _unset
+			_then
+				ds_to_do.add({od_ds[i], gis_program_manager.cached_dataset(i)})
+			_endif
+		_endloop
+
+		res << equality_hash_table.new()
+		_for sel_geom _over map_sel.fast_elements()
+		_loop
+			# Ensure this item is from a source view being tracked.
+			_if (sel_rwo << sel_geom.rwo) _is _unset _then _continue _endif
+			sel_rwo_view << sel_rwo.source_view
+			do_ds? << _false 
+			_for i _over ds_to_do.fast_elements()
+			_loop
+				_if sel_rwo_view _is i[1]
+				_then
+					do_ds? << _true
+					_leave
+				_endif
+			_endloop
+			_if _not do_ds? _then _continue _endif
+
+			sel_rwo_tbl << sel_rwo.source_collection
+			_if (s << res[sel_rwo_tbl]) _is _unset
+			_then
+				s << res[sel_rwo_tbl] << equality_set.new()
+			_endif 
+			s.add(sel_rwo)
+		_endloop
+
+		# Build tree items.
+		sstr << styled_string.new(:value, :count, :tab,
+					  :value, :dataset_name, :tab,
+					  :value, :external_name)
+		_for i, j _over res.fast_keys_and_elements()
+		_loop
+			target_dataset << _unset 
+			_for k _over ds_to_do.fast_elements()
+			_loop
+				_if i.source_view _is k[1]
+				_then
+					target_dataset << k[2]
+				_endif
+			_endloop
+			
+			val << property_list.new_with(
+				       :count, j.size,
+				       :dataset_name, i.source_view.original_dataset_name,
+				       :external_name, i.external_name,
+				       :source_dataset, i.source_view,
+				       :target_dataset, target_dataset,
+				       :records, j)
+			dt << display_tree.new(i, val)
+			dt.styled_string << sstr
+			msl.add(dt)
+		_endloop 
+	_endif
+
+	_self.changed(:map_selection_list, :renew)
+	_self.manage_actions_for_map_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.select_unchanged_geometry? << x
+	## 
+	## When setting this option, pass the setting on to all dataset
+	## managers.
+	##
+
+	_self.set_option(:select_unchanged_geometry?, x, _true)
+	_if (pl << _self.current_overlay_design_data) _isnt _unset _andif
+	    (ds_pl << pl[:datasets]) _isnt _unset
+	_then
+		_for a_soc _over gis_program_manager.spatial_object_controllers()
+		_loop
+			_for a_ds _over ds_pl.fast_elements()
+			_loop
+				_if (dsm << a_soc.dataset_manager_of(a_ds)) _isnt _unset _andif
+				    dsm.responds_to?(:|override_only?<<|)
+				_then
+					dsm.override_only?<< _not x
+				_endif
+			_endloop
+		_endloop
+	_endif
+	
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.copy_map_selection()
+	## 
+	## Perform the work of copying the map selection.
+	##
+
+	(ds_to_do, recs_to_do, how) << _self.validate_copy_map_selection()
+	ds_group << dataset_group.new(ds_to_do)
+	
+	_protect
+		_self.status_string << _self.message(:copying_map_selection)
+		.engine.clear()
+		.engine.set_dataset_mapping(ds_to_do)
+		.engine.add_insert_update_records(recs_to_do)
+		.engine.set_copy_parameters(how)
+		trans << custom_record_transaction.new(
+				 ds_group, .engine, :|perform_copy()|, {},
+				 _self.message(:copy_map_selection_transaction))
+		trans.run()
+	_protection
+		_self.status_string << ""
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.validate_copy_map_selection()
+	## 
+	## Perform validations to ensure that the copy is permitted.
+	##
+
+	# Ensure copying between these designs is permitted in the
+	# workflow model.
+	ad << _self.ensure_active_design()
+	od << _self.ensure_overlay_design()
+	(ok?, how) << ad.validate_overlay_copy_from(od)
+	_if how _isnt _unset
+	_then
+		how << how.copy()
+		how[:to_design] << ad
+		how[:to_design_id] << ad.id
+		how[:from_design] << od
+		how[:all_from_design_ids] << equality_set.new()
+		_for i _over od.ordered_design_path.fast_elements()
+		_loop
+			how[:all_from_design_ids].add(i.id)
+		_endloop
+	_endif
+	
+	# Ensure that something is selected, and that everything is writable.
+	ds_to_do << equality_property_list.new()
+	recs_to_do << equality_set.new()
+	_for i _over .map_selection_list.fast_elements()
+	_loop
+		ds_to_do[i.value[:source_dataset]] << i.value[:target_dataset]
+		recs_to_do.add_all(i.value[:records])
+	_endloop
+
+	# Add a customization hook to allow additional datasets to be
+	# captured, even if the features are not selected explicitly
+	# (to support cross-dataset stuff that could take place in
+	# a subclassed mss_ovc_consistency_roots() method).
+	_self.custom_validate_datasets_to_process(ds_to_do, recs_to_do)
+	
+	_if ds_to_do.size = 0
+	_then
+		_self.user_error(:no_map_selection)
+	_endif
+	_for i _over ds_to_do.fast_elements()
+	_loop
+		_if _not i.writable?
+		_then
+			_self.user_error(:not_writable, i.original_view_name)
+		_endif
+	_endloop
+	_return ds_to_do, recs_to_do, how
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_overlay_view_copy_plugin.custom_validate_datasets_to_process(ds_to_do, recs_to_do)
+	## 
+	## Customization hook to allow multiple datasets to be identified
+	## for processing.  DS_TO_DO is an equality_property_list where
+	## each key is a source dataset to copy from, and each value is
+	## a target dataset to copy to.  RECS_TO_DO is an equality_set
+	## of records to be processed.
+	##
+	## Backstop processing does nothing, and this can be redefined
+	## to augment data in DS_TO_DO if it is known that
+	## cross-dataset joins will be required for a specific data
+	## model.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.ensure_active_design()
+	##
+	## Ensure that an active design exists.
+	##
+
+	_if (ad << mss_workspace_manager_engine.active_design) _is _unset
+	_then
+		_self.user_error(:no_active_design)
+	_endif
+	_return ad
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_plugin.ensure_overlay_design()
+	##
+	## Ensure that an overlay design exists.
+	##
+
+	_if (od << _self.current_overlay_design) _is _unset 
+	_then
+		_self.user_error(:no_overlay_design)
+	_endif
+	_return od
+	
+_endmethod
+$

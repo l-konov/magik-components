@@ -1,0 +1,84 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Created By: David Little
+## Date: 11-28-2005
+## Copyright 2005 David Little
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+$
+
+## This plugin can be added to an application, and manages the
+## action that activates the Smallworld Module Manager Dialog.
+##
+## XML-Impact: Yes
+##
+## XML-Details:
+## Xml changes are required to existing application modules.
+##
+## For Example:
+##       config.xml
+##       <plugin name="sw_module_dialog" class_name="mclib:sw_module_dialog_plugin" />
+##
+##       gui.xml
+##       <action name="sw_module_dialog.open" />
+##
+## To Extend the Administration application: 
+##       config.xml
+##       <plugin name="sw_module_dialog" class_name="mclib:sw_module_dialog_plugin"/>
+##
+##        <action action_name 	= "sw_module_dialog.open"
+##                     caption_id   	= "sw_module_dialog" 
+##	         comment_id   	= "sw_module_dialog_comment"
+##	         image        	= "mclib_sw_module_dialog_plugin.sw_module_dialog_plugin" 
+##	         large_image  	= "mclib_sw_module_dialog_plugin.sw_module_dialog_plugin_large" 
+##	         category     	= "main" 
+##	         sub_category = "configuration" />
+##
+
+_pragma(classify_level=restricted, topic={module_mgmt})
+## Plugin to allow user to login into product as different user
+# (11-28-2005 David Little, GeoSpatial Innovations, Inc.): created.
+def_slotted_exemplar(:sw_module_dialog_plugin, {}, :plugin)
+$
+
+_pragma(classify_level=restricted, topic={module_mgmt})
+_method sw_module_dialog_plugin.init_actions()
+	##   Initialise the actions provided by the plugin
+	# (11-28-2005 David Little, GeoSpatial Innovations, Inc.): created.
+	
+	_self.add_action(sw_action.new(
+				 :open,
+				 :engine, _self,
+				 :caption, "Module Manager...",
+				 :toolbar_control, :button_item,
+				 :enabled?, _true,
+				 :action_message, :activate_sw_module_dialog|()|))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={module_mgmt})
+_method sw_module_dialog_plugin.activate_sw_module_dialog()
+	## Activates the SW Module Dialog
+	# (11-28-2005 David Little, GeoSpatial Innovations, Inc.): created.
+
+	sw_module_dialog.open()
+_endmethod
+$

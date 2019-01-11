@@ -1,0 +1,12 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method ordered_collection_mixin.convert_to_json()
+	## convert_to_json() : json_array
+
+	_return json_array.new_from(_self)
+	
+_endmethod
+$
+

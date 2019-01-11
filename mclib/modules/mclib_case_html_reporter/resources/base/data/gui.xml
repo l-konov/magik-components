@@ -1,0 +1,9 @@
+<gui>
+  <work_area>
+     <plugin plugin_name="case_html_report"/>
+  </work_area>
+   <statusbar name="default">
+	    <pane id="status_info" style="innie" width="200" springy="true"/>
+ 	    <progress_bar id="progress" style="innie" width = "200"/>
+   </statusbar>
+</gui>

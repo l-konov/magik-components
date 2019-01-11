@@ -1,0 +1,22 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+smallworld_product.register_application(
+	:mss_demo,
+	:application,
+	:resource_module_name, :cam_db_swaf_mss_demo,
+	:html_help_file_name, "swafPro",
+	:html_help_resource_module_name, :swaf_professional_application,
+	:description, "The Workbench by Minto Spatial Solutions using SWAF",
+	:external_name, "The Workbench by Minto Spatial Solutions",
+	:ace_name, :|Electricity|,
+	:default_application_coordinate_system_name, :uk_british_national_grid,
+	:application_coordinate_system_unit, :mm
+		   )
+$

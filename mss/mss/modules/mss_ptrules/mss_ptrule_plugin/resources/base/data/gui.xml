@@ -1,0 +1,38 @@
+<gui>
+  <toolbar name="refresh">
+    <action name="ptrule_plugin.refresh"/>
+  </toolbar>
+  <toolbar name="ptrules">
+    <action name="ptrule_plugin.terminate_ptrule"/>
+    <action name="ptrule_plugin.terminate_all_ptrules"/>
+  </toolbar>
+  <toolbar name="options">
+    <action name="ptrule_plugin.activate_options_dialog"/>
+  </toolbar>
+  <toolbar name="find">
+    <action name="find.find_string"/>
+    <action name="find.find_next"/>
+    <action name="find.find_all"/>
+  </toolbar>
+  <toolbar name="rwo_specials" role="rwo_specials">
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="refresh"/>
+    <toolbar name="ptrules"/>
+    <toolbar name="options"/>
+    <toolbar name="find"/>
+    <toolbar name="rwo_specials"/>
+  </dock>
+
+  <work_area>
+    <paned_window side_by_side="no"> 
+      <plugin plugin_name="ptrule_plugin" gui_usage="body" stretch="70"/>
+      <tab_box stretch="30">
+        <plugin plugin_name="ptrule_plugin" gui_usage="long_help"/>
+        <plugin plugin_name="construction"/>
+        <plugin plugin_name="specials"/>
+      </tab_box>
+    </paned_window>
+  </work_area>
+</gui>

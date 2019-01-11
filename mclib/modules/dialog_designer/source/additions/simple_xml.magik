@@ -1,0 +1,50 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## SIMPLE_XML_THING - added functionality for CORE object.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_xml_thing.elements_matching(match_name,prop,val,_optional quick?)
+	## 
+	## Return a rope of elements matching MATCH_NAME with name=PROP
+	## and value=VAL.
+
+	els << rope.new()
+	
+	_for el _over _self.elements_matching_name(match_name)
+	_loop
+		_for p _over el.xml_elements()
+		_loop
+			_if p.attributes["name"] = prop _andif
+			    p.attributes["value"] = val
+			_then
+				els.add(el)
+
+				_if quick?.default(_false)
+				_then
+					_return els
+				_endif 
+			_endif 
+		_endloop
+	_endloop
+
+	>> els
+_endmethod
+$
+
+
+

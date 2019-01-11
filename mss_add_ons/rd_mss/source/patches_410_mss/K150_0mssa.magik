@@ -1,0 +1,155 @@
+#% text_encoding = iso8859_1
+#Patch-Number:	150 (aus 410-Fehlerliste)
+#Fixes-Bug-Numbers:	
+#Author:	Reinhard Hahn 
+#Copyright:	regioDATA GmbH
+#Date:		27.03.2009
+#Product:	MSS
+#TOPIC		Join-fields
+#
+#INTEGRATED TO SOURCES?: Nein
+#
+#Release Notes:
+# the ptrule prompter doesn't handle join field in a way I
+# expect ist. In fact the proposed values for join field are
+# written to ptrule.detached_text_joins. Afterwards they are
+# handled properly only for text joins.
+#
+# What I don't know is, why non-text joins aren't handled like
+# physical fields.
+#
+# A solution without mss core change would be to subclass the
+# method mss_ptrule_file_pre_insert_actions(). A quite general
+# way would be the following:
+#
+#	_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+#	_method ds_record.mss_ptrule_fire_pre_insert_actions(pl,ptrule)
+#		## 
+#		## 
+#		_for jfn,val _over ptrule.detached_text_joins.fast_keys_and_elements()
+#		_loop
+#			_local fd << _self.field(jfn)
+#			_if fd _is _unset _orif
+#			    _not fd.is_join? _orif
+#			    fd.join_type _is :text
+#			_then
+#				_continue
+#			_endif
+#			_self.perform(fd.chevronned_name,val)
+#		_endloop
+#		>> _super.mss_ptrule_fire_pre_insert_actions(pl,ptrule)
+#	_endmethod
+#	$
+#
+# In fact, if this works, a correction at the root should work
+# as well. But first I'll try it out. If it works for all cases
+# I see, we should ask Tim Minto, whether it seems sensible to
+# him to integrate this change. If he thinks it is, it should
+# be integrated into mss core. Otherwise a solution like the
+# a.m. implementation of a mss_ptrule_file_pre_insert_action()
+# or a individual implementation on various child classes
+# should be preferred.
+
+
+
+sw!patch_software("mss_ptrule_attribute_dialog",1)
+$
+_package user
+$
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.update_current_detached_record()
+	## 
+	## Update the detached record associated with the current
+	## pointing rule being displayed, based on what has been
+	## entered on this menu.
+	##
+
+	_handling dd_mandatory_field, dd_bad_field_value, db_value_wrong_type,
+	db_value_out_of_range _with _self.user_error_handler
+	
+	_if .current_ptrule _is _unset _orif
+	    _not .current_ptrule.responds_to?(:detached_record)
+	_then
+		_return
+	_endif
+	dr << .current_ptrule.detached_record
+	_if .current_ptrule.responds_to?(:detached_text_joins)
+	_then
+		tj << .current_ptrule.detached_text_joins
+	_endif 
+	_for values _over _self.databus_request_all_data(:proposed_values_for_update)
+	_loop
+		_for key, value _over values.fast_keys_and_elements()
+		_loop
+# OLD:
+#			_if dr.source_collection.all_fields[key].is_join?
+#			_then
+#				tj[key] << value
+#			_else 
+#				dr.perform(key.with_chevron, value)
+# END
+# NEW:
+			fd << dr.source_collection.all_fields[key]
+			_if fd.is_join? _andif fd.join_type _is :text
+			_then
+				tj[key] << value
+			_else
+				# some debugging information:
+				_if fd.is_join?
+				_then
+					write("*** K150: ",dr,%.,fd.chevronned_name,%space,value," method: update_current_detached_record() ***")
+				_endif 
+				# end debugging information:
+				dr.perform(fd.chevronned_name, value)
+# END
+			_endif 
+		_endloop
+	_endloop
+	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.work_record()
+	## 
+	## 
+
+	_if (cr << _self.current_object) _is _unset
+	_then
+		_return _unset
+	_endif 
+	dr << cr.copy()
+	_for values _over _self.databus_request_all_data(:proposed_values_for_update)
+	_loop
+		_for key, value _over values.fast_keys_and_elements()
+		_loop
+			_try
+# OLD:
+#				_if dr.source_collection.all_fields[key].is_join? _then _continue _endif 
+#				dr.perform(key.with_chevron, value)
+# END
+# NEW:
+				fd << dr.source_collection.all_fields[key]
+				_if fd _is _unset _orif
+				    fd.is_join? _andif fd.join_type _is :text
+				_then
+					_continue
+				_endif
+				# some debugging information:
+				_if fd.is_join?
+				_then
+					write("*** K150: ",dr,%.,fd.chevronned_name,%space,value," method: work_record() ***")
+				_endif 
+				# end debugging information:
+				dr.perform(fd.chevronned_name, value)
+# END
+			_when error
+			_endtry 
+		_endloop
+	_endloop
+	_return dr
+	
+_endmethod
+$
+
+sw!declare_custom_patch(150,"0mssa","Attribute Prompter should handle join fields as well")
+$

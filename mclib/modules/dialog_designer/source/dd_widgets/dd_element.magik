@@ -1,0 +1,63 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_ELEMENT - generic object that can be edited using a DD_ELEMENT_EDITOR
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_element,{})
+$
+
+			     
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element.new(vals)
+	## 
+	## Return new instance.
+	## 
+	>> _clone.init(vals)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element.init(vals)
+	##
+	## Initialise.
+	##
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element.dd_properties()
+	##
+	## Return empty property list.
+	##
+
+	>> property_list.new()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element.cascading_changes()
+	## 
+	## Backstop, do nothing.
+	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element.define_shared_constant(:has_logical_properties?,_false,:public)
+$
+
+

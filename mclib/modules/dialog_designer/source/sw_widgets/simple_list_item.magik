@@ -1,0 +1,246 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## SIMPLE_LIST_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+simple_list_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :aspect,:string,
+					  :values,:string,
+					  :strings,:string,
+					  :representation_message,:string,
+					  :change_selector,:string,
+					  :mode,{:none,:one,:many},
+					  :visible_item_count,:integer
+						),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over simple_list_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	props.remove_key(:label)
+	props.remove_key(:balloon_tooltip)
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.dd_values_to_items()
+	## 
+	## Generate a the text vector code for the value & items of SELF.
+
+	txt << write_string("{{",%",%",",_unset}")
+	
+	_if _self.strings.default("").size > 0
+	_then
+		vals << _self.values.split_by(%,)
+		strs << _self.strings.split_by(%,)
+
+		min_size << min(vals.size,strs.size)
+		
+		_for i _over 1.upto(min_size)
+		_loop
+			txt +<< write_string(",{",%",strs[i],%",",:",vals[i].as_symbol(),%})
+		_endloop
+	_elif (rm << _self.representation_message).default("").size > 0
+	_then
+		vals << _self.values.split_by(%,)
+		
+		_for i _over 1.upto(vals.size)
+		_loop
+			str << vals[i].perform(rm.as_symbol())
+			txt +<< write_string(",{",%",str,%",",:",vals[i].as_symbol(),%})
+		_endloop
+	_else
+		txt << write_string(%{,%",%")
+
+		_for v _over _self.values.split_by(%,).fast_elements()
+		_loop
+			txt +<< write_string(%,,%",v,%")
+		_endloop
+	_endif
+
+	>> txt + "}"
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+	
+	>> 40
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	vts << vtext_style.new(_self.font)
+	cnt << max(2,_self.visible_item_count.default(1))
+	>> cnt * vts.box_coordinates("Ab").bounds.height.rounded
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF. 
+	>> _self.new(rc,:row,row,:col,col,:mode,:one,
+		     :col_alignment,:fill,:row_alignment,:fill)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	>> _self.new(parent,_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+	
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![pbb] << _self
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	vts << vtext_style.new(_self.font)
+	h << vts.box_coordinates("Ab").bounds.height.rounded
+
+	y << pbb.ymin+h-2
+	vals << _self.values.default("").split_by(%,)
+	strs << _self.strings.default("").split_by(%,)
+
+	_if vals.size _is 0
+	_then
+		ras << smallworld_product.get_raster_image(:simple_list_item,:dialog_designer)
+		canv.render_raster(ras,pbb.centre.x-8,pbb.centre.y-8,_false)
+	_endif 
+	
+	_for i _over 1.upto(vals.size)
+	_loop
+		str << _if strs.size >= i
+		       _then
+			       >> strs[i]
+		       _else
+			       >> vals[i]
+		       _endif
+			
+		canv.draw_text(ts,pbb.xmin+4,y,str)
+		y +<< h
+
+		_if (i+1)*h > pbb.height
+		_then
+			_leave 
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,".items[:",_self.dialog_element_id, 
+		  "] << simple_list_item.new(",parent_id)
+	txt.write(%,,%newline,%tab*2,":model,",%tab,"_self")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		_if n = "aspect" _orif (n = "values" _andif _not _self.aspect.default("").empty?)
+		_then
+			_continue 
+		_endif
+		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+
+		_if v2 _isnt _unset
+		_then 
+			txt.write(%,,%newline,%tab*2,%:,n2,%,,%tab,v2)
+		_endif 
+	_endloop
+	
+	_if _not (asp << _self.aspect.default("")).empty?
+	_then
+		txt.write(%,,%newline,%tab*2,":items,",%tab,"_self.",asp)
+	_endif
+	
+	txt.write(" )",%newline)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+simple_list_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method simple_list_item.set_logical_properties(_optional all?)
+	## 
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_self.change_selector << _self.dialog_element_id + "_changed()"
+	_self.aspect << _self.dialog_element_id + "_aspect"
+_endmethod
+$
+

@@ -1,0 +1,113 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## STATUSBAR_ELEMENT - object to hold statusbar element data.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:statusbar_element,
+		     {
+			     {:type,_unset,:writable},
+			     {:id,_unset,:writable},
+			     {:style,_unset,:writable},
+			     {:width,_unset,:writable},
+			     {:springy,_unset,:writable}
+		     },:dd_element)
+$
+
+			     
+statusbar_element.define_shared_constant(:dd_properties,
+					 property_list.new_with(
+						 :type,:string,
+						 :id,:string,
+						 :style,{"innie","flat","outie"},
+						 :width,:integer,
+						 :springy,:boolean),
+					  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_element.width << new_value
+	## 
+	## Set the width of SELF, this serves to control user input.
+	.width << new_value.default(30).abs
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_element.init(vals)
+	## 
+	## Initialise SELF from the property list VALS.
+
+	.type    << vals[:type]
+	.id      << vals[:id]
+	.style   << vals[:style]
+	.width   << vals[:width]
+	.springy << vals[:springy]
+
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_element.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over statusbar_element.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_element.values
+	## 
+	## Return SELF's slot values as a property list.
+	
+	>> property_list.new_with(
+		   :type,.type,
+		   :id,.id,
+		   :style,.style,
+		   :width,.width,
+		   :springy,.springy)
+		   
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_element.dialog_description()
+	## 
+	##  Return descriptive text for SELF.
+	
+	>> .id
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_element.dialog_element_id
+	## 
+	## Return the :id slot value.
+	>> .id
+_endmethod
+$
+

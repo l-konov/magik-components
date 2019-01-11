@@ -1,0 +1,727 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_editor_plugin.magik
+##
+## Plugin for editing Compatible Units associated with any
+## database record.
+##
+
+def_slotted_exemplar(:mss_cu_editor_plugin,
+{
+	{:items, _unset, :readable},
+	{:cu_list, _unset, :readable},
+	{:collection, _unset, :readable},
+	{:current_object, _unset, :readable}
+},
+{:editor_plugin, :mss_cu_list_mixin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_editor_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:cu_list},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_editor_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:collection, :current_object, :proposed_value},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.init(_gather args)
+	## 
+	##
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	.cu_list << sorted_collection.new(10, mss_cu_holder.standard_sort_proc)
+	.collection << _unset
+	.current_object << _unset
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:edit_cus,
+				       :image, {:edit_cus, :mss_cu_editor},
+				       :engine, _self,
+				       :action_message, :|edit_cus()|))
+	_self.add_action(sw_action.new(:editor_insert_with_cus,
+				       :image, {:insert_record, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|editor_insert_with_cus()|))
+	_self.add_action(sw_action.new(:editor_update_with_cus,
+				       :image, {:update_record, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|editor_update_with_cus()|))
+	_self.add_action(sw_action.new(:editor_place_with_cus,
+				       :image, {:place1, object_editor.module_name},
+				       :engine, _self,
+				       :action_message, :|editor_place_with_cus()|))
+	_self.add_action(sw_action.new(:editor_move_with_cus,
+				       :image, {:move1, object_editor.module_name},
+				       :engine, _self,
+				       :action_message, :|editor_move_with_cus()|))
+
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.build_gui(container, _optional xml_element)
+	## 
+	## 
+
+	height_in_chars << _unset 
+	_if xml_element _isnt _unset
+	_then
+		height_in_chars << xml_element.attribute(:height_in_chars).default("").as_number()
+	_endif
+	_if height_in_chars _is _unset
+	_then
+		height_in_chars << 5
+	_endif 
+	
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+	
+	ps << :|perform_safely()|
+	
+	p.start_row()
+	.items[:cu_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :cu_list,
+			      :data_selector, :cu_list,
+			      :select_notifier, :|cu_list_selected()|,
+			      :double_click_notifier, :|cu_list_double_click()|,
+			      :editor_required_notifier, :|cu_list_editor_required()|,
+			      :value_changed_notifier, {ps, :|cu_list_value_changed()|},
+			      :column_widths, mss_cu_holder.list_display_tree_column_widths().copy(),
+			      :column_headings, mss_cu_holder.list_display_tree_column_headings().copy(),
+			      :height_in_chars, height_in_chars,
+			      :distribute_spare_width, :always,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.current_object
+	## 
+	## 
+
+	_if .current_object _isnt _unset _andif
+	    _not .current_object.is_valid?
+	_then
+		.current_object << _unset
+	_endif
+	_return .current_object
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.cu_list_selected(selection)
+	## 
+	## Currently taking no action when a CU is selected.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.cu_list_double_click(selection)
+	##
+	## Bring up a dialog to edit CUs.
+	##
+
+	_if _self.action(:edit_cus).enabled?
+	_then 
+		_self.edit_cus()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.cu_list_value_changed(a_tree, value_id, new_value, old_value)
+	## 
+	## If the cu_code or operation change (which can affect
+	## attributes), then update those attributes on the editor.
+	##
+
+	_dynamic !mss_cu_editor_validate?! << _false
+	
+	_super.cu_list_value_changed(a_tree, value_id, new_value, old_value)
+
+	# N.B.: not currently allowing in-place editing of cu_code, but
+	# this same processing would be needed if I did... update the
+	# attributes if the CU changes, or if the operation changes to
+	# a non-blank value.
+	cu_holder << a_tree.key
+	_if (cu_def << cu_holder.cu_definition) _is _unset _orif
+	    (cur_obj << _self.current_object_for_cu_edit()) _is _unset
+	_then
+		# Nothing to update.
+		_return
+	_endif
+	
+	cur_op << cu_holder.operation.default("")
+	_if (old_value ~= new_value) _andif
+	    ((value_id _is :cu_code) _orif
+	     (value_id _is :operation _andif cur_op ~= ""))
+	_then
+		# Pre-conditions are set - see if this CU_DEF drives any
+		# attributes for this operation.
+		attr_pl << property_list.new()
+		_if (mu_holder << cu_holder.mu_parent) _isnt _unset _andif
+		    (mu_def << mu_holder.cu_definition) _isnt _unset
+		_then
+			mu_prop_vals << cur_obj.mss_proposed_values_for_cu_definition(mu_def, cur_op)
+			_for attr_name, attr_value _over mu_prop_vals.fast_keys_and_elements()
+			_loop
+				attr_pl[attr_name] << attr_value
+			_endloop
+		_endif 
+
+		cu_prop_vals << cur_obj.mss_proposed_values_for_cu_definition(cu_def, cur_op)
+		_for attr_name, attr_value _over cu_prop_vals.fast_keys_and_elements()
+		_loop
+			attr_pl[attr_name] << attr_value
+		_endloop
+
+		_if attr_pl.size > 0
+		_then
+			_self.databus_make_data_available(:proposed_values, attr_pl)
+		_endif
+	_endif
+
+	!mss_cu_editor_validate?! << _true
+	_self.validate_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	##
+
+	_if data_type_name _is :cu_list
+	_then
+		_return _self.cu_holder_list
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_dynamic !mss_cu_editor_validate?!
+	
+	_if data_type_name _is :collection
+	_then
+		_self.int!collection << data
+		_self.handle_new_current_object(_unset)
+
+	_elif data_type_name _is :current_object
+	_then
+		_if data _isnt _unset _andif 
+		    data.is_valid?
+		_then
+			_self.int!collection << data.source_collection
+		_endif 
+		_self.handle_new_current_object(data)
+		
+	_elif data_type_name _is :proposed_value
+	_then
+		_if !mss_cu_editor_validate?! _isnt _false
+		_then 
+			_self.validate_cu_list()
+		_endif 
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.note_change(who, what, data)
+	## 
+	## 
+
+	_if what _is :mode
+	_then
+		_self.manage_actions()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.int!collection << a_collection
+	## 
+	## Forge dataset dependencies when collection changes.
+	##
+
+	_if .collection _is a_collection
+	_then
+		_return
+	_endif
+
+	_if .collection _isnt _unset
+	_then
+		.collection.dataset.remove_dependent(_self)
+	_endif
+
+	.collection << a_collection
+	_if .collection _isnt _unset
+	_then
+		.collection.dataset.add_dependent(_self, :mode)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.handle_new_current_object(cur_obj)
+	## 
+	## Update self for the new current object CUR_OBJ.
+	##
+
+	.current_object << cur_obj
+	_self.set_cu_list_from_object(cur_obj)
+	_self.validate_cu_list()
+	
+	# If there is a dialog open to edit CUs for the old object,
+	# cancel it.
+	_if (d << _self.get_dialog(:mss_cu_query_framework)) _isnt _unset _andif
+	    (tf << d.top_frame) _isnt _unset _andif
+	    tf.active?
+	_then
+		d.cancel()
+	_endif
+
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.manage_actions()
+	## 
+	## Set the enabled? state of actions when current collection or
+	## current object changes.
+	##
+
+	_if (cur_obj << _self.current_object) _isnt _unset
+	_then
+		cu_rec_ex << cur_obj
+	_elif .collection _isnt _unset
+	_then
+		cu_rec_ex << .collection.record_exemplar
+	_else
+		cu_rec_ex << _unset
+	_endif 
+	
+	insertable? << .collection _isnt _unset _andif
+		      .collection.writable_in_run_transaction? _andif 
+		      .collection.write_authorised?
+
+	updatable? << .current_object _isnt _unset _andif
+		      .collection.writable_in_run_transaction? _andif 
+		      .current_object.write_authorised?
+
+	_self.action(:editor_insert_with_cus).enabled? << insertable?
+	_self.action(:editor_update_with_cus).enabled? << updatable?
+	_self.action(:editor_place_with_cus).enabled? << insertable?
+	_self.action(:editor_move_with_cus).enabled? << updatable?
+	_self.action(:edit_cus).enabled? << insertable? _andif
+					    cu_rec_ex _isnt _unset _andif
+					    cu_rec_ex.mss_cus_allowed?()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.editor_insert_with_cus()
+	## 
+	## Delegate all work to the object editor.
+	##
+
+	_dynamic !mss_cu_editor_validate?! << _false
+	
+	_self.editor.mss_insert_with_cus(_self.cu_holder_list_for_insert)
+
+	!mss_cu_editor_validate?! << _true
+	_self.validate_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.editor_update_with_cus()
+	## 
+	## Delegate all work to the object editor.
+	##
+
+	_dynamic !mss_cu_editor_validate?! << _false
+	
+	_self.editor.mss_update_with_cus(_self.cu_holder_list)
+	
+	!mss_cu_editor_validate?! << _true
+	_self.validate_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.editor_place_with_cus()
+	## 
+	## Delegate all work to the object editor.
+	##
+
+	_dynamic !mss_cu_editor_validate?! << _false
+	
+	_self.editor.mss_place_with_cus(_self.cu_holder_list_for_insert)
+	
+	!mss_cu_editor_validate?! << _true
+	_self.validate_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.editor_move_with_cus()
+	## 
+	## Delegate all work to the object editor.
+	##
+
+	_dynamic !mss_cu_editor_validate?! << _false
+	
+	_self.editor.mss_move_with_cus(_self.cu_holder_list)
+	
+	!mss_cu_editor_validate?! << _true
+	_self.validate_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.cu_holder_list
+	## 
+	## Return a rope of mss_cu_holder records contained in .cu_list.
+	##
+
+	r << rope.new()
+	_for i _over .cu_list.fast_elements()
+	_loop
+		r.add_last(i.key)
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.cu_holder_list_for_insert
+	## 
+	## Return a rope of mss_cu_holder records contained in
+	## .cu_list, prepared for a new insert operation.  This
+	## actually creates a copy of each, and strips the cu_reference
+	## from it (so that it is not associated with an existin
+	## record).
+	##
+
+	r << rope.new()
+	_for i _over .cu_list.fast_elements()
+	_loop
+		new_holder << i.key.copy()
+		new_holder.clear_cu_reference()
+		r.add_last(new_holder)
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.current_object_for_cu_edit()
+	## 
+	## Return either a database record or a record exemplar of a
+	## table that will have CUs edit by the edit_cus() action.
+	##
+
+	_if (cur_obj << _self.current_object) _is _unset 
+	_then
+		_if (cur_tbl << _self.collection) _isnt _unset 
+		_then
+			cur_obj << cur_tbl.record_exemplar
+		_endif 
+	_endif
+	_return cur_obj
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.callback_object_identifier
+	## 
+	## Return a unique object identifying the thing that is subject
+	## to having its CUs edited.
+	##
+
+	_return _self.current_object_for_cu_edit()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.edit_cus()
+	## 
+	## Activate a menu to allow CUs to be changed.
+	##
+
+	_if (cur_obj << _self.current_object_for_cu_edit()) _is _unset 
+	_then
+		condition.raise(:user_error, :string, _self.message(:cus_not_allowed))
+	_endif
+	_if _not cur_obj.mss_cus_allowed?()
+	_then
+		condition.raise(:user_error, :string, _self.message(:cus_not_allowed))
+	_endif
+	
+	r << rope.new()
+	_for i _over .cu_list.fast_elements()
+	_loop
+		r.add_last(i.key)
+	_endloop
+	
+	_if (m << _self.get_dialog(:mss_cu_query_framework)) _is _unset
+	_then
+		m << mss_cu_query_framework.new(:mss_cu_query_framework, _unset)
+		_self.cache_dialog(:mss_cu_query_framework, m)
+		m.activate_relative_to(_self.top_frame, m.message(:title), _self.top_frame, 50, 50)
+	_else
+		m.activate(_self.top_frame, m.message(:title))
+	_endif
+
+	pvals << _self.databus_request_data(:proposed_values_for_update)
+	m.set_current_object_and_query_values(cur_obj, pvals)
+	m.set_cu_list(r)
+	_self.set_cu_query_framework_properties(m, cur_obj)
+	m.register_ok_callback(_self, :|set_cu_list_from_query_framework()|, _self.callback_object_identifier)
+
+	_return m
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.set_cu_query_framework_properties(m, cur_obj)
+	## 
+	## Set properties on the newly-activated mss_cu_query_framework
+	## menu M, to edit CUs for object CUR_OBJ.
+	##
+
+	# Get any proposed geometries to use for work point calculation.
+	prop_geoms << property_list.new()
+	_for prop_values _over _self.databus_request_all_data(:proposed_values_for_insert)
+	_loop
+		_for fd_name, prop_value _over prop_values.fast_keys_and_elements()
+		_loop 
+			_if prop_value _isnt _unset _andif
+			    (fd << cur_obj.all_fields[fd_name]) _isnt _unset _andif
+			    fd.is_geometry?
+			_then
+				prop_geoms[fd_name] << prop_value
+			_endif
+		_endloop 
+	_endloop
+	_if (wp << cur_obj.mss_cu_work_point_candidate(prop_geoms)) _isnt _unset
+	_then
+		wp_number << wp.work_point_number.default("").as_charvec()
+	_else
+		wp_number << ""
+	_endif 
+	m.set_cu_lister_properties(property_list.new_with(
+					   :cu_code, "",
+					   :operation, "",
+					   :work_point_number, wp_number,
+					   :quantity, 1,
+					   :unit_multiplier, _unset))
+	m.set_cu_query_properties(property_list.new_with(
+					  :query_operation, mss_cu_engine.default_install_operation,
+					  :query_cu_code, "",
+					  :query_description, "",
+					  :by_group?, _false,
+					  :by_facility?, _true))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.set_cu_list_from_object(cur_rec)
+	## 
+	## Update the contents of the cu_list to reflect the CUs
+	## associated with CUR_REC.
+	##
+
+	.cu_list.empty()
+	_if cur_rec _is _unset _orif
+	    _not cur_rec.is_valid?
+	_then
+		_self.changed(:cu_list, :renew)
+		_return .cu_list
+	_endif
+
+	_for cu_ref _over mss_cu_reference.tracking_records_for(cur_rec).fast_elements()
+	_loop
+		cu_holder << mss_cu_holder.new_from_cu_reference(cu_ref)
+		dt << cu_holder.as_list_display_tree()
+		.cu_list.add(dt)
+	_endloop
+	_self.validate_cu_list()
+	
+	_self.changed(:cu_list, :renew)
+	_return .cu_list
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.set_cu_list_from_query_framework(m, id_object)
+	## 
+	## Update the contents of the cu_list to reflect the CUs
+	## entered on mss_cu_query_framework M.
+	##
+
+	_dynamic !mss_cu_editor_validate?! << _false
+	
+	_if (cur_obj << _self.current_object_for_cu_edit()) _is _unset 
+	_then
+		_return 
+	_endif
+	_if _self.callback_object_identifier ~= id_object
+	_then
+		# The query menu is representing a different object than self
+		# is managing, so ignore the results.
+		_return 
+	_endif
+
+	new_cu_list << m.current_cu_list()
+	.cu_list.empty()
+	_for cu_holder _over new_cu_list.fast_elements()
+	_loop
+		dt << cu_holder.as_list_display_tree()
+		.cu_list.add(dt)
+	_endloop
+
+	_self.changed(:cu_list, :refresh)
+
+	# Build a list of all proposed attribute values based on these
+	# CU settings.
+	attr_pl << property_list.new()
+	_for cu_holder _over new_cu_list.fast_elements()
+	_loop
+		_if (cu_def << cu_holder.cu_definition) _is _unset
+		_then
+			_continue
+		_endif
+		_if (mu_holder << cu_holder.mu_parent) _isnt _unset _andif
+		    (mu_def << mu_holder.cu_definition) _isnt _unset
+		_then
+			mu_prop_vals << cur_obj.mss_proposed_values_for_cu_definition(mu_def, mu_holder.operation)
+			_for attr_name, attr_value _over mu_prop_vals.fast_keys_and_elements()
+			_loop
+				attr_pl[attr_name] << attr_value
+			_endloop
+		_endif
+
+		cu_prop_vals << cur_obj.mss_proposed_values_for_cu_definition(cu_def, cu_holder.operation)
+		_for attr_name, attr_value _over cu_prop_vals.fast_keys_and_elements()
+		_loop
+			attr_pl[attr_name] << attr_value
+		_endloop
+	_endloop
+
+	# Notify about the new attributes.
+	# N.B.: if a given attribute does not exist in the field list,
+	# the following will actually cause it to be added!  I'm not
+	# sure what is the best thing to do in this case: let the field
+	# be added (so that the user can see that it will explicitly be
+	# set by the proposed CU), or ignore it now (although it will
+	# get updated by the CU when an insert/update is performed).
+	# For now, just pass all proposed values along.
+	_if attr_pl.size > 0
+	_then
+		_self.databus_make_data_available(:proposed_values, attr_pl)
+	_endif
+
+	!mss_cu_editor_validate?! << _true
+	_self.validate_cu_list()
+	
+	_return .cu_list
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_editor_plugin.validate_cu_list()
+	## 
+	## Something has changed on the editor - ask each item in the
+	## cu_list to validate itself.
+	##
+
+	_dynamic !mss_cu_editor_validate?!
+
+	_if !mss_cu_editor_validate?! _is _false
+	_then
+		_return
+	_endif
+
+	_if .cu_list.size = 0 _orif
+	    (cu_obj << _self.current_object_for_cu_edit()) _is _unset
+	_then
+		_return
+	_endif
+
+	pvals << _self.databus_request_data(:proposed_values_for_update)
+	_for i _over .cu_list.fast_elements()
+	_loop
+		i.key.validate_for_object(cu_obj, pvals, i)
+	_endloop
+	_self.changed(:cu_list)
+	
+_endmethod
+$

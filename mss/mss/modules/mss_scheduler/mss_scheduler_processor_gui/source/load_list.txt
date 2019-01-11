@@ -1,0 +1,4 @@
+mss_scheduler_processor_framework.magik
+mss_scheduler_processor_fw_pi.magik
+mss_scheduler_processor_plugin.magik
+mss_scheduler_results_plugin.magik

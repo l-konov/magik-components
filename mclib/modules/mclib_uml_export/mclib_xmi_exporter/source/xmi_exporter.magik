@@ -1,0 +1,256 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+_pragma(classify_level=basic)
+## This class is used to export Magik object models to XMI
+def_slotted_exemplar(:xmi_exporter,
+{
+   {:max_levels, _unset},
+   {:traverse_packages, _true},
+   {:model, _unset},
+   {:c_and_i_completed, 0}
+})
+$
+
+_pragma(classify_level=basic)
+## The number of level of inheritance to export
+xmi_exporter.define_slot_access(:max_levels, :write, :public)
+$
+
+_pragma(classify_level=basic)
+## Should parent classes which are in different packages be exported?
+xmi_exporter.define_slot_access(:traverse_packages, :write, :public)
+$
+
+_pragma(classify_level=basic)
+## The model for this exporter
+xmi_exporter.define_slot_access(:model, :write, :public)
+$
+
+_pragma(classify_level=basic)
+## Number of Classes and Interfaces completely exported so far.
+xmi_exporter.define_slot_access(:c_and_i_completed, :write, :private)
+$
+
+
+_pragma(classify_level=advanced)
+## The known XMI output streams.  Keys are in the
+## form <xmi_version>,<uml_version>
+xmi_exporter.define_shared_constant(:xmi_output_streams,
+				    property_list.new_with(
+				       :|1.1,1.3|,
+				       xmi_11_uml_13_output_stream),
+				    :private)
+							   
+_pragma(classify_level=basic)
+_method xmi_exporter.new(name, _optional max_levels,
+			 traverse_packages)
+   ## Creates a new instance of XMI exporter.
+   ## 
+   ## name : string -- the name of the model to be exported
+   ## max_levels : integer -- the number of levels of parents to export
+   ## traverse_packages : boolean -- should parents in a different package
+   ##   be exported?  (Not implemented yet).
+   ##
+   ## returns : xmi_exporter -- a new instance of self.
+   
+   _return _clone.init(uml_model.new(name), max_levels,
+		       traverse_packages)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_exporter.new_with_model(model, _optional max_levels,
+				    traverse_packages)
+   ## Creates a new instance of XMI exporter with will export an 
+   ## existing model.
+   ##
+   ## model : uml_model -- the model to export
+   ## max_levels : integer -- the number of levels of parents to export
+   ## traverse_packages : boolean -- should parents in a different package
+   ##   be exported?  (Not implemented yet).
+   ##
+   ## returns : xmi_exporter -- a new instance of self.
+   
+   _return _clone.init(model, max_levels,
+		       traverse_packages)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_exporter.init(model, _optional max_levels,
+			  traverse_packages)
+   ## Initialises a new instance of xmi_exporter.
+   ## 
+   ## model : uml_model -- the model to export
+   ## max_levels : integer -- the number of levels of parents to
+   ##   export.  Default: all 
+   ## traverse_packages : boolean -- should parents in a different package
+   ##   be exported?  (Not implemented yet).
+   ##
+   ## returns : xmi_exporter -- self, but inited
+   
+   _self.max_levels << max_levels
+   _self.traverse_packages << traverse_packages
+   _self.model << model
+
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method xmi_exporter.note_change(who, aspect, _gather data)
+   ## 
+   ## 
+
+   _if aspect _is :class_exported _orif
+       aspect _is :interface_exported
+   _then
+      _self.c_and_i_completed +<< 1
+      write("completed ", _self.c_and_i_completed, " of ",
+	    _self.model.number_of_classes_and_interfaces, " classes")
+   _endif
+   
+    
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_exporter.export_to(filename, _optional lcd_names?, xmi_version,
+			       uml_version)
+   ## Exports self's model to a file.
+   ##
+   ## filename : string -- the file in which to store the export
+   ## lcd_names? : boolean -- should names be mangle to fit Java
+   ##   style nameing rules?
+   ## xmi_version : string -- the XMI version you wish to export.
+   ##   Default: 1.1
+   ## uml_version : string -- the UML version you wish to
+   ##   export. Default: 1.3
+   ##
+   ## returns : unset 
+
+   props << property_list.new()
+   _if lcd_names? _isnt _unset
+   _then
+      props[:lcd_names?] << lcd_names?
+   _endif
+
+   xmi_version << xmi_version.default("1.1")
+   uml_version << uml_version.default("1.3")
+   
+   out_stream_exemplar << _self.xmi_output_streams[symbol.concatenation(
+						      xmi_version, ",",
+						      uml_version)]
+
+   _if out_stream_exemplar _is _unset 
+   _then
+      condition.raise(:user_error, :string, "Unknown XMI or UML version.")
+   _endif
+
+   
+   t_out << external_text_output_stream.new(filename, :utf8)
+   out << out_stream_exemplar.new(t_out, _scatter props)
+
+   out.add_dependent(_self)
+   _self.c_and_i_completed << 0
+   
+   _protect
+      out.write_prolog()
+      out.start_xmi_doc("Magik xmi_exporter", "0.8.3")
+      
+      _self.model.export_on(out)
+      out.end_xmi_doc()
+      
+   _protection
+      out.close()
+   _endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_exporter.include_classes(_gather exemplars)
+   ## Includes specified classes in the model being exported.
+   ##
+   ## exemplars : object(s) -- exemplars of the classes you would
+   ##   like exported
+   ##
+   ## returns : unset
+
+   levels_to_go << _unset
+   _if _self.max_levels _isnt _unset 
+   _then
+      levels_to_go << _self.max_levels - 1
+   _endif
+
+   _for an_exemplar _over exemplars.fast_elements()
+   _loop
+      _self.model.include_class(an_exemplar.method_table, levels_to_go)
+   _endloop
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method xmi_exporter.include_packages(_gather package_names)
+   ## Includes specified packages in the model being exported
+   ##
+   ## package_names : symbol(s) -- the names of the packages you
+   ##   would like exported.
+   ##
+   ## returns : unset
+
+   _local interesting_packages << set.new()
+   
+   _for a_package_name _over package_names.fast_elements()
+   _loop
+      a_pack_name << sw:symbol.check_type(a_package_name)
+
+      a_package << package.all_packages[a_pack_name]
+
+      interesting_packages.add(a_package)
+   _endloop
+   
+   levels_to_go << _unset
+   _if _self.max_levels _isnt _unset 
+   _then
+      levels_to_go << _self.max_levels - 1
+   _endif
+   
+   
+   _for an_mt _over each_class()
+   _loop
+      
+      _if interesting_packages.includes?(
+	     an_mt.metadata[:exemplar_global].package)
+      _then
+	 _self.model.include_class(an_mt, levels_to_go)
+      _endif
+   _endloop
+   
+      
+_endmethod
+$

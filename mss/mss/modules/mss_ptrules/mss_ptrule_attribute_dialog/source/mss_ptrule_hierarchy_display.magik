@@ -1,0 +1,195 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_hierarchy_display
+##
+## Display a hierarchy of possible pointing rules in the
+## mss_ptrule_attribute_dialog.
+##
+
+def_slotted_exemplar(:mss_ptrule_hierarchy_display,
+{
+	{:list, _unset, :readable},
+	{:activation_mode, _unset, :writable},
+	{:tree_item, _unset, :readable},
+	{:current_ptrule, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+mss_ptrule_hierarchy_display.define_shared_constant(
+	:databus_consumer_data_types,
+	{:activation_mode,
+	 :top_ptrule},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+mss_ptrule_hierarchy_display.define_shared_constant(
+	:databus_producer_data_types,
+	{},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_hierarchy_display.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :activation_mode
+	_then
+		.activation_mode << data
+	_elif data_type_name _is :top_ptrule
+	_then
+		_self.refresh(data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_hierarchy_display.build_gui(a_container)
+	## 
+	## 
+	
+	p << panel.new(a_container)
+	p.border_width << p.border_height << 0
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << p.resize_y? << _true
+	
+	.list << rope.new()
+	.tree_item << tree_item.new(p,
+				    :resize_x?, _true,
+				    :resize_y?, _true,
+				    :width_in_chars, 70,
+				    :height_in_chars, 5,
+				    :model, _self,
+				    :aspect, :list,
+				    :mode, :one,
+				    :data_selector, :list,
+				    :select_notifier, {:|perform_safely()|, :|ptrule_selected()|})
+
+	_return p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_hierarchy_display.ptrule_selected(tree_thing)
+	## 
+	## When the tree selection TREE_THING has been selected, use
+	## that to update the current pointing rule being displayed.
+	##
+
+	_if (e << tree_thing.an_element()) _is _unset
+	_then
+		data << _unset
+	_else
+		data << e.key
+	_endif
+	_if data _isnt _unset
+	_then
+		old_data << .current_ptrule
+		_protect
+			ok? << _false 
+			.current_ptrule << data
+			_self.framework.set_current_ptrule(data)
+			ok? << _true
+		_protection
+			_if _not ok?
+			_then
+				# Really should reset the selection here if a failure happened
+				# while changing pointing rules being displayed.
+			_endif
+		_endprotect 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_hierarchy_display.build_tree(top_ptrule)
+	## 
+	## Create a hierarchy of list items based on the substructure
+	## of child pointing rules under TOP_PTRULE.
+	##
+
+	.list << rope.new()
+	.current_ptrule << _unset
+	_if top_ptrule _is _unset
+	_then
+		_return
+	_endif
+
+	sstr << {:image, :default, :value, :description}
+
+	# Add children recursively.  Note that the following processing
+	# is structured so that if a given parent ptrule is not being
+	# prompted, then its children are simply reparented to whatever
+	# is next up the food chain.
+	done_ptrules << equality_set.new()
+	q << queue.new()
+	q.add({top_ptrule, _unset})
+	_loop
+		_if q.size = 0 _then _leave _endif
+		ptrule_data << q.next()
+		ptrule << ptrule_data[1]
+		parent_tree << ptrule_data[2]
+		_if done_ptrules.includes?(ptrule) _then _continue _endif
+		done_ptrules.add(ptrule)
+		
+		_if ptrule.prompting_required?(.activation_mode)
+		_then
+			pl << property_list.new_with(
+				      :ptrule, ptrule,
+				      :description, ptrule.name)
+			new_parent_tree << display_tree.new(ptrule, pl, parent_tree)
+			new_parent_tree.styled_string << sstr
+			_if parent_tree _is _unset
+			_then
+				.list.add_last(new_parent_tree)
+			_endif
+			_if .current_ptrule _is _unset
+			_then
+				.current_ptrule << ptrule
+			_endif 
+		_else
+			new_parent_tree << parent_tree
+		_endif
+		
+		_for rec _over ptrule.child_ptrules.fast_elements()
+		_loop
+			q.add({rec, new_parent_tree})
+		_endloop
+	_endloop
+
+	_for base_tree _over .list.fast_elements()
+	_loop 
+		base_tree.expand_fully()
+	_endloop
+
+	_self.framework.set_current_ptrule(.current_ptrule)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_hierarchy_display.refresh(data)
+	## 
+	## 
+
+	_self.build_tree(data)
+	_self.changed(:list, :renew)
+	
+_endmethod
+$

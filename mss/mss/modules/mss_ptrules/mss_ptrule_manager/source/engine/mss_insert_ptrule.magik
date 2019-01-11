@@ -1,0 +1,1126 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_insert_ptrule
+##
+## Generic superclass for pointing rules which insert a
+## database record - do not instantiate directly.
+##
+
+def_slotted_exemplar(:mss_insert_ptrule,
+{
+	{:attributes, _unset, :readable},
+	{:detached_record, _unset, :readable},
+	{:detached_text_joins, _unset, :readable},
+	{:detached_geometry, _unset, :readable},
+	{:cu_references, _unset, :readable},
+	{:current_record, _unset, :writable},
+	{:geometry_name, _unset, :writable}
+},
+{:mss_ptrule})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+mss_insert_ptrule.define_shared_constant(
+	:prompt_dialog_class_name,
+	:mss_ptrule_attribute_dialog,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_insert_ptrule.core_default_properties
+	## 
+	## 
+
+	_local pl << _super.core_default_properties.copy()
+	pl[:suspended?] << _false
+	pl[:check_editable?] << _true
+	pl[:offset_transform] << _unset
+	pl[:text_justification] << _unset
+	pl[:correlation_category] << :default
+	pl[:insert_on_release] << :always
+	pl[:insert_on_complete] << :never
+	pl[:subrule_insert_on_release] << :with_parent_ptrule
+	pl[:subrule_insert_on_complete] << :with_parent_ptrule
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_insert_ptrule.core_property_types
+	## 
+	## 
+
+	_local pl << _super.core_property_types.copy()
+	pl[:suspended?] << {:boolean}
+	pl[:check_editable?] << {:boolean}
+	pl[:offset_transform] << {:string}
+	pl[:text_justification] << {:integer}
+	pl[:insert_on_release] << {:symbol, {:always, :never}}
+	pl[:insert_on_complete] << pl[:insert_on_release]
+	pl[:subrule_insert_on_release] << {:symbol, {:always, :never, :with_top_ptrule, :with_parent_ptrule}}
+	pl[:subrule_insert_on_complete] << pl[:subrule_insert_on_release]
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.init_from_definition(a_mss_ptdef, a_manager)
+	## 
+	## 
+
+	_super.init_from_definition(a_mss_ptdef, a_manager)
+
+	.current_record << _unset
+	.attributes << rope.new()
+	.cu_references << rope.new()
+	_if (.geometry_name << a_mss_ptdef.geometry_name) _isnt _unset
+	_then
+		.geometry_name << .geometry_name.as_symbol()
+	_endif
+	
+	_if (tbl << a_mss_ptdef.actual_collection) _is _unset
+	_then
+		# Don't treat this as an error, since it is possible to have
+		# anonymous pointing definitions.  However, if this is the
+		# case, it is not possible to define attributes.
+		_self.init_detached_rec(_unset)
+		_return _self
+	_endif
+
+	dr << tbl.new_detached_record()
+	my_ace << _unset
+	_if .manager _isnt _unset
+	_then
+		my_ace << .manager.ace
+	_endif 
+	_for attr_def _over a_mss_ptdef.ordered_attributes(my_ace).fast_elements()
+	_loop
+		attr_name << attr_def.name.as_symbol()
+		_if (fd << tbl.all_fields[attr_name]) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:undefined_field, attr_name))
+		_endif
+		_if (set_method << attr_def.set_method) _isnt _unset
+		_then
+			val << _self.perform(set_method.as_symbol())
+		_else
+			val << attr_def.value
+		_endif
+		
+		_if val _is _unset
+		_then
+			# No additional processing
+		_elif fd.is_physical?
+		_then
+			_if val.is_kind_of?(charindex_mixin)
+			_then 
+				val << dr.value_from_string(fd, val)
+			_endif 
+		_else
+			_if val.is_kind_of?(charindex_mixin)
+			_then
+				val << val.as_charvec()
+			_endif 
+		_endif
+		
+		pl << property_list.new_with(
+			      :fd, fd,
+			      :name, attr_name,
+			      :value, val,
+			      :visible?, attr_def.visible?)
+		.attributes.add_last(pl)
+	_endloop
+
+	_self.init_detached_rec(tbl)
+	_self.init_cu_references(a_mss_ptdef)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.init_cu_references(a_mss_ptdef)
+	## 
+	## By default, do not initialize any CU (Compatible Unit)
+	## references.
+	##
+
+	# N.B.: this method may be redefined by modules which care
+	# about CUs.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.maintain_cu_references(mode)
+	## 
+	## By default, do not maintain any CU (Compatible Unit)
+	## references.
+	##
+
+	# N.B.: this method may be redefined/subclassed by modules which care
+	# about CUs.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.update_detached_rec_for_cu_references()
+	## 
+	## By default, do not update based on any CU (Compatible Unit)
+	## references.
+	##
+
+	# N.B.: this method may be redefined by modules which care
+	# about CUs.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.set_cu_references(cu_ref_list)
+	##
+	## Set the cu_references slot to be the contents of CU_REF_LIST.
+	##
+
+	.cu_references.empty()
+	.cu_references.add_all_last(cu_ref_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.reinit_one_rule_properties()
+	## 
+	## 
+
+	pl << _super.reinit_one_rule_properties()
+	pl[:correlation_history] << rope.new()
+
+	.current_record << _unset
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.init_detached_rec(tbl)
+	## 
+	## Initialize the .detached_record slot by first setting default
+	## values, and then setting values defined in the attributes list.
+	##
+
+	_if tbl _is _unset
+	_then
+		_return
+	_endif
+	
+	dr << .detached_record << tbl.new_detached_record()
+	tj << .detached_text_joins << property_list.new()
+	
+	# Set defaults first...
+	_for fd _over dr.physical_fields.fast_elements()
+	_loop
+		_if (val << fd.default_value) _isnt _unset _orif
+		    (val << fd.unset_value) _isnt _unset
+		_then
+			_if val.is_class_of?(procedure)
+			_then
+				val << val.invoke()
+			_endif
+			dr.perform(fd.name.with_chevron, val)
+		_endif 
+	_endloop
+
+	# Override with attribute configuration next...
+	_for attr_def _over .attributes.fast_elements()
+	_loop
+		_if attr_def[:fd].is_physical?
+		_then
+			_if attr_def[:value] _is _unset _andif
+			    attr_def[:fd].mandatory?
+			_then
+				# Don't set anything - configurer has defined a mandatory field
+				# with no default, so presume that it will be set later during
+				# prompting.
+			_else 
+				dr.perform(attr_def[:fd].name.with_chevron, attr_def[:value])
+			_endif
+		_elif attr_def[:fd].is_join?
+		_then
+			_if attr_def[:value] _isnt _unset
+			_then
+				tj[attr_def[:fd].name] << attr_def[:value]
+			_endif 
+		_endif
+	_endloop 
+
+	_return dr
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.prompting_required?(mode)
+	## 
+	## 
+
+	_if .attributes _is _unset
+	_then
+		_return _false
+	_endif
+
+	_if _self.get_property(:suspended?) _is _true
+	_then
+		_return _false
+	_endif
+	
+	# If any attribute is visible, prompting is to be done.
+	my_attrs? << _false 
+	_for pl _over .attributes.fast_elements()
+	_loop
+		_if pl[:visible?] _is _true
+		_then 
+			my_attrs? << _true
+			_leave 
+		_endif
+	_endloop
+	_if my_attrs? _is _false
+	_then
+		_return _false
+	_endif
+
+	_return _super.prompting_required?(mode)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.insert_enabled?(mode)
+	## 
+	## 
+
+	_if _self.get_property(:suspended?) _is _true
+	_then
+		_return _false
+	_endif
+	
+	_if .parent_ptrule _is _unset
+	_then 
+		_if mode _is :complete _andif 
+		    _self.get_property(:insert_on_complete) _is :always 
+		_then
+			_return _true
+		_endif
+		_if mode _is :release _andif 
+		    _self.get_property(:insert_on_release) _is :always
+		_then
+			_return _true
+		_endif
+	_else
+		_if mode _is :complete
+		_then
+			_if (val << _self.get_property(:subrule_insert_on_complete)) _is :always
+			_then
+				_return _true
+			_elif val _is :with_top_ptrule
+			_then
+				_return _self.top_ptrule.insert_enabled?(mode)
+			_elif val _is :with_parent_ptrule
+			_then
+				_return .parent_ptrule.insert_enabled?(mode)
+			_endif
+		_endif
+		_if mode _is :release
+		_then
+			_if (val << _self.get_property(:subrule_insert_on_release)) _is :always
+			_then
+				_return _true
+			_elif val _is :with_top_ptrule
+			_then
+				_return _self.top_ptrule.insert_enabled?(mode)
+			_elif val _is :with_parent_ptrule
+			_then
+				_return .parent_ptrule.insert_enabled?(mode)
+			_endif
+		_endif
+	_endif
+	
+	_return false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.transaction_required?(mode)
+	## 
+	## 
+
+	_return _self.insert_enabled?(mode)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!start()
+	## 
+	## 
+
+	_super.int!start()
+	_self.check_write_authorised()
+	_self.set_offset_transform()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!restart()
+	## 
+	## 
+
+	_super.int!start()
+	_self.check_write_authorised()
+	_self.set_offset_transform()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.set_offset_transform()
+	## 
+	## Set the :offset_transform property.
+	##
+
+	pdr << .pdr_data
+	pdr[:offset_transform] << _unset
+	_if (ot_str << _self.get_property(:offset_transform)) _isnt _unset
+	_then
+		ot_vals << ot_str.split_by(%,)
+		_if ot_vals.size = 2 _andif
+		    (ot_x << ot_vals[1].as_number()) _isnt _unset _andif
+		    (ot_y << ot_vals[2].as_number()) _isnt _unset
+		_then
+			pdr[:offset_transform] << transform.translate(ot_x, ot_y)
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!pre_press(a_window, pos)
+	## 
+	## 
+
+	_super.int!pre_press(a_window, pos)
+	
+	_if .current_record _isnt _unset _andif
+	    _not .current_record.is_valid?
+	_then
+		.current_record << _unset
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!press(a_window, pos)
+	## 
+	## 
+
+	_super.int!press(a_window, pos)
+
+	a_map_view << a_window.user_data
+	a_map << a_map_view.map
+	
+	_if (working_record << .current_record) _is _unset
+	_then
+		working_record << .detached_record
+	_endif 
+	_if _self.get_property(:check_editable?) _isnt _false _andif
+	    working_record _isnt _unset _andif
+	    _not a_map.collection_accessible?(working_record.source_collection)
+	_then
+		condition.raise(:geometry_not_editable_in_map,
+				:ace_name, a_map.ace_name,
+				:geometry_field_description, _self.name)
+	_endif
+	
+	corr_info << _self.get_correlation_information(a_window, pos)
+	_self.perform_correlation(corr_info, a_window, pos)
+	
+	adj_pos << corr_info[:adj_pos]
+	pdr << .pdr_data
+
+	pdr[:drag_sectors] << _unset
+	.detached_geometry << _unset
+	
+	pdr[:transform] << transform.new()
+	pdr[:translate_transform] << transform.new()
+	pdr[:rotate_transform] << transform.new()
+	pdr[:start_pos] << adj_pos
+	pdr[:last_pos] << adj_pos
+	pdr[:int!rotation_offset] << coordinate.new(0, 0)
+	pdr[:int!rotation_center] << _unset
+	_self.set_offset_transform()
+	_if (offset_xfm << pdr[:offset_transform]) _isnt _unset
+	_then
+		adj_pos << offset_xfm.convert(adj_pos)
+	_endif 
+
+	_if working_record _isnt _unset _andif
+	    .geometry_name _isnt _unset
+	_then
+		gf << working_record.all_fields[.geometry_name]
+		_if (cat << gf.geom_category) _is :point
+		_then
+			pp << pseudo_point.new(adj_pos)
+		_elif cat _is :text
+		_then
+			_if (str << working_record.mss_ptrule_text_for(.geometry_name, _self)) _is _unset
+			_then 
+				str << working_record.text_for(.geometry_name)
+			_endif 
+			_if str _is _unset _orif str = ""
+			_then
+				str << "??"
+			_endif
+			pp << pseudo_text.new(adj_pos, str)
+			_if (just << _self.get_property(:text_justification)) _isnt _unset
+			_then
+				pp.justification << just
+			_endif 
+		_endif
+
+		_if pp _isnt _unset
+		_then
+			# For deriving the style, use a mapped geometry if possible.
+			# However, note that the working_record may be incomplete (user
+			# has not entered attributes yet), and so ignore any errors
+			# that may come about when sorting out mapped geometries.
+			mapped_gf << _unset
+			_try
+				mapped_gf << gf.descriptor_for(working_record)
+			_when error
+			_endtry
+			_if mapped_gf _is _unset
+			_then
+				mapped_gf << gf
+			_endif
+			
+			pp << pp.new_for_world(pp, a_map_view.world)
+			pp.add_source_rwo(working_record)
+			pp.style_info << mapped_gf
+			style << a_map_view.style_for(pp)
+			.detached_geometry << pp
+			pdr[:drag_sectors] << pp.contour_for(style, a_window)
+		_endif 
+	_endif
+	
+	_if _self.insert_enabled?(:release)
+	_then 
+		_if pdr[:drag_sectors] _isnt _unset
+		_then 
+			a_window.xor_sector_rope_transform(line_style, pdr[:drag_sectors])
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!drag(a_window, pos)
+	## 
+	## 
+	
+	_super.int!drag(a_window, pos)
+
+	a_map_view << a_window.user_data
+	
+	pdr << .pdr_data
+	
+	# If the shift key is held down, and if the trail is not being
+	# placed at the same time, then enter a special rotate
+	# transform mode for as long as it is held.  Note that this
+	# rotate mode is not compatible with placing a trail, since it
+	# causes an offset to exist between the correlated position
+	# (:last_pos in the pdr_data) and the cursor position
+	# (where the trail point will go).	
+	_if _self.manager.modmask = 1 _andif
+	    _self.rotate_allowed?()
+	_then
+		adj_pos << pos
+		_if pdr[:int!rotation_center] _is _unset
+		_then
+			pdr[:int!rotation_center] << pos + pdr[:int!rotation_offset]
+			pdr[:int!rotation_start_coord] << pos
+		_else
+			rot_center << pdr[:start_pos]
+			pdr[:rotate_transform] << transform.translate(-rot_center.x, -rot_center.y).
+						 rotate(pdr[:int!rotation_center].angle_to(pos)).
+						 translate(rot_center.x, rot_center.y)
+		_endif 
+	_else
+		_if (prev_rot_center << pdr[:int!rotation_center]) _isnt _unset
+		_then
+			pdr[:int!rotation_center] << _unset
+			pdr[:int!rotation_offset] +<< pdr[:int!rotation_start_coord] - pos
+		_endif
+
+		corr_info << _self.get_correlation_information(a_window, pos + pdr[:int!rotation_offset])
+		_self.perform_correlation(corr_info, a_window, pos + pdr[:int!rotation_offset])
+		adj_pos << corr_info[:adj_pos]
+		
+		delta << adj_pos - pdr[:start_pos]
+		pdr[:translate_transform] << transform.translate(delta.x, delta.y)
+		pdr[:last_pos] << adj_pos
+	_endif 
+	pdr[:transform] << pdr[:rotate_transform] * pdr[:translate_transform]
+
+	_self.redraw_drag_sectors(a_window)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.redraw_drag_sectors(a_window)
+	## 
+	## Undraw the currently drawn drag sectors, transform them by
+	## the current transform, and redraw them.
+	##
+
+	pdr << .pdr_data
+	a_map_view << a_window.user_data
+	
+	old_drag_sectors << pdr[:drag_sectors]
+	_if (working_record << .current_record) _is _unset
+	_then
+		working_record << .detached_record
+	_endif 
+	_if (pp << .detached_geometry) _isnt _unset
+	_then
+		pp2 << pp.transformed(pdr[:transform])
+		pp2.add_source_rwo(working_record)
+		pp2.world << pp.world
+		pp2.style_info << pp.style_info
+		
+		style << a_map_view.style_for(pp2)
+		pdr[:drag_sectors] << pp2.contour_for(style, a_window)
+	_endif
+	
+	_if (ins_enabled? << _self.insert_enabled?(:release))
+	_then
+		_if old_drag_sectors _isnt _unset
+		_then 
+			a_window.xor_sector_rope_transform(line_style, old_drag_sectors)
+		_endif 
+		_if pdr[:drag_sectors] _isnt _unset
+		_then 
+			a_window.xor_sector_rope_transform(line_style, pdr[:drag_sectors])
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.rotate_allowed?()
+	## 
+	## By default, rotate is permitted only if not using the trail,
+	## since trail mode is not compatible with dynamic rotate.
+	##
+
+	_return _not _self.trail_enabled?()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!pre_release(a_window, pos)
+	## 
+	## 
+
+	_super.int!pre_release(a_window, pos)
+
+	pdr << .pdr_data
+
+	_if _self.insert_enabled?(:release)
+	_then 
+		_if pdr[:drag_sectors] _isnt _unset
+		_then 
+			a_window.xor_sector_rope_transform(line_style, pdr[:drag_sectors])
+		_endif 
+	_endif
+
+	_if (last_corr_geom << .pdr_data[:last_correlation_geometry]) _isnt _unset _andif
+	    last_corr_geom.is_valid?
+	_then
+		_if (corr_cat << _self.get_property(:correlation_category)) _isnt _unset _andif
+		    corr_cat _isnt :none _andif
+		    .detached_record _isnt _unset
+		_then 
+			.detached_record.mss_ptrule_update_from_correlation(corr_cat,
+									    last_corr_geom, _self)
+		_endif
+	_endif
+
+	# After any correlation-type of updating that may have taken
+	# place here, refresh attributes from CUs, since these should
+	# override correlation-type attributes.
+	_self.maintain_cu_references(:release)
+	_self.update_detached_rec_for_cu_references()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!post_release(a_window, pos)
+	## 
+	## 
+
+	_super.int!post_release(a_window, pos)
+	
+	pl << .pdr_data[:dynamic_correlation].copy()
+	pl[:last_correlation_geometry] << .pdr_data[:last_correlation_geometry]
+	.one_rule_properties[:correlation_history].add_last(pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!pre_complete()
+	## 
+	## 
+
+	_super.int!pre_complete()
+	_self.maintain_cu_references(:complete)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.int!complete()
+	## 
+	## Before prompting, ensure that insertion is permitted.
+	##
+
+	_if _self.insert_enabled?(:complete)
+	_then 
+		_if (a_map_view << .manager.current_map_view) _isnt _unset
+		_then
+			a_map << a_map_view.map
+			_if (working_record << .current_record) _is _unset
+			_then
+				working_record << .detached_record
+			_endif 
+			_if _self.get_property(:check_editable?) _isnt _false _andif
+			    _not a_map.collection_accessible?(working_record.source_collection)
+			_then
+				condition.raise(:geometry_not_editable_in_map,
+						:ace_name, a_map.ace_name,
+						:geometry_field_description, _self.name)
+			_endif
+		_endif
+	_endif
+	
+	_super.int!complete()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.check_write_authorised()
+	## 
+	## Ensure that self's source view is writable, and self's table
+	## has update permission.
+	##
+
+	_if .detached_record _isnt _unset
+	_then
+		_super.check_write_authorised({.detached_record.source_view},
+					      {.detached_record.source_collection})
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.insert_detached_record()
+	## 
+	## Insert a new record based on the contents of the .detached_record
+	## and .detached_text_joins slots.
+	##
+
+	# N.B.: the following is confusing, and requires some separate
+	# explanation.  Standard non-transaction based protocols for
+	# inserting data (the insert() method) and creating geometry
+	# (the make_geometry() method) are used in ptrule code, rather
+	# than using record_transaction.new_insert().  There are
+	# various reasons for this:
+	# - At this point, we're already in an outer transaction which
+	#   may be inserting/updating a variety of objects.
+	# - Ptrule processing creates things one geometry at a time, and
+	#   would break down if faced with a situation such as a record
+	#   that has two mandatory geometries.
+	# - Similarly, joined records are created one record at a time.
+	#
+	# So, this creates a property_list of all proposed values and
+	# calls mss_ptrule_fire_pre_insert_actions() using that.  Then, any
+	# modified values within that method are transferred back to
+	# the detached record, and it is inserted.
+	#
+	# Subsequent processing within the method that called this will
+	# make the geometry, and call mss_ptrule_fire_post_insert_actions().
+	
+	pl << property_list.new()
+	_for fd _over .detached_record.all_fields.fast_elements()
+	_loop
+		# Ignore internal fields.
+		fd_name << fd.name
+		_if fd_name _is :ds!version _then _continue _endif
+		
+		# Only consider physical fields or text join fields.
+		_if fd.is_physical?
+		_then
+			_if (val << .detached_record.perform(fd_name)) _isnt _unset
+			_then
+				pl[fd_name] << val
+			_endif
+			
+		_elif (fd.is_join? _andif fd.join_type _is :text)
+		_then
+			_if (val << .detached_text_joins[fd_name]) _isnt _unset
+			_then
+				pl[fd_name] << val
+			_endif 
+		_endif
+	_endloop
+	orig_pl << pl.copy()
+	new_pl << .detached_record.mss_ptrule_fire_pre_insert_actions(pl, _self)
+
+	# Update detached_record with any changed physical field values.
+	_for fdn, new_pl_value _over new_pl.fast_keys_and_elements()
+	_loop
+		_if orig_pl[fdn] ~= new_pl_value _andif
+		    (new_fd << .detached_record.all_fields[fdn]) _isnt _unset _andif
+		    new_fd.is_physical?
+		_then
+			.detached_record.perform(fdn.with_chevron, new_pl_value)
+		_endif
+	_endloop
+
+	# Unset any physical values that were removed from the property list.
+	_for fdn, orig_pl_value _over orig_pl.fast_keys_and_elements()
+	_loop
+		_if _not new_pl.includes_key?(fdn) _andif
+		    (orig_fd << .detached_record.all_fields[fdn]) _isnt _unset _andif
+		    orig_fd.is_physical?
+		_then
+			.detached_record.perform(fdn.with_chevron, _unset)
+		_endif
+	_endloop 
+
+	# Insert the record.
+	cr << .current_record << .detached_record.source_collection.insert(.detached_record)
+	_if cr _is _unset
+	_then
+		_return
+	_endif
+	
+	# Set text join values - use whatever has been set in new_pl,
+	# which represents any modifications which may have been made
+	# by the mss_ptrule_fire_pre_insert_actions() call.
+	_for fdn, new_pl_value _over new_pl.fast_keys_and_elements()
+	_loop
+		_if new_pl_value _isnt _unset _andif
+		    (new_fd << .detached_record.all_fields[fdn]) _isnt _unset _andif
+		    new_fd.is_join? _andif
+		    new_fd.join_type _is :text
+		_then
+			cr.perform(fdn.with_chevron, new_pl_value)
+		_endif
+	_endloop
+
+	_self.insert_cu_references()
+	
+	_return cr
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.insert_cu_references()
+	## 
+	## By default, do not insert any CU (Compatible Unit)
+	## references.
+	##
+
+	# N.B.: this method may be redefined by modules which care
+	# about CUs.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.validate_for_mss_ptrule_attribute_dialog(a_dialog)
+	## 
+	## Called when prompting is complete in A_DIALOG.  Ensure that
+	## the detached_record is valid.
+	##
+
+	_if .detached_record _isnt _unset
+	_then
+		.detached_record.mss_ptrule_validate(_self, a_dialog)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.ok_for_correlation?(cat, test_corr_geom)
+	## 
+	## 
+
+	_if .detached_record _is _unset
+	_then
+		_return _false
+	_endif
+	_return .detached_record.mss_ptrule_ok_for_correlation?(cat, test_corr_geom, _self)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.geometry_sectors_for_relative_insert()
+	## 
+	## 
+
+	_if (cr << .current_record) _isnt _unset _andif
+	    cr.is_valid? _andif 
+	    .geometry_name _isnt _unset _andif
+	    (geom << cr.perform(.geometry_name)) _isnt _unset
+	_then
+		ori << _unset 
+		_if geom.responds_to?(:orientation)
+		_then
+			ori << geom.orientation
+		_endif 
+		_return geom.sectors, ori, geom.world
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.add_to_post_render_set(a_set)
+	## 
+	## Render self's sectors, if dynamically dragging.
+	##
+
+	_if .manager.pdr_running_ptrule _is _self.top_ptrule _andif
+	    (pdr << .pdr_data) _isnt _unset _andif
+	    (secs << pdr[:drag_sectors]) _isnt _unset
+	_then
+		pg << pseudo_chain.new(secs)
+		_if .detached_geometry _isnt _unset
+		_then
+			pg.world << .detached_geometry.world
+		_endif 
+		pg.style_info << line_style
+		a_set.add(pg)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.date_now()
+	## 
+	## Used as a set method in a mss_ptdef_attribute to set an
+	## attribute to the current date.
+	##
+
+	_return date.now()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.perform_on_current_record(a_window, pos, method_name, _gather args)
+	## 
+	## Helper action method, to perform a given action on the
+	## current record.
+	##
+
+	_if .current_record _is _unset
+	_then
+		_return
+	_endif
+	.current_record.perform(method_name.as_symbol(), _self, a_window, pos, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.perform_on_detached_record(a_window, pos, method_name, _gather args)
+	## 
+	## Helper action method, to perform a given action on the
+	## detached record.
+	##
+
+	_if .detached_record _is _unset
+	_then
+		_return
+	_endif
+	.detached_record.perform(method_name.as_symbol(), _self, a_window, pos, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.start_one_shot_add_geometry_ptrule(a_window, pos, ptdef_name, _optional external_name)
+	## 
+	## Helper action method, to activate an add geometry pointing
+	## rule from the given pointing definition name PTDEF_NAME.  If
+	## given, EXTERNAL_NAME will override the actual name (so that
+	## a generic rule can have a useful name when presented to the
+	## user).  This will be activated as a one-shot rule, mainly
+	## intended to add an annotation geometry after a feature has
+	## been placed.
+	##
+
+	_dynamic !mss_ptrule_plugin_check_select?! << _false
+	
+	_if .current_record _is _unset
+	_then
+		_return
+	_endif
+	
+	ptdef << .manager.get_pointing_definition_by_name(ptdef_name)
+	ptrule << ptdef.as_pointing_rule(.manager)
+	ptrule.backstop_properties[:one_shot?] << _true
+	_if external_name _isnt _unset _andif
+	    external_name ~= ""
+	_then
+		ptrule.name << external_name.as_charvec()
+	_endif
+	
+	.manager.start_ptrule(ptrule)
+	ptrule.current_record << .current_record
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_insert_ptrule.figure_subrule_placement_location()
+	## 
+	## For rules which create geometry as a subrule, this method
+	## returns two values: a sector_rope that defines the position
+	## of that geometry (using a combination of the parent pointing
+	## rule geometry, and the various subrule placement-type properties
+	## defined on self); and the world of that parent pointing rule
+	## geometry.  These return values may legitimately be unset,
+	## indicating that no rules for placing relative to the parent
+	## have been defined.
+	##
+	
+	pdr << .pdr_data
+	_if .parent_ptrule _is _unset
+	_then
+		_return _unset
+	_endif
+
+	geom_rule << _self.get_property(:subrule_placement_location)
+	geom_rule_method << _self.get_property(:subrule_placement_loc_method)
+	_if geom_rule _is _unset _andif
+	    geom_rule_method _is _unset
+	_then
+		_return _unset
+	_endif
+	
+	(parent_sr, parent_ori, parent_w) << .parent_ptrule.geometry_sectors_for_relative_insert()
+	c1 << _unset 
+	_if parent_sr _isnt _unset 
+	_then
+		# If a specified method is provided, try that first.
+		_if geom_rule_method _isnt _unset
+		_then
+			c1 << _self.perform_private(geom_rule_method, parent_sr)
+		_endif
+
+		_if c1 _is _unset
+		_then 
+			_if geom_rule _is :midpoint
+			_then
+				_if (ll << parent_sr.line_length) = 0.0
+				_then
+					c1 << parent_sr.first_coord
+				_else 
+					c1 << parent_sr.coordinate_for_distance(ll / 2.0)
+				_endif
+			_elif geom_rule _is :first_coord
+			_then
+				c1 << parent_sr.first_coord
+			_elif geom_rule _is :last_coord
+			_then
+				c1 << parent_sr.last_coord
+			_elif geom_rule _is :bounds_center
+			_then
+				c1 << parent_sr.bounds.centre
+				parent_ori << 0.0
+			_endif
+		_endif
+	_endif
+	
+	_if c1 _isnt _unset
+	_then
+		ori_rule << _self.get_property(:subrule_placement_orientation)
+		_if ori_rule _is :zero
+		_then
+			angle << 0.0
+		_elif parent_ori _isnt _unset
+		_then
+			angle << parent_ori
+		_elif parent_sr _isnt _unset _andif
+		      parent_sr.line_length > 0.0
+		_then 
+			# Get orientation from parent_sr too.
+			angle << parent_sr.angle_near(c1)
+		_else 
+			angle << pdr[:rotate_transform].rotation
+		_endif
+
+		_if ori_rule _isnt :with_parent_raw
+		_then
+			angle << angle.normalise(-1.0.half_pi, 1.0.half_pi)
+		_endif
+		
+		_if (off_xfm << pdr[:offset_transform]) _isnt _unset
+		_then
+			off_xfm << off_xfm.rotate(angle)
+			c1 +<< off_xfm.convert(coordinate.new(0, 0))
+		_endif
+		
+		c2 << c1 + transform.rotate(angle).convert(coordinate.new(100000, 0))
+		geom_data << sector_rope.new_with(sector.new_with(c1, c2))
+	_endif 
+
+	_return geom_data, parent_w
+	
+_endmethod
+$

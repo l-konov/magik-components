@@ -1,0 +1,10 @@
+cam_db_mss_workspace_tracking	1
+
+description
+	MSS workspace tracking for Cambridge database
+end
+
+requires
+	cam_db_data_model
+	mss_workspace_tracking
+end

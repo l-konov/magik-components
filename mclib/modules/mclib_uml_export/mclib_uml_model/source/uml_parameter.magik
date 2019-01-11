@@ -1,0 +1,137 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+_pragma(classify_level=basic)
+## A class which represents a parameter to or from and
+## operation in UML
+def_slotted_exemplar(:uml_parameter,
+{
+   {:owner, _unset},
+   {:name, _unset},
+   {:kind, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=advanced)
+## The owner of self
+uml_parameter.define_slot_access(:owner, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## The name of this parameter
+uml_parameter.define_slot_access(:name, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## The type of parameter self is.
+uml_parameter.define_slot_access(:kind, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_method uml_parameter.new(owner, name, kind)
+   ## Creates a new instance of uml_parameter
+   ##
+   ## owner : uml thing -- the owner of this parameter
+   ## name : string -- the name of this parameter
+   ## kind : symbol -- the type of parameter this is (:in, :out,
+   ##   or :inout)
+   ##
+   ## returns : uml_parameter
+
+   _return _clone.init(owner, name, kind)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method uml_parameter.init(owner, name, kind)
+   ## Inits a new instance of uml_parameter
+   ##
+   ## owner : uml thing -- the owner of this parameter
+   ## name : string -- the name of this parameter
+   ## kind : symbol -- the type of parameter this is (:in, :out,
+   ##   or :inout)
+   ##
+   ## returns : uml_parameter -- self, but inited
+
+   _self.owner << owner
+   _self.name << name
+   _self.kind << kind
+   
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_attribute.xmi_id
+   ## returns : string -- the xmi id of this object
+   ## 
+   name << _self.name
+   name.substitute_character(%!, %.)
+   name.substitute_character(%?, %.)
+
+   _return char16_vector.concatenation(_self.owner.xmi_id,
+				       "-attrib-", name)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_parameter.model
+   ## returns : uml_model -- the model to which self belongs
+   ## 
+   _return _self.owner.model
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_parameter.private?
+   ## returns : boolean -- is this parameter private?
+   ## 
+
+   _return _true
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_parameter.type
+   ## returns : uml_interface -- the class values of this
+   ##   parameter must be
+   ## 
+
+   _return _self.model.get_object_class()
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_parameter.export_on(a_uml_output_stream)
+   ## export self
+   ## 
+
+   a_uml_output_stream.write_uml_parameter(_self)
+_endmethod
+$

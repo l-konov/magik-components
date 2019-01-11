@@ -1,0 +1,280 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_general_config_plugin
+##
+## General superclass for CU config plugins.
+##
+
+def_slotted_exemplar(:mss_cu_general_config_plugin,
+{
+	{:items, _unset, :readable}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+mss_cu_general_config_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+mss_cu_general_config_plugin.define_shared_constant(
+	:max_to_report,
+	## The maximum number of records to report in any CU output list.
+	1000,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+mss_cu_general_config_plugin.define_shared_constant(
+	:standard_sort_proc,
+	## A procedure suitable for sorting a collection of elements
+	## used by various subclasses.  Expects that each element being
+	## sorted is a vector where items 2...N contain data
+	## interesting to the subclass, and item 1 is a vector of
+	## vectors used for sorting.
+	_proc(a, b)
+		s1 << a[1]
+		s2 << b[1]
+		
+		# Note that S1 and S2 are each going to be a vector of vectors.
+		s1_size << s1.size
+		s2_size << s2.size
+		_for sort_idx _over 1.upto(min(s1_size, s2_size))
+		_loop
+			v1 << s1[sort_idx]
+			v1_size << v1.size
+			v2 << s2[sort_idx]
+			v2_size << v2.size
+			
+			# Compare individual elements of this inner vector.
+			_for i _over 1.upto(min(v1_size, v2_size))
+			_loop
+				_if (x << v1[i] _cf v2[i]) _isnt _maybe
+				_then
+					_return x
+				_endif
+			_endloop
+
+			# If one inner vector is shorter than the other, it wins.
+			_if (x << v1_size _cf v2_size) _isnt _maybe
+			_then
+				_return x
+			_endif
+		_endloop
+
+		# If one outer vector is shorter than the other, it wins.
+		_if (x << s1_size _cf s2_size) _isnt _maybe
+		_then
+			_return x
+		_endif
+
+		_return _maybe 
+	_endproc,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.init(name, a_framework, _gather properties)
+	##
+	##
+
+	_super.init(name, a_framework, _scatter properties)
+	.items << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.status_string << x
+	## 
+	## Send a databus notification that :status_string has
+	## changed.
+	##
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_general_config_plugin.selected_cu_cost_group
+	## 
+	## For subclasses that care about CU cost groups, return the
+	## currently selected one.
+	##
+
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+	_return tbl.at(_self.get_option(:current_cu_cost_group))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_general_config_plugin.current_cu_cost_group << a_rec_or_id
+	## 
+	## Set the current_cu_cost_group property to A_REC_OR_ID -
+	## either a database record, or the ID of a record.
+	##
+
+	_if a_rec_or_id.is_a_datastore_object?
+	_then
+		new_id << a_rec_or_id.id
+	_else
+		new_id << a_rec_or_id
+	_endif
+	_if new_id ~= _self.get_option(:current_cu_cost_group)
+	_then
+		_self.set_option(:current_cu_cost_group, new_id, _true)
+	_endif
+	_return a_rec_or_id
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.current_cu_cost_group_choices
+	## 
+	## Return a structure of items to use for the text_choice_item
+	## that represents all CU cost groups.
+	##
+
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+	sc << sorted_collection.new(tbl.size, _proc(a, b) _return a[2] _cf b[2] _endproc)
+	sc.add({0, ""})
+	_for i _over tbl.fast_elements()
+	_loop
+		sc.add({i.id, i.name.as_charvec()})
+	_endloop
+	_return simple_vector.new_from(sc)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.note_change(who, what, _gather data)
+	## 
+	## For subclasses that care about view changes, perform a
+	## refresh.  For subclasses that care about CU cost groups,
+	## handle database notifications.
+	##
+
+	_if who _is mss_cu_engine.view
+	_then
+		_if what _is :view
+		_then
+			_self.handle_cu_cost_group_change()
+			_self.refresh()
+			
+		_elif {:insert, :update, :post_delete}.includes?(what)
+		_then 
+			tbl << data[1]
+			_if tbl.name _is :mss_cu_cost_group
+			_then
+				_self.handle_cu_cost_group_change()
+			_endif 
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.handle_cu_cost_group_change()
+	## 
+	## Reset pick-list for current CU cost group.
+	##
+
+	_if (cur_group << _self.get_option(:current_cu_cost_group)) _is _unset
+	_then
+		# This subclass doesn't care about CU cost groups.
+		_return
+	_endif
+	
+	new_items << _self.current_cu_cost_group_choices
+	still_exists? << _false
+	_for i _over new_items.fast_elements()
+	_loop
+		_if i[1] = cur_group
+		_then
+			still_exists? << _true
+		_endif
+	_endloop
+	_if _not still_exists?
+	_then
+		_self.current_cu_cost_group << 0
+	_endif
+	_if (mi << .items[:current_cu_cost_group]) _isnt _unset
+	_then
+		mi.items << new_items
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.figure_filter_predicate()
+	## 
+	## Determine a predicate to use for filtering the CU list.
+	##
+
+	pred << _unset
+
+	_if (x << _self.get_option(:filter_cu_code).default("")) ~= ""
+	_then
+		_if x.last _isnt %*
+		_then
+			x << write_string(x, %*)
+		_endif
+		_if pred _is _unset
+		_then
+			pred << predicate.wild(:cu_code, x, :ci)
+		_else
+			pred _and<< predicate.wild(:cu_code, x, :ci)
+		_endif
+	_endif
+
+	_if (x << _self.get_option(:filter_description).default("")) ~= ""
+	_then
+		_if x.last _isnt %*
+		_then
+			x << write_string(x, %*)
+		_endif
+		_if pred _is _unset
+		_then
+			pred << predicate.wild(:description, x, :ci)
+		_else
+			pred _and<< predicate.wild(:description, x, :ci)
+		_endif
+	_endif
+
+	_if pred _is _unset
+	_then
+		pred << predicate
+	_endif
+	_return pred
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={subclassable})
+_method mss_cu_general_config_plugin.refresh()
+	##
+	## Refresh self when requested, or when the config view changes.
+	##
+	
+_endmethod
+$

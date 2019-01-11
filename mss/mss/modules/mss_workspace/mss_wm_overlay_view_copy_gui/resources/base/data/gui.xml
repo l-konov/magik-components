@@ -1,0 +1,38 @@
+<gui>
+  <accelerators>
+    <accelerator id="refresh_a" name="refresh"/>
+  </accelerators>
+
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="close"/>
+    </submenu>
+    <submenu name="view">
+      <action name="refresh"/>
+    </submenu>
+    <submenu name="edit">
+      <action name="mss_wm_overlay_view_copy_plugin.copy_map_selection"/>
+    </submenu>
+  </menu>
+
+  <toolbar name="edit_1">
+    <action name="mss_wm_overlay_view_copy_plugin.copy_map_selection"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="edit_1"/>
+  </dock>
+ 
+  <work_area>
+    <paned_window side_by_side="no" dynamic="no">
+      <plugin plugin_name="mss_wm_overlay_view_copy_plugin" gui_type="header" stretch="0"/>
+      <tab_box stretch="1">
+        <plugin plugin_name="mss_wm_overlay_view_copy_plugin" gui_type="map_selection"/>
+      </tab_box>
+    </paned_window>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

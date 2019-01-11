@@ -1,0 +1,79 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_design_history_viewer.magik
+##
+## Menu to display the history of a given design.
+##
+
+def_slotted_exemplar(:mss_design_history_viewer,
+{},
+{:mss_job_history_viewer})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_design_history_viewer.define_shared_constant(
+	:result_list_column_widths,
+	## Column widths to use for result list.
+	{50, 100, 100, 100, 80, 120},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_design_history_viewer.result_list_column_headings
+	## 
+	## Column headings to use for result list.
+	## 
+
+	_return {_self.message(:rch_action),
+		 _self.message(:rch_name),
+		 _self.message(:rch_owner),
+		 _self.message(:rch_status),
+		 _self.message(:rch_last_update_user),
+		 _self.message(:rch_last_update_time)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_design_history_viewer.result_list_styled_string(disp_tree)
+	## 
+	## The styled_string to use for displaying data in the result list.
+	##
+
+	_return styled_string.new(:value, :action, :tab,
+				  :value, :name, :tab,
+				  :value, :owner, :tab,
+				  :value, :status, :tab,
+				  :value, :last_update_user, :tab,
+				  :value, :last_update_time)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_design_history_viewer.set_result_list_attributes(pl, hist_rec)
+	##
+	## Set the attributes for displaying the search result for
+	## history record HIST_REC.  PL is the property list in which
+	## to store the attributes. 
+	##
+	## This may be redefined, in conjunction with result_list_styled_string(),
+	## result_list_column_widths, and result_list_column_headings.
+	##
+
+	pl[:name] << hist_rec.name
+	pl[:owner] << hist_rec.owner
+	pl[:status] << hist_rec.status
+	_return pl
+	
+_endmethod
+$

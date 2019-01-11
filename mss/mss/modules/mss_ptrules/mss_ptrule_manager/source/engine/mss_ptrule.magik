@@ -1,0 +1,1605 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule
+##
+## Generic superclass for pointing rules - do not instantiate directly.
+##
+
+def_slotted_exemplar(:mss_ptrule,
+{
+	{:manager, _unset, :readable},
+	{:ptdef, _unset, :readable},
+	{:name, _unset, :writable},
+	{:help_text, _unset, :writable},
+	{:parent_ptrule, _unset, :readable},
+	{:child_ptrules, _unset, :readable},
+	{:backstop_properties, _unset, :readable},
+	{:one_rule_properties, _unset, :readable},
+	{:one_shot_properties, _unset, :readable},
+	{:raw_actions, _unset, :readable},
+	{:ordered_actions, _unset, :writable},
+	{:pdr_data, _unset, :readable},
+	{:user_data, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+mss_ptrule.define_shared_constant(
+	:core_default_properties,
+	## A property list where each key is a core product property,
+	## and each value is the default value for that property.
+	property_list.new_with(
+		:one_shot?, _false,
+		:correlation_category, _unset,
+		:correlation_check_method, _unset,
+		:prompt_on_release, :always,
+		:prompt_on_complete, :never,
+		:subrule_prompt_on_release, :with_parent_ptrule,
+		:subrule_prompt_on_complete, :with_parent_ptrule,
+		:transaction_on_release?, _false,
+		:transaction_on_complete?, _false,
+		:im_cursor, _unset,
+		:im_prompt_string, _unset,
+		:im_one_shot?, _false,
+		:gui_plugin_key, _unset
+		      ),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable, subclassable})
+mss_ptrule.define_shared_constant(
+	:custom_default_properties,
+	## A property list where each key is an application-specific
+	## property, and each value is the default value for that property.
+	property_list.new(),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+mss_ptrule.define_shared_constant(
+	:core_property_types,
+	## A property list where each key is a core product property,
+	## and each value is a vector of one or two items:
+	## - the first item is the data type (:boolean, :symbol,
+	##   :integer, :float, :string)
+	## - the second item, if entered, is the domain of possible
+	##   values (as a vector).
+	property_list.new_with(
+		:one_shot?, {:boolean},
+		:correlation_category, {:symbol, _unset},
+		:correlation_check_method, {:symbol, _unset},
+		:prompt_on_release, {:symbol, {:always, :once, :never}},
+		:prompt_on_complete, {:symbol, {:always, :once, :never}},
+		:subrule_prompt_on_release, {:symbol, {:always, :once, :never, :with_top_ptrule, :with_parent_ptrule}},
+		:subrule_prompt_on_complete, {:symbol, {:always, :once, :never, :with_top_ptrule, :with_parent_ptrule}},
+		:transaction_on_release?, {:boolean, _unset},
+		:transaction_on_complete?, {:boolean, _unset},
+		:im_cursor, {:string, _unset},
+		:im_prompt_string, {:string, _unset},
+		:im_one_shot?, {:boolean, _unset},
+		:gui_plugin_key, {:symbol}
+		      ),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable, subclassable})
+mss_ptrule.define_shared_constant(
+	:custom_property_types,
+	## A property list where each key is an application-specific
+	## property, and each value is a vector of one or two items:
+	## - the first item is the data type (:boolean, :symbol,
+	##   :ingeger, :float, :string)
+	## - the second item, if entered, is the domain of possible
+	##   values (as a vector).
+	property_list.new(),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable, subclassable})
+mss_ptrule.define_shared_constant(
+	## Subclasses that care about prompting must redefine this.
+	:prompt_dialog_class_name,
+	_unset,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable})
+mss_ptrule.define_shared_constant(
+	:action_type_mapping,
+	## Equality hash table that maps external action types to
+	## internal symbol values.
+	equality_hash_table.new_with(
+		"Start", :start,
+		"Restart", :restart,
+		"Press", :press,
+		"Drag", :drag,
+		"Release", :release,
+		"Pre Release", :pre_release,
+		"Post Release", :post_release,
+		"Complete", :complete,
+		"Pre Complete", :pre_complete,
+		"Post Complete", :post_complete,
+		"Hotkey 1", :hotkey_1,
+		"Hotkey 2", :hotkey_2,
+		"Hotkey 3", :hotkey_3,
+		"Hotkey 4", :hotkey_4,
+		"Hotkey 5", :hotkey_5),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.message_handler
+	## 
+	## Returns selfs message_handler (which is unique for each
+	## subclass).  See sw_component.message_handler.
+	##
+
+	_if (meth << _self.method(:local_message_handler)) _is _unset _orif 
+	    meth.owner _isnt _self.method_table
+	_then
+		mh << message_handler.new(_self.class_name)
+			   _if _self.class_name _isnt :mss_ptrule _andif
+			       _not mh.uses?(:mss_ptrule)
+			   _then
+				   mh.add_use(:mss_ptrule, _unset, _false)
+			   _endif
+			   
+			   _self.define_shared_constant(:local_message_handler,
+							mh, 
+							:private)
+	_endif
+	_return _self.local_message_handler
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule.message(msg_id, _gather args)
+	## 
+	## Standard message accessor method.
+	##
+
+	_return _self.message_handler.human_string(msg_id, _unset, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule.new(a_manager, a_name)
+	## 
+	## Create a new instance of self for a given mss_ptrule_manager
+	## A_MANAGER, with a name of A_NAME.
+	##
+
+	_return _clone.init(a_manager, a_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule.new_from_definition(a_mss_ptdef, a_manager)
+	## 
+	## Create a new instance of self from A_MSS_PTDEF, a mss_ptdef
+	## configuration record.  A_MANAGER is an mss_ptrule_manager.
+	##
+
+	_dynamic !mss_ptdefs!
+
+	_if !mss_ptdefs! _is _unset
+	_then
+		!mss_ptdefs! << equality_set.new()
+	_endif
+	_if !mss_ptdefs!.includes?(a_mss_ptdef)
+	_then
+		# Disallow multiple instances (i.e. a circular parent-child relationship)
+		_return _unset
+	_endif
+	!mss_ptdefs!.add(a_mss_ptdef)
+
+	_if (r << _clone.init_from_definition(a_mss_ptdef, a_manager)) _is _unset
+	_then
+		_return
+	_endif
+	
+	_for child_ptdef _over a_mss_ptdef.child_ptdefs.fast_elements()
+	_loop
+		_if !mss_ptdefs!.includes?(child_ptdef)
+		_then
+			_continue
+		_endif
+		_if (child_ptrule << child_ptdef.as_pointing_rule(a_manager)) _isnt _unset
+		_then
+			child_ptrule.set_parent(r)
+		_endif
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.init(a_manager, a_name)
+	## 
+	## 
+	
+	.manager << a_manager
+	.name << a_name
+	.child_ptrules << rope.new()
+	.pdr_data << property_list.new()
+	.user_data << property_list.new()
+	_self.init_properties()
+	_self.init_actions()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.init_from_definition(a_mss_ptdef, a_manager)
+	## 
+	## Initialize self from the data contained in mss_ptdef record
+	## A_MSS_PTDEF.  A_MANAGER is the mss_ptrule_manager that is
+	## managing self.
+	##
+
+	_self.init(a_manager, a_mss_ptdef.name.as_charvec())
+	.ptdef << a_mss_ptdef
+	.help_text << a_mss_ptdef.help_text.default("").as_charvec()
+	
+	_self.init_properties(a_mss_ptdef)
+	_self.init_actions(a_mss_ptdef)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.set_manager(a_ptrule_manager)
+	## 
+	## Set's self's manager slot to be A_PTRULE_MANAGER.  This
+	## should only be called by a mss_ptrule_manager to claim an
+	## unparented mss_ptrule.
+	##
+
+	.manager << a_ptrule_manager
+	_return a_ptrule_manager
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.init_properties(_optional a_mss_ptdef)
+	## 
+	## Initialize the backstop_properties for self from self's
+	## default_properties, and create empty property lists for
+	## self's one_rule_properties and one_shot_properties.  If
+	## A_MSS_PTDEF is provided, then use that to incrementally
+	## override backstop_properties.
+	##
+	
+	p << .backstop_properties << _self.default_properties.copy()
+	.one_rule_properties << property_list.new()
+	.one_shot_properties << property_list.new()
+	
+	ptypes << _self.property_types
+
+	_if a_mss_ptdef _is _unset
+	_then
+		_return p
+	_endif
+	
+	_for i _over a_mss_ptdef.properties.fast_elements()
+	_loop
+		key << i.name.as_symbol()
+		value << i.value
+		
+		_if value _is _unset _orif
+		    value = ""
+		_then
+			value << _unset
+		_else
+			_if (format_data << ptypes[key]) _is _unset
+			_then
+				format_type << :symbol
+			_else
+				format_type << format_data[1]
+			_endif
+			_if format_type _is :symbol
+			_then
+				value << value.as_symbol()
+			_elif format_type _is :integer
+			_then
+				_if (value << value.as_number()) _isnt _unset
+				_then
+					value << value.rounded
+				_endif
+			_elif format_type _is :float
+			_then
+				_if (value << value.as_number()) _isnt _unset
+				_then
+					value << value.as_float
+				_endif	
+			_elif format_type _is :boolean _orif
+			      format_type _is :kleenean
+			_then
+				value << value.write_string.lowercase
+				_if value = "true"
+				_then
+					value << _true
+				_elif value = "maybe"
+				_then
+					value << _maybe
+				_else
+					value << _false
+				_endif 
+			_else
+				# Treat anything else as a string.
+				value << value.write_string
+			_endif 
+		_endif
+		p[key] << value
+	_endloop
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.init_actions(_optional a_mss_ptdef)
+	## 
+	## Initialize the .raw_actions slot.  If A_MSS_PTDEF is
+	## provided, then add the actions for that record.
+	##
+
+	r << .raw_actions << rope.new()
+
+	_if a_mss_ptdef _is _unset
+	_then
+		_return r
+	_endif
+
+	action_map << _self.action_type_mapping
+	_for i _over a_mss_ptdef.actions.fast_elements()
+	_loop
+		_if (internal_type << action_map[i.type]) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:invalid_action_type, i.type))
+		_endif
+		_if (param_1 << i.param_1) _isnt _unset _then param_1 << param_1.as_charvec() _endif 
+		_if (param_2 << i.param_2) _isnt _unset _then param_2 << param_2.as_charvec() _endif 
+		_if (param_3 << i.param_3) _isnt _unset _then param_3 << param_3.as_charvec() _endif 
+		p << property_list.new_with(:type, internal_type,
+					    :seq, i.seq.default(0),
+					    :receiver, _self,
+					    :action_method, i.action_method.as_symbol(),
+					    :param_1, param_1,
+					    :param_2, param_2,
+					    :param_3, param_3)
+		r.add_last(p)
+	_endloop 
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.default_properties
+	## 
+	## Default properties for self, derived from core_default_properties
+	## and custom_default_properties.
+	##
+	
+	p << _self.core_default_properties.copy()
+	_for i, j _over _self.custom_default_properties.fast_keys_and_elements()
+	_loop
+		p[i] << j
+	_endloop
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.property_types
+	## 
+	## Default property types for self, derived from core_property_types
+	## and custom_property_types.
+	##
+
+	p << _self.core_property_types.copy()
+	_for i, j _over _self.custom_property_types.fast_keys_and_elements()
+	_loop
+		p[i] << j
+	_endloop
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.get_property(key)
+	## 
+	## Get the property specified by KEY.  First look in
+	## one_shot_properties (which persist for a single PDR), then
+	## one_rule_properties (which persist for the duration of a
+	## pointing rule execution and may cover multiple PDRs), and
+	## finally look in backstop_properties (which persist until
+	## the pointing rule is terminated).
+	##
+
+	_if .one_shot_properties.includes_key?(key)
+	_then
+		_return .one_shot_properties[key]
+	_elif .one_rule_properties.includes_key?(key)
+	_then
+		_return .one_rule_properties[key]
+	_else
+		_return .backstop_properties[key]
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.actions_for(type, _optional format)
+	## 
+	## Return all actions for TYPE (as defined in the
+	## action_type_mapping shared constant).  If FORMAT is
+	## :pre_and_post, then two results are returned - those where
+	## the execution sequence is < 0, and those where it is >= 0.
+	## Otherwise, all actions are returned.
+	##
+	## Note that the returned actions are ordered, and they are
+	## also cached in the ordered_actions slot, so any custom
+	## action that dynamically adds other actions must clear the
+	## ordered_actions slot to reset the cache.
+	##
+
+	_if .ordered_actions _is _unset
+	_then
+		.ordered_actions << hash_table.new()
+		wrk_tbl << hash_table.new()
+		all_types << _self.action_type_mapping
+		sort_proc << _proc(a, b)
+				     _if (x << a[1] _cf b[1]) _isnt _maybe
+				     _then
+					     _return x
+				     _endif
+				     _return a[2] _cf b[2]
+			     _endproc
+				     
+		_for a_type _over all_types.fast_elements()
+		_loop
+			wrk_tbl[a_type] << sorted_collection.new(5, sort_proc)
+		_endloop
+		
+		all_rules << _self.all_child_ptrules(_true)
+		_for rule_seq, a_rule _over all_rules.fast_keys_and_elements()
+		_loop
+			_for action_def _over a_rule.raw_actions.fast_elements()
+			_loop
+				sc << wrk_tbl[action_def[:type]]
+				sc.add({action_def[:seq], rule_seq, action_def})
+			_endloop
+		_endloop
+
+		_for a_type, sorted_actions _over wrk_tbl.fast_keys_and_elements()
+		_loop
+			.ordered_actions[a_type] << v << {rope.new(), rope.new(), rope.new()}
+			_for sorted_data _over sorted_actions.fast_elements()
+			_loop
+				v[1].add_last(sorted_data[3])
+				_if sorted_data[1] < 0
+				_then
+					v[2].add_last(sorted_data[3])
+				_else
+					v[3].add_last(sorted_data[3])
+				_endif
+			_endloop
+		_endloop 
+	_endif
+
+	v << .ordered_actions[type]
+	_if format _is :pre_and_post
+	_then
+		_return v[2], v[3]
+	_else
+		_return v[1]
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.set_parent(parent_ptrule)
+	## 
+	## Set the parent pointing rule for self to be PARENT_PTRULE.
+	##
+
+	.parent_ptrule << parent_ptrule
+	parent_ptrule.child_ptrules.add(_self)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.all_child_ptrules(including_self?)
+	## 
+	## Return a rope of all child pointing rules.  If
+	## INCLUDING_SELF? is true, then self is put at the start of
+	## the rope.
+	##
+
+	r << rope.new()
+	_if including_self? _then r.add_last(_self) _endif 
+	q << queue.new()
+	q.add(_self)
+	_loop
+		_if q.size = 0 _then _leave _endif
+		next << q.next()
+		_for child _over next.child_ptrules.fast_elements()
+		_loop
+			q.add(child)
+			r.add_last(child)
+		_endloop
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.prompting_required?(mode)
+	## 
+	## Examine properties to decide if prompting is required.
+	## MODE may be: 
+	##  :release - as part of the release of a PDR sequence.
+	##  :complete - as part of a specific completion action.
+	##
+
+	_if .parent_ptrule _is _unset
+	_then 
+		_if mode _is :complete _andif 
+		    _self.get_property(:prompt_on_complete) _isnt :never
+		_then
+			_return _true
+		_endif
+		_if mode _is :release _andif 
+		    _self.get_property(:prompt_on_release) _isnt :never
+		_then
+			_return _true
+		_endif
+	_else
+		_if mode _is :complete
+		_then
+			_if (val << _self.get_property(:subrule_prompt_on_complete)) _is :never
+			_then
+				_return _false
+			_elif val _is :with_top_ptrule
+			_then
+				_return _self.top_ptrule.prompting_required?(mode)
+			_elif val _is :with_parent_ptrule
+			_then
+				_return .parent_ptrule.prompting_required?(mode)
+			_else
+				_return _true 
+			_endif
+		_endif
+		_if mode _is :release
+		_then
+			_if (val << _self.get_property(:subrule_prompt_on_release)) _is :never
+			_then
+				_return _false
+			_elif val _is :with_top_ptrule
+			_then
+				_return _self.top_ptrule.prompting_required?(mode)
+			_elif val _is :with_parent_ptrule
+			_then
+				_return .parent_ptrule.prompting_required?(mode)
+			_else
+				_return _true 
+			_endif
+		_endif
+	_endif
+
+	# In case everything falls through above, don't prompt.
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.insert_enabled?(mode)
+	## 
+	## Backstop is that data insertion is not required.  MODE may be:
+	##  :release - as part of the release of a PDR sequence.
+	##  :complete - as part of a specific completion action.
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.transaction_required?(mode)
+	## 
+	## If MODE is :release, this returns true if the
+	## :transaction_on_release? property is set.
+	##
+	## If MODE is :complete, this returns true if the
+	## :transaction_on_complete? property is set.
+	##
+
+	_if mode _is :release
+	_then
+		_return _self.get_property(:transaction_on_release?).default(_false)
+	_endif
+	_if mode _is :complete
+	_then
+		_return _self.get_property(:transaction_on_complete?).default(_false)
+	_endif
+
+	# Anything else is not valid input.
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule.trail_enabled?(_optional local_only?)
+	## 
+	## By default, the trail is not enabled while processing a
+	## pointing rule, unless a child ptrule requires it.
+	##
+
+	_if local_only? _is _true
+	_then
+		_return _false
+	_endif 
+	
+	_for ptrule _over _self.top_ptrule.all_child_ptrules(_true).fast_elements()
+	_loop
+		_if ptrule.trail_enabled?(_true)
+		_then
+			_return _true
+		_endif 
+	_endloop
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.trail_enabled_for_interaction_mode_change?(_optional local_only?)
+	## 
+	## Called when trail changes are requesting an interaction mode
+	## change to trail mode (i.e. the trail has changed).  If this
+	## action was initiated by the mss_ptrule_manager, or if the
+	## current pointing rule is trail based, then instruct the
+	## interaction handler to not change modes.
+	##
+
+	_dynamic !mss_ptrule_initiator!
+
+	_if !mss_ptrule_initiator! _isnt _unset
+	_then
+		_return _true
+	_endif
+	_return _self.trail_enabled?(local_only?)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={subclassable})
+_method mss_ptrule.assert_mss_ptrule_mode_on_complete?()
+	## 
+	## Assume that trail-based pointing rules require use of the
+	## mss_ptrule interaction mode on completion, so that if a
+	## trail was laid out in geometry mode it can be used now.
+	##
+
+	_return _self.trail_enabled?()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.start()
+	## 
+	## Perform initialization actions the first time that a
+	## pointing rule is started.
+	##
+
+	_dynamic !mss_current_ptrule! << _self
+	
+	(pre_actions, post_actions) << _self.actions_for(:start, :pre_and_post)
+	_self.perform_actions(pre_actions)
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!start()
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.restart()
+	## 
+	## Perform initialization actions when a pointing rule is
+	## restarted. 
+	##
+
+	_dynamic !mss_current_ptrule! << _self
+	
+	(pre_actions, post_actions) << _self.actions_for(:restart, :pre_and_post)
+	_self.perform_actions(pre_actions)
+
+	all_ptrules << _self.all_child_ptrules(_true)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!restart()
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.dispatch_hotkey(keyval)
+	## 
+	## 
+	
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_actions << _self.actions_for(keyval)
+	_self.perform_actions(all_actions)
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.press(a_window, pos)
+	## 
+	## 
+
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		i.one_rule_properties[:pointing_count] +<< 1
+		i.pdr_data.empty()
+	_endloop
+	
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!pre_press(a_window, pos)
+	_endloop
+
+	!mss_current_ptrule! << _self
+	(pre_actions, post_actions) << _self.actions_for(:press, :pre_and_post)
+	_self.perform_actions(pre_actions, a_window, pos)
+	
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!press(a_window, pos)
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions, a_window, pos)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.drag(a_window, pos)
+	## 
+	## 
+	
+	_dynamic !mss_current_ptrule! << _self
+	
+	(pre_actions, post_actions) << _self.actions_for(:drag, :pre_and_post)
+	_self.perform_actions(pre_actions, a_window, pos)
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!drag(a_window, pos)
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions, a_window, pos)
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.pre_release(a_window, pos)
+	## 
+	## 
+
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+
+	(pre_actions, post_actions) << _self.actions_for(:pre_release, :pre_and_post)
+	_self.perform_actions(pre_actions, a_window, pos)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!pre_release(a_window, pos)
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions, a_window, pos)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.release(a_window, pos)
+	## 
+	## 
+
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+
+	(pre_actions, post_actions) << _self.actions_for(:release, :pre_and_post)
+	_self.perform_actions(pre_actions, a_window, pos)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!release(a_window, pos)
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions, a_window, pos)
+
+	(pre_actions, post_actions) << _self.actions_for(:post_release, :pre_and_post)
+	_self.perform_actions(pre_actions, a_window, pos)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!post_release(a_window, pos)
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions, a_window, pos)
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.pre_complete()
+	## 
+	## 
+
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+
+	(pre_actions, post_actions) << _self.actions_for(:pre_complete, :pre_and_post)
+	_self.perform_actions(pre_actions)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!pre_complete()
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.complete()
+	## 
+	## 
+	
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+
+	(pre_actions, post_actions) << _self.actions_for(:complete, :pre_and_post)
+	_self.perform_actions(pre_actions)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!complete()
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions)
+
+	(pre_actions, post_actions) << _self.actions_for(:post_complete, :pre_and_post)
+	_self.perform_actions(pre_actions)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!post_complete()
+	_endloop
+
+	!mss_current_ptrule! << _self
+	_self.perform_actions(post_actions)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.terminate()
+	## 
+	## 
+	
+	_dynamic !mss_current_ptrule! << _self
+	
+	all_ptrules << _self.all_child_ptrules(_true)
+	_for i _over all_ptrules.fast_elements()
+	_loop
+		!mss_current_ptrule! << i
+		i.int!terminate()
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!start()
+	## 
+	## 
+
+	.user_data.empty()
+	_self.reinit_one_rule_properties()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!restart()
+	## 
+	## 
+
+	.user_data.empty()
+	_self.reinit_one_rule_properties()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.reinit_one_rule_properties()
+	## 
+	## 
+
+	pl << .one_rule_properties
+	pl.empty()
+	pl[:pointing_count] << 0
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!pre_press(a_window, pos)
+	## 
+	## 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!press(a_window, pos)
+	## 
+	## 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!drag(a_window, pos)
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!pre_release(a_window, pos)
+	## 
+	## 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!release(a_window, pos)
+	## 
+	## 
+
+	_self.unhighlight_correlation()
+	_self.perform_prompt_on_release(a_window, pos)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.check_write_authorised(dbvs, _optional tbls)
+	##
+	## Ensure that each database in DBVS is writable.  If TBLS is
+	## provided, ensure that each table in TBLS has update permission.
+	##
+
+	_for dbv _over dbvs.fast_elements()
+	_loop
+		_if _not dbv.writable?
+		_then
+			condition.raise(:user_error, :string, _self.message(:view_readonly, dbv.original_view_name))
+		_endif
+	_endloop
+	_for tbl _over tbls.default({}).fast_elements()
+	_loop
+		_if _not tbl.write_authorised?
+		_then
+			condition.raise(:user_error, :string, _self.message(:not_write_authorised, tbl.external_name))
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.unhighlight_correlation()
+	## 
+	## Unhighlight the last correlation geometry.
+	##
+
+	_if (last_corr_geom << .pdr_data[:last_correlation_geometry]) _isnt _unset _andif
+	    last_corr_geom.is_valid?
+	_then
+		.manager.unhighlight_geometry(last_corr_geom)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.perform_prompt_on_release(a_window, pos)
+	## 
+	## 
+
+	_dynamic !global_auto_declare?! << _false
+	
+	_if .parent_ptrule _is _unset
+	_then
+		prompt? << _false
+		main_prompt_ref << equality_property_list.new()
+		child_prompt_ref << equality_property_list.new()
+		_for ptrule _over _self.all_child_ptrules(_true).fast_elements()
+		_loop
+			_if ptrule.parent_ptrule _is _unset
+			_then
+				main_prompt_ref[ptrule] << ptrule.get_property(:prompt_on_release)
+			_else 
+				child_prompt_ref[ptrule] << ptrule.get_property(:subrule_prompt_on_release)
+			_endif
+			_if ptrule.prompting_required?(:release)
+			_then
+				prompt? << _true
+			_endif
+		_endloop
+
+		_if prompt?
+		_then 
+			_if (ed_class_name << _self.prompt_dialog_class_name) _is _unset
+			_then
+				# Can't prompt.
+				_return
+			_endif
+			
+			d << .manager.get_ptrule_dialog(ed_class_name)
+			d.activation_mode << :release
+			tf << _self.manager.top_frame
+			d.activate_relative_to(tf, _unset, tf, 50, 50)
+			d.top_frame.title << _self.name
+			d.top_ptrule << _self
+			ok? << d.wait()
+			_if ok? _isnt _true
+			_then
+				!abort!()
+			_endif
+
+			# Any rules flagged as prompt = once, change to never.
+			_for ptrule, data _over main_prompt_ref.fast_keys_and_elements()
+			_loop
+				_if data _is :once
+				_then
+					ptrule.backstop_properties[:prompt_on_release] << :never
+				_endif
+			_endloop
+			_for ptrule, data _over child_prompt_ref.fast_keys_and_elements()
+			_loop
+				_if data _is :once
+				_then
+					ptrule.backstop_properties[:subrule_prompt_on_release] << :never
+				_endif
+			_endloop			
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!post_release(a_window, pos)
+	## 
+	## 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!complete()
+	## 
+	## 
+
+	_self.perform_prompt_on_complete()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!pre_complete()
+	## 
+	## 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.perform_prompt_on_complete()
+	## 
+	## 
+
+	_dynamic !global_auto_declare?! << _false
+	
+	_if .parent_ptrule _is _unset
+	_then
+		prompt? << _false 
+		main_prompt_ref << equality_property_list.new()
+		child_prompt_ref << equality_property_list.new()
+		_for ptrule _over _self.all_child_ptrules(_true).fast_elements()
+		_loop
+			_if ptrule.parent_ptrule _is _unset
+			_then
+				main_prompt_ref[ptrule] << ptrule.get_property(:prompt_on_complete)
+			_else 
+				child_prompt_ref[ptrule] << ptrule.get_property(:subrule_prompt_on_complete)
+			_endif 
+			_if ptrule.prompting_required?(:complete)
+			_then
+				prompt? << _true
+			_endif
+		_endloop
+
+		_if prompt?
+		_then 
+			_if (ed_class_name << _self.prompt_dialog_class_name) _is _unset
+			_then
+				# Can't prompt.
+				_return
+			_endif
+			
+			d << .manager.get_ptrule_dialog(ed_class_name)
+			d.activation_mode << :complete
+			tf << _self.manager.top_frame
+			d.activate_relative_to(tf, _unset, tf, 50, 50)
+			d.top_frame.title << _self.name
+			d.top_ptrule << _self
+			ok? << d.wait()
+			_if ok? _isnt _true
+			_then
+				!abort!()
+			_endif
+			
+			# Any rules flagged as prompt = once, change to never.
+			_for ptrule, data _over main_prompt_ref.fast_keys_and_elements()
+			_loop
+				_if data _is :once
+				_then
+					ptrule.backstop_properties[:prompt_on_complete] << :never
+				_endif
+			_endloop
+			_for ptrule, data _over child_prompt_ref.fast_keys_and_elements()
+			_loop
+				_if data _is :once
+				_then
+					ptrule.backstop_properties[:subrule_prompt_on_complete] << :never
+				_endif
+			_endloop			
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!post_complete()
+	## 
+	## 
+
+	_if _self.trail_enabled?(_true)
+	_then
+		_if (tr << .manager.current_trail) _isnt _unset
+		_then
+			tr.clear()
+		_endif 
+	_endif 
+	_self.int!restart()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.int!terminate()
+	## 
+	## 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={subclassable})
+_method mss_ptrule.validate_for_mss_ptrule_attribute_dialog(a_dialog)
+	## 
+	## Called when prompting is complete in A_DIALOG.  Subclasses
+	## should validate that the data obtained is OK.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.perform_actions(action_list, _optional a_window, pos)
+	## 
+	## 
+
+	_for i _over action_list.fast_elements()
+	_loop
+		i[:receiver].perform(i[:action_method], a_window, pos,
+				     i[:param_1],
+				     i[:param_2],
+				     i[:param_3])
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule.top_ptrule
+	## 
+	## Return the top pointing rule in the structure that self is a
+	## part of.
+	##
+
+	_if .parent_ptrule _is _unset
+	_then
+		_return _self
+	_endif
+	_return .parent_ptrule.top_ptrule
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule.get_correlation_information(a_window, pos, _optional mode)
+	## 
+	## If correlation has already happened in this pointing, return
+	## that information.  Otherwise, perform the correlation, and
+	## cache it.
+	##
+
+	_return .manager.get_correlation_information(a_window, pos, mode)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.perform_correlation(corr_info, a_window, pos)
+	## 
+	## May be called by subclasses during a press or drag
+	## operation.  Decide if any geometry has been correlated on -
+	## if so, store it away for later reference, and highlight it.
+	##
+
+	.pdr_data[:dynamic_correlation] << corr_info
+	cat << _self.get_property(:correlation_category)
+
+	# Clear out invalid data (in case of failed transaction).
+	_if (last_corr_geom << .pdr_data[:last_correlation_geometry]) _isnt _unset _andif
+	    _not last_corr_geom.is_valid?
+	_then
+		last_corr_geom << .pdr_data[:last_correlation_geometry] << _unset
+	_endif
+	
+	sorted_correlated_geoms << corr_info[:hit_list].default({})
+	adj_pos << corr_info[:adj_pos].default(pos)
+	min_dist << _unset 
+	
+	cur_corr_geom << _unset
+	cur_corr_score << _unset
+	_if cat _is _unset _orif
+	    cat _is :none _orif
+	    sorted_correlated_geoms.size = 0
+	_then
+		# Do no correlation in this case.
+	_else 
+		# Re-sort, based on proximity to ADJ_POS.
+		scg2 << sorted_collection.new(sorted_correlated_geoms.size,
+					      _proc(a, b)
+						      _return a[3] _cf b[3]
+					      _endproc)
+		_for corr_data _over sorted_correlated_geoms.fast_elements()
+		_loop
+			_if _not (test_corr_thing << corr_data[1]).is_a_datastore_object?
+			_then
+				_continue
+			_endif
+			_if {:node, :link}.includes?(test_corr_thing.class_name)
+			_then
+				all_test_corr_geoms << rope.new_from_iter(test_corr_thing,
+									  :|top_level_geoms()|)
+			_else
+				all_test_corr_geoms << {test_corr_thing}
+			_endif
+			
+			_for a_test_corr_geom _over all_test_corr_geoms.fast_elements()
+			_loop
+				new_dist << adj_pos.distance_to(a_test_corr_geom)
+				scg2.add({a_test_corr_geom, corr_data[2], new_dist})
+			_endloop
+		_endloop
+
+		_for corr_data _over scg2.fast_elements()
+		_loop @outer
+			test_corr_geom << corr_data[1]
+			_if min_dist _is _unset
+			_then
+				min_dist << corr_data[3]
+			_else
+				test_dist << corr_data[3]
+				_if test_dist > min_dist + 1
+				_then
+					_leave @outer
+				_endif 
+			_endif
+			
+			# If the previous correlation is still correlated, don't change anything.
+			_if last_corr_geom = test_corr_geom _andif
+			    _self.ok_for_correlation?(cat, test_corr_geom)
+			_then
+				cur_corr_geom << test_corr_geom
+				_leave @outer
+			_endif
+			
+			_if _self.ok_for_correlation?(cat, test_corr_geom)
+			_then
+				_if (test_corr_rwo << test_corr_geom.rwo) _is _unset
+				_then
+					test_corr_score << -1000
+				_else
+					test_corr_score << test_corr_rwo.mss_ptrule_correlation_score(cat, test_corr_geom)
+				_endif
+				_if cur_corr_score _is _unset _orif
+				    test_corr_score > cur_corr_score
+				_then 
+					cur_corr_geom << test_corr_geom
+					cur_corr_score << test_corr_score
+				_endif 
+			_endif
+		_endloop
+	_endif
+	
+	_if last_corr_geom = cur_corr_geom
+	_then
+		# No change - nothing to undraw/redraw.
+		_return
+	_endif
+
+	.pdr_data[:last_correlation_geometry] << cur_corr_geom
+	
+	.manager.unhighlight_geometry(last_corr_geom)
+	.manager.highlight_geometry(cur_corr_geom)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.dynamic_correlated_geometry()
+	## 
+	## Return all top level geoms that are part of the most recent
+	## dynamic correlation.
+	##
+
+	retval << equality_set.new()
+	_if (corr_info << .pdr_data[:dynamic_correlation]) _is _unset
+	_then
+		_return retval
+	_endif
+	
+	sorted_correlated_geoms << corr_info[:hit_list].default({})
+	
+	_for corr_data _over sorted_correlated_geoms.fast_elements()
+	_loop
+		_if _not (test_corr_thing << corr_data[1]).is_a_datastore_object?
+		_then
+			_continue
+		_endif
+		_if {:node, :link}.includes?(test_corr_thing.class_name)
+		_then
+			all_test_corr_geoms << rope.new_from_iter(test_corr_thing,
+								  :|top_level_geoms()|)
+		_else
+			all_test_corr_geoms << {test_corr_thing}
+		_endif
+			
+		_for test_corr_geom _over all_test_corr_geoms.fast_elements()
+		_loop
+			retval.add(test_corr_geom)
+		_endloop 
+	_endloop
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={subclassable})
+_method mss_ptrule.ok_for_correlation?(cat, test_corr_geom)
+	## 
+	## Return true if the geometry TEST_CORR_GEOM is allowed to be
+	## correlated on, using correlation category CAT.
+	##
+	## If the correlation_check_method property has been defined,
+	## that method will be performed to decide if correlation is
+	## allowed.  Otherwise, the backstop always returns false.
+	##
+
+	_if (meth << _self.get_property(:correlation_check_method)) _isnt _unset
+	_then
+		_return _self.perform(meth, cat, test_corr_geom)
+	_endif 
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.reactivate()
+	## 
+	##
+	
+	# Only perform this operation on the top ptrule, and ripple it
+	# down to all children.
+	_if .parent_ptrule _is _unset
+	_then
+		_for ptrule _over _self.all_child_ptrules(_false).fast_elements()
+		_loop
+			ptrule.reactivate()
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.deactivate()
+	## 
+	##
+	
+	# Only perform this operation on the top ptrule, and ripple it
+	# down to all children.
+	_if .parent_ptrule _is _unset
+	_then
+		_for ptrule _over _self.all_child_ptrules(_false).fast_elements()
+		_loop
+			ptrule.deactivate()
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.trail_changed(new_trail, _optional a_window)
+	## 
+	## Deal with changed trail.
+	##
+
+	# Only perform this operation on the top ptrule, and ripple it
+	# down to all children.
+	_if .parent_ptrule _is _unset
+	_then
+		_for ptrule _over _self.all_child_ptrules(_false).fast_elements()
+		_loop
+			ptrule.trail_changed(new_trail, a_window)
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.dynamic_trail_changed(new_trail, add_sectors, a_window)
+	## 
+	## Deal with dynamically changing trail.
+	##
+
+	# Only perform this operation on the top ptrule, and ripple it
+	# down to all children.
+	_if .parent_ptrule _is _unset
+	_then
+		_for ptrule _over _self.all_child_ptrules(_false).fast_elements()
+		_loop
+			ptrule.dynamic_trail_changed(new_trail, add_sectors, a_window)
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.add_to_post_render_set(a_set)
+	## 
+	## Backstop is that there is nothing to render.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule.set_gui_plugin(a_plugin)
+	## 
+	## Set A_PLUGIN to be the gui_plugin that may contain
+	## additional input information for self.
+	##
+
+	_if (cur_gui << .manager.current_ptrule_gui) _isnt _unset
+	_then
+		cur_gui_framework << cur_gui.framework
+	_endif
+
+	# The following is done because there could be multiple GUIs
+	# (of the mss_ptrule_plugin class), each with a gui_plugin to
+	# offer to self.  It only makes sense to choose one, and the
+	# best bet is to choose the one from the current GUI.
+	_if a_plugin _isnt _unset _andif
+	    (cur_gui_framework _is _unset _orif
+	     cur_gui_framework _is a_plugin.framework)
+	_then
+		.backstop_properties[:gui_plugin] << a_plugin
+	_endif
+	
+_endmethod
+$

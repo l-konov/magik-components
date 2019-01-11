@@ -1,0 +1,37 @@
+<gui base="job_server_plugin.viewer_gui_proc">
+
+   <menu name="job_viewer_popup"  role="rwo_specials">
+	<super/>
+	<separator/>
+	<!-- <action name="edit_object"	mnemonic_id="edit_object_m"/>  
+	<action name="push_to_explorer" mnemonic_id="push_to_explorer_m"/> -->
+    </menu>
+	
+	<toolbar name="interaction">
+	  <action name="refresh"/>        
+	  <action name="options"/> 
+	</toolbar>
+	<toolbar name="mclib_job_display">
+	  <action name="display_job_group"/> 
+	  <action name="display_available_status"/> 
+	  <action name="display_text_input"/> 
+	  <action name="display_text_field"/> 
+	<!-- action name="show_multi_merge_scheme"/ --> 
+	  <action name="filter_by_start_date"/>
+	  <action name="display_list_count"/>
+	</toolbar>
+	<toolbar name="mclib_job_actions">
+	  <!--	<action name="edit_object"/> 
+	  <action name="push_to_explorer"/>  -->
+	</toolbar>
+  <toolbar name="help">
+	<action name="help"/>        
+  </toolbar>
+  
+  <dock name="top">
+	<toolbar name="interaction"/>
+	<toolbar name="mclib_job_display"/>
+<!--	<toolbar name="mclib_job_actions"/>  -->
+	<toolbar name="help"/>
+  </dock>
+</gui>

@@ -1,0 +1,35 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method node.mss_transform_in_situ(a_transform)
+	## 
+	## Transform self's coordinate based on A_TRANSFORM and the
+	## current value of the !mss_transform_override! dynamic.
+	##
+
+	_dynamic !mss_transform_override!
+	_if (xfm_data << !mss_transform_override!) _is _unset
+	_then
+		_self.coordinate << a_transform.convert(_self.coordinate)
+	_else 
+		_if xfm_data.species _is coordinate.species
+		_then
+			# Only transform self if at this coordinate.
+			_if coordinate.check_type(_self.coordinate) = xfm_data
+			_then
+				_self.coordinate << a_transform.convert(_self.coordinate)
+			_endif
+		_endif
+	_endif
+	
+	_return _self
+	
+_endmethod
+$

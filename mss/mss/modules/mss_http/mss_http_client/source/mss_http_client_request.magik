@@ -1,0 +1,559 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_client_request
+##
+## Wrapper to format information suitable for sending a request
+## to an HTTP server.
+##
+## Example use to connect to an XSD file hosted on www.example.com
+## with a 10 second timeout, and then display the result status and
+## result data as an XML document.
+##
+## - x << mss_http_client_request.new(:url, "http://www.example.com/DataTypes.xsd")
+## - x.execute(10000)
+## - y << x.response
+## - write(y.status_code)
+## - write(y.reason_phrase)
+## - xml_doc << y.response_body_as_xml()
+##
+## This class does not natively support binary streams, but it
+## could be subclassed to do so.
+##
+## Developer note: this is NOT HTTP/1.1 compliant.  It only
+## includes parts of the HTTP/1.0 protocol that I've actually
+## used, and doesn't support some V1.1 features
+## (i.e. Transfer-Encoding: chunked).
+##
+
+def_slotted_exemplar(:mss_http_client_request,
+{
+	{:url, _unset},
+	{:http_request_method, _unset},
+	{:http_version, _unset},
+	{:raw_post_string, _unset},
+	{:response, _unset}
+},
+{:mss_http_generic_request_response})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_request.define_slot_access(
+	:url,
+	## The URL to be requested (i.e. "http://www.example.com").
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_request.define_slot_access(
+	:http_request_method,
+	## The HTTP request method (i.e. "GET" or "POST").  Defaults to "GET".
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_request.define_slot_access(
+	:http_version,
+	## The HTTP protocol version.  Defaults to "1.0".
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_request.define_slot_access(
+	:raw_post_string,
+	## For a POST request, the raw text to be posted.  Subclasses
+	## may choose to not use this in favor of a more standardized
+	## format (i.e. a SOAP formatted request).
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_request.define_slot_access(
+	:response,
+	## A mss_http_client_response that describes the response to
+	## the request. 
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+mss_http_client_request.define_shared_constant(
+	:option_types,
+	## A set of option types recongized by this class.
+	_block
+		_local s
+		s << mss_http_generic_request_response.option_types.copy()
+		s.add_all({:content_type,
+			   :default_port,
+			   :persistent?,
+			   :user_agent})
+		>> s
+	_endblock,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.init_defaults()
+	## 
+	## Set standard defaults for this request.
+	##
+	
+	.http_request_method << "GET"
+	.http_version << "1.0"
+
+	_self.set_option(:content_type, "text/plain")
+	_self.set_option(:default_port, 80)
+	_self.set_option(:persistent?, _false)
+	_self.set_option(:user_agent, "MSS-HTTP/1.0")
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.terminate()
+	## 
+	## Terminate all resources that are no longer needed.
+	##
+
+	_super.terminate()
+	_self.close_connection()
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.url << a_url
+	## 
+	## When setting the URL, set the URL components also.
+	##
+
+	.url << a_url
+	_if a_url _is _unset _then _return _endif 
+	p << mss_http_url_parser.new()
+	pl << p.parse_url(a_url)
+	_self.set_option(:url_components, pl)
+	_return a_url
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.host
+	## 
+	## Return the host to be connected to.
+	##
+
+	_if (x << _self.get_option(:url_components)) _isnt _unset
+	_then
+		_return x[:host]
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.port
+	## 
+	## Return the port to be connected to.
+	##
+
+	def_port << _self.get_option(:default_port)
+	_if (x << _self.get_option(:url_components)) _isnt _unset
+	_then
+		_return x[:port].default(def_port)
+	_endif
+	_return def_port
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.host_ip_address()
+	## 
+	## Returns the primary host IP address as a byte_vector, or
+	## unset if it cannot be resolved.
+	##
+
+	_if (h << _self.host) _is _unset 
+	_then
+		_return _unset
+	_endif
+
+	retval << _unset 
+	_try
+		addrs << system.get_host_by_name(h)
+		_if addrs _isnt _unset _andif
+		    addrs.size > 0
+		_then
+			retval << addrs[1]
+		_endif 
+	_when sw_net_lookup_failed
+	_endtry
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.connect(_optional timeout)
+	## 
+	## Initiate a tcpip_connection to self's host.  If TIMEOUT is
+	## provided, it is a timeout period in milliseconds.
+	##
+	## N.B.: some parts of the connect process are primitives, so
+	## there is no guarantee that this will respond in a timely
+	## manner to a timeout request.
+	##
+	
+	_if timeout _isnt _unset
+	_then
+		retval << _self.perform_with_timeout(timeout, _false, :|int!connect()|)
+		_if _self.timed_out? _is _true
+		_then
+			condition.raise(:user_error, :string, _self.message(:connection_timeout, _self.host))
+		_endif
+		_return retval
+	_else
+		_return _self.int!connect()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.execute(_optional timeout)
+	##
+	## Execute the request.  This consists of transmitting the
+	## currently-built request (c.f. the request_text() method), and
+	## receiving a response.
+	##
+	
+	_if timeout _isnt _unset
+	_then
+		retval << _self.perform_with_timeout(timeout, _false, :|int!execute()|)
+		_if _self.timed_out? _is _true
+		_then
+			condition.raise(:user_error, :string, _self.message(:execute_timeout, _self.host))
+		_endif 
+	_else
+		_return _self.int!execute()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_private _method mss_http_client_request.int!connect()
+	##
+	##
+
+	# If already connected, discard whatever is there.
+	_if .connection _isnt _unset
+	_then
+		_self.close_connection()
+	_endif
+	_if (addr << _self.host_ip_address()) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:unknown_address, _self.host))
+	_endif
+	_self.create_new_connection(addr, _self.port)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_private _method mss_http_client_request.create_new_connection(addr, port)
+	##
+	##
+
+	_local me << _self 
+	_catch :self_error
+	       _handling self_error _with
+	       _proc(cond)
+		       _import me
+		       
+		       # If the TCP error code can be parsed, use it for something
+		       # more descriptive.
+		       err_data << cond[:data]
+		       tcp_code << _unset 
+		       _if err_data _isnt _unset _andif
+			   err_data.size >= 3
+		       _then
+			       tcp_code << err_data[3]
+		       _endif
+		       
+		       _if tcp_code = 10061
+		       _then
+			       condition.raise(:user_error, :string, me.message(:tcp_10061, me.url))
+		       _endif
+		       
+		       # As a fallback, carry on.
+		       cond.continue_handling()
+	       _endproc
+	       
+	       .connection << tcpip_connection.new(addr, port,
+						   :input_class, external_text_input_stream,
+						   :output_class, external_text_output_stream)
+	_endcatch 
+	_return .connection
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.request_text()
+	## 
+	## The formatted text that describes the request to be sent.
+	##
+	
+	_self.init_header_fields_for_request()
+
+	nl << newline_char
+	s << internal_text_output_stream.new()
+	s.write(_self.http_request_method, " ", _self.url, " HTTP/", _self.http_version, nl)
+	s.write("Host: ", _self.host, ":", _self.port, nl)
+	_for i, j _over .header_fields.fast_keys_and_elements()
+	_loop
+		s.write(i, ": ", j, nl)
+	_endloop 
+	s.write(nl)
+	
+	_if _self.http_request_method = "POST"
+	_then
+		_self.write_post_content_data_on(s)
+	_endif
+
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.init_header_fields_for_request()
+	##
+	## Initialize header data for sending a request.
+	##
+
+	_if (ua << _self.get_option(:user_agent)) _isnt _unset
+	_then
+		_self.set_header_field("User-Agent", ua)
+	_endif 
+	_if (hrm << _self.http_request_method) = "POST"
+	_then
+		_self.set_header_field("Content-Type", _self.content_type("POST"))
+		_if _self.get_option(:send_chunked_request) _is _true
+		_then
+			# The following is not documented, because it is not supported,
+			# and I don't have a way of properly testing it.  Use at your
+			# own risk.
+			_self.set_header_field("Transfer-Encoding", "chunked")
+		_else 
+			_self.set_header_field("Content-Length", _self.content_length("POST"))
+		_endif 
+	_endif 
+	_if _self.get_option(:persistent?) _isnt _true
+	_then
+		_self.set_header_field("Connection", "Close")
+	_endif
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.write_post_content_data_on(s)
+	## 
+	## Write data to be posted (excluding headers) on output stream S.
+	##
+
+	_if _self.get_option(:send_chunked_request) _isnt _true
+	_then 
+		s.write(_self.raw_post_string)
+		_return
+	_endif 
+
+	# The following is not documented, because it is not supported,
+	# and I don't have a way of properly testing it.  Use at your
+	# own risk.
+
+	# Chunk the data at each line, limited by the send_chunked_size
+	# option. 
+	max_chunk_size << _self.get_option(:send_chunked_size).default(64)
+	nl << newline_char
+	
+	in_s << _self.raw_post_string.default("").read_stream()
+	_loop
+		_if (l << in_s.get_n(max_chunk_size)) _is _unset _orif
+		    l = ""
+		_then
+			_leave
+		_endif
+
+		# Write this chunk's size.  Note that for text streams, each
+		# (one char) NL gets converted into a (two char) CR-LF.  So,
+		# increment by one for each such instance.
+		l_size << l.size
+		l_size +<< l.occurrences_of(newline_char)
+		s.write(l_size.print_string_with_radix(16), nl)
+		
+		# Write this chunk.
+		s.write(l, nl)
+	_endloop 
+
+	# Write the end-of-chunking indicator.
+	s.write("0", nl)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.content_type(meth)
+	## 
+	## Description of the content of a METH type request
+	## (i.e. "POST"). 
+	##
+
+	_return _self.get_option(:content_type)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.content_length(meth)
+	##
+	## Total content length to be transmitted for a METH type
+	## request (i.e. "POST")
+	##
+
+	_if meth = "POST"
+	_then 
+		rps << _self.raw_post_string
+		v << _self.raw_post_string.size
+		# Note that for text streams, each (one char) NL gets converted
+		# into a (two char) CR-LF.  So, increment by one for each such
+		# instance.
+		v +<< rps.occurrences_of(newline_char)
+		_return v
+	_else
+		# Don't currently know what to do with any other methods.
+		_return 0
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_private _method mss_http_client_request.int!execute()
+	## 
+	##
+
+	.response << _unset
+	_protect
+		_if .connection _is _unset
+		_then
+			_self.int!connect()
+		_endif
+		
+		# Transmit the request.
+		s << .connection.output
+		s.write(_self.request_text())
+		s.flush()
+
+		# Wait for a response.
+		_self.process_response()
+	_protection
+		_if _self.get_option(:persistent?) _isnt _true
+		_then
+			_self.close_connection()
+		_endif 
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.process_response()
+	##
+	## Get data from the input stream of the connection.
+	##
+
+	_if .connection _isnt _unset _andif
+	    (s << .connection.input) _isnt _unset
+	_then 
+		.response << mss_http_client_response.new_from_stream(s)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_request.read_raw_post_string_from_file(fname)
+	## 
+	## Helper to set raw_post_string from a file named FNAME.
+	##
+
+	s << internal_text_output_stream.new()
+	f << external_text_input_stream.new(fname)
+	_protect
+		_loop
+			_if (l << f.get_line()) _is _unset _then _leave _endif
+			s.write(l, newline_char)
+		_endloop
+	_protection
+		f.close()
+	_endprotect
+	str << s.string
+	_if str.size > 0 _andif str.last _is newline_char
+	_then
+		str << str.slice(1, str.size - 1)
+	_endif 
+	_self.raw_post_string << str
+	
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={mss_common}, usage={subclassable})
+_method mss_http_client_request.debug_execute(_optional timeout)
+	## 
+	## For debugging: execute self, and write out results
+	## received.  TIMEOUT defaults to 15000 msec.
+	##
+
+	_self.execute(timeout.default(15000))
+	_if .response _is _unset
+	_then
+		write("NO RESPONSE")
+		_return
+	_endif
+	
+	write("STATUS: ", .response.http_version, %,, .response.status_code, %,, .response.reason_phrase)
+	write("HEADERS:")
+	max_hl << 0
+	_for i, j _over .response.header_fields.fast_keys_and_elements()
+	_loop
+		_if i.size > max_hl
+		_then
+			max_hl << i.size
+		_endif
+	_endloop
+	_for i, j _over .response.header_fields.fast_keys_and_elements()
+	_loop
+		write(i.space_pad(max_hl, _false, _true), " : ", j)
+	_endloop 
+	write("RESPONSE BODY:")
+	_if (rb << .response.response_body) _isnt _unset 
+	_then
+		write(rb.string)
+	_endif 
+	
+_endmethod
+$

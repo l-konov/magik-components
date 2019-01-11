@@ -1,0 +1,31 @@
+<config base="cam_db_swaf_professional_application.config">
+<plugins>
+<plugin name="explorer" class_name="explorer_plugin">
+      <properties>
+        <property name="expose_embedded_selection" value="true"/>
+        <property name="expose_floating_selection" value="true"/>
+        <property name="editor_manager_name"       value="editor_manager"/>
+        <property name="model_config_definition_file_name"   value="explorer_model_config.xml"/>
+        <property name="model_config_definition_module_name" value="mclib_sample_cambridge_swaf_application"/>
+	<property name="floating_gui_definition_module_name" value="mclib_sample_cambridge_swaf_application"/>
+	<property name="floating_gui_definition_file_name"   value="floating_explorer_view_gui.xml"/>
+	<property name="embedded_gui_definition_module_name" value="swaf_professional_application"/>
+	<property name="embedded_gui_definition_file_name"   value="embedded_explorer_view_gui.xml"/>
+	<property name="floating_config_definition_module_name" value="mclib_sample_cambridge_swaf_application"/>
+	<property name="floating_config_definition_file_name"   value="explorer_config.xml"/>
+      </properties>
+      <export>
+        <toolbar source_name="find"/>
+        <toolbar source_name="advanced_find"/>
+      </export>
+      <find_engine>
+        <categories>
+          <category name="addresses" default="yes"/>
+          <category name="cadastral" />
+        </categories>
+        <engine plugin_name="search_engine"/>
+        <default_text id ="find_text"/>
+      </find_engine>
+    </plugin>
+</plugins>
+</config>

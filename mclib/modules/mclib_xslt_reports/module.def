@@ -1,0 +1,12 @@
+mclib_xslt_reports	4000
+
+description
+	Provides support for generating reports from Smallworld tables using XSLT to process the data into XML/HTML
+end
+
+requires
+	mclib_plugin_threading_mixin
+	mclib_package
+	mclib_action_property_mixin
+	mclib_directory_action
+end

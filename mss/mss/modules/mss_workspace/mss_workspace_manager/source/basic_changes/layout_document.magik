@@ -1,0 +1,80 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={plotting})
+_method layout_document.save_as_xml ( output )
+	##
+	## Writes SELF as XML to OUTPUT (either a stream or filename)
+	##
+
+	# 2004/12/31 TM  If there is an active design, save a related document
+	#                reference also.
+	# 2011/04/25 TM  Updated for V4.2 compatibility.
+	
+	_dynamic !print_float_precision! << 12
+	_dynamic !text_encoding! << :utf8
+
+	# Make sure we do not save this!
+	.properties.remove_key ( :custom_text_properties )
+
+	# If there is no created stamp yet then set it now
+	_if _self.get_date_time ( :created ) _is _unset 
+	_then
+		_self.set_date_time ( :created )
+	_endif
+
+	# Update the modified stamp
+	_self.set_date_time ( :modified )
+
+	# Now save it
+	serial_xml_thing.write_thing_to ( _self, output )
+
+	# And if it was saved to a file, then update the filename
+	_if output.is_kind_of? ( "" )
+	_then
+		_self.filename << output
+
+		# TM START CHANGE
+		_if (ad << mss_workspace_manager_engine.active_design) _isnt _unset _andif
+		    _self.mss_add_related_document?(output) _is _true 
+		_then
+			pl << property_list.new_with(:filename, output,
+						     :usage_id, 1)
+			# If there is an error: handle it quietly so that the save
+			# operation can complete normally.  This is not important
+			# enough to alert the user and cause their operation to fail.
+			_try _with cond
+				ad.add_related_document(pl)
+			_when error
+				write("Error encountered in add_related_document():")
+				cond.report_on(!terminal!)
+				!traceback!(!terminal!)
+			_endtry 
+		_endif
+		# TM END CHANGE
+	_endif
+
+	# All changes have been saved, so we are up to date again
+	.updated? << _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={plotting}, usage={redefinable})
+_method layout_document.mss_add_related_document?(output)
+	## 
+	## Return true if a related document relationship should be
+	## made to connect the layout document named OUTPUT to the
+	## active design.
+	##
+	
+	_return _false
+	
+_endmethod
+$

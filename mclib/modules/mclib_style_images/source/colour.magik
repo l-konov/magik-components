@@ -1,0 +1,31 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-08-08 22:12:51 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 04-14-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method colour.as_www_hex()
+	## 
+	## 
+	##
+
+	# (04-14-2005 Brad Sileo): created.
+	(r,g,b) << _self.rgb()
+	r << (r*255).as_hex_string(2)
+	g << (g*255).as_hex_string(2)
+	b << (b*255).as_hex_string(2)
+	>> write_string("#",r,g,b)
+_endmethod
+$

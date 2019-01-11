@@ -1,0 +1,106 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+
+_pragma(classify_level=restricted)
+## Class which represents an XMI Foundation.Core.Class element
+def_slotted_exemplar(:uml_class,
+{
+   {:attributes, _unset}
+},
+{
+:uml_interface
+})
+$
+
+_pragma(classify_level=basic)
+## The attributes of this class
+uml_class.define_slot_access(:attributes, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_private _method uml_class.init(owner, an_mt, _optional levels_to_go)
+   ## Inits self
+   ##
+   ## an_mt : method_table -- the magik class this XMI class represents
+   ##
+   ## returns uml_class -- self, but inited
+
+   _super.init(owner, an_mt, levels_to_go)
+   
+   _self.attributes << equality_hash_table.new()
+      
+   _if (slots << _self.mt.metadata[:instance_slot_data]) _isnt _unset
+   _then
+      _for a_slot _over slots.fast_elements() 
+      _loop
+	 _if a_slot.owner _is an_mt
+	 _then
+	    # we have a slot on this mt
+	    a_uml_attrib << uml_attribute.new(_self, a_slot)
+	    _self.attributes[a_uml_attrib.name] << a_uml_attrib 
+	 _endif
+      _endloop
+   _endif
+
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_iter _method uml_class.features()
+   ## Iterate of the attribute and methods of this class.
+   ## 
+
+   _for an_attr _over _self.attributes.fast_elements()
+   _loop
+      _loopbody(an_attr)
+   _endloop
+
+   _for an_op _over _super.features()
+   _loop
+      _loopbody(an_op)
+   _endloop
+
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_class.abstract?
+   ## returns : boolean -- is this class abstract?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_class.export_on(an_uml_output_stream)
+   ## Exports self
+   ## 
+
+   an_uml_output_stream.write_uml_class(_self)
+_endmethod
+$

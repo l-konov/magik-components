@@ -1,0 +1,42 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2008 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.mss_insert_with_cus(cu_list)
+	##
+	## Inserts a new object using proposed field values, and
+	## assigns CUs based on the contents of CU_LIST.  Also sets
+	## default geometry per mss_user_object_editor.insert() method.
+	##
+
+	_dynamic !mss_user_object_editor_insert_from_place?!
+
+	_if !mss_user_object_editor_insert_from_place?! _is _true _orif
+	    _self.perform_place_on_insert? _is _false
+	_then
+		_return _super.mss_insert_with_cus(cu_list)
+	_else
+		_return _self.mss_place_with_cus(cu_list)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.mss_place_with_cus(cu_list)
+	## 
+	## Set a dynamic to avoid the potential to bounce back and
+	## forth between place() and insert().
+	##
+	
+	_dynamic !mss_user_object_editor_insert_from_place?! << _true
+	_return _super.mss_place_with_cus(cu_list)
+	
+_endmethod
+$

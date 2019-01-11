@@ -1,0 +1,166 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-07-12 21:52:09 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 09-09-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+def_mixin(:action_property_mixin)
+$
+
+action_property_mixin.define_shared_constant(:toolbar_controls_by_type,
+					      property_list.new_with(
+						      :string,:text_item,
+						      :number,:text_item,
+						      :integer,:text_item,
+						      :boolean,:toggle_item,
+						      :directory,:combo_box_item,
+						      :symbol,:text_item),
+					      :public)
+$
+action_property_mixin.define_shared_constant(:menu_controls_by_type,
+					      property_list.new_with(
+						      :boolean,:toggle_item
+							    ),
+					      :public)
+$
+action_property_mixin.define_shared_constant(:action_exemplars,
+					      property_list.new_with(
+						      :directory,mclib:directory_action.default(sw_action)
+							    ),
+					      :public)
+$
+						      
+
+_pragma(classify_level=basic, usage={redefinable})
+_method action_property_mixin.add_property_action(property_name, _gather action_props)
+	## Creates a new action based on my PROPERTY_NAME, setting the
+	## right type of control for it.
+	## 
+	##
+
+	# (09-09-2005 Brad Sileo): created.
+	action_prop_list << property_list.new_with(_scatter action_props)
+	image? << action_prop_list.includes_key?(:image)
+	items << action_prop_list[:items]
+	props << property_list.new_with(
+			 :engine,_self,
+			 :value,_self.perform(property_name),
+			 :value_change_message,property_name.with_chevron,
+			 :toolbar_control, _self.toolbar_control_for_property(property_name,image?,items),
+			 :menu_control, _self.menu_control_for_property(property_name,image?),
+			 :caption,_self.message(property_name),
+			 :short_help_text,_self.message(property_name + :_sh),
+			 :value_mgr, _self.value_manager_for(property_name),
+			 :tooltip,_self.message(property_name + :_tt))
+	_for a_key,a_value _over action_prop_list.fast_keys_and_elements()
+	_loop
+		props[a_key] << a_value
+	_endloop
+	#debug show(property_name,_self.get_property_type(property_name),_self.action_exemplar(_self.get_property_type(property_name)))
+	exem << _self.action_exemplar(_self.get_property_type(property_name))
+	_self.add_action(ac << exem.new(property_name,_scatter props))
+	>> ac
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method action_property_mixin.action_exemplar(a_type)
+	## returns the type of action to create for A_TYPE, which is a
+	## property type.
+	## 
+	##
+	
+	# (09-12-2005 Brad Sileo): created.
+	>> _self.action_exemplars[a_type].default(sw_action)						     
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method action_property_mixin.toolbar_control_for_property(property_name,_optional image?,items)
+	## Returns the type of control to use for PROPERTY_NAME
+	## 
+	##
+
+	# (09-09-2005 Brad Sileo): created.
+	sig << _self.get_property_signature(property_name)
+	type << _self.toolbar_controls_by_type[sig.type]
+	_if image? _is _true 
+	_then
+		_if type _is :toggle_item _orif type _is :button_item
+		_then
+			type << :image_ + type
+		_endif
+	_endif
+	_if items _isnt _unset  _andif 
+	    type _is :text_item
+	_then
+		type << :text_choice_item
+	_endif
+	>> type
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method action_property_mixin.menu_control_for_property(property_name)
+	## Returns the type of control to use for PROPERTY_NAME
+	## 
+	##
+
+	# (09-09-2005 Brad Sileo): created.
+	sig << _self.get_property_signature(property_name)
+	type << _self.menu_controls_by_type[sig.type]
+	>> type
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method action_property_mixin.get_property_type(property_name)
+	## Returns the type for the named property
+	## 
+	##
+
+	# (09-12-2005 Brad Sileo): created.
+	sig << _self.get_property_signature(property_name)
+	>> sig.type
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method action_property_mixin.value_manager_for(property_name)
+	## 
+	## 
+	##
+
+	# (07-12-2006 Brad Sileo): created.
+	pt << _self.get_property_type(property_name)
+	>> _if pt _is :number _orif
+	    pt _is :integer
+	_then
+		>> numeric_value_manager.new_with_properties(:integer?,pt _is :integer)
+	_else
+		>> _unset 
+	_endif
+_endmethod
+$

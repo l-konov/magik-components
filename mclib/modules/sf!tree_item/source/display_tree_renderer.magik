@@ -1,0 +1,71 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+_package sw
+$
+
+
+_pragma(classify_level=restricted)
+_private _method display_tree_renderer.sf!provide_hierarchy_info()
+
+	## This code provides some rudimentary parent/child
+	## hierarchy information.
+	## The output does not look as nice as on the screen,
+	## because we can't really draw lines in HTML...
+
+	_local vh << _self.value_holder
+
+	_if vh _is _unset _orif
+	    _not vh.children?
+	_then
+		_return
+	_endif
+
+	_local mod_name << :mclib_tree_item
+	_local strm     << internal_text_output_stream.new()
+	#
+	# The root of the tree is the display_tree_manager (which is;
+	# never displayed), and the current level will be handled in
+	# the next step - so we subtract two from the current level!
+	#
+	_for i _over range( 1, vh.level - 2 )
+	_loop
+		#
+		# Use a empty icon to gain some space on the left side...
+		#
+		strm.write( _self.sf!locate_image(
+				    { :sf!tree_spacing, mod_name } ) )
+	_endloop
+	#
+	# Use the appropriate icon, depending on the state of
+	# the tree (e.g. compressed or expanded)...
+	#
+	strm.write( _self.sf!locate_image(
+			    { _if vh.expanded?
+			      _then >> :sf!tree_expanded
+			      _else >> :sf!tree_compressed
+			      _endif,
+			      mod_name } ) )
+
+	>> strm.string, :left
+_endmethod
+$
+
+
+
+

@@ -1,0 +1,315 @@
+Release notes for MSS V4.2.0 2011.04.25:
+
+This release is intended entirely as an upgrade to MSS V4.1.1 2010.09.07, for
+compatibility with Smallworld Core Spatial Technology V4.2.0.  No new functionality
+is introduced in this release.
+
+Developers who are upgrading from any MSS V4.1.1 version are strongly encouraged to
+perform a source code comparison relative to that previous version, in order to
+understand any relevant upgrade code changes, and to ensure that any local
+customizations are properly re-integrated where appropriate.
+
+
+MSS_BULK_UPDATE modules:
+
+mss_bulk_update
+- dd_record_mixin.mss_bu_child_records(): updated to work with heterogeneous joins.
+- mss_bulk_update_framework.locked fields: removed, no longer required.
+- mss_bulk_update_framework.highlight_on_selection?: new method, required to 
+  impersonate an object_editor.  No geometry fields to highlight.
+- mss_bulk_update_plugin: use get_service_provider() to get editor_manager and map_manager.
+
+
+MSS_COMMON modules:
+
+mss_core_changes
+- application_mixin.mss_get_spatial_context_for_record_and_geometry(): moved here from
+  to mss_swaf_changes (application_mixin is a core class, not a SWAF class).
+- geometry_set_factory.get_application_world_for_world(): moved here from mss_swaf_changes
+  (geometry_set_factory is a core class, not a SWAF class).
+- world_mixin.vmds_dataset_worlds: new method.
+
+mss_in_place_join_editor
+- This module is no longer required, as embedded join field editors are now part
+  of core (via the object_editor_field_lister class).
+- For an example of using the new core product capabilities, refer to the gui.xml
+  configuration file for the mss_user_object_editor module.
+
+mss_record_tracking
+- mss_record_tracking_mixin.tracking_records_for(): do not track internal tables 
+  which do not have data dictionary information.
+
+mss_swaf_changes
+- application_mixin.mss_get_spatial_context_for_record_and_geometry(): moved
+  to mss_core_changes (application_mixin is a core class, not a SWAF class).
+- geometry_set_factory.get_application_world_for_world(): moved to mss_core_changes
+  (geometry_set_factory is a core class, not a SWAF class).
+- map.note_change(): integrated with V4.2.0 changes.
+- map_trail.handle_action(): removed, basic change no longer required.
+- map_trail.probe_from(): added explanatory comments for why a basic change 
+  is still required (instead of using :additional_hit_geometry protocol).
+- object_editor.current_object<<: this basic change has been removed, and moved
+  down to the mss_user_object_editor class.
+
+mss_user_object_editor
+- Various basic changes and additions removed related to embedded join field
+  editors, which are now part of core (c.f. removal of mss_in_place_join_editor
+  module described above).
+- In some cases, additions and basic changes on old db_join_lister class have
+  been migrated to new join_field_value_viewer class.
+- editor_manager.sw_databus_data_available(): integrated with V4.2.0 changes.
+- editor_manager.update_viewers(): basic changes applied to this method, based 
+  on corresponding changes that existed in V4.1.1 version of update_editors() method.
+- editor_manager.editor_exemplar_for_collection(): removed, basic change no longer
+  needed (the previously-changed functionality now exists in core).
+- in_place_geometry_field_editor.set(): removed basic change to this method.  All
+  of the bug-related changes have been fixed in core.  Clients who still rely on
+  classic behavior (i.e. either the !selecting_editor! dynamic, or on the ability
+  for an RWO-specific make_proposed_geometry_for() method to return a trail rather than
+  a pseudo geometry) may still depend on this change, in which case they are encouraged
+  to either upgrade code to be fully SWAF-compatible, or to make an appropriate
+  basic change to this method part of their custom codebase.
+- mss_user_editor_field_lister.post_init_plugins(): integrated with V4.2.0 changes.
+- mss_user_object_editor.make_proposed_geometry_for(): removed, for same reasons
+  as in_place_geometry_field_editor.set() noted above.
+- mss_user_object_editor.insert(), .place(): integrated with V4.2.0 changes.
+- mss_user_object_editor.set_default_geometry(): unlike the superclass, do not raise
+  an error if there is no default geometry.
+- mss_user_object_editor.current_object<<: method moved here, from parent
+  object_editor class.
+- mss_user_rwo_specials_plugin.build_gui(): force it to be at least a minimum height
+  high when initially activated.
+
+
+MSS_CU modules:
+
+mss_cu_config_application:
+- mss_cu_config_application: use get_service_provider() to get editor_manager.
+
+mss_cu_config_gui
+- config.xml: version_management_plugin updated to use conflict_viewer_dialog.
+  Removed superfluous editor_manager_name properties.
+- mss_cu_config_framework: use get_service_provider() to get editor_manager.
+- mss_cu_config_framework.has_spatial_spatial_contexts_for?(): remove the deprecated
+  method with the silly name.
+- mss_cu_config_framework.in_swaf_environment?: Required by non-application things 
+  which have an editor_manager.
+
+mss_cu_data_model
+- mss_cu_work_point.update_trigger(): do not transfer CU references if either the old
+  or new work point number is blank.
+- rwo_record_mixin.clone(): integrated with V4.2.0 changes.
+
+mss_cu_editor
+- mss_cu_editor_plugin.build_gui(): add an optional :height_in_chars parameter to
+  define initial height of GUI.
+- object_editor.mss_insert_with_cus(): updated for compatibility with V4.2.0 insert() method.
+- object_editor.mss_place_with_cus(): updated for compatibility with V4.2.0 place() method.
+- object_editor.mss_move_with_cus(): updated for compatibility with V4.2.0 move() method.
+
+mss_cu_report
+- mss_cu_report_plugin: use get_service_provider() to get editor_manager.
+- mss_cu_wp_assignment_plugin.check_perform_updates_allowed(): do not update
+  detached records (which represent elements added by a customization hook,
+  and which should not be updated here).
+
+mss_cu_user_object_editor
+- Various changes to switch from mss_in_place_join_editor to using core in-place
+  join field editing classes.
+- mss_user_object_editor.mss_insert_with_cus(): updated for compatibility with V4.2.0 
+  insert() method.
+- mss_user_object_editor.mss_place_with_cus(): updated for compatibility with V4.2.0 
+  place() method.
+
+mss_cu_work_point_ptrule
+- mss_trail_insert_ptrule.mss_wp_multi_create(): use a dataset_group for performing 
+  transaction.
+
+
+MSS_HTTP modules:
+
+mss_http_server
+- mss_http_heartbeat_manager.run(): added explanatory comments for why some
+  likely-obsolete error handling is being retained anyways.
+- mss_http_server_engine.debug_last_connection_manager: fix comments.
+- mss_http_server_engine.build_configuration_gui(): place narrow "?" file selector
+  button (core code now defaults it to be a standard minimum width otherwise).
+- mss_http_server_engine.run(): added explanatory comments for why it may not need 
+  to sleep so much when shutting down, but why it is doing it anyways.
+
+
+MSS_PTRULES modules:
+
+mss_config_case_application
+- This module is no longer required, as access to the CASE tool is now provided
+  via the standard SWAF-based CASE application.
+
+mss_config_editor
+- Various changes to switch from mss_in_place_join_editor to using core in-place
+  join field editing classes.
+- mss_config_editor_field_lister.post_init_plugins(): integrated with V4.2.0 changes.
+- mss_config_in_place_combo_field_editor: improve comments (and remove obsolete
+  comments that refer to patches in prior versions).
+
+mss_map_trail
+- mss_map_trail_addon_plugin.figure_offset_sectors(): removed unused code.
+
+mss_ptdef_config
+- config.xml: version_management_plugin updated to use conflict_viewer_dialog.
+  Removed superfluous editor_manager_name properties.
+- mss_ptdef_config_menu: remove warning/error/user error handlers, which are
+  duplicates of superclass handlers.
+- mss_ptdef_config_menu: use get_service_provider() to get editor_manager.
+- mss_ptdef_config_menu.has_spatial_spatial_contexts_for?(): remove the deprecated
+  method with the silly name.
+- mss_ptdef_config_menu.in_swaf_environment?: Required by non-application things 
+  which have an editor_manager.
+
+mss_ptdef_config_application:
+- mss_ptdef_config_application: use get_service_provider() to get editor_manager.
+
+mss_ptrule_attribute_dialog
+- mss_ptrule_attribute_dialog.highlight_on_selection?: new method, required to 
+  impersonate an object_editor.  No geometry fields to highlight.
+
+mss_ptrule_construction_manager
+- mss_ptrule_construction_manager.current_map_view: removed this slot and related 
+  code, as it is not required anywhere.
+- mss_ptrule_construction_manager.databus_producer_data_types: removed :post_render_sets,
+  for compatibility with V4.2.0 post render protocols.
+- mss_ptrule_construction_manager.render_priority: new property, for compatibility 
+  with V4.2.0 post render protocols.
+- mss_ptrule_construction_manager.post_init_plugins(): new method, to register as a 
+  post-renderer in V4.2.0 post render protocols.
+- mss_ptrule_construction_manager.post_render_sets(): new method replaces sw_databus_data_requested(),
+  for compatibility with V4.2.0 post render protocols.
+- mss_ptrule_construction_manager.get_length_display_format(): obtain this from the
+  map_manager, rather than current_map_view slot.
+- mss_ptrule_construction_manager.set_current_map_view(): do not require use of
+  current_map_view slot.
+- mss_ptrule_construction_manager.dynamic_process_hit_list(): add comments to make it
+  clear why sector_ropes are ignored, in case an implementer wants to customize
+  this method to use them.
+- mss_ptrule_construction_manager.handle_trail_action(): removed this empty, 
+  non-subclassible method.
+- mss_ptrule_construction_plugin.application_databus_consumer_data_types: add
+  :map_properties to list of interesting notifications.
+- mss_ptrule_construction_plugin.sw_databus_data_available(): when :map_properties
+  change, update the length display format of the GUI.
+
+mss_ptrule_manager
+- document_gui_framework.mss_set_interaction_mode_statusbar_text(): unused method,
+  removed.
+- map_gui_framework.note_change(): integrated with V4.2.0 changes.
+- mss_ptrule_manager.construction_manager: removed this slot and related code, as 
+  it is not required anywhere.
+- mss_ptrule_manager.databus_producer_data_types: removed :post_render_sets,
+  for compatibility with V4.2.0 post render protocols.
+- mss_ptrule_manager.render_priority: new property, for compatibility with V4.2.0 post
+  render protocols.
+- mss_ptrule_manager.post_init_plugins(): new method, to register as a post-renderer
+  in V4.2.0 post render protocols.
+- mss_ptrule_manager.post_render_sets(): new method replaces sw_databus_data_requested(),
+  for compatibility with V4.2.0 post render protocols.
+- mss_ptrule_manager.init_interaction_modes(): fully set up middle mouse button 
+  for panning.
+- mss_ptrule_manager.handle_trail_mode_action(): handle additional actions related
+  to middle mouse button for panning.  Also, do not perform the trail_changed() method
+  when informed about a dragging vertex, because core now broadcasts a :map_trail
+  notification when the map trail incrementally changes.  That's actually a bad thing
+  in core, and I expect that they'll fix it at some point (it is a huge resource hog
+  if there are multiple complex things listening for :map_trail changes), but until
+  they do fix it, don't double-respond to incremental trail changes.
+- mss_ptrule_manager.terminate_one_shot_ptrule(): if a smooth pan is in process,
+  cleanly terminate it (the escape key can be used to terminate a one-shot pointing
+  rule, and/or terminate an in-progress smooth pan).
+- mss_ptrule_manager.probe_from(): integrated with V4.2.0 changes to map_trail.probe_from().
+- mss_trail_insert_ptrule.trail_changed(): always draw/undraw, rather than trying
+  to XOR, because :map_trail notifications in V4.2.0 are wrong when dragging a vertex
+  (core is notifying where the trail was before the drag, not where it is after the drag).
+
+mss_ptrule_plugin
+- mss_ptrule_gui_plugin.init_actions(): new method, required to prevent a debug
+  action added in core from automatically showing up on GUI toolbar.
+
+
+MSS_QA modules:
+
+mss_qa_engine
+- mss_qa_engine: use get_service_provider() to get map_manager.
+
+mss_qa_gui
+- mss_qa_processor_plugin: use get_service_provider() to get editor_manager and map_manager.
+
+
+MSS_SCHEDULER modules:
+
+mss_scheduler_case_application
+- This module is no longer required, as access to the CASE tool is now provided
+  via the standard SWAF-based CASE application.
+
+mss_scheduler_processor_gui
+- config.xml: version_management_plugin updated to use conflict_viewer_dialog.
+- mss_scheduler_processor_plugin: use get_service_provider() to get editor_manager.
+- mss_scheduler_results_plugin: use get_service_provider() to get editor_manager.
+
+
+MSS_WORKSPACE modules:
+
+mss_wm_conflict_dialog
+- Significant rework to inherit from conflict_viewer_dialog (a gui_framework subclass)
+  rather than conflict_dialog (a model subclass).
+
+mss_wm_job_design_plugin
+- mss_wm_job_design_plugin: use get_service_provider() to get editor_manager.
+- mss_wm_job_design_plugin.aggregate_selected_designs(): attempt to avoid stale records
+  in map selection by explicitly clearing map selection before doing updates.
+
+mss_wm_overlay_view
+- dd_record_mixin.mss_geometry_changed_in_replica?(): fixed error in comments.
+- mss_wm_overlay_swdp_manager.init_from(): improved comments in unclear section of
+  apparently-duplicated code.
+- mss_wm_overlay_swdp_manager.geometry_changed_in_replica?(): bug fix for dealing with
+  free geometry.
+
+mss_wm_search_plugin
+- mss_wm_search_plugin.custom_post_build_gui(): now an empty method, as custom date
+  sort procedure no longer required for tree_item.
+- mss_wm_search_plugin.set_result_list_date_sorter_for_column(): method removed, as
+  custom date sort procedure no longer required for tree_item.
+
+mss_workspace_case_application
+- This module is no longer required, as access to the CASE tool is now provided
+  via the standard SWAF-based CASE application.
+
+mss_workspace_manager
+- layout_document.save_as_xml(): integrated with V4.2.0 changes.
+- mss_workspace_manager_engine.activate_conflict_viewer(): update to activate a gui_framework
+  based viewer, rather than a model based one.
+
+
+RELEASE_PATCHES
+
+P314000_2:
+- This patch is no longer required, as transaction handling for cross-dataset
+  transactions is finally fixed in core.  It only took 4 versions and 7 years.
+  Yay.  Lets hope I never have to write P314000_3.
+
+source
+- case_ds_view.archive_data_model(): integrated with V4.2.0 changes.  (Note: this
+  is not part of regularly-compiled MSS code; it is compiled on-demand so that
+  CASE archives get created with a more regular ordering of objects, to facilitate
+  source code compares).
+
+
+MSS_CAMBRIDGE_DEMO modules:
+
+cam_db_mss_open_swaf
+- session_startup.magik: update for V4.2.0 Cambridge DB compatibility.
+
+cam_db_swaf_mss_demo
+- config.xml: updated to reflect standard cam_db_swaf_professional_application config.
+- gui.xml: updated to reflect standard cam_db_swaf_professional_application GUI.
+
+source
+- make_cam_db_image_mss_open_swaf.magik: do not load now-obsolete classic CASE modules.

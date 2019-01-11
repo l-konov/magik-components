@@ -1,0 +1,170 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_GROUP_BOX - object to represent a group_box but still
+## acts like rowcol for rendering and analysis
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_group_box,{},:rowcol)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_group_box.define_shared_constant(:dd_properties,
+			      property_list.new_with(
+				      :label,:string,
+				      :default_row_alignment,  {:fill,:top,:centre,:bottom},
+				      :default_col_alignment,  {:fill,:left,:centre,:right}
+				      ),
+			      :public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.dd_properties()
+	## 
+	## Return the properties for the editor.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_group_box.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.label
+	## 
+	## Return the :caption property.
+	
+	>> _self.properties[:caption]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.label << new_val
+	## 
+	## Set the :caption property
+	
+	>> _self.properties[:caption] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.gui_code(txt)
+	## 
+	## Write the GUI code for SELF to the stream TXT.  Here we
+	## generate code for the group_box and a inner rowcol to go
+	## into the group_box.
+
+	(parent_id,r,c) << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,"gb << group_box.new(",parent_id,
+		  %,,%",_self.label.default(""),%",%,,%newline,              #"
+		  %tab*2,":col_alignment,",%tab,%:,_self.default_col_alignment.default(:fill),%,,%newline,
+		  %tab*2,":row_alignment,",%tab,%:,_self.default_row_alignment.default(:fill),%,,%newline,
+		  %tab*2,":row,",r,",:col,",c,")",%newline) 
+
+	overrides << property_list.new_with(
+			     :top_spacing,_self.top_spacing,
+			     :bottom_spacing,_self.bottom_spacing,
+			     :left_spacing,_self.left_spacing,
+			     :right_spacing,_self.right_spacing,
+			     :default_col_alignment,_self.default_col_alignment.default(:fill).as_symbol(),
+			     :default_row_alignment,_self.default_row_alignment.default(:fill).as_symbol(),
+			     :col_alignment,_self.col_alignment,
+			     :row_alignment,_self.row_alignment,
+			     :label,_unset)
+	
+	_super.gui_code(txt,"gb",overrides)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.dialog_footprint(_optional bb)
+	## 
+	## Tweek the values so the render is does not overwrite itself.
+	
+	tmp << .top_spacing
+	.top_spacing << max(6,.top_spacing.default(0))
+
+	(r,c,h,w,pbb) << _super.dialog_footprint(bb)
+
+	.top_spacing << tmp
+
+	>> r,c,h,w,pbb
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.render_on(canv,bb,_optional x0,y0)
+	## 
+	## Render SELF onto the CANVas in bounding_box BB with optional
+	## origin (X0,YO)
+
+	
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+	
+	gb << pbb.deep_copy()
+	
+	wb << pixel_bounding_box.new(bb.xmin+1,gb.ymin+1,gb.xmax+1,gb.ymax+1)
+	canv.draw(wb.boundary,line_style.new(colour.called(:white),1))
+	canv.draw(gb.boundary,line_style.new(colour.called(:gray),1))
+
+	_super.render_on(canv,bb,x0,y0)
+
+	_if (txt << _self.label).default("") <> ""
+	_then
+		txt << " " + txt
+		ts  << text_style.new_with_properties(:colour,colour.called(:black))
+		vts << vtext_style.new(ts.font)
+		tb  << vts.box_coordinates(txt,gb.xmin+10,gb.ymin-2,0).bounds
+		
+		fs << fill_style.new_solid(colour.called(:lightgrey))
+		fs.realise()
+		pp << pseudo_polygon.new_with_sectors(tb.boundary.sectors)
+		pp.draw_filled_on(canv,fs)
+	
+		canv.draw_text(ts,gb.xmin+8,gb.ymin+5,txt)
+	_endif 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_group_box.new_with_xml_properties(parent,props)
+	## 
+	## Return a new group_box instance in PARENT with properties PROPS.
+	
+	gb << group_box.new_dialog_default(parent,props[:row],props[:col])
+
+	_for k,e _over props.fast_keys_and_elements()
+	_loop
+		_if e _isnt _unset 
+		_then
+			gb.perform(k.with_chevron,e)			
+		_endif
+	_endloop
+
+	>> gb
+
+_endmethod
+$
+

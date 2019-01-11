@@ -1,0 +1,36 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=deprecated)
+_method layout_plugin.mss_start_layout_designer()
+	## -------Deprecated------
+	## Reason     : Not needed for mss_ptrules
+	##		Other parts of this product are currently not
+	##		supported. 
+	##		Code base has changed with TSB CST 4.3.0.2
+	##		(P149119_3a.magik) 
+	## Use instead: start_layout_designer()
+	## Action     : <action to be taken - use / for options>
+	## Deprecated : 09 September 2015
+	## -----------------------
+	## 
+	## Same as start_layout_designer(), except that it also returns
+	## the resulting application and the layout manager plugin.
+	##
+
+	_self.start_layout_designer()
+	
+	an_app << _self.get_dialog( :layout_designer)
+
+	_if an_app _isnt _unset
+	_then
+		_return an_app,an_app.plugin(:layout_manager)
+	_endif 
+_endmethod
+$

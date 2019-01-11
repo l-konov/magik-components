@@ -1,0 +1,13 @@
+mclib_index_viewer	1
+
+description
+	Code to visualize index information of (Smallworld) collections in a dataset.
+end
+
+requires
+	component_framework
+	tree
+	ui_resources
+	mclib_package
+	mclib_tree_item
+end

@@ -1,0 +1,197 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2010 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method join_field_value_viewer.build_embedded_gui( a_rowcol )
+	##
+	## Builds the join lister part of the GUI in A_ROWCOL.
+	## 
+
+	# 2011/04/25 TM  Get a handle on the tree_item used for
+	#                the join_lister.
+	
+	toolbar_rc << rowcol.new( a_rowcol, 1 )
+
+	first_group? << _true 
+	_for toolbar_group _over _self.toolbar_actions.fast_elements()
+	_loop
+		_if _not first_group?
+		_then
+			panel_separator.new( toolbar_rc, :vertical?, _true, 
+					     :row_alignment, :fill, :min_width, 10 )
+		_endif
+
+		_for a_name _over toolbar_group.fast_elements()
+		_loop
+			.toolbar_controls[a_name] << .actions[a_name].place_control_on( toolbar_rc, :dialog,
+											:has_border?, _false )
+			.toolbar_controls[a_name].allow_keyboard_navigation? << _false 
+		_endloop
+
+		first_group? << _false 
+	_endloop
+
+	join_rc << rowcol.new( a_rowcol, 1 )
+	join_rc.row_alignment << :fill
+	join_rc.col_alignment << :fill
+
+	.win_stack << window_stack.new( join_rc )
+        .win_stack.row_alignment << :fill
+        .win_stack.col_alignment << :fill
+
+	# GUI FOR HOMOGENEOUS JOINS
+
+	homo_rc << rowcol.new( .win_stack )
+	homo_rc.resize? << _true
+	
+	(.join_lister, tree_item) << _self.build_collection_lister( homo_rc, :mode, :many,
+								    :row_alignment, :fill, 
+								    :col_alignment, :fill,
+								    :retain_sort_order?, _true )
+	# TM START CHANGE
+	.join_lister_tree_item << tree_item
+	# TM END CHANGE
+	
+	tree_item.tree_manager.external_sorter << handler.new( _self, :int!sort|()| )
+	
+	.join_lister.add_event_handler( :records_selected, _self, :join_records_selected|()| )
+	.join_lister.add_event_handler( :double_clicked, _self, :join_records_double_clicked|()| )
+
+	_self.build_popup_menu( tree_item )
+	
+	.win_stack.add_named_child( homo_rc, :homogeneous )
+	
+	# GUI FOR HETEROGENEOUS JOINS
+	
+	hetero_rc << rowcol.new( .win_stack )
+	hetero_rc.resize? << _true 
+
+	_if .owner.ordered?
+	_then
+		column_headings << { _self.message( :order ),
+				     _self.message( :type ),
+				     _self.message( :description ) }
+		column_widths   << { 50, 100, 300 }
+		col_resize_values << { 0, 50, 50 }
+	_else
+		column_headings << { _self.message( :type ),
+				     _self.message( :description ) }
+		column_widths   << { 100, 300 }
+		col_resize_values << { 50, 50 }
+	_endif
+	
+	.hetero_join_lister << tree_item.new( hetero_rc,
+					      :model,             _self,
+					      :aspect,            :hetero_records,
+					      :data_selector,     :|hetero_records()|,
+					      :select_notifier,   :|join_records_selected()|,
+					      :column_headings,   column_headings,
+					      :column_widths,     column_widths,
+					      :col_resize_values, col_resize_values,
+					      :col_alignment,     :fill,
+					      :row_alignment,     :fill,
+					      :identifier,        :hetero_records_tree )
+
+	_self.build_popup_menu( .hetero_join_lister )
+	
+	.win_stack.add_named_child( hetero_rc, :heterogeneous )
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method join_field_value_viewer.build_popup_menu( a_tree_item )
+	##
+	## Build popup_menu for A_TREE_ITEM
+	##
+
+	# 2011/04/25 TM  Add a customization hook to create additional actions.
+	
+	# TM START CHANGE
+	_if (popup << a_tree_item.popup_menu) _isnt _unset
+	_then
+		popup.unrealise()
+		a_tree_item.popup_menu << _unset
+	_endif
+	# TM END CHANGE
+	
+	popup << popup_menu.new( a_tree_item )
+
+	first_group? << _true
+	# TM START CHANGE
+	_for popup_group _over _self.mss_custom_join_lister_popup_actions.fast_elements()
+	# TM END CHANGE
+	_loop
+		_if _not first_group?
+		_then
+			separator_item.new( popup )
+		_endif
+
+		_for action_name _over popup_group.fast_elements()
+		_loop
+			c << .actions[action_name].place_control_on( popup, :menu )
+			message << action_name.as_symbol() + :_m
+			_if _self.message_accessor.has_message?( message )
+			_then
+				c.mnemonic << _self.message(message)[1]
+			_endif
+		_endloop
+
+		first_group? << _false 
+	_endloop
+
+	a_tree_item.popup_menu << popup
+
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method join_field_value_viewer.mss_custom_join_lister_popup_actions
+	## 
+	## If the record exemplar has custom actions to put on the
+	## popup menu, use them.
+	##
+
+	# 2011/04/25 TM  Created.  This is actually a new method, but
+	#                it represents an encapsulation of basic changes
+	#                to core editor GUI activation methods, so it
+	#                is classified here as a basic change.
+
+	_if .record.responds_to?(:|mss_custom_join_lister_popup_actions()|) _andif
+	    (v << .record.mss_custom_join_lister_popup_actions(_self)) _isnt _unset
+	_then
+		_return v
+	_endif 
+	_return _self.popup_actions
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method join_field_value_viewer.set_record_and_field_item(record, field_item, _gather keys_and_values)
+	## 
+	## In addition to superclass processing, rebuild popup menus
+	## based on the current record.
+	##
+
+	# 2011/04/25 TM  Created.
+	
+	_super.set_record_and_field_item(record, field_item, _scatter keys_and_values)
+	_if .join_lister_tree_item _isnt _unset
+	_then
+		_self.build_popup_menu(.join_lister_tree_item)
+	_endif
+	_if .hetero_join_lister _isnt _unset
+	_then
+		_self.build_popup_menu(.hetero_join_lister)
+	_endif
+	
+_endmethod
+$

@@ -1,0 +1,11 @@
+mss_ptrule_plugin	1
+
+description
+	MSS pointing rule plugin GUI
+end
+
+requires
+	mss_ptrule_attribute_dialog
+	mss_ptrule_construction_manager
+	mss_ptrule_manager
+end

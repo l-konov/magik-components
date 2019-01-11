@@ -1,0 +1,256 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-02-21 16:55:26 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-16-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+##
+## To use this element, you will need to configure your layout
+## designer to provide mnapping services for it.To do so, you
+## needd to configure the layout_manager in the
+## design_config.xml with code like this:
+##
+##
+##        <plugin name="layout_manager" class_name="layout_manager_plugin">
+##	    <layout_element class_name="viewport_layout" plugin="viewport_mapper"/>
+##	    <layout_element class_name="masked_viewport_layout" plugin="viewport_mapper"/>
+##	</plugin>
+##
+##
+##
+
+_pragma(classify_level=basic, topic={layouts})
+## proivides a layout element that is a viewport and also
+## supports setting a mask to filter out parts of the mapped
+## area. this can be a selection, the trail, or some
+## programmer defined area.
+def_slotted_exemplar(:masked_viewport_layout,
+                         {
+				 {:mask,_unset}
+			 },
+			 {:viewport_layout}
+)
+$
+
+condition.define_condition(:invalid_mask,:user_error,{:viewport_name,:reason},
+			   "Failed to mask the viewport '#1' due to '#2'")
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method masked_viewport_layout.defined_attributes
+	## Adds my masking_mode attribute
+	## 
+	##
+
+	# (01-12-2005 Brad Sileo, TenSails): created.
+	attribs << rope.new_from ( _super.defined_attributes )
+	attribs.add ( layout_attribute_definition.new ( :masking_mode, :string,
+							:description, "Masking Mode",
+							:default_value, "Trail",
+							:enum_list,{"Trail","Selection","None"}
+						  )
+		)
+	attribs.add ( layout_attribute_definition.new ( :hard_mask, :boolean,
+							:description, "Hard Masking",
+							:default_value, _true
+						  )
+		)
+	attribs.add ( layout_attribute_definition.new ( :mask_fill, :fill_style,
+							:description, "Mask Fill",
+							:default_value, _unset 
+						  )
+		)
+
+	attribs.add ( layout_attribute_definition.new ( :draw_mask, :boolean,
+							:description, "Draw the mask?",
+							:default_value, _false 
+						  )
+		)
+	
+	attribs.add ( layout_attribute_definition.new ( :mask_draw_style, :fill_style,
+							:description, "Mask Drawing Style",
+							:default_value, _unset 
+						  )
+		)
+	attribs.add ( layout_attribute_definition.new ( :mask_draw_outline_style, :line_style,
+							:description, "Mask Outline Drawing Style",
+							:default_value, _unset 
+						  )
+		)
+	>> attribs
+_endmethod
+$
+
+masked_viewport_layout.define_attributes ()
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method masked_viewport_layout.mask << something
+	## Set the current mask slot. This will be rpelaced during
+	## processing unless you set the mask_mode to "None"
+	## 
+	# (05/02/14 annett7): created.
+
+	.mask << something 	
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method masked_viewport_layout.geometry_set_for_render
+	## Apply the extra masking to my rendering data to control the
+	## bounds, and optionally hard mask it.
+	## 
+	##
+
+	# (01-13-2005 Brad Sileo, TenSails): created.
+	_dynamic !current_coordinate_system!
+	!current_coordinate_system! << _self.coordinate_system
+	_if (gs << _super.geometry_set_for_render) _isnt _unset _andif
+	    (mask << _self.masking_area) _isnt _unset 
+	_then
+		gs << gs.select(:interacting_with,mask)
+		_if _self.hard_mask _isnt _false 
+		_then
+			# Expand these bounds out to make sure we get anything beyond
+			# the edges
+			bb << _self.world_bounds.buffer(50000)
+			# A slight buffer here helps avoid cutting into the edge to close
+			_try _with cond
+				cover << bb.subtraction(mask.buffer(20))
+			_when polygon_acp_invalid_area
+				# This means they created a trail or selection
+				# that we can not handle. Just abort witha  condition in this case.
+				condition.raise(:invalid_mask,:viewport_name, _self.name,:reason,cond[:reason])
+			_endtry
+			_if cover _isnt _unset 
+			_then
+				new_gs << geometry_set.new_with(cover)
+				new_gs.style_system << _self.masking_style_system()
+				gs << composite_geometry_set.new_with(gs,new_gs)
+			_endif 
+		_endif
+		_if _self.draw_mask _isnt _false 
+		_then
+			mask << mask.copy()
+			mask.style_info << _unset 
+			new_gs << geometry_set.new_with(mask)
+			new_gs.style_system << _self.masking_draw_style_system()
+			gs << composite_geometry_set.new_with(gs,new_gs)
+			new_gs << geometry_set.new_with(mask)
+			new_gs.style_system << _self.masking_draw_style_system(_true)
+			gs << composite_geometry_set.new_with(gs,new_gs)
+		_endif
+	_endif
+	>> gs
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method masked_viewport_layout.masking_area
+	## Returns the geometry set to use for masking with me.
+	## 
+	##
+
+	# (01-12-2005 Brad Sileo, TenSails): created.
+	_dynamic !current_coordinate_system!
+	!current_coordinate_system! << _self.coordinate_system
+	_if _self.masking_mode = "Trail"
+	_then
+		.mask << _unset 
+		# get it from trail
+		_if _self.mapped? _andif
+		    ( my_layout << _self.layout ) _isnt _unset _andif
+		    ( a_map_manager << my_layout.map_manager ) _isnt _unset _andif
+		    (my_world << _self.world) _isnt _unset 
+		_then
+			_if ( a_map << a_map_manager.get_map_for ( _self.ace_name, my_world ) ) _isnt _unset
+			_then
+				# Get the Trail (if there is any)
+				_if ( a_trail << a_map.trail ) _isnt _unset _andif
+				    a_trail.empty? _is _false _andif
+				    a_trail.closed?
+				_then
+					a_geom << a_trail.as_pseudo_geometry
+					a_geom.world << my_world
+					.mask << a_geom
+				_endif
+			_endif
+		_endif		
+	_elif _self.masking_mode = "Selection"
+	_then
+		.mask << _unset 
+		#debug show("Sel")
+		# get the user selection and use that
+		_if _self.mapped? _andif
+		    ( my_layout << _self.layout ) _isnt _unset _andif
+		    ( a_map_manager << my_layout.map_manager ) _isnt _unset _andif
+		    (my_world << _self.world) _isnt _unset _andif 
+		    ( a_map << a_map_manager.get_map_for ( _self.ace_name, my_world ) ) _isnt _unset _andif 
+		    ( a_selection << a_map.current_selection ) _isnt _unset _andif
+		    a_selection.size > 0
+		_then
+			.mask << pseudo_area.new(a_selection.bottom_up_union())
+		_endif 
+	_endif
+	>> .mask
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method masked_viewport_layout.masking_style_system(_optional solid?)
+	## returns the styles to use for the hard mask. This is used
+	## for the area outside of the mask
+	## 
+	##
+
+	# (01-13-2005 Brad Sileo, TenSails): created.
+	>> transient_style_system.new(_unset,property_list.new_with(
+						  :area,_self.mask_fill.default(_self.fill_style)
+							)
+				  )
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method masked_viewport_layout.masking_draw_style_system(_optional outline?)
+	## returns the styles to use for the hard mask. This is used
+	## for the mask itself
+	## 
+	##
+
+	# (01-13-2005 Brad Sileo, TenSails): created.
+	_if outline? _is _true 
+	_then
+		st << _self.mask_draw_outline_style.default(_self.fill_style)
+	_else
+		st << _self.mask_draw_style.default(_self.fill_style)
+	_endif
+	>> transient_style_system.new(_unset,property_list.new_with(
+						  :area,st
+							)
+				  )
+_endmethod
+$
+

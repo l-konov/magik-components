@@ -1,0 +1,1055 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+## This class provides a dialog that shows all known/active datasets
+## and some feedback about collections in them.
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+def_slotted_exemplar( :sf!database_view_selector,
+{
+	#
+	# Public slots
+	#
+	{ :current_dsview, _unset },
+	{ :database_list,  _unset },
+	#
+	# Private slots
+	#
+	{ :widgets,   _unset },
+	{ :db_sorter, _unset },
+	{ :view_list, _unset }
+},
+{ :plugin } )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_slot_access( :current_dsview, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_slot_access( :database_list, :write, :readonly )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_slot_access( :widgets, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_slot_access( :db_sorter, :write, :private )
+$
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_slot_access( :view_list, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_property( :database_sort_field, :symbol,
+	"The name of a property by which predefined databases are sorted.",
+	_false, _false, :magik_string )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_property( :database_list_fields, :object,
+	"A vector with symbols/callbacks that defines which columns will be displayed in the database chooser list.",
+	_false, _false,
+	{ :ext_name, :alternative, :mode } )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_property( :database_list_colored_entries?, :boolean,
+	"A Boolean value that determines if list entries are displayed in different colors, depending on their 'type' (system, internal, external, application).",
+	_false, _false, _true )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_property( :database_list_width, :integer,
+	"A number that determines how many pixels the database chooser list is wide.",
+	_false, _false, 300 )
+$
+
+_pragma(classify_level=advanced, topic={database})
+sf!database_view_selector.define_property( :database_list_rows, :integer,
+	"A number that determines how many rows the initial database chooser list will have.",
+	_false, _false, 10 )
+$
+
+
+_pragma(classify_level=advanced, topic={database}, usage={redefinable})
+##
+## Provides a color for a "type" of database.
+## The value for a key must be a symbol; if the existing pre-defined
+## text styles are not sufficient, define a new by calling add_text_style()
+## on class sw:string_styles_holder.
+## The keys used in the table must correspond to values returned from
+## method determine_database_type().
+##
+sf!database_view_selector.define_shared_constant( :database_type_to_color_map,
+	sw:property_list.new_with(
+		:system,	:black,
+		:internal,	:red,
+		:external,	:blue,
+		:application,	:green ),
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+##
+## The data this plugin can put on the databus.
+##
+sf!database_view_selector.define_shared_constant( :databus_producer_data_types,
+	{ :status,
+	  :current_dsview,
+	  :current_alternative
+	},
+	:public )
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+##
+## Provides a list of database views that are considered system
+## (and not application) views.
+## Gets initialized by method is_system_view?().
+##
+sf!database_view_selector.define_shared_variable( :system_database_views,
+	_unset,
+	:private )
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!database_view_selector.init( p_name, p_framework,
+						 _optional p_properties )
+
+	## Initialize local slots and return _self.
+
+	_local l_sort_field << _self.database_sort_field
+
+	_super.init( p_name, p_framework, p_properties )
+
+	.current_dsview << _unset
+	.database_list  << sw:rope.new()
+
+	.widgets   << sw:property_list.new()
+	.db_sorter << sw:sorted_collection.new()
+	.view_list << sw:rope.new()
+
+	.db_sorter.order_proc <<
+		_proc @sf!database_view_selector_sorter( p_entry1, p_entry2 )
+			_import l_sort_field
+
+			>> p_entry1[ l_sort_field ] _cf p_entry2[ l_sort_field ]
+		_endproc
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!database_view_selector.init_actions()
+
+	## Define the actions available for this plugin.
+
+	_local mod_name << :version_management_plugin
+	_local this_mod << :mclib_table_inspector
+	_local view?    << _self.current_dsview _isnt _unset
+	_local mode     << _if view? _then >> _self.current_dsview.mode _endif
+	_local ctl_props
+
+	_super.init_actions()
+
+	_self.add_action(
+	    sw:sw_action.new( :choose_database,
+			      :action_message, :|activate_database_chooser()|,
+			      :image,  { :sf!choose_database, this_mod } ) )
+
+	ctl_props << { :text_item,
+		       :label,     _self.message( :database_expression ),
+		       :resize_x?, _true,
+		       :resize_y?, _false }
+
+	_self.add_action(
+	    sw:sw_action.new( :database_view_expression,
+		    :caption, _self.message( :database_expression ),
+		    :engine,  _self,
+		    :activate_selector,    :|db_expr_return_pressed()|,
+		    :value_change_message, :|db_expr_focus_changed()|,
+		    :dialog_control,       ctl_props,
+		    :toolbar_control,      ctl_props ) )
+
+	_self.add_action(
+	    sw:sw_action.new( :database_info,
+		    :toolbar_control, :image_button_item,
+		    :dialog_control,  :image_button_item,
+		    :enabled?,        view?,
+		    :action_message,  :|show_database_info()|,
+		    :image,	      { :sf!info, this_mod } ) )
+
+	_self.add_action(
+	    sw:sw_action.new( :toggle_access_mode,
+		    :toolbar_control, :image_button_item,
+		    :dialog_control,  :image_button_item,
+		    :enabled?,        view?,
+		    :action_message,  :|toggle_access_mode()|,
+		    :image,           { :sf!no_mode_info, this_mod } ) )
+
+	_self.add_action(
+	    sw:sw_action.new( :alternative_up,
+			      :toolbar_control, :image_button_item,
+			      :dialog_control,  :image_button_item,
+			      :action_message,  :|alternative_up()|,
+			      :enabled?,        view?,
+			      :image,
+			          { :up_to_parent_alternative, mod_name } ) )
+
+	_self.add_action(
+	    sw:sw_action.new( :select_alternative,
+			      :toolbar_control, :image_button_item,
+			      :dialog_control,  :image_button_item,
+			      :action_message,  :|activate_alternative_chooser()|,
+			      :enabled?,        view?,
+			      :image,
+			          { :go_to_alternative, mod_name } ) )
+
+	_for i_action_name _over { :commit,
+				   :rollback,
+				   :rollforward }.fast_elements()
+	_loop
+	    _self.add_action(
+		sw:sw_action.new( i_action_name,
+				  :toolbar_control, :image_button_item,
+				  :menubar_control, :button_item,
+				  :dialog_control,  :image_button_item,
+				  :action_message,  { :|perform_on_database()|,
+						      i_action_name.
+							  with_parentheses },
+				  :enabled?,        view? _andif
+					            mode = :write,
+				  :image,
+				      { i_action_name, mod_name } ) )
+	_endloop
+	_self.action( :rollforward ).enabled? <<
+		view? _andif mode = :readonly
+
+	_for i_key _over { :choose_database,
+			   :toggle_access_mode,
+			   :alternative_up,
+			   :select_alternative,
+			   :commit,
+			   :rollback,
+			   :rollforward,
+			   :database_info
+			 }.fast_elements()
+	_loop
+		ctl << _self.action( i_key )
+		ctl.engine          << _self
+		ctl.caption         << _self.message( i_key )
+		ctl.tooltip         << _self.message( i_key + :|_tt| )
+		ctl.short_help_text << _self.message( i_key + :|_sh| )
+	_endloop
+
+	#
+	# The core version_managment_plugin module does not provide
+	# a greyed-out version for the go-to-alternative icon...
+	#
+	_self.action( :select_alternative ).image <<
+		{ :go_to_alternative, this_mod }
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!database_view_selector.build_gui(
+		p_container, _optional p_xml_element )
+
+	## Build the GUI in P_CONTAINER.
+
+	_local l_pnl << sw:panel.new( p_container )
+
+	_self.action( :database_view_expression ).
+		place_control_on( l_pnl, :dialog )
+
+	p_container.parent.tab_label <<
+		_self.message( :tables_heading	)
+
+	>> l_pnl
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!database_view_selector.db_expr_return_pressed( p_control )
+
+	## This method gets called when the user pressed the <RETURN>
+	## key in the 'Database' widget (in the 'Tables' tab).
+
+	_local l_str << p_control.value
+
+	_if _not l_str.default( "" ).empty?
+	_then
+		_self.db_expr_focus_changed( l_str )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!database_view_selector.db_expr_focus_changed( p_string )
+
+	## This method gets called when the user enters or leaves
+	## the 'Database' widget (in the 'Tables' tab).
+
+	_local l_value
+
+	_try _with l_cond
+
+		_dynamic !global_auto_declare?! << _false
+
+		l_value << p_string.evaluate()
+
+	_when parser_error
+		write( "parser error - ", l_cond.report_contents_string )
+	_when error
+		write( "generic error - ", l_cond.report_contents_string )
+	_endtry
+	#
+	# Currently we cover these classes:
+	# sw:sw_dataset_mixin
+	#     sw:database_view
+	#         sw:scrapbook_view
+	#         sw:auth_view
+	#         sw:message_view
+	#         sw:gis_ds_view
+	#             sw:style_ds_view
+	#             sw:case_ds_view
+	#     sw:universal_dataset
+	#         sw:extdb_dataset
+	#         sw:transient_dataset
+	#
+	_if l_value _isnt _unset _andif
+	    _not l_value.inherits_from?( sw:sw_dataset_mixin )
+	_then
+		_self.show_alert( _self.message( :ds_wrong_inheritance ) )
+		!abort!()
+	_endif
+
+	_if l_value _isnt _unset
+	_then
+		_self.set_database_view( l_value )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!database_view_selector.note_change( p_who, p_aspect, _gather p_data )
+
+	## Process change notifications from the environment.
+	##
+	## P_WHO
+	##	The object who sends the notification.
+	##
+	## P_ASPECT
+	##	A symbol describing an 'event'.
+	##
+	## P_DATA
+	##	Data that describes what has changed.
+
+	_super.note_change( p_who, p_aspect, _scatter p_data )
+
+	#
+	# If nothing has changed about the current database,
+	# we're not interested...
+	#
+	_if p_who <> _self.current_dsview _then _return _endif
+
+	_if p_aspect _is :mode
+	_then
+		_self.manage_actions()
+
+	_elif p_aspect _is :alternative_path _orif
+	      p_aspect _is :checkpoint_list
+	_then
+		_self.manage_actions()
+		_self.notify_alternative_change()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!database_view_selector.set_database_view( p_db_view )
+
+	## Send the information about the selected database to all
+	## interested parties and update the actions...
+
+	#
+	# Only send "real" changes to the databus...
+	#
+	_if ( _self.current_dsview ^<< p_db_view ) = p_db_view
+	_then
+		_return
+	_endif
+
+	_self.current_dsview 
+	_local l_v_list << _self.view_list
+
+	_self.databus.make_data_available( :current_dsview, p_db_view, _self )
+
+	_if _not l_v_list.empty? _andif
+	    p_db_view <> l_v_list.last
+	_then
+		l_v_list.add_last( p_db_view )
+	_endif
+
+	_self.manage_actions()
+
+	>> p_db_view
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!database_view_selector.create_database_list()
+
+	## Data collection method to build display_trees for all
+	## known/active datasets.
+
+	_local l_aspect << :database_list
+	_local l_list   << _self.database_list
+	_local l_sorter << _self.db_sorter
+	_local l_fields << _self.database_list_fields
+	_local l_ss     << {}.new( l_fields.size * 3 ).fill_with( :tab )
+	_local l_offset
+	_local l_data
+	_local l_dbv
+	_local l_add?
+	_local l_dt
+	_local l_ti
+
+	l_list.empty()
+	l_sorter.empty()
+
+	_for i_idx,i_fld _over l_fields.fast_keys_and_elements()
+	_loop
+		l_offset << ( i_idx - 1 ) * 3
+
+		l_ss[ l_offset + 1 ] << :value
+		l_ss[ l_offset + 2 ] << i_fld
+	_endloop
+
+	_for i_view _over sw:ds_environment.views.fast_elements()
+	_loop
+		l_data << _self.get_property_data_for( i_view )
+		_if l_data _is _unset _then _continue _endif
+
+		l_sorter.add( l_data )
+		#
+		# Add self as a dependendent of the view (if necessary)
+		# so that any changes are reflected properly in the GUI...
+		#
+		l_add? << _true
+		_for i_dep _over i_view.dependents()
+		_loop
+			_if i_dep = _self _then l_add? << _false ; _leave _endif
+		_endloop
+
+		_if l_add?
+		_then
+			i_view.add_dependent( _self )
+		_endif
+	_endloop
+
+	_for i_db_info _over l_sorter.fast_elements()
+	_loop
+		l_dt << sw:display_tree.new( i_db_info[ :view ],
+					     i_db_info )
+		l_dt.styled_string <<
+			_self.styled_string_for( i_db_info, l_ss )
+
+		l_list.add_last( l_dt )
+	_endloop
+
+	_self.changed( l_aspect, :renew )
+	#
+	# Now adjust the column widths...
+	#
+	_if ( l_ti << .widgets[ :database_list ] ) _isnt _unset
+	_then
+		l_ti.sf!adjust_column_widths()
+
+		_self.changed( l_aspect, :renew )
+	_endif 
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database}, usage={redefinable})
+_private _method sf!database_view_selector.styled_string_for(
+			 p_property_list, p_styled_string )
+
+	## Provides a styled string for an entry in the dataset list.
+
+	_if _self.database_list_colored_entries? _isnt _true
+	_then
+		_return p_styled_string
+	_endif
+
+	_local l_color << _self.database_type_to_color_map[
+				p_property_list[ :database_type ] ]
+	>> _if l_color _isnt _unset
+	   _then
+		   >> {}.concatenation( { l_color }, p_styled_string )
+	   _else
+		   >> p_styled_string
+	   _endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!database_view_selector.set_status << p_string
+
+	## Set the status information in self's window/frame.
+
+	_self.databus.make_data_available( :status, p_string, _self )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database}, usage={redefinable})
+_private _method sf!database_view_selector.get_property_data_for(
+			 p_view, _optional p_ext_name )
+
+	## Extract all available information from P_VIEW.
+
+	_local l_internal_tables << 0
+	_local l_view_name       << p_view.name
+	_local l_ext_name
+	_local l_cols
+	_local l_data
+
+	_try _with l_cond
+	    _if p_ext_name _is _unset
+	    _then
+		    l_ext_name <<
+			    _if l_view_name _isnt _unset _andif
+				_self.has_message?( l_view_name )
+			    _then >> _self.message( l_view_name )
+			    _else >> p_view.external_name
+			    _endif
+		    _if l_ext_name = "unset"
+		    _then
+			    l_ext_name << _unset
+		    _endif
+	    _else
+		    l_ext_name << p_ext_name
+	    _endif
+	    
+	    _if l_view_name _is _unset
+	    _then
+		    l_view_name << _self.message( :default_view_name,
+				     p_view.class_name,
+				     p_view.files.map(
+					  _proc @file_mapper( p_ds_file )
+						  >> p_ds_file.name
+					  _endproc ).join_as_strings( %, ) )
+	    _endif
+
+	    _for i_tbl _over ( l_cols << p_view.collections ).fast_elements()
+	    _loop
+		    _if i_tbl.descriptor.internal_table?
+		    _then
+			    l_internal_tables +<< 1
+		    _endif
+	    _endloop
+
+	    l_type << _self.determine_database_type( p_view )
+	    l_data << sw:hash_table.new_with(
+		        :view,		p_view,
+			:magik_string,	p_view.write_string,
+			:class,		p_view.class_name,
+			:ext_name,	l_ext_name,
+			:name,		l_view_name,
+			:tables,	l_cols.size,
+			:user_tables,	l_cols.size - l_internal_tables,
+			:int_tables,	l_internal_tables,
+			:mode,		p_view.mode,
+			:database_type, l_type,
+			:db_type_string,_self.message( l_type ),
+			:changed?,	_try >> p_view.updated?
+					_when error _endtry,
+			:files,		_try >> p_view.files
+					_when error _endtry,
+			:alternative,
+			    _try
+				    >> p_view.alternative_path_name()
+			    _when error
+				    >> _self.message( :no_alternative_info )
+			    _endtry )
+	_when error
+	_endtry
+
+	>> l_data
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database}, usage={redefinable})
+_private _method sf!database_view_selector.determine_database_type( p_view )
+
+	## Returns a symbol that can be used to obtain a color for rendering.
+	#
+	# See class constant database_type_to_color_map for details.
+
+	>> _if _self.is_system_view?( p_view )
+	   _then
+		   >> :system
+
+	   _elif _self.is_internal_view?( p_view )
+	   _then
+		   >> :internal
+
+	   _elif _self.is_external_view?( p_view )
+	   _then
+		   >> :external
+	   _else
+		   >> :application
+	   _endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database}, usage={redefinable})
+_private _method sf!database_view_selector.is_system_view?( p_view )
+
+	## This method does two things:
+	## a) Initializes class variable system_database_views
+	## b) returns a Boolean value that indicates if P_VIEW
+	##    is a user-defined or CST database.
+
+	_local l_gpm       << sw:gis_program_manager
+	_local l_sys_views << _self.system_database_views
+
+	_if l_sys_views _is _unset
+	_then
+		l_sys_views << _self.system_database_views <<
+			sw:equality_set.new_with(
+				l_gpm.style_view,
+				l_gpm.ace_view,
+				l_gpm.ace_top_view,
+				l_gpm.authorisation_view,
+				sw:message_handler.view )
+		_try
+			l_sys_views.add( l_gpm.scrapbook().scrapbook_view )
+		_when error
+		_endtry
+
+		l_sys_views.remove( _unset )
+	_endif
+
+	>> l_sys_views.includes?( p_view )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database}, usage={redefinable})
+_private _method sf!database_view_selector.is_internal_view?( p_view )
+
+	## Retursn a Boolean value to indicate if P_VIEW is an
+	## "internal" database. Currently only those databases
+	## used for super-joins are condidered internal.
+
+	_local l_files
+
+	>> _try
+		   >> p_view.name _is _unset _andif
+		      ( l_files << p_view.files ).size = 1 _andif
+		      l_files.an_element().name = "super_dd.ds" _andif
+		      p_view.is_class_of?( sw:database_view )
+	   _when error
+		   >> _false
+	   _endtry
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database}, usage={redefinable})
+_private _method sf!database_view_selector.is_external_view?( p_view )
+
+	## Returns a Boolean value to indicate if P_VIEW is an
+	## "external" database.
+
+	>> p_view.is_kind_of?( sw:universal_dataset )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database}, usage={subclassable})
+_private _method sf!database_view_selector.manage_actions()
+
+	## Central callback to manage the enabled-state of all actions.
+
+	_local l_view  << _self.current_dsview
+	_local l_view? << l_view _isnt _unset
+	_local l_ctl   << _self.action( :toggle_access_mode )
+	_local l_mode  << _try
+				  >> l_view.mode
+			  _when error
+				  >> :hard_readonly
+			  _endtry
+
+	l_ctl.set_image( _if l_view?
+			 _then
+			     >> { _if l_mode _is :write
+				  _then >> :set_alternative_writable
+				  _else >> :set_alternative_readonly
+				  _endif,
+				  :version_management_plugin }
+			 _else
+			     >> { :sf!no_mode_info, :mclib_table_inspector }
+			 _endif )
+		       
+	l_ctl.enabled? << l_view? _andif
+			  l_mode _isnt :hard_readonly _andif
+			  l_view.method( :|switch()| ) _isnt _unset
+
+	l_ctl << _self.action( :alternative_up )
+	l_ctl.enabled? << l_view? _andif
+			  l_view.responds_to?( :alternative_level ) _andif
+			  l_view.alternative_level > 0 _andif
+			  l_view.responds_to?( :|up()| )
+
+	l_ctl << _self.action( :select_alternative )
+	l_ctl.enabled? << l_view? _andif
+			  l_view.responds_to?( :|go_to_alternative()| ) _andif
+			  l_view.responds_to?( :alternatives ) _andif
+			  _not l_view.alternatives.empty?
+
+	l_ctl << _self.action( :commit )
+	l_ctl.enabled? << l_view? _andif
+			  l_mode _is :write _andif
+			  l_view.method( :|commit()| ) _isnt _unset
+
+	l_ctl << _self.action( :rollback )
+	l_ctl.enabled? << l_view? _andif
+			  l_mode _is :write _andif
+			  l_view.method( :|rollback()| ) _isnt _unset
+
+	l_ctl << _self.action( :rollforward )
+	l_ctl.enabled? << l_view? _andif
+			  l_view.method( :|rollforward()| ) _isnt _unset _andif
+			  l_view.mode <> :write
+
+	l_ctl << _self.action( :database_info )
+	l_ctl.enabled? << l_view?
+_endmethod
+$
+
+
+##
+##	G U I   -   R E L A T E D
+##	_________________________
+##
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!database_view_selector.activate_database_chooser()
+
+	## Helper callback to activate the database chooser dialog.
+
+	_local l_key << :db_chooser
+	_local l_dlg << _self.get_dialog( l_key )
+
+	_if l_dlg _is _unset
+	_then
+		l_dlg << _self.create_db_chooser_dialog()
+
+		l_dlg.modality << :primary_modal
+
+		_self.cache_dialog( l_key, l_dlg )
+	_endif
+
+	_self.create_database_list()
+
+	l_dlg.activate()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!database_view_selector.activate_alternative_chooser()
+
+	## Helper callback to activate a home-grown alternative
+	## selection dialog.
+
+	_local l_key << :alt_chooser
+	_local l_dlg << _self.get_dialog( l_key )
+
+	_if l_dlg _is _unset
+	_then
+		l_dlg << sw:choice_lister.new_dialog( _self )
+
+		_self.cache_dialog( l_key, l_dlg )
+	_endif
+
+	l_dlg.activate_on( _self.current_dsview.alternatives, _self,
+			   :|alternative_selected()|,
+			   :alternative_name,
+			   :one,
+			   _self.message( :ac_title ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!database_view_selector.alternative_selected( p_ds_alternative )
+
+	## Callback to move to the passed alternative in the currently
+	## active dataset. The passed parameter must be an instance of
+	## sw:ds_alternative, not just an alternative name.
+
+	_local l_new_stat << :failed
+
+	_protect
+		_self.set_status << :busy
+
+		_self.current_dsview.
+			go_to_alternative( p_ds_alternative.alternative_name )
+		_self.notify_alternative_change()
+
+		l_new_stat << :ok
+	_protection
+		_self.set_status << l_new_stat
+		_self.manage_actions()
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!database_view_selector.alternative_up()
+
+	## Callback to move to the parent alternative in the
+	## currently active dataset.
+
+	_local l_new_stat << :failed
+
+	_protect
+		_self.set_status << :busy
+
+		_self.current_dsview.up()
+		_self.notify_alternative_change()
+
+		l_new_stat << :ok
+	_protection
+		_self.set_status << l_new_stat
+		_self.manage_actions()
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!database_view_selector.show_database_info()
+
+	## Activates a new text window that display some status
+	## information (name, access mode, collection data, searchpaths etc)
+	## for the currently active dataset.
+
+	_local l_view   << _self.current_dsview
+	_local l_nd_str << _self.message( :no_data_available )
+	_local l_data   << _self.get_property_data_for( l_view )
+	_local l_strm   << sw:internal_text_output_stream.new()
+	_local l_sep    << _self.message( :file_path_col_sep )
+	_local l_val    << l_data[ :changed? ]
+	_local l_files
+
+	#
+	# Provide some basic information about this database view...
+	#
+	l_strm.write(
+		_self.message( :db_common_info_msg,
+			       l_data[ :ext_name ].default( l_nd_str ),
+			       l_data[ :name ].default( l_nd_str ),
+			       l_data[ :class ].default( l_nd_str ),
+			       l_data[ :magik_string ],
+			       l_data[ :user_tables ],
+			       l_data[ :int_tables ],
+			       l_data[ :alternative ].default( l_nd_str ),
+			       l_data[ :mode ].default( l_nd_str ),
+			       _if l_val _is _true
+			       _then >> _self.message( :yes )
+			       _elif l_val _is _false
+			       _then >> _self.message( :no )
+			       _else >> l_nd_str
+			       _endif ) )
+	#
+	# Add specific data about the files used in this view...
+	#
+	_if ( l_files << l_data[ :files ] ) _isnt _unset
+	_then
+		_local l_pad, l_str, l_file_info
+
+		l_pad << max( _scatter
+			      l_view.files.map( _proc( p ) >> p.name.size _endproc ) )
+		l_str << _self.message( :file_header )
+		_if l_str.size > l_pad _then l_pad << l_str.size _endif
+
+		l_strm.write( %newline, %newline,
+			      l_str.space_pad( l_pad, _true ), l_sep,
+			      _self.message( :searchpath_header ),
+			      %newline, %=.repeated( 60 ) )
+
+		_for i_file _over l_files.fast_elements()
+		_loop
+			l_file_info << i_file.current_logical_file
+
+			l_strm.write( %newline,
+				      l_file_info.leafname.space_pad( l_pad, _true ),
+				      l_sep,
+				      l_file_info.directory )
+		_endloop
+	_endif
+
+	_self.framework.display_text(
+		l_strm.string,
+		_self.message( :dbi_title, l_data[ :ext_name ] ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!database_view_selector.create_db_chooser_dialog()
+
+	## Creates a new window that displays all currently active
+	## datasets the table inspector can deal with.
+
+	_local l_dlg_frame  << sw:dialog_frame.new_with_parent(
+				     _self.application.top_frame,
+				     _self.message( :dbc_title ) )
+	_local l_column_ids << _self.database_list_fields
+	_local l_header_ss  << {}.new( l_column_ids.size * 4 ).
+			       fill_with( :tab )
+	_local l_headings   << {}.new( l_column_ids.size )
+	_local l_idx
+	_local l_ti
+	_local l_value
+
+	_for i_col,i_col_id _over l_column_ids.fast_keys_and_elements()
+	_loop
+		l_idx << ( i_col - 1 ) * 4
+		l_header_ss[ l_idx + 1 ] << :align
+		l_header_ss[ l_idx + 2 ] << :centre
+		l_header_ss[ l_idx + 3 ] <<
+		l_headings[ i_col ]      << _self.message( i_col_id +
+							   :|_heading| )
+	_endloop
+
+	.widgets[ :database_list ] << l_ti <<
+		sw:tree_item.new( l_dlg_frame,
+			:model,   _self,
+			:mode,    :one,
+			:aspect,  :database_list,
+			:resize?, _true,
+			:double_click_notifier, :|database_selected()|,
+			:column_headings,       l_headings,
+			:column_headings_styled_strings, l_header_ss )
+
+	_if ( l_value << _self.database_list_width ) _isnt _unset
+	_then
+		l_ti.width << l_value
+	_endif
+	_if ( l_value << _self.database_list_rows ) _isnt _unset
+	_then
+		l_ti.visible_rows << l_value
+	_endif
+
+	>> l_dlg_frame
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!database_view_selector.database_selected( p_display_tree )
+
+	## Callback when a user double-clicks on a lis-entry.
+	## Closes the dialog window and propagates the selected view.
+
+	_local l_view << p_display_tree.value[ :view ]
+
+	_self.get_dialog( :db_chooser ).suspend()
+
+	_if l_view _isnt _unset
+	_then 
+		_self.set_database_view( l_view )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_method sf!database_view_selector.toggle_access_mode()
+
+	## Helper callback to switch the dataset access mode.
+
+	_local l_view << _self.current_dsview
+	_local l_mode << l_view.mode
+
+	_if l_mode _is :write
+	_then
+		l_view.switch( :readonly )
+	_else
+		l_view.switch( :write )
+	_endif
+
+	_if l_mode <> l_view.mode
+	_then
+		_self.manage_actions()
+	_endif
+_endmethod
+$
+
+
+_method sf!database_view_selector.perform_on_database(
+		p_callback, _gather p_args )
+
+	## Convenience method to run P_CALLBACK with arguments
+	## P_ARGS on the currently active database view.
+
+	_self.current_dsview.perform( p_callback, _scatter p_args )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={database})
+_private _method sf!database_view_selector.notify_alternative_change()
+
+	## Notify all interested parties about an alternative change
+	## in the current database.
+
+	_self.databus_make_data_available( :current_alternative,
+					   _self.current_dsview )
+_endmethod
+$

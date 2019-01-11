@@ -1,0 +1,21 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-08-30 07:06:08 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 04-06-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package sw
+
+message_handler.new(:explorer_fielded_rwo_sets_plugin).add_use(:explorer_model_application_rwo_sets_plugin)
+$
+message_handler.new(:explorer_model_difference_stream_plugin).add_use(:explorer_model_datasets_plugin)
+$

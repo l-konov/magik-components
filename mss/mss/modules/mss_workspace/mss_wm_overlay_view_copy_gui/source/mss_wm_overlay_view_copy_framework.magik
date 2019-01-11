@@ -1,0 +1,78 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_overlay_view_copy_framework
+##
+## GUI framework for handling copying of overlay design data
+## into the active design.
+##
+
+def_slotted_exemplar(:mss_wm_overlay_view_copy_framework,
+{
+},
+{:gui_framework})
+$
+
+_pragma(classify_level=basic)
+mss_wm_overlay_view_copy_framework.define_shared_constant(
+	:databus_consumer_data_types,
+	{:status_string},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_framework.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:close,
+				       :engine, _self,
+				       :action_message, :|close()|))
+	_self.add_action(sw_action.new(:refresh,
+				       :short_help_text, _self.message(:refresh_sh),
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_framework.sw_databus_data_available(data_type_name, data)
+	## 
+	## Update the status bar to indicate status messages from any
+	## plugin.
+	##
+
+	_if data_type_name _is :status_string
+	_then
+		_self.update_statusbar(:status_string, :text, data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_view_copy_framework.refresh()
+	## 
+	## Ask all plugins to refresh.
+	##
+
+	_for i _over _self.plugins()
+	_loop
+		_if i.responds_to?(:|refresh()|)
+		_then
+			i.refresh()
+		_endif
+	_endloop
+	
+_endmethod
+$

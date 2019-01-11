@@ -1,0 +1,1255 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_report_plugin
+##
+## Plugin to allow CU reporting.
+##
+
+def_slotted_exemplar(:mss_cu_report_plugin,
+{
+	{:items, _unset, :readable},
+	{:engine, _unset, :readable},
+	{:cu_list, _unset, :readable}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_report_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:refresh_cu_list},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_report_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string, :cu_report_plugin},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_report_plugin.define_shared_constant(
+	:excel_field_formats,
+	## For each column in the Excel report, this is a property list
+	## of Excel properties to be set for that column.
+	property_list.new_with(
+		:work_point_number, property_list.new_with(:columnwidth, 8.0, :numberformat, "@"),
+		:cu_code, property_list.new_with(:columnwidth, 15.0, :numberformat, "@"),
+		:description, property_list.new_with(:columnwidth, 35.0),
+		:operation, property_list.new_with(:columnwidth, 9.0),
+		:material_unit_cost, property_list.new_with(:columnwidth, 9.0, :numberformat, "0.00"),
+		:labor_unit_cost, property_list.new_with(:columnwidth, 9.0, :numberformat, "0.00"),
+		:total_unit_cost, property_list.new_with(:columnwidth, 9.0, :numberformat, "0.00"),
+		:dimensionality, property_list.new_with(:columnwidth, 11.0),
+		:quantity, property_list.new_with(:columnwidth, 6.0, :numberformat, "0"),
+		:unit_multiplier, property_list.new_with(:columnwidth, 9.0, :numberformat, "0.00"),
+		:combined_quantity, property_list.new_with(:columnwidth, 9.0, :numberformat, "0.00"),
+		:material_total_cost, property_list.new_with(:columnwidth, 11.0, :numberformat, "0.00"),
+		:labor_total_cost, property_list.new_with(:columnwidth, 11.0, :numberformat, "0.00"),
+		:total_cost, property_list.new_with(:columnwidth, 11.0, :numberformat, "0.00")
+		      ),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_report_plugin.excel_pagesetup_formats
+	##
+	## Hash table of Excel properties for page setup.
+	##
+
+	_local ht << hash_table.new()
+	ht[:printgridlines] << _true 
+	ht[:leftmargin] << 27
+	ht[:rightmargin] << 27
+	ht[:topmargin] << 54
+	ht[:bottommargin] << 36
+	ht[:headermargin] << 18
+	ht[:footermargin] << 18
+	ht[:orientation] << 2
+	ht[:centerhorizontally] << _true
+	ht[:fittopageswide] << 1
+	ht[:fittopagestall] << _false
+	ht[:zoom] << _false
+
+	ht[:printtitlerows] << "$4:$5"
+	
+	ht[:centerheader] << "&F"
+	
+	# Note: want footer to reflect the date that the report was
+	# created, not when it was printed - so, store the date value
+	# explicitly, rather than using an Excel function.
+	ht[:leftfooter] << date.now().write_string
+	ht[:centerfooter] << "Page &P of &N"
+	_if (lrp << _self.get_option(:last_run_parameters)) _is _unset _orif
+	    (des << lrp[:mss_design]) _is _unset _orif
+	    _not des.is_valid?
+	_then
+		# All of these are not expected, but in this case, just set
+		# this part of the footer to be the sheet name.
+		ht[:rightfooter] << "&A"
+	_else
+		ht[:rightfooter] << des.job_and_design_full_name
+	_endif 
+
+	_return ht
+_endmethod 
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	_self.set_option(:combine_similar_cus?, _true)
+	_self.set_option(:include_cus_with_no_operation?, _false)
+	_self.set_option(:include_parent_designs?, _true)
+	_self.set_option(:work_point_subtotals?, _true)
+	_self.set_option(:current_cu_cost_group, 0)
+	_self.set_option(:last_run_parameters, property_list.new())
+	.engine << mss_cu_summary_engine.new()
+	.engine.combine_similar_cus? << _self.get_option(:combine_similar_cus?)
+	.engine.include_cus_with_no_operation? << _self.get_option(:include_cus_with_no_operation?)
+	.cu_list << rope.new()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:refresh,
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh()|))
+	_self.add_action(sw_action.new(:export_to_excel,
+				       :image, {:export_to_excel, :explorer_plugin},
+				       :engine, _self,
+				       :action_message, :|export_to_excel()|))
+
+	_self.add_action(sw_action.new(:combine_similar_cus?,
+				       :menubar_control, :toggle_item,
+				       :value, _self.get_option(:combine_similar_cus?),
+				       :engine, _self,
+				       :value_change_message, :|combine_similar_cus?<<|))
+	_self.add_action(sw_action.new(:include_cus_with_no_operation?,
+				       :menubar_control, :toggle_item,
+				       :value, _self.get_option(:include_cus_with_no_operation?),
+				       :engine, _self,
+				       :value_change_message, :|include_cus_with_no_operation?<<|))
+	_self.add_action(sw_action.new(:include_parent_designs?,
+				       :menubar_control, :toggle_item,
+				       :value, _self.get_option(:include_parent_designs?),
+				       :engine, _self,
+				       :value_change_message, :|include_parent_designs?<<|))
+	_self.add_action(sw_action.new(:work_point_subtotals?,
+				       :menubar_control, :toggle_item,
+				       :value, _self.get_option(:work_point_subtotals?),
+				       :engine, _self,
+				       :value_change_message, :|work_point_subtotals?<<|))
+	
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.manage_actions()
+	## 
+	## 
+
+	_self.action(:export_to_excel).enabled? << .cu_list.size > 0
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << _true
+	p.resize_y? << _true
+	p.tab_label << _self.message(:tab_label)
+
+	ps << :|perform_safely()|
+	go << :|get_option()|
+
+	p.start_row()
+	.items[:current_cu_cost_group] <<
+		text_choice_item.new(p, _self.message(:current_cu_cost_group),
+				     :items, _self.current_cu_cost_group_choices,
+				     :model, _self,
+				     :aspect, :current_cu_cost_group,
+				     :change_selector, {ps, :|current_cu_cost_group<<|},
+				     :value_selector, {go, :current_cu_cost_group})
+	
+	# Pick an initial width that is a bit bigger than the total,
+	# since this menu will normally get a vertical scrollbar.
+	base_width << 20
+	_for i _over mss_cu_holder.report_display_tree_column_widths().fast_elements()
+	_loop
+		base_width +<< i
+	_endloop
+	
+	p.start_row()
+	.items[:cu_list] << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :cu_list,
+			      :data_selector, :cu_list,
+			      :select_notifier, :|cu_list_selected()|,
+			      :double_click_notifier, {ps, :|cu_list_double_click()|},
+			      :column_widths, mss_cu_holder.report_display_tree_column_widths().copy(),
+			      :column_headings, mss_cu_holder.report_display_tree_column_headings().copy(),
+			      :width, base_width,
+			      :height_in_chars, 20,
+			      :column_allow_sort?, _false,
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.post_activation()
+	## 
+	## 
+
+	_super.post_activation()
+	_self.handle_cu_cost_group_change()
+
+	# Refresh the display.  However, ignore any errors (i.e. no
+	# active design).
+	.cu_list.empty()
+	_self.changed(:cu_list, :renew)
+	_try
+		_self.refresh()
+	_when error
+	_endtry
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## If refresh_cu_list is requested, then refresh the list.
+	##
+
+	_super.sw_databus_data_available(data_type_name, data)
+	_if data_type_name _is :refresh_cu_list
+	_then
+		_self.refresh()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	## If cu_report_plugin is requested, return self.
+	##
+
+	_if data_type_name _is :cu_report_plugin
+	_then
+		_return _self
+	_endif 
+	_return _super.sw_databus_data_requested(data_type_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_report_plugin.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.cu_list_selected(selection)
+	## 
+	## Perform actions when a selection is made in the cu_list.
+	##
+
+	# Currently, no actions are required here.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.cu_list_double_click(selection)
+	## 
+	## When a CU is double-clicked, activate the editor for the
+	## record that owns it.
+	##
+
+	_if (cu_holder << selection.key).is_kind_of?(mss_cu_holder)
+	_then 
+		_self.edit_object_for_cu_holder(cu_holder)
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.selected_cu_cost_group
+	## 
+	## Return the currently selected cost group.
+	##
+
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+	_return tbl.at(_self.get_option(:current_cu_cost_group))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.current_cu_cost_group << a_rec_or_id
+	## 
+	## Set the current_cu_cost_group property to A_REC_OR_ID -
+	## either a database record, or the ID of a record.
+	##
+
+	_if a_rec_or_id.is_a_datastore_object?
+	_then
+		new_id << a_rec_or_id.id
+	_else
+		new_id << a_rec_or_id
+	_endif
+	_if new_id ~= _self.get_option(:current_cu_cost_group)
+	_then
+		_self.set_option(:current_cu_cost_group, new_id, _true)
+		
+		.engine.cu_cost_group << _self.selected_cu_cost_group
+		_self.set_last_run_parameters()
+		_self.redisplay_results()
+	_endif
+
+	_return a_rec_or_id
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.current_cu_cost_group_choices
+	## 
+	## Return a structure of items to use for the text_choice_item
+	## that represents all CU cost groups.
+	##
+
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+	sc << sorted_collection.new(tbl.size, _proc(a, b) _return a[2] _cf b[2] _endproc)
+	sc.add({0, _self.message(:default_cu_cost_group)})
+	_for i _over tbl.fast_elements()
+	_loop
+		sc.add({i.id, i.name.as_charvec()})
+	_endloop
+	_return simple_vector.new_from(sc)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.handle_cu_cost_group_change()
+	## 
+	## Reset pick-list for current CU cost group.
+	##
+
+	cur_group << _self.get_option(:current_cu_cost_group)
+	new_items << _self.current_cu_cost_group_choices
+	still_exists? << _false
+	_for i _over new_items.fast_elements()
+	_loop
+		_if i[1] = cur_group
+		_then
+			still_exists? << _true
+		_endif
+	_endloop
+	_if _not still_exists?
+	_then
+		_self.current_cu_cost_group << 0
+	_endif
+	_if (mi << .items[:current_cu_cost_group]) _isnt _unset
+	_then
+		mi.items << new_items
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.edit_object_for_cu_holder(cu_holder)
+	## 
+	##
+
+	_if cu_holder.internal_usage _is :aggregator
+	_then
+		_self.user_error(:cannot_edit_aggregator)
+	_endif
+
+	_if (rec << cu_holder.tracked_record()) _is _unset
+	_then
+		_if (rec << cu_holder.cu_reference) _is _unset
+		_then 
+			_return
+		_endif
+
+		# N.B.: it may be useful to have a separate custom dialog which
+		# only allows editable fields to be changed (i.e. user has no
+		# need to update record_tid, record_id, etc), and which only
+		# allows updates or deletes (no inserts).  But, this is going
+		# to be used extremely, extremely rarely, so just use a default
+		# object editor for now.
+		condition.raise(:warning, :string, _self.message(:warn_edit_cu_reference))
+	_endif
+	
+	_if rec _isnt _unset _andif
+	    (ed_man << _self.editor_manager) _isnt _unset
+	_then
+		an_editor << ed_man.edit_object(rec)
+		_if an_editor _isnt _unset _andif
+		    (app << an_editor.application) _isnt _unset _andif
+		    an_editor.floating? _isnt _true 
+		_then
+			# Bring the application to the forefront.
+			_self.bring_application_forward(app)
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.bring_application_forward(app)
+	## 
+	## Ensure that the application APP is brought to the front.
+	##
+
+	_if app _isnt _unset _andif
+	    (tf << app.top_frame) _isnt _unset
+	_then
+		tf.activate()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.selected_cu
+	## 
+	## Return the mss_cu_holder that is currently selected in the
+	## cu_list, and the selected display tree.
+	##
+
+	_if (ti << .items[:cu_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		_return sel.key, sel
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_report_plugin.combine_similar_cus? << new_val
+	## 
+	## If set to true, this will cause CUs with the same work
+	## point, CU code, and operation to be combined into a single
+	## line-item. 
+	##
+
+	old_val << _self.get_option(:combine_similar_cus?)
+	_if new_val = old_val
+	_then
+		_return
+	_endif
+	_self.set_option(:combine_similar_cus?, new_val)
+
+	# The following is only needed if something other than the
+	# toggle action sets this value.
+	_if (a << _self.action(:combine_similar_cus?)) _isnt _unset
+	_then
+		a.value << new_val
+	_endif
+
+	# Notify engine of change, and redisplay results.
+	.engine.combine_similar_cus? << new_val
+	.engine.set_results()
+	_self.set_last_run_parameters()
+	_self.redisplay_results()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_report_plugin.include_cus_with_no_operation? << new_val
+	## 
+	## If set to true, this will cause CUs with no operation value
+	## to be included in the report.
+	##
+
+	old_val << _self.get_option(:include_cus_with_no_operation?)
+	_if new_val = old_val
+	_then
+		_return
+	_endif
+	_self.set_option(:include_cus_with_no_operation?, new_val)
+
+	# The following is only needed if something other than the
+	# toggle action sets this value.
+	_if (a << _self.action(:include_cus_with_no_operation?)) _isnt _unset
+	_then
+		a.value << new_val
+	_endif
+
+	# Notify engine of change, and redisplay results.
+	.engine.include_cus_with_no_operation? << new_val
+	.engine.set_results()
+	_self.set_last_run_parameters()
+	_self.redisplay_results()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_report_plugin.include_parent_designs? << new_val
+	## 
+	## If set to true, this will cause all parent designs to be
+	## included in the results.
+	##
+
+	old_val << _self.get_option(:include_parent_designs?)
+	_if new_val = old_val
+	_then
+		_return
+	_endif
+	_self.set_option(:include_parent_designs?, new_val)
+
+	# The following is only needed if something other than the
+	# toggle action sets this value.
+	_if (a << _self.action(:include_parent_designs?)) _isnt _unset
+	_then
+		a.value << new_val
+	_endif
+
+	# Notify engine of change, and redisplay results.
+	.engine.set_designs(_self.all_designs_for_report)
+	.engine.set_results()
+	_self.set_last_run_parameters()
+	_self.redisplay_results()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_report_plugin.work_point_subtotals? << new_val
+	## 
+	## If set to true, this will cause summary lines to be produced
+	## for each different work point.
+	##
+
+	old_val << _self.get_option(:work_point_subtotals?)
+	_if new_val = old_val
+	_then
+		_return
+	_endif
+	_self.set_option(:work_point_subtotals?, new_val)
+
+	# The following is only needed if something other than the
+	# toggle action sets this value.
+	_if (a << _self.action(:work_point_subtotals?)) _isnt _unset
+	_then
+		a.value << new_val
+	_endif
+
+	# Redisplay results - this is just a GUI change, so
+	# recalculation is not required.
+	_self.set_last_run_parameters()
+	_self.redisplay_results()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.all_designs_for_report
+	## 
+	## Return the active design, plus all parent designs if the
+	## :include_parent_designs? option is set.
+	##
+
+	_if (ad << mss_cu_engine.active_design) _is _unset
+	_then
+		_return {}
+	_endif
+	_if _self.get_option(:include_parent_designs?)
+	_then
+		_return ad.ordered_design_path
+	_else
+		_return {ad}
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.refresh()
+	## 
+	## Refresh the list of CUs displayed.
+	##
+
+	_self.status_string << ""
+	_if (ad << mss_cu_engine.active_design) _is _unset
+	_then
+		_self.user_error(:no_active_design)
+	_endif
+
+	ok? << _false 
+	_protect
+		_self.status_string << _self.message(:calculating_cus)
+		all_designs << _self.all_designs_for_report
+		.engine.clear()
+		.engine.cu_job_type << mss_cu_engine.active_job_type
+		.engine.set_designs(all_designs)
+		.engine.set_results()
+		_self.set_last_run_parameters(ad)
+		_self.redisplay_results()
+		ok? << _true 
+	_protection
+		_if ok?
+		_then
+			_self.status_string << ""
+		_else
+			_self.status_string << _self.message(:failed)
+		_endif
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.set_last_run_parameters(_optional a_design)
+	## 
+	## Update the last_run_parameters results with the given
+	## design A_DESIGN (defaults to the active design if not
+	## specified). 
+	##
+
+	_if a_design _is _unset
+	_then
+		a_design << mss_cu_engine.active_design
+	_endif
+	
+	pl << _self.get_option(:last_run_parameters)
+	pl.empty()
+	pl[:mss_design] << a_design
+
+	_for key _over {:combine_similar_cus?, :include_cus_with_no_operation?,
+			:include_parent_designs?, :work_point_subtotals?}.fast_elements()
+	_loop
+		pl[key] << _self.get_option(key)
+	_endloop
+	pl[:selected_cu_cost_group] << _self.selected_cu_cost_group
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.redisplay_results()
+	## 
+	## Redisplay the report results, based on a refresh request or
+	## a change to any parameter that affects the calculation.
+	##
+
+	ok? << _false 
+	_protect
+		_self.status_string << _self.message(:displaying_results)
+		_self.int!redisplay_results()
+		ok? << _true 
+	_protection
+		_if ok?
+		_then
+			_self.status_string << ""
+		_else
+			_self.status_string << _self.message(:failed)
+		_endif
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.int!redisplay_results()
+	## 
+	## 
+
+	wps? << _self.get_option(:work_point_subtotals?)
+	material_c << 0.0
+	labor_c << 0.0
+	total_c << 0.0
+	wp_m_c << 0.0
+	wp_l_c << 0.0
+	wp_t_c << 0.0
+	
+	.cu_list.empty()
+	res << .engine.results
+	results_size << .engine.results.size
+	_for i, res_dt _over res.fast_keys_and_elements()
+	_loop
+		.cu_list.add_last(res_dt)
+		cu_holder << res_dt.key
+		_if (incr_c << cu_holder.material_total_cost) _isnt _unset
+		_then
+			material_c +<< incr_c
+			wp_m_c +<< incr_c
+		_endif 
+		_if (incr_c << cu_holder.labor_total_cost) _isnt _unset
+		_then
+			labor_c +<< incr_c
+			wp_l_c +<< incr_c
+		_endif 
+		_if (incr_c << cu_holder.total_cost) _isnt _unset
+		_then
+			total_c +<< incr_c
+			wp_t_c +<< incr_c
+		_endif 
+
+		_if wps?
+		_then
+			_if i > 1 _andif
+			    cu_holder.report_work_point_number = res[i - 1].key.report_work_point_number
+			_then
+				# Blank out second and subsequent work_point_number values when
+				# grouping by work point.
+				_if res_dt.value[:work_point_number] ~= ""
+				_then 
+					res_dt.value[:int!original_wpn] << res_dt.value[:work_point_number]
+					res_dt.value[:work_point_number] << ""
+				_endif 
+			_endif
+			
+			# Same is true for aggregated things.
+			_for child _over res_dt.children.fast_elements()
+			_loop
+				_if child.value[:work_point_number] ~= ""
+				_then 
+					child.value[:int!original_wpn] << child.value[:work_point_number]
+					child.value[:work_point_number] << ""
+				_endif
+			_endloop 
+		_else
+			# If there was a previously blanked-out value, restore it.
+			_if (bl_wpn << res_dt.value.remove_key(:int!original_wpn)) _isnt _unset
+			_then
+				res_dt.value[:work_point_number] << bl_wpn
+			_endif
+
+			# Same is true for aggregated things.
+			_for child _over res_dt.children.fast_elements()
+			_loop
+				_if (bl_wpn << child.value.remove_key(:int!original_wpn)) _isnt _unset
+				_then
+					child.value[:work_point_number] << bl_wpn
+				_endif
+			_endloop 
+		_endif
+		
+		_if i = results_size _orif
+		    cu_holder.report_work_point_number ~= res[i + 1].key.report_work_point_number
+		_then
+			_if wps?
+			_then 
+				ph << mss_cu_placeholder.new(
+					      property_list.new_with(:description, _self.message(:work_point_summary),
+								     :material_total_cost, wp_m_c,
+								     :labor_total_cost, wp_l_c,
+								     :total_cost, wp_t_c))
+				dt << ph.as_report_display_tree()
+				.cu_list.add_last(dt)
+
+				# And add a blank line.
+				ph << mss_cu_placeholder.new(property_list.new())
+				dt << ph.as_report_display_tree()
+				.cu_list.add_last(dt)
+			_endif
+			wp_m_c << 0.0
+			wp_l_c << 0.0
+			wp_t_c << 0.0
+		_endif 
+		
+	_endloop
+
+	# Add a placeholder for total cost.
+	_if _not wps?
+	_then
+		# Only need this blank line if not doing work point subtotals.
+		ph << mss_cu_placeholder.new(property_list.new())
+		dt << ph.as_report_display_tree()
+		.cu_list.add_last(dt)
+	_endif 
+	ph << mss_cu_placeholder.new(
+		      property_list.new_with(:description, _self.message(:report_summary),
+					     :material_total_cost, material_c,
+					     :labor_total_cost, labor_c,
+					     :total_cost, total_c))
+	dt << ph.as_report_display_tree()
+	.cu_list.add_last(dt)
+
+	_self.changed(:cu_list, :renew)
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_report_plugin.excel_filename_for_design(ad)
+	## 
+	## Return a filename to use for saving an Excel workbook for
+	## the design AD.  If this returns unset, no file saving will
+	## be performed.  This may be redefined to automatically save
+	## the resulting files - either by prompting the user, or by
+	## using a value derived from the design itself.
+	##
+
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.editor_manager
+	## 
+	## Return self's editor_manager component.
+	##
+
+	_return _self.application.get_service_provider(:editor_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.export_to_excel()
+	## 
+	## Perform the work of exporting the current results to an
+	## Excel spreadsheet.
+	##
+
+	_self.status_string << ""
+	vis_col_names << _self.visible_column_names()
+	batch_size << 5
+	lrp << _self.get_option(:last_run_parameters)
+	_if (last_run_design << lrp[:mss_design]) _isnt _unset _andif
+	    _not last_run_design.is_valid?
+	_then
+		last_run_design << _unset
+	_endif
+	
+	_if last_run_design _isnt _unset _andif 
+	    (saveas_fname << _self.excel_filename_for_design(last_run_design)) _isnt _unset
+	_then
+		# If there is a filename specified, verify that an overwrite of
+		# existing data is OK, and verify that the file can be created.
+		_if system.file_exists?(saveas_fname) _andif
+		    _self.show_question(_self.message(:ok), _self.message(:cancel),
+					_self.message(:confirm_overwrite, saveas_fname)) _is _false 
+		_then
+			_return
+		_endif
+
+		_if _not system.file_creatable?(saveas_fname)
+		_then
+			condition.raise(:warning, :string,
+					_self.message(:cannot_create_file, saveas_fname))
+			saveas_fname << _unset 
+		_endif
+	_endif 
+
+	ok? << _false 
+	_protect
+		_self.status_string << _self.message(:exporting_to_excel)
+		_if _not (excel_appl << ole_client.create_object("Excel.application")).is_class_of?(ole_controller)
+		_then
+			_self.user_error(:cannot_start_excel)
+		_endif
+
+		_try _with cond
+			# Turn off screenupdating
+			excel_appl.screenupdating << _false
+		_when ole_server_error
+			# Excel was in a mode that it couldn't accept input
+			_self.user_error(:excel_could_not_get_access)
+		_endtry
+
+		wbs << excel_appl.workbooks()
+		wb << wbs.add()
+		sheet << excel_appl.sheets(1)
+		sheet.activate()
+		sheet.name << _self.message(:excel_sheet_name).truncate(20)
+
+		# Set some overall default column properties.
+		x1 << sheet.range(_self.int!excel_range_string_for("", 1, vis_col_names.size))
+		x1.horizontalalignment << 1
+		x1.wraptext << _false
+		x1.release_object()
+
+		# Set properties on specific columns.
+		_for i, vcn _over vis_col_names.fast_keys_and_elements()
+		_loop
+			_if (fmt_info << _self.excel_field_formats[vcn]) _is _unset
+			_then
+				_continue
+			_endif
+			x1 << sheet.range(_self.int!excel_range_string_for("", i, 1))
+			_for fmt_key, fmt_data _over fmt_info.fast_keys_and_elements()
+			_loop
+				x1.perform(fmt_key.with_chevron, fmt_data)
+			_endloop
+			x1.release_object()
+		_endloop 
+
+		next_row << _self.create_excel_title_information(sheet)
+		idx << 1
+		_loop
+			_if idx + batch_size >= .cu_list.size
+			_then
+				next_row << _self.send_batch_to_excel(.cu_list.slice_to_end(idx), sheet,
+								      next_row, vis_col_names)
+				_leave
+			_endif
+			next_row << _self.send_batch_to_excel(.cu_list.slice(idx, idx + batch_size - 1), sheet,
+							      next_row, vis_col_names)
+			idx +<< batch_size
+		_endloop 
+
+		# Select the first cell.
+		x1 << sheet.range(_self.int!excel_range_string_for(1, 1, 1))
+		x1.select()
+		x1.release_object()
+
+		_if saveas_fname _isnt _unset
+		_then
+			# Try to save the file, with kid gloves on (since there is a
+			# decent likelihood that the user already has the file open in
+			# Excel if they are running this for a second and subsequent
+			# time).  The following turns off prompting for overwrite
+			# (since we already did that in Magik), and if there is a
+			# workbook with the same name open, display a descriptive
+			# message. 
+			saveas_ok? << _false 
+			old_disp_alerts << excel_appl.displayalerts
+			_protect
+				excel_appl.displayalerts << _false
+				_try _with cond 
+					wb.saveas(saveas_fname, :|xlWorkbookNormal|)
+				_when ole_server_error
+					_if cond[:ole_reason] _isnt _unset
+					_then
+						_self.show_message(cond[:ole_reason])
+					_else 
+						_self.show_message(cond.report_contents_string)
+					_endif 
+				_endtry
+				saveas_ok? << _true 
+			_protection
+				_if _not saveas_ok?
+				_then
+					saveas_fname << _unset
+				_endif 
+				excel_appl.displayalerts << old_disp_alerts
+			_endprotect 
+		_endif
+		ok? << _true
+	_protection
+		_if x1 _isnt _unset _then x1.release_object() _endif 
+		_if sheet _isnt _unset _then sheet.release_object() _endif 
+		_if wb _isnt _unset _then wb.release_object() _endif 
+		_if wbs _isnt _unset _then wbs.release_object() _endif
+		
+		_if excel_appl _isnt _unset 
+		_then
+			_try _with cond 
+				# Turn screenupdating on, forcing a redraw
+				excel_appl.screenupdating << _true
+
+				# Make Excel visible on the desktop
+				excel_appl.visible << _true
+			_when ole_server_error
+			_endtry
+
+			excel_appl.release_object()
+		_endif
+		_if ok?
+		_then
+			_self.status_string << ""
+		_else
+			_self.status_string << _self.message(:failed)
+		_endif
+	_endprotect
+
+	_if last_run_design _isnt _unset _andif
+	    saveas_fname _isnt _unset _andif
+	    system.file_exists?(saveas_fname)
+	_then
+		# Forge a relationship between this document and this design.
+		_self.add_related_document(last_run_design, saveas_fname)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.add_related_document(last_run_design, saveas_fname)
+	## 
+	## Add a related document link to join the design
+	## LAST_RUN_DESIGN with the Excel filename SAVEAS_FNAME.
+	##
+
+	pl << property_list.new_with(:filename, saveas_fname,
+				     :usage_id, 0)
+	last_run_design.add_related_document(pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.int!excel_range_string_for(start_row, start_col, width)
+	##
+	## Returns a suitable range for START_ROW, START_COL and
+	## WIDTH. 
+	##
+
+	# N.B.: copied from private method on collection_export_engine.
+	
+	_local range_stream << internal_text_output_stream.new()
+	_local start_col_letter1 << ((start_col-1) _div 26) + 64
+	_local start_col_letter2 << ((start_col-1) _mod  26) + 65
+	_local end_col<< (start_col+width-1).min(256)
+	_local end_col_letter1 << ((end_col-1) _div 26) + 64
+	_local end_col_letter2 << ((end_col-1) _mod  26) + 65
+
+	# Write start element
+	_if start_col_letter1 > 64 
+	_then
+		range_stream.write(start_col_letter1.as_character())
+	_endif
+	range_stream.write(start_col_letter2.as_character(),start_row)
+
+	# Write separator
+	range_stream.write(":")
+
+	# Write end element
+	_if end_col_letter1 > 64 
+	_then
+		range_stream.write(end_col_letter1.as_character())
+	_endif
+	range_stream.write(end_col_letter2.as_character(),start_row)
+
+	# Return the string 
+	>> range_stream.string
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.visible_column_names()
+	## 
+	## Return a rope of internal column names that are currently visible.
+	## This takes into account changes made dynamically by user.
+	##
+
+	# Need to get a handle on any cu_holder display tree to
+	# determine styled string info.
+	_if (a_cu_holder << .cu_list.an_element()) _is _unset
+	_then
+		a_cu_holder << mss_cu_placeholder.new(property_list.new()).as_report_display_tree()
+	_endif
+
+	r << rope.new()
+	_for i _over .items[:cu_list].headings_holder.visible_column_order.fast_elements()
+	_loop
+		r.add_last(a_cu_holder.value_id_in_column(i))
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.visible_column_headings()
+	## 
+	## Return a rope of column heading strings that are currently visible.
+	## This takes into account changes made dynamically by user.
+	## 
+
+	r << rope.new()
+	ch << .items[:cu_list].headings_holder.column_headings
+	_for i _over .items[:cu_list].headings_holder.visible_column_order.fast_elements()
+	_loop
+		r.add_last(ch[i])
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.create_excel_title_information(sheet)
+	## 
+	## Populate title block / header information in the given Excel
+	## SHEET.
+	##
+
+	vch << _self.visible_column_headings()
+	act_ref << _self.top_frame.actual
+	h_data << rope.new()
+	_if (lrp << _self.get_option(:last_run_parameters)) _is _unset _orif
+	    (des << lrp[:mss_design]) _is _unset _orif
+	    _not des.is_valid?
+	_then
+		# All of these are not expected, but in this case, just set
+		# active design info to blank.
+		des_name << ""
+	_else
+		des_name << des.job_and_design_full_name
+	_endif
+
+	cgrp << _unset 
+	_if lrp _isnt _unset
+	_then
+		cgrp << lrp[:selected_cu_cost_group]
+	_endif
+	_if cgrp _is _unset
+	_then
+		cgrp_name << _self.message(:default_cu_cost_group_report)
+	_else
+		cgrp_name << cgrp.name.as_charvec()
+	_endif
+	
+	h_data.add_last(_self.message(:header_line_1, des_name))
+	h_data.add_last(_self.message(:header_line_2, date_time.now()))
+	h_data.add_last(_self.message(:header_line_3, cgrp_name))
+	h_data.add_last("")
+	
+	_protect
+		# Page setup: note that this fails if no printer installed, so
+		# don't worry about that error.
+		_try
+			x1 << sheet.pagesetup
+			_for ps_key, ps_value _over _self.excel_pagesetup_formats.fast_keys_and_elements()
+			_loop
+				x1.perform(ps_key.with_chevron, ps_value)
+			_endloop 
+		_when ole_server_error
+		_endtry
+		_if x1 _isnt _unset _then x1.release_object() _endif
+
+		next_row << 1
+		_for i _over h_data.fast_elements()
+		_loop 
+			act_ref.clipboard_text << i
+			_if vch.size > 1
+			_then 
+				x1 << sheet.range(_self.int!excel_range_string_for(next_row, 1, vch.size))
+				x1.select()
+				x1.merge()
+				x1.release_object()
+			_endif 
+			x1 << sheet.range(_self.int!excel_range_string_for(next_row, 1, 1))
+			x1.value << i
+			x1.release_object()
+			next_row +<< 1
+		_endloop
+		
+		str << internal_text_output_stream.new()
+		field_sep << ""
+		_for i, header _over vch.fast_keys_and_elements()
+		_loop
+			str.write(field_sep, header)
+			field_sep << tab_char
+		_endloop
+		
+		act_ref.clipboard_text << str.string
+		x1 << sheet.range(_self.int!excel_range_string_for(next_row, 1, vch.size))
+		x1.select()
+		sheet.paste()
+		x1.release_object()
+		
+	_protection 
+		_if x1 _isnt _unset _then x1.release_object() _endif 
+	_endprotect
+	
+	_return next_row + 2
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_report_plugin.send_batch_to_excel(data_rope, sheet, line_num, vis_col_names)
+	## 
+	## Send all data in DATA_ROPE to the excel sheet SHEET,
+	## starting at line number LINE_NUM.  VIS_COL_NAMES is a list
+	## of visible column names to be exported.
+	##
+	
+	# Note that this is done using a paste operation to set several
+	# cells at once.
+
+	_dynamic !print_float_precision! << 12
+	
+	act_ref << _self.top_frame.actual
+	str << internal_text_output_stream.new()
+	line_sep << ""
+	_for data_item _over data_rope.fast_elements()
+	_loop
+		str.write(line_sep)
+		line_sep << newline_char
+
+		field_sep << ""
+		_for field_name _over vis_col_names.fast_elements()
+		_loop
+			str.write(field_sep, data_item.value[field_name].default(""))
+			field_sep << tab_char
+		_endloop
+	_endloop
+	
+	act_ref.clipboard_text << str.string
+	_protect
+		x1 << sheet.range(_self.int!excel_range_string_for(line_num, 1, 1))
+		x1.select()
+		sheet.paste()
+	_protection 
+		_if x1 _isnt _unset _then x1.release_object() _endif 
+	_endprotect
+	
+	_return line_num + data_rope.size
+	
+_endmethod
+$

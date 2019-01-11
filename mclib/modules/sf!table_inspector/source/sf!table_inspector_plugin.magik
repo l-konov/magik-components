@@ -1,0 +1,105 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+
+_package mclib
+$
+##
+##
+##
+
+
+_pragma(classify_level=advanced, topic={database})
+def_slotted_exemplar( :sf!table_inspector_plugin,
+{
+	{ :embedded_gui, _unset }
+},
+{ :plugin } )
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_private _method sf!table_inspector_plugin.init_actions()
+
+	## Define the _self's actions.
+
+	_local l_action << :activate_table_inspector
+
+	_self.add_action(
+	    sw:sw_action.new( :activate_table_inspector,
+		:caption, _self.message( l_action ),
+		:engine,  _self,
+		:image,   { :sf!table_inspector,
+			    :mclib_table_inspector },
+		:tooltip, _self.message( l_action + :|_tt| ),
+		:short_help_text, _self.message( l_action + :|_sh| ),
+		:action_message,  l_action.with_parentheses ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector_plugin.activate_table_inspector()
+
+	## Action callback to open a floating version of the
+	## Table Inspector.
+
+	_local l_key << :floating_dialog
+	_local l_dlg
+
+	_if ( l_dlg << _self.get_dialog( l_key ) ) _is _unset
+	_then
+		l_dlg << mclib:sf!table_inspector.new( :ti, _self.application )
+
+		_self.cache_dialog( l_key, l_dlg )
+	_endif
+
+	l_dlg.activate()
+
+	>> l_dlg
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+_method sf!table_inspector_plugin.build_gui( p_container )
+
+	## Builds an embedded GUI for the Table Inspector.
+	#
+	#  Because title and status bar are missing in this case,
+	#  the GUI does not display some fairly useful information
+	#  (e.g. current dataset and current alternative). Other
+	#  functionality (collection reporting) is also lost, because
+	#  the callback are only availablein pull-down menus.
+
+	_if .embedded_gui _isnt _unset
+	_then
+		sw:condition.raise( :plugin_only_one_gui,
+				    :framework_class, .embedded_gui.class_name,
+				    :plugin_class,    _self.class_name )
+	_endif
+
+	_local l_fwk << mclib:sf!table_inspector.new( :ti, _self.application )
+
+	l_fwk.build_gui( p_container )
+
+	.embedded_gui << l_fwk
+
+	>> p_container
+_endmethod
+$

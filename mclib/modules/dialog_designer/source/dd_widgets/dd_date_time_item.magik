@@ -1,0 +1,224 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_DATE_TIME_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_date_time_item,{},:dd_tabular_list)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_date_time_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :data_type,{:date,:date_time},
+					  :value_changed_notifier,:symbol
+						),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_date_time_item.define_shared_constant(:dd_min_width,
+				  property_list.new_with(
+					  :date,80,
+					  :date_time,130),
+				  :public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_date_time_item.define_shared_constant(:dd_date_formats,
+				  property_list.new_with(
+					  :us,"#m/#d/#Y",
+					  :uk,"#d/#m/#Y"),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.dd_properties()
+	## 
+	##  Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_date_time_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	_for k _over {:col_alignments,:column_alignments,:column_allow_groupby?,
+		      :column_headings,:grid_lines?,:mode,:select_notifier,:height}.fast_elements()
+	_loop
+		props.remove_key(k)
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+	
+	>> max(60,_self.width.as_number().default(60).abs)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.default_min_height
+	## 
+ 	## Return the minimum default rendering height.
+	
+	vts << vtext_style.new(_self.font)
+	>> vts.box_coordinates("Ab").bounds.height.rounded - 2
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	dt << _self.new(rc,
+			:row,row,:col,col,
+			:width,60,
+			:col_alignment,:fill,
+			:row_alignment,:top)
+	
+	dt.data_type << :date
+	dt.aspect << :dd_date_time_aspect
+
+	>> dt
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	desc << props[:dialog_description]
+	props.remove_key(:dialog_description)
+
+	vcn << props[:value_changed_notifier]
+	props.remove_key(:value_changed_notifier)
+	
+	dt << props[:data_type]
+	props.remove_key(:data_type)
+	
+	res << _self.new(parent,_scatter props)
+
+	res.dialog_description << desc
+	res.value_changed_notifier << vcn
+	res.data_type << dt
+	res.aspect << props[:aspect]
+
+	>> res
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	!dialog_element_footprints![pbb.deep_copy()] << _self
+	
+	# Adjust when there's label 
+	lab_w << _self.label_width
+	pbb.xmin +<< lab_w
+	w -<< lab_w
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	# Render an icon to show the type.
+	ri << smallworld_product.get_raster_image(_self.data_type,:dialog_designer)
+	canv.render_raster(ri,pbb.xmin+4,pbb.ymin+1,_false)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+	canv.draw(pbb.boundary,ls)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF, an action control placement.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,".items[:",_self.dialog_element_id,"] << tree_item.new(",parent_id)
+
+	txt.write(dialog_designer.message(:dd_date_time_gui_code,
+					  _self.aspect,
+					  _self.col,
+					  _self.col_alignment,
+					  _self.row,
+					  _self.row_alignment,
+					  _self.data_type,
+					  _self.dd_min_width[_self.data_type],
+					  _self.value_changed_notifier.default("class_name")))
+
+	txt.write(%newline)			
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.data_type
+	##  
+	## Get SELFs date_time
+	>> .properties[:data_type]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.data_type << dt
+	## 
+	## Set SELFs date_time
+	.properties[:data_type] << dt
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.value_changed_notifier
+	##  
+	## Get SELFs notifier method
+	>> .properties[:value_changed_notifier]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.value_changed_notifier << val
+	##  
+	## Set SELFs notifier method
+	.properties[:value_changed_notifier] << val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_date_time_item.set_logical_properties(_optional all?)
+	## 
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_self.aspect << _self.dialog_element_id + "_aspect"
+	_self.value_changed_notifier << _self.dialog_element_id + "_changed()"
+_endmethod
+$

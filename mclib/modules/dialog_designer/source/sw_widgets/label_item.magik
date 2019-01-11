@@ -1,0 +1,213 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## LABEL_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+label_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :value,:string),
+#					  :font_name,{:default,:heading,:emphasis,:fixed},
+#					  :font_size,:integer),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over label_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	props.remove_key(:label)
+	props.remove_key(:balloon_tooltip)	
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.font_size
+	## 
+	## Return SELF font size.
+
+	>> _self.font.point_size
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.font_size << newval
+	## 
+	## Set SELF font size.
+
+	_if _self.font _is _unset
+	_then 
+		_self.font << font.new_with_properties(:type,:logical,
+						       :name,"fixed",
+						       :point_size,newval.as_number().default(12))
+	_endif
+
+	_if _self.font_name = "fixed"
+	_then
+		_self.font << font.new_with_properties(:type,:logical,
+						       :name,_self.font_name,
+						       :point_size,newval.as_number().default(12))
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.font_name
+	## 
+	## Return SELF's font name.
+	
+	>>_self.font.identification_string.split_by(%=).last.split_by(%,).first
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.font_name << new_val
+	## 
+	## Set SELF's f ont name.
+
+	_if new_val _is :fixed
+	_then
+		_self.font << font.new_with_properties(:type,:logical,
+						       :name,"fixed",
+						       :point_size,_self.font_size)
+	_else	
+		_self.font << font.new_usage(new_val)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+	vts << vtext_style.new(_self.font)
+
+	val << _self.message_from_keyed_message(_self.value)
+
+	>> vts.box_coordinates(val).bounds.width.rounded 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	>> 19
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.id_changed()
+	## 
+	## Update the value when the id changes.
+	n << _self.get_property(:dialog_element_id).write_string.split_by(%_).last.as_number()
+	_self.value << write_string("Label ",n)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	>> _self.new(rc,"label",
+		     :font,font.new_usage("default"),
+		     :row,row,:col,col,
+		     :col_alignment,:fill,
+		     :row_alignment,:top)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.new_with_xml_properties(parent,props)
+	## 
+	## Return the default instance for SELF.
+
+	>> _self.new(parent,props[:value],_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.render_on(canv,bb)
+	## 
+	##  Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![pbb] << _self
+
+	_self.font << font.new_with_properties(:type,:logical,
+					       :name,"fixed",
+					       :point_size,12)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black),
+					     :font,_self.font)
+
+	val << _self.message_from_keyed_message(_self.value)
+	canv.draw_text(ts,pbb.xmin+1,pbb.ymax-4,val)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.gui_messages(txt)
+	## 
+	## Write SELF's messages to the text stream TXT.
+
+	val << _self.message_from_keyed_message(_self.value)
+	txt.write(%:,_self.get_property(:dialog_element_id),%tab,val,%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.gui_code(txt)
+	## 
+	## Write SELF's gui_code for SELF to the text stream TXT
+
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id,
+		  "] << label_item.new(",parent_id,%,,%",_self.value.default(""),%") #"
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	txt.write(" )",%newline)
+_endmethod
+$

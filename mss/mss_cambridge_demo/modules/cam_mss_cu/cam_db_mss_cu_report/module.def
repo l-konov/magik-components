@@ -1,0 +1,9 @@
+cam_db_mss_cu_report	1
+
+description
+	MSS CU report customizations for Cambridge database
+end
+
+requires
+	mss_cu_report
+end

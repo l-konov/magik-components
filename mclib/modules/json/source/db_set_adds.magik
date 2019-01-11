@@ -1,0 +1,32 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	db_set.write_as_json(a_stream)
+	##
+	##
+	 _local s << a_stream
+	 _local first? << _true
+	 l_max_value << !json_max_records!
+	 s.write(%[)
+	 l_numb << 0
+	_for i_object _over _self.fast_elements()
+	_loop
+		l_numb +<< 1
+		_if ~first?
+		_then s.write(%,)
+		_else first? << _false
+		_endif
+		
+		i_object.write_as_json(s)
+		_if l_max_value _isnt _unset _andif
+		    l_max_value <= l_numb
+		_then
+			_leave
+		_endif 
+
+	_endloop 
+	s.write(%])
+
+_endmethod
+$

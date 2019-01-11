@@ -1,0 +1,9 @@
+mss_wm_conflict_dialog	1
+
+description
+	Conflict dialog for MSS workspace functionality
+end
+
+requires
+	conflict_viewer_framework
+end

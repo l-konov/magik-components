@@ -1,0 +1,10 @@
+mclib_databus_bridge	4000	
+
+description
+	Provides a component used to build a bridge between two databuses
+end
+
+requires
+	component_framework
+	mclib_package
+end

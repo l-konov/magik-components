@@ -1,0 +1,158 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+########################################################################
+
+_pragma(classify_level=basic)
+## the Graphviz DOT language graph.
+def_slotted_exemplar(:dot_container,
+      {
+	      {:children,_unset},
+	      {:parent,_unset},
+	      {:id,_unset}
+      },
+      {:dot_attribute_list}
+)
+$
+dot_container.define_slot_access(:id,:read,:public)
+$
+dot_container.define_slot_access(:children,:read,:private)
+$
+dot_container.define_slot_access(:parent,:read,:public)
+$
+_pragma(classify_level=restricted)
+_private _method dot_container.init(id,_optional parent)
+	## init(string ID, optional dot_container PARNET) : dot_container
+	##
+	## initialises self
+
+	_super.init()
+
+	id << id.write_string
+	
+	_if (id.includes?(space_char) _orif
+	     id.includes?(%/) _orif
+	     id.includes?(%\) _orif
+	     id.includes?(%.) _orif
+	     id.includes?(%-)) _andif
+	    id.first _isnt %"
+	_then
+		id << write_string(%",id,%")
+	_endif
+
+	.id << id
+	.parent << parent
+	.children << rope.new()
+	
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_container.create_subgraph(id)
+	## create_subgraph(string ID) : dot_subgraph
+	## 
+	## createa a dot_subgraph and makes the appropriate
+	## child/parent links for later reference.
+
+	_return .children.add_last(dot_subgraph.new(id,_self))
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_container.create_node(id)
+	## create_node(string ID) : dot_node
+	##
+	## creates a dot_node 
+
+	_return .children.add_last(dot_node.new(id,_self))
+	
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_container.create_edge(id_list)
+	## create_node(ordered collection of strings ID_LIST) : dot_edge
+	##
+	## creates a dot_edge
+
+	_return .children.add_last(dot_edge.new(id_list,_self))
+	
+_endmethod
+$
+_pragma(classify_level=basic)
+_method dot_container.write_on(a_stream,_optional indent_level,compact?)
+	## write_on(output_stream A_STREAM,
+	##          optional integer INDENT_LEVEL) : _unset
+	##
+	## writes the contents of _self
+
+	compact? << compact? _is _true 
+	
+	indent_level << indent_level.default(0)
+
+	_local indent_increment << 4
+	
+	_constant outline_indent_string << _if compact?
+					   _then
+						   >> ""
+					   _else
+						   >> space_char * indent_level
+					   _endif
+	
+	_constant body_indent_string << _if compact?
+					_then
+						>> ""
+					_else
+						>> space_char * (indent_level + indent_increment)
+					_endif 
+	
+	a_stream.write(outline_indent_string,_self.graph_type," ",.id," {")
+
+	_if _not compact?
+	_then
+		a_stream.newline()
+	_endif
+	
+	_if _not .attributes.empty?
+	_then
+		_if _not compact?
+		_then
+			a_stream.newline()
+		_endif
+
+		_for attribute_name,attribute_value _over .attributes.fast_keys_and_elements()
+		_loop
+			a_stream.write(body_indent_string,attribute_name,"=",attribute_value,";")
+			_if _not compact?
+			_then
+				a_stream.newline()	
+			_endif
+		_endloop
+				
+	_endif
+	
+	_for a_child _over .children.fast_elements()
+	_loop
+		_if _not compact?
+		_then
+			a_stream.newline()
+			a_child.write_on(a_stream,indent_level + indent_increment,compact?)
+		_else 
+			a_child.write_on(a_stream,_unset,compact?)
+		_endif
+		
+	_endloop
+
+	_if _not compact?
+	_then
+		a_stream.newline()
+	_endif
+	
+	a_stream.write(outline_indent_string,"}")
+	
+_endmethod
+$

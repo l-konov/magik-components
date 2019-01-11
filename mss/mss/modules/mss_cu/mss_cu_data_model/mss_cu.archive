@@ -1,0 +1,1086 @@
+#% text_encoding = utf8
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"mss_cu_dimensionality_type", 
+				       :ds_uint, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(10, "Each")
+enum.add_archive_values(100, "Per Meter")
+enum.add_archive_values(110, "Per Foot")
+enum.add_archive_values(200, "Per Square Meter")
+enum.add_archive_values(210, "Per Square Foot")
+enum.add_archive_values(300, "Per Cubic Meter")
+enum.add_archive_values(310, "Per Cubic Foot")
+enum.add_archive_values(400, "Per Hour")
+enum.add_archive_values(410, "Per Day")
+enum.add_archive_values(420, "Per Week")
+enum.add_archive_values(500, "Per Ton")
+
+_endblock
+$
+
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"mss_cu_operation_type", 
+				       :ds_uint, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(0, "")
+enum.add_archive_values(10, "Install")
+enum.add_archive_values(20, "Abandon")
+enum.add_archive_values(30, "Remove")
+enum.add_archive_values(40, "Transfer")
+
+_endblock
+$
+
+_block
+
+ft << case_field_type.new_from_archive(
+				       {"mss_cu_usage_type", 
+				       :ds_uint, 
+				       True, 
+				       True, 
+				       _unset, 
+				       0, 
+				       unset, 
+				       _unset, _unset})
+
+enum << ft.enumerator
+enum.archive_domain_class << "string"
+enum.type << "Mapping"
+
+_endblock
+$
+
+_block
+
+enum.add_archive_values(10, "Material")
+enum.add_archive_values(20, "Labor")
+enum.add_archive_values(30, "Equipment")
+enum.add_archive_values(9000, "Macro Unit")
+enum.add_archive_values(9998, "Other")
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1711,
+                                  "mss_cu_cost_group",
+                                  write_string("CU Cost Group"),
+                                  "mss_cu_cost_group",
+                                  _unset,{0,0,0},0} ,84306.0000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_cu_cost_group_items", "CU Cost Group Items", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1722,
+                                  "mss_cu_cost_group_item",
+                                  write_string("CU Cost Group Item"),
+                                  "mss_cu_cost_group_item",
+                                  _unset,{0,0,0},0} ,84306.0000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("mss_cu_cost_group_id", "CU Cost Cost Group ID", :physical)
+
+
+an_f << o.add_field("mss_cu_operation_definition_id", "CU Operation Definition ID", :physical)
+
+
+an_f << o.add_field("material_cost", "Material Cost", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << (-8795213412905779*2.0**-43)
+
+
+an_f << o.add_field("labor_cost", "Labor Cost", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << (-8795213412905779*2.0**-43)
+
+
+an_f << o.add_field("cu_cost_group_name", "Cost Group Name", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("cu_code_and_operation", "CU Code And Operation", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,30)
+an_f.print_width << 30
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("mss_cu_cost_group", "CU Cost Group", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+an_f << o.add_field("mss_cu_operation_definition", "CU Operation Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1739,
+                                  "mss_cu_definition",
+                                  write_string("CU Definition"),
+                                  "mss_cu_definition",
+                                  _unset,{0,0,0},0} ,0.00000000000, -7500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("cu_code", "CU Code", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+an_f.mandatory? << True
+
+
+an_f << o.add_field("description", "Description", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+an_f.mandatory? << False
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("usage", "Usage", :physical)
+an_f.archive_set_field_type_to(:|mss_cu_usage_type|,_unset)
+an_f.print_width << 12
+an_f.archive_default_value << "Material"
+
+
+an_f << o.add_field("dimensionality", "Dimensionality", :physical)
+an_f.archive_set_field_type_to(:|mss_cu_dimensionality_type|,_unset)
+an_f.print_width << 18
+an_f.archive_default_value << "Each"
+
+
+an_f << o.add_field("effective_date", "Effective Date", :physical)
+an_f.archive_set_field_type_to(:|ds_date|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << False
+an_f.archive_unset_value << date
+
+
+an_f << o.add_field("obsolete_date", "Obsolete Date", :physical)
+an_f.archive_set_field_type_to(:|ds_date|,_unset)
+an_f.print_width << 19
+an_f.mandatory? << False
+an_f.archive_unset_value << date
+
+
+an_f << o.add_field("mss_cu_job_types", "CU Job Types", :join)
+an_f.editor_name << "dbset_field_editor"
+
+
+an_f << o.add_field("mss_cu_operation_definitions", "CU Operation Definitions", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("mss_cu_facility_relationships", "CU Facility Relationships", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+an_f << o.add_field("mss_cu_group_definitions", "CU Group Definitions", :join)
+an_f.editor_name << "dbset_field_editor"
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1758,
+                                  "mss_cu_facility_attribute",
+                                  write_string("CU Facility Attribute"),
+                                  "mss_cu_facility_attribute",
+                                  _unset,{0,0,0},0} ,44721.0000000, -31500.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("attribute_name", "Attribute Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,32)
+an_f.print_width << 32
+an_f.mandatory? << True
+
+
+an_f << o.add_field("attribute_value", "Attribute Value", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_cu_facility_relationship_id", "CU Facility Relationship ID", :physical)
+
+
+an_f << o.add_field("mss_cu_facility_relationship", "CU Facility Relationship", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1771,
+                                  "mss_cu_facility_relationship",
+                                  write_string("CU Facility Relationship"),
+                                  "mss_cu_facility_relationship",
+                                  _unset,{0,0,0},0} ,44721.0000000, -25500.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("cu_code", "CU Code", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+an_f.mandatory? << True
+
+
+an_f << o.add_field("table_code", "Table Code", :physical)
+an_f.archive_set_field_type_to(:|ds_int|,80)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|mss_cu_operation_type|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_cu_definition_id", "CU Definition ID", :physical)
+
+
+an_f << o.add_field("mss_cu_definition", "CU Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+an_f << o.add_field("mss_cu_facility_attributes", "CU Facility Attributes", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1786,
+                                  "mss_cu_group_definition",
+                                  write_string("CU Group Definition"),
+                                  "mss_cu_group_definition",
+                                  _unset,{0,0,0},0} ,0.00000000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,40)
+an_f.print_width << 40
+an_f.mandatory? << True
+
+
+an_f << o.add_field("mss_cu_definitions", "CU Definitions", :join)
+an_f.editor_name << "dbset_field_editor"
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1797,
+                                  "mss_cu_job_type",
+                                  write_string("CU Job Type"),
+                                  "mss_cu_job_type",
+                                  _unset,{0,0,0},0} ,-40000.0000000, -1500.00000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("name", "Name", :physical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,80)
+an_f.print_width << 80
+an_f.mandatory? << True
+
+
+an_f << o.add_field("material_cost_multiplier", "Material Cost Multiplier", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("labor_cost_multiplier", "Labor Cost Multiplier", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("mss_cu_definitions", "CU Definitions", :join)
+an_f.editor_name << "dbset_field_editor"
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1810,
+                                  "mss_cu_mu_relationship",
+                                  write_string("CU MU Relationship"),
+                                  "mss_cu_mu_relationship",
+                                  _unset,{0,0,0},0} ,44721.0000000, -19500.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("quantity", "Quantity", :physical)
+an_f.archive_set_field_type_to(:|ds_uint|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("unit_multiplier", "Unit Multiplier", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << False
+an_f.archive_unset_value << (0.0)
+
+
+an_f << o.add_field("p_mss_cu_operation_definition_id", "Parent Operation Definition ID", :physical)
+
+
+an_f << o.add_field("c_mss_cu_operation_definition_id", "Child Operation Definition ID", :physical)
+
+
+an_f << o.add_field("parent_cu_code_and_operation", "Parent CU Code And Operation", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,30)
+an_f.print_width << 30
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("child_cu_code_and_operation", "Child CU Code And Operation", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,30)
+an_f.print_width << 30
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("p_mss_cu_operation_definition", "Parent Operation Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+an_f << o.add_field("c_mss_cu_operation_definition", "Child Operation Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+
+_endblock
+$
+
+_block
+
+o << case_object.new_from_archive(
+                                  {1827,
+                                  "mss_cu_operation_definition",
+                                  write_string("CU Operation Definition"),
+                                  "mss_cu_operation_definition",
+                                  _unset,{0,0,0},0} ,44721.0000000, -13500.0000000)
+o.set_trigger(:insert,"insert_trigger()")
+o.set_trigger(:update,"update_trigger()")
+o.set_trigger(:delete,"delete_trigger()")
+o.add_validator("general_validator()")
+o.editor_name << "component_editor"
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("id", "Id", :physical)
+an_f.set_key_status_to(_true)
+an_f.archive_set_field_type_to(:|sys_id|,_unset)
+an_f.print_width << 10
+an_f.editor_name << "field_editor"
+an_f.mandatory? << True
+an_f.set_generator_method_name("make_sysid()")
+
+
+an_f << o.add_field("operation", "Operation", :physical)
+an_f.archive_set_field_type_to(:|mss_cu_operation_type|,_unset)
+an_f.print_width << 10
+an_f.mandatory? << True
+
+
+an_f << o.add_field("material_cost", "Material Cost", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("labor_cost", "Labor Cost", :physical)
+an_f.archive_set_field_type_to(:|ds_double|,_unset)
+an_f.print_width << 10
+
+
+an_f << o.add_field("mss_cu_definition_id", "CU Definition ID", :physical)
+
+
+an_f << o.add_field("cu_code", "CU Code", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,20)
+an_f.print_width << 20
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("cu_code_and_operation", "CU Code And Operation", :logical)
+an_f.archive_set_field_type_to(:|ds_char16canon_vec|,30)
+an_f.print_width << 30
+an_f.archive_unset_value << ""
+
+
+an_f << o.add_field("mss_cu_definition", "CU Definition", :join)
+an_f.editor_name << "owner_field_editor"
+an_f.structure_type << :super
+
+
+an_f << o.add_field("mss_cu_cost_group_items", "CU Cost Group Items", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+an_f << o.add_field("c_mss_cu_mu_relationships", "Child MU Relationships", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+an_f << o.add_field("p_mss_cu_mu_relationships", "Parent MU Relationships", :join)
+an_f.editor_name << "component_field_editor"
+an_f.cascade? << True
+an_f.structure_type << :sub
+
+
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1898,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_definition", "mss_cu_facility_relationship")
+r.add_default_join_names()
+r.join_name << "mss_cu_defini_to_mss_cu_facili"
+r.reverse_join_name << "mss_cu_facili_to_mss_cu_defini"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((32295.0),(-6375*2.0**2),(0.0),(-6375*2.0**2),(0.0),(-1125*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1948,
+                                        "m:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_job_type", "mss_cu_definition")
+r.add_default_join_names()
+r.archive_update_int_info_rec({_unset, 
+"int!mss_cu_job_ty_mss_cu_defini", 
+"mss_cu_job_ty_to_int!mss_cu_job", 
+"int!mss_cu_job_to_mss_cu_job_ty", 
+"mss_cu_defini_to_int!mss_cu_job", 
+"int!mss_cu_job_to_mss_cu_defini"})
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((-7563.0),(-1875*2.0**2),(-625*2.0**6),(-1875*2.0**2),(-625*2.0**6),(-375*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1885,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_operation_definition", "mss_cu_cost_group_item")
+r.add_default_join_names()
+r.join_name << "mss_cu_operat_to_mss_cu_cost_g"
+r.reverse_join_name << "mss_cu_cost_g_to_mss_cu_operat"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((42153*2.0),(-1125*2.0**3),(42153*2.0),(-3375*2.0**2),(28479*2.0),(-3375*2.0**2))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1935,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_facility_relationship", "mss_cu_facility_attribute")
+r.add_default_join_names()
+r.join_name << "mss_cu_facili_to_mss_cu_facili"
+r.reverse_join_name << "mss_cu_facili_to_mss_cu_facil"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((44721.0),(-1875*2.0**4),(44721.0),(-3375*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1872,
+                                        "m:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_group_definition", "mss_cu_definition")
+r.add_default_join_names()
+r.archive_update_int_info_rec({_unset, 
+"int!mss_cu_group__mss_cu_defini", 
+"mss_cu_group__to_int!mss_cu_gro", 
+"int!mss_cu_gro_to_mss_cu_group_", 
+"mss_cu_defini_to_int!mss_cu_gro", 
+"int!mss_cu_gro_to_mss_cu_defini"})
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((0.0),(-375*2.0**4),(0.0),(-375*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1859,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_operation_definition", "mss_cu_mu_relationship")
+r.add_default_join_names()
+r.join_name << "mss_cu_operat_to_mss_cu_mu_rel"
+r.reverse_join_name << "mss_cu_mu_rel_to_mss_cu_operat"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((17687*2.0),(-1125*2.0**4),(17687*2.0),(-1875*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1924,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_definition", "mss_cu_operation_definition")
+r.add_default_join_names()
+r.join_name << "mss_cu_defini_to_mss_cu_operat"
+r.reverse_join_name << "mss_cu_operat_to_mss_cu_defini"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((8121*2.0**2),(-3375*2.0**2),(0.0),(-3375*2.0**2),(0.0),(-1125*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1846,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_cost_group", "mss_cu_cost_group_item")
+r.add_default_join_names()
+r.join_name << "mss_cu_cost_g_to_mss_cu_cost_g"
+r.reverse_join_name << "mss_cu_cost_g_to_mss_cu_cost_"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((42153*2.0),(-375*2.0**4),(42153*2.0),(-375*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+r << case_relationship.new_from_archive(
+                                        {1911,
+                                        "1:n",
+                                        "unset",
+                                        _unset, {0,0,0}, 0})
+r.make_archive_o_rec("mss_cu_operation_definition", "mss_cu_mu_relationship")
+r.add_default_join_names()
+r.join_name << "mss_cu_operat_to_mss_cu_mu_rel1"
+r.reverse_join_name << "mss_cu_mu_rel_to_mss_cu_operat1"
+sec_rope << sector_rope.new(1)
+sec_rope[1] << sector.new_with_xy((13517*2.0**2),(-1125*2.0**4),(13517*2.0**2),(-1875*2.0**3))
+r.make_archived_geometry(sec_rope)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_cu_cost_group, :mss_cu_cost_group_items, 1846, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_cu_cost_group_item, :mss_cu_cost_group_id, :mss_cu_cost_group, :id, 1846)
+case_object.archive_add_field_inheritance(:mss_cu_cost_group_item, :mss_cu_operation_definition_id, :mss_cu_operation_definition, :id, 1885)
+case_object.archive_join_field_info(:mss_cu_cost_group_item, :mss_cu_cost_group, 1846, :child)
+case_object.archive_join_field_info(:mss_cu_cost_group_item, :mss_cu_operation_definition, 1885, :child)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_cu_definition, :mss_cu_job_types, 1948, :child)
+case_object.archive_join_field_info(:mss_cu_definition, :mss_cu_operation_definitions, 1924, :parent)
+case_object.archive_join_field_info(:mss_cu_definition, :mss_cu_facility_relationships, 1898, :parent)
+case_object.archive_join_field_info(:mss_cu_definition, :mss_cu_group_definitions, 1872, :child)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_cu_facility_attribute, :mss_cu_facility_relationship_id, :mss_cu_facility_relationship, :id, 1935)
+case_object.archive_join_field_info(:mss_cu_facility_attribute, :mss_cu_facility_relationship, 1935, :child)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_cu_facility_relationship, :mss_cu_definition_id, :mss_cu_definition, :id, 1898)
+case_object.archive_join_field_info(:mss_cu_facility_relationship, :mss_cu_definition, 1898, :child)
+case_object.archive_join_field_info(:mss_cu_facility_relationship, :mss_cu_facility_attributes, 1935, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_cu_group_definition, :mss_cu_definitions, 1872, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_join_field_info(:mss_cu_job_type, :mss_cu_definitions, 1948, :parent)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_cu_mu_relationship, :p_mss_cu_operation_definition_id, :mss_cu_operation_definition, :id, 1859)
+case_object.archive_add_field_inheritance(:mss_cu_mu_relationship, :c_mss_cu_operation_definition_id, :mss_cu_operation_definition, :id, 1911)
+case_object.archive_join_field_info(:mss_cu_mu_relationship, :p_mss_cu_operation_definition, 1859, :child)
+case_object.archive_join_field_info(:mss_cu_mu_relationship, :c_mss_cu_operation_definition, 1911, :child)
+
+_endblock
+$
+
+_block
+
+case_object.archive_add_field_inheritance(:mss_cu_operation_definition, :mss_cu_definition_id, :mss_cu_definition, :id, 1924)
+case_object.archive_join_field_info(:mss_cu_operation_definition, :mss_cu_definition, 1924, :child)
+case_object.archive_join_field_info(:mss_cu_operation_definition, :mss_cu_cost_group_items, 1885, :parent)
+case_object.archive_join_field_info(:mss_cu_operation_definition, :c_mss_cu_mu_relationships, 1859, :parent)
+case_object.archive_join_field_info(:mss_cu_operation_definition, :p_mss_cu_mu_relationships, 1911, :parent)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_cost_group,
+                                            {"name"})
+case_object.archived_indices(:mss_cu_cost_group, {"name"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_cost_group_item,
+                                            {"cu_cost_group_name",
+                                            "cu_code_and_operation",
+                                            "material_cost",
+                                            "labor_cost",
+                                            "mss_cu_cost_group",
+                                            "mss_cu_operation_definition"})
+case_object.archived_indices(:mss_cu_cost_group_item, {"mss_cu_cost_group_id"}, {1846})
+case_object.archived_indices(:mss_cu_cost_group_item, {"mss_cu_operation_definition_id","mss_cu_cost_group_id"}, {1885})
+case_object.archive_aspect_field(:mss_cu_cost_group_item, :mss_cu_cost_group, :mss_cu_cost_group, :name)
+case_object.archive_aspect_field(:mss_cu_cost_group_item, :mss_cu_operation_definition, :mss_cu_operation_definition, :cu_code_and_operation)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_definition,
+                                            {"cu_code",
+                                            "description",
+                                            "usage",
+                                            "dimensionality",
+                                            "effective_date",
+                                            "obsolete_date",
+                                            "mss_cu_operation_definitions",
+                                            "mss_cu_facility_relationships",
+                                            "mss_cu_group_definitions",
+                                            "mss_cu_job_types"})
+case_object.archived_indices(:mss_cu_definition, {"cu_code"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_facility_attribute,
+                                            {"attribute_value",
+                                            "attribute_name",
+                                            "mss_cu_facility_relationship"})
+case_object.archived_indices(:mss_cu_facility_attribute, {"mss_cu_facility_relationship_id"}, {1935})
+case_object.archive_aspect_field(:mss_cu_facility_attribute, :mss_cu_facility_relationship, :mss_cu_facility_relationship, :id)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_facility_relationship,
+                                            {"table_code",
+                                            "cu_code",
+                                            "operation",
+                                            "mss_cu_definition",
+                                            "mss_cu_facility_attributes"})
+case_object.archived_indices(:mss_cu_facility_relationship, {"cu_code"}, {})
+case_object.archived_indices(:mss_cu_facility_relationship, {"table_code","cu_code"}, {})
+case_object.archived_indices(:mss_cu_facility_relationship, {"mss_cu_definition_id"}, {1898})
+case_object.archive_aspect_field(:mss_cu_facility_relationship, :mss_cu_definition, :mss_cu_definition, :cu_code)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_group_definition,
+                                            {"name",
+                                            "mss_cu_definitions"})
+case_object.archived_indices(:mss_cu_group_definition, {"name"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_job_type,
+                                            {"name",
+                                            "material_cost_multiplier",
+                                            "labor_cost_multiplier",
+                                            "mss_cu_definitions"})
+case_object.archived_indices(:mss_cu_job_type, {"name"}, {})
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_mu_relationship,
+                                            {"quantity",
+                                            "unit_multiplier",
+                                            "parent_cu_code_and_operation",
+                                            "child_cu_code_and_operation",
+                                            "p_mss_cu_operation_definition",
+                                            "c_mss_cu_operation_definition"})
+case_object.archived_indices(:mss_cu_mu_relationship, {"p_mss_cu_operation_definition_id"}, {1859})
+case_object.archived_indices(:mss_cu_mu_relationship, {"c_mss_cu_operation_definition_id","p_mss_cu_operation_definition_id"}, {1911})
+case_object.archive_aspect_field(:mss_cu_mu_relationship, :p_mss_cu_operation_definition, :mss_cu_operation_definition, :cu_code_and_operation)
+case_object.archive_aspect_field(:mss_cu_mu_relationship, :c_mss_cu_operation_definition, :mss_cu_operation_definition, :cu_code_and_operation)
+
+_endblock
+$
+
+_block
+
+case_visible_fields_object.new_from_archive(:default, 
+                                            :mss_cu_operation_definition,
+                                            {"operation",
+                                            "material_cost",
+                                            "labor_cost",
+                                            "mss_cu_definition",
+                                            "mss_cu_cost_group_items",
+                                            "c_mss_cu_mu_relationships",
+                                            "p_mss_cu_mu_relationships"})
+case_object.archived_indices(:mss_cu_operation_definition, {"mss_cu_definition_id"}, {1924})
+case_object.archive_aspect_field(:mss_cu_operation_definition, :mss_cu_definition, :mss_cu_definition, :cu_code)
+
+_endblock
+$
+
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$
+
+$

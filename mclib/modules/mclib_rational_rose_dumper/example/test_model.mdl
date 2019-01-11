@@ -1,0 +1,413 @@
+
+(object Petal
+    version    	44
+    _written   	"Rose 7.1.9642.27"
+    charSet    	0)
+
+(object Design "Logical View"
+    is_unit    	TRUE
+    is_loaded  	TRUE
+    quid       	"426902770280"
+    defaults   	(object defaults
+	rightMargin 	0.250000
+	leftMargin 	0.250000
+	topMargin  	0.250000
+	bottomMargin 	0.500000
+	pageOverlap 	0.250000
+	clipIconLabels 	TRUE
+	autoResize 	TRUE
+	snapToGrid 	TRUE
+	gridX      	16
+	gridY      	16
+	defaultFont 	(object Font
+	    size       	10
+	    face       	"Arial"
+	    bold       	FALSE
+	    italics    	FALSE
+	    underline  	FALSE
+	    strike     	FALSE
+	    color      	0
+	    default_color 	TRUE)
+	showMessageNum 	1
+	showClassOfObject 	TRUE
+	notation   	"Unified")
+    root_usecase_package 	(object Class_Category "Use Case View"
+	quid       	"426902770282"
+	exportControl 	"Public"
+	global     	TRUE
+	logical_models 	(list unit_reference_list)
+	logical_presentations 	(list unit_reference_list
+	    (object UseCaseDiagram "Main"
+		quid       	"4269027702DF"
+		title      	"Main"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	0
+		items      	(list diagram_item_list))))
+    root_category 	(object Class_Category "Logical View"
+	quid       	"426902770281"
+	exportControl 	"Public"
+	global     	TRUE
+	subsystem  	"Component View"
+	quidu      	"426902770283"
+	logical_models 	(list unit_reference_list
+	    (object Class_Category "source"
+		quid       	"426902D30280"
+		exportControl 	"Public"
+		logical_models 	(list unit_reference_list
+		    (object Class_Category "test"
+			quid       	"42706D1B0280"
+			exportControl 	"Public"
+			logical_models 	(list unit_reference_list
+			    (object Class_Category "test_source"
+				quid       	"42708D310213"
+				exportControl 	"Public"
+				logical_models 	(list unit_reference_list
+				    (object Class "test_super_class"
+					quid       	"42706D5601D4")
+				    (object Class "test_super_class_two"
+					quid       	"42708C1402AF")
+				    (object Class "test_class"
+					quid       	"42706D4B0000"
+					documentation 	
+|Class comment 1
+|Class comment 2
+					
+					superclasses 	(list inheritance_relationship_list
+					    (object Inheritance_Relationship
+						quid       	"42706F91007D"
+						supplier   	"Logical View::source::test::test_source::test_super_class"
+						quidu      	"42706D5601D4")
+					    (object Inheritance_Relationship
+						quid       	"42708C2101E4"
+						supplier   	"Logical View::source::test::test_source::test_super_class_two"
+						quidu      	"42708C1402AF"))
+					operations 	(list Operations
+					    (object Operation "setter_method<<"
+						quid       	"42706DB901F4"
+						documentation 	
+|setter method doc1
+|setter method doc2
+						
+						parameters 	(list Parameters
+						    (object Parameter "new_value"
+							quid       	"42706DE70213"
+							type       	"Boolean"))
+						concurrency 	"Sequential"
+						opExportControl 	"Public"
+						uid        	0)
+					    (object Operation "getter_method"
+						quid       	"42706DFA0109"
+						documentation 	
+|getter method doc1
+|getter method doc2
+						
+						result     	"Boolean"
+						concurrency 	"Sequential"
+						opExportControl 	"Public"
+						uid        	0)
+					    (object Operation "param_method()"
+						quid       	"42706E3B005D"
+						documentation 	
+|param method doc1
+|param method doc2
+|param method doc3
+						
+						parameters 	(list Parameters
+						    (object Parameter "param1"
+							quid       	"42706E7D0232"
+							documentation 	
+|param1 doc1
+|param1 doc2
+							
+							type       	"Boolean")
+						    (object Parameter "param2"
+							quid       	"42706E8F003E"
+							documentation 	
+|param2 doc1
+|param2 doc2
+							
+							type       	"Integer")
+						    (object Parameter "param3"
+							quid       	"42706EF001D4"
+							documentation 	
+|param3 doc1
+|param3 doc2
+							
+							type       	"test_class_two"
+							quidu      	"42706EDF01A5"))
+						result     	"Integer"
+						concurrency 	"Sequential"
+						opExportControl 	"Public"
+						uid        	0)
+					    (object Operation "shared_var1"
+						quid       	"427070E0035B"
+						documentation 	
+|shared var doc1
+|shared var doc2
+						
+						stereotype 	"Shared Variable"
+						concurrency 	"Sequential"
+						opExportControl 	"Private"
+						uid        	0)
+					    (object Operation "shared_const"
+						quid       	"427070F7003E"
+						documentation 	
+|shared const doc1
+|shared const doc2
+						
+						stereotype 	"Shared Constant"
+						concurrency 	"Sequential"
+						opExportControl 	"Public"
+						uid        	0)
+					    (object Operation "bracket_only_method()"
+						quid       	"42709BC203C8"
+						concurrency 	"Sequential"
+						opExportControl 	"Public"
+						uid        	0)
+					    (object Operation "param_method2"
+						quid       	"42709BDB0138"
+						documentation 	"this method captured in rose with 1 parameter but no brackets in the name"
+						parameters 	(list Parameters
+						    (object Parameter "a_param"
+							quid       	"42709BEA035B"))
+						concurrency 	"Sequential"
+						opExportControl 	"Public"
+						uid        	0))
+					class_attributes 	(list class_attribute_list
+					    (object ClassAttribute "public_slot"
+						quid       	"427070210196"
+						documentation 	
+|public slot doc1
+|public slot doc2
+						
+						type       	"Boolean"
+						exportControl 	"Public")
+					    (object ClassAttribute "private_slot"
+						quid       	"4270702D003E"
+						documentation 	
+|private slot doc1
+|private slot doc2
+						
+						type       	"Integer")))
+				    (object Class "test_class_two"
+					quid       	"42706EDF01A5"))
+				logical_presentations 	(list unit_reference_list
+				    (object ClassDiagram "test_class_diagram"
+					quid       	"42706F70005D"
+					title      	"test_class_diagram"
+					zoom       	100
+					max_height 	28350
+					max_width  	21600
+					origin_x   	0
+					origin_y   	0
+					items      	(list diagram_item_list
+					    (object ClassView "Class" "Logical View::source::test::test_source::test_class" @1
+						ShowCompartmentStereotypes 	TRUE
+						IncludeAttribute 	TRUE
+						IncludeOperation 	TRUE
+						location   	(832, 1024)
+						font       	(object Font
+						    size       	10
+						    face       	"Arial"
+						    bold       	FALSE
+						    italics    	FALSE
+						    underline  	FALSE
+						    strike     	FALSE
+						    color      	0
+						    default_color 	TRUE)
+						label      	(object ItemLabel
+						    Parent_View 	@1
+						    location   	(464, 743)
+						    fill_color 	13434879
+						    nlines     	1
+						    max_width  	736
+						    justify    	0
+						    label      	"test_class")
+						icon_style 	"Icon"
+						line_color 	3342489
+						fill_color 	13434879
+						quidu      	"42706D4B0000"
+						compartment 	(object Compartment
+						    Parent_View 	@1
+						    location   	(464, 804)
+						    font       	(object Font
+							size       	10
+							face       	"Arial"
+							bold       	FALSE
+							italics    	FALSE
+							underline  	FALSE
+							strike     	FALSE
+							color      	0
+							default_color 	TRUE)
+						    icon_style 	"Icon"
+						    fill_color 	13434879
+						    anchor     	2
+						    nlines     	10
+						    max_width  	734)
+						width      	754
+						height     	586
+						annotation 	8
+						autoResize 	TRUE)
+					    (object ClassView "Class" "Logical View::source::test::test_source::test_super_class" @2
+						ShowCompartmentStereotypes 	TRUE
+						IncludeAttribute 	TRUE
+						IncludeOperation 	TRUE
+						location   	(560, 496)
+						font       	(object Font
+						    size       	10
+						    face       	"Arial"
+						    bold       	FALSE
+						    italics    	FALSE
+						    underline  	FALSE
+						    strike     	FALSE
+						    color      	0
+						    default_color 	TRUE)
+						label      	(object ItemLabel
+						    Parent_View 	@2
+						    location   	(391, 444)
+						    fill_color 	13434879
+						    nlines     	1
+						    max_width  	338
+						    justify    	0
+						    label      	"test_super_class")
+						icon_style 	"Icon"
+						line_color 	3342489
+						fill_color 	13434879
+						quidu      	"42706D5601D4"
+						width      	356
+						height     	128
+						annotation 	8
+						autoResize 	TRUE)
+					    (object InheritView "" @3
+						stereotype 	TRUE
+						line_color 	3342489
+						quidu      	"42706F91007D"
+						client     	@1
+						supplier   	@2
+						line_style 	0)
+					    (object ClassView "Class" "Logical View::source::test::test_source::test_super_class_two" @4
+						ShowCompartmentStereotypes 	TRUE
+						IncludeAttribute 	TRUE
+						IncludeOperation 	TRUE
+						location   	(1088, 496)
+						font       	(object Font
+						    size       	10
+						    face       	"Arial"
+						    bold       	FALSE
+						    italics    	FALSE
+						    underline  	FALSE
+						    strike     	FALSE
+						    color      	0
+						    default_color 	TRUE)
+						label      	(object ItemLabel
+						    Parent_View 	@4
+						    location   	(869, 418)
+						    fill_color 	13434879
+						    nlines     	2
+						    max_width  	439
+						    justify    	0
+						    label      	"test_super_class_two")
+						icon_style 	"Icon"
+						line_color 	3342489
+						fill_color 	13434879
+						quidu      	"42708C1402AF"
+						width      	457
+						height     	181
+						annotation 	8
+						autoResize 	TRUE)
+					    (object InheritView "" @5
+						stereotype 	TRUE
+						line_color 	3342489
+						quidu      	"42708C2101E4"
+						client     	@1
+						supplier   	@4
+						line_style 	0)
+					    (object ClassView "Class" "Logical View::source::test::test_source::test_class_two" @6
+						ShowCompartmentStereotypes 	TRUE
+						IncludeAttribute 	TRUE
+						IncludeOperation 	TRUE
+						location   	(1696, 784)
+						font       	(object Font
+						    size       	10
+						    face       	"Arial"
+						    bold       	FALSE
+						    italics    	FALSE
+						    underline  	FALSE
+						    strike     	FALSE
+						    color      	0
+						    default_color 	TRUE)
+						label      	(object ItemLabel
+						    Parent_View 	@6
+						    location   	(1537, 733)
+						    fill_color 	13434879
+						    nlines     	1
+						    max_width  	318
+						    justify    	0
+						    label      	"test_class_two")
+						icon_style 	"Icon"
+						line_color 	3342489
+						fill_color 	13434879
+						quidu      	"42706EDF01A5"
+						width      	336
+						height     	126
+						annotation 	8
+						autoResize 	TRUE))))))
+			logical_presentations 	(list unit_reference_list)))
+		logical_presentations 	(list unit_reference_list)))
+	logical_presentations 	(list unit_reference_list
+	    (object ClassDiagram "Main"
+		quid       	"4269027702BF"
+		title      	"Main"
+		zoom       	36
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	122
+		items      	(list diagram_item_list))))
+    root_subsystem 	(object SubSystem "Component View"
+	quid       	"426902770283"
+	physical_models 	(list unit_reference_list)
+	physical_presentations 	(list unit_reference_list
+	    (object Module_Diagram "Main"
+		quid       	"4269027702DE"
+		title      	"Main"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	0
+		items      	(list diagram_item_list))))
+    process_structure 	(object Processes
+	quid       	"426902770284"
+	ProcsNDevs 	(list
+	    (object Process_Diagram "Deployment View"
+		quid       	"426902770286"
+		title      	"Deployment View"
+		zoom       	100
+		max_height 	28350
+		max_width  	21600
+		origin_x   	0
+		origin_y   	0
+		items      	(list diagram_item_list))))
+    properties 	(object Properties
+	attributes 	(list Attribute_Set
+	    (object Attribute
+		tool       	"framework"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Rose Model Integrator"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Rose Web Publisher"
+		name       	"HiddenTool"
+		value      	FALSE)
+	    (object Attribute
+		tool       	"Version Control"
+		name       	"HiddenTool"
+		value      	FALSE))
+	quid       	"426902770285"))

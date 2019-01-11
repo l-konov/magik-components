@@ -1,0 +1,33 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_transaction
+##
+## A custom_record_transaction that can work correctly in a
+## short transaction environment.
+##
+
+def_slotted_exemplar(:mss_scheduler_transaction,
+{},
+{:custom_record_transaction})
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduler_transaction.initial_transaction_record_set()
+	## 
+	## Returns a list of initial records that will be changed in this
+	## transaction.
+	##
+
+	_return {}
+	
+_endmethod
+$

@@ -1,0 +1,10 @@
+cam_mss_scheduler	1
+
+description
+	Cambridge DB glue code for mss_scheduler
+end
+
+requires
+	mss_scheduler
+	cam_db_mss_scheduler_workspace_additions
+end

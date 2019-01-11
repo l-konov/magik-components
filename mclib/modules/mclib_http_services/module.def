@@ -1,0 +1,9 @@
+mclib_http_services	4000	
+
+description
+	Generic services for use with the mclib_http_server
+end
+
+requires
+	mclib_http_server
+end	

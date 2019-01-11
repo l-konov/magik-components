@@ -1,0 +1,57 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# The purpose of the following condition is to allow an engine
+# to seamlessly request an interactive result from a calling
+# process, without having to explicitly stop and check if a
+# GUI-type thing is available to handle it.
+#
+# For example, the engine could raise a condition like this:
+# retval << condition.raise(:mss_question, :string, "This is the prompt to display",
+#			    :button_labels, {"Yes", "No", "I Don't Know"},
+#			    :button_values, {:value_1, :value_2, :value_3})
+#
+# If the caller does not specifically handle mss_question, this
+# will result in regular information condition handling, and
+# retval will be unset.
+#
+# However, if the caller handles it in this manner...
+#
+#		_handling mss_question _with
+#		_proc(cond)
+#			_import gui_handler
+#			_if (bl << cond[:button_labels]) _is _unset _orif
+#			    (bv << cond[:button_values]) _is _unset
+#			_then
+#				# Malformed - cannot display question.
+#				_return
+#			_endif
+#			str << cond[:string]
+#			_return gui_handler.show_query(bl, bv, _unset, str)
+#		_endproc
+#
+# Then retval will be the result of the show_query() call.
+#
+
+condition.define_condition(:mss_question, :information,
+			   {:string, :button_labels, :button_values, :default_value}, "#1")
+$
+
+condition.define_condition(:mss_information, :information,
+			   {:string}, "#1")
+$
+
+condition.define_condition(:mss_warning, :information,
+			   {:string}, "#1")
+$
+
+condition.define_condition(:mss_error, :information,
+			   {:string}, "#1")
+$
+

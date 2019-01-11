@@ -1,0 +1,141 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_conflict_dialog.magik
+##
+## Custom conflict dialog for managing merges across multiple
+## database partitions. 
+##
+
+def_slotted_exemplar(:mss_wm_conflict_dialog,
+{
+	{:parms, _unset, :readable}
+},
+{:conflict_viewer_dialog})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+mss_wm_conflict_dialog.define_shared_variable(
+	:module_name,
+	## This only exists to allow this class to temporarily share
+	## resources with the conflict_viewer_dialog during portions of
+	## its activation.
+	:mss_wm_conflict_dialog,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_conflict_dialog.build_conflict_lister_gui(_gather args)
+	## 
+	## This only exists to allow this class to temporarily share
+	## resources with the conflict_viewer_dialog during portions of
+	## its activation.
+	## 
+
+	_protect
+		_self.module_name << :conflict_viewer_framework
+		retval << _super.build_conflict_lister_gui(_scatter args)
+	_protection
+		_self.module_name << :mss_wm_conflict_dialog
+	_endprotect
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_conflict_dialog.init_map_control_actions()
+	## 
+	## This only exists to allow this class to temporarily share
+	## resources with the conflict_viewer_dialog during portions of
+	## its activation.
+	## 
+
+	_protect
+		_self.module_name << :conflict_viewer_framework
+		retval << _super.init_map_control_actions()
+	_protection
+		_self.module_name << :mss_wm_conflict_dialog
+	_endprotect
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_conflict_dialog.set_parameters(pl)
+	## 
+	## 
+
+	.parms << pl
+	pl[:conflict_resolution_completed_ok?] << _false 
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_conflict_dialog.int!complete()
+	## 
+	## 
+
+	retval << _super.int!complete()
+	.parms[:conflict_resolution_completed_ok?] << _true
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_conflict_dialog.quit(no_alerts?, success?)
+	## 
+	## quit self, removing views so they don't lurk unneccessarily
+	##
+
+	_if no_alerts? _isnt _true _andif
+	    _not _self.show_alert(_self.string(:quit_message),
+				  _self.string(:yes), _self.string(:no))
+	_then
+		_return
+	_endif 
+	
+	_super.quit(_true, success?)
+	
+	# After quitting, either carry on with performing merge/post
+	# activities, or cancel.
+	gui_handler << .parms[:gui_handler]
+
+	gui_handler.busy? << _true 
+	_protect 
+		_catch @error
+			_handling user_error _with gui_handler.user_error_handler
+			_handling error _with gui_handler.error_handler
+			_handling warning _with gui_handler.warning_handler
+			_dynamic !abort! << _proc() _throw @error _endproc
+			
+			.parms.remove_key(:conflict_resolution_in_progress?)
+			ok? << .parms.remove_key(:conflict_resolution_completed_ok?)
+			_if ok? _is _true
+			_then
+				op_list << .parms.remove_key(:continue_op_list)
+				mss_workspace_manager_engine.perform_vmds_operation_list(op_list, .parms)
+			_else
+				mss_workspace_manager_engine.notify_conflict_dialog_failure(.parms)
+			_endif
+		_endcatch
+	_protection
+		gui_handler.busy? << _false
+	_endprotect
+	
+_endmethod
+$

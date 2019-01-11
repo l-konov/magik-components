@@ -1,0 +1,97 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_state
+##
+## A state represents a single step in a workflow that
+## describes the life cycle of a job or design.
+##
+
+# Implementation note: this is not a datastore record - all
+# configuration for a workflow is defined in code.  The
+# following implementation is structured so that this could be
+# changed in the future.
+
+def_slotted_exemplar(:mss_state,
+{
+	{:workflow, _unset, :readable},
+	{:name, _unset, :readable},
+	{:properties, _unset, :readable}
+},
+{:mss_workspace_record_mixin})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_state.new(workflow, name, _gather properties)
+	## 
+	## Create and return a new state named NAME, for the given
+	## WORKFLOW.  PROPERTIES is a series of key/value pairs, which
+	## may contain the following keys:
+	## - :initial_for_job? - set this to true if this is the initial
+	##      state for new jobs using this workflow.
+	## - :initial_for_design? - set this to true if this is the initial
+	##      state for new designs using this workflow.
+	## - :can_delete_job? - set this to false if jobs in this state
+	##      cannot be deleted (default is that they can be).
+	## - :can_delete_design? - set this to false if designs in this state
+	##      cannot be deleted (default is that they can be).
+	## - :readonly? - set this to true if the state is readonly.
+	## - :singular? - set this to true if the state is considered
+	##      to be singular.  This means that for any job for which
+	##      the singular_children? attribute is true, only one design
+	##      can exist in a singular state.  This is typically used
+	##      for "approved" type of states (where only one design can
+	##      be approved).
+	## - :progress_score - set this to an integer indicating the relative
+	##      advancement of a state in the overall workflow.  Specifically,
+	##      this is used by the mss_design.synchronize_job_status()
+	##      method.
+	## - :overlay_copy_from - a vector of vectors to indicate which
+	##      workflows and state names are suitable for copying data
+	##      into this design using overlay copy functionality.  Each
+	##      inner vector consists of the workflow internal name and
+	##      the state name.  Any overlay design with that workflow and
+	##      state can be used to copy data into the active design
+	##      which as the overlay_copy_from state parameter in this manner.
+	## - :aggregate_from - a vector of vectors to indicate which
+	##      workflows and state names are suitable for copying data
+	##      into this design using aggregate functionality.  Each
+	##      inner vector consists of the workflow internal name and
+	##      the state name, plus (optionally) a property list to describe
+	##      how the aggregation should take place.  See
+	##      mss_workspace_manager_engine.aggregate_design() for details.
+	##
+
+	_if _not workflow.is_kind_of?(mss_workflow)
+	_then
+		_self.user_error(:no_workflow)
+	_endif
+	new_rec << _clone.init(workflow, name, _scatter properties)
+	workflow.add_state(new_rec)
+
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_private _method mss_state.init(workflow, name, _gather properties)
+	## 
+	## 
+
+	.workflow << workflow
+	.name << name
+	.properties << property_list.new_with(_scatter properties)
+
+	_return _self
+	
+_endmethod
+$

@@ -1,0 +1,16 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+########################################################################
+_pragma(classify_level=basic)
+condition.define_condition(:exemplar_already_exists,:information,{:exemplar_name})
+$
+_pragma(classify_level=basic)
+condition.define_condition(:dd_xml_parsing_progress,:information,{:step})
+$

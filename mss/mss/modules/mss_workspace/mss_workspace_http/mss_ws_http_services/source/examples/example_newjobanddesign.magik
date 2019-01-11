@@ -1,0 +1,65 @@
+#% text_encoding = iso8859_1
+_package user
+
+_global example_newjobanddesign <<
+_proc(url, job_name, _optional georef)
+	##
+	## Example proc to submit a NewJobAndDesign web service request
+	## to the given URL to create a new job named JOB_NAME with a
+	## single new design.
+	##
+	## This is for demonstration purposes only - in normal usage,
+	## this web service would be invoked from some other external
+	## system (such as a work management system).  As demonstration
+	## for the Cambridge DB, GEOREF may be passed in, which is the
+	## name of a min_road to use for setting the design boundary.
+	##
+	## As a prerequisite, the mss_http_soap module must be loaded.
+	##
+
+	# For further review and debugging, store the resulting
+	# request globally.
+	_global z50
+
+	sd << date.now()
+	ed << sd + time_interval.new(60, 0)
+	s << internal_text_output_stream.new()
+	sd.format_to(s, "#Y-#m-#d")
+	sd_str << s.string
+	s.reset()
+	ed.format_to(s, "#Y-#m-#d")
+	ed_str << s.string
+	
+	t1 << simple_xml_thing.new("NewJobAndDesignRequest")
+	t1.elements.add(simple_xml_thing.new("JobName", job_name))
+	t1.elements.add(simple_xml_thing.new("JobTitle", "Sample job title for web service"))
+	t1.elements.add(simple_xml_thing.new("JobType", "Simple job - gis and electricity"))
+	t1.elements.add(simple_xml_thing.new("JobStartDate", sd_str))
+	t1.elements.add(simple_xml_thing.new("JobEndDate", ed_str))
+	t1.elements.add(simple_xml_thing.new("JobComments", "Sample job comments"))
+	t1.elements.add(simple_xml_thing.new("DesignOwner", "root"))
+	_if georef _isnt _unset
+	_then
+		t1.elements.add(simple_xml_thing.new("GeoReference", georef))
+	_endif
+	
+	se << mss_http_soap_engine.new()
+	se.add_to_body(t1)
+
+	z50 << mss_http_client_simple_soap_request.new(
+		       :url, url,
+		       :soap_action, "NewJobAndDesign",
+		       :soap_document, se.document)
+
+	# The following is not documented, because it is not supported,
+	# and I don't have a way of properly testing it.  Use at your
+	# own risk.
+	#z50.set_option(:send_chunked_request, _true)
+	#z50.set_option(:send_chunked_size, 128)
+	
+	z50.debug_execute()
+
+	_return z50
+
+_endproc
+$

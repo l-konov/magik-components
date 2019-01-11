@@ -1,0 +1,2 @@
+mss_workspace_manager_framework.magik
+mss_workspace_manager_plugin.magik

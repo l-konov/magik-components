@@ -1,0 +1,59 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_related_document_fw_pi
+##
+## Plugin for providing access to the
+## mss_wm_related_document_framework
+##
+
+# N.B.: this class is not (yet) being used anywhere, because
+# the mss_wm_related_document_framework is not activated as a
+# free-floating entity; it is always parented to an editor
+# plugin.
+
+def_slotted_exemplar(:mss_wm_related_document_fw_pi,
+{
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_fw_pi.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:activate_mss_wm_related_document_framework,
+				       :engine, _self,
+				       :action_message, :|activate_mss_wm_related_document_framework()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_fw_pi.activate_mss_wm_related_document_framework()
+	##
+	## Activate the mss_wm_related_document_framework menu.
+	##
+
+	_if (m << _self.get_dialog(:mss_wm_related_document_framework)) _is _unset
+	_then
+		m << mss_wm_related_document_framework.new(:mss_wm_related_document_framework, _self)
+		_self.cache_dialog(:mss_wm_related_document_framework, m)
+		m.activate_relative_to(_self.top_frame, m.message(:title), _self.top_frame, 50, 50)
+	_else 
+		m.activate(_self.top_frame, m.message(:title))
+	_endif
+
+	_self.add_dependent(m, :current_object)
+	
+_endmethod
+$

@@ -1,0 +1,90 @@
+#% text_encoding = iso8859_1
+_package user
+
+
+#-------------------------------------------------------------------------------
+#
+# The information and design as detailed in this document is the property of
+# General Electric Company, and/or their Associates, and must be returned on demand.
+# It is issued on the strict condition that except with our written permission
+# it must not be reproduced, copied or communicated in part or in whole to any
+# third party, nor be used for any purpose other than that stated in the
+# particular enquiry, order or contract with which it is issued.
+#
+# The reservation of copyright in this document extends from each date
+# appearing thereon and in respect of the subject matter as it appeared at the
+# relevant date.
+#
+# Copyright 2000-2006 General Electric Company. All Rights Reserved. This software
+# product may only be used strictly in accordance with the applicable written License Agreement.
+#
+#------------------------------------------------------------------------------
+
+
+_pragma(classify_level=restricted, topic={drafting})
+_method constructions_engine.selected_to_constructions_geoms(a_geom_set)
+	## 
+	## creates a equivalent constructions geometry from the
+	## geometries in the A_GEOM_SET,
+	## A GEOM_SET should contain only the constructions object
+	## geometry otherwise they will be ignored. return construction
+	## geometry will be of type construction_arc,
+	## construction_circle, construction_line.
+	## or in other way the geometry app_type should be one of
+	## :trail, :arc, :circle, :line
+	## at present  there is no equivalent construction geometry for
+	## :point type so it is ignored. 
+	
+	constructions_geoms << rope.new()
+	world_size << .world_size
+	_if a_geom_set _isnt _unset _andif ( size << a_geom_set.size) _is 1 _orif size _is 2 
+	_then
+		geom_nr << 1
+		_for geom _over  a_geom_set.fast_elements()
+		_loop
+			cons_geom << _if geom.app_type _is :trail
+				     _then
+					     >>  _if (sects << geom.sectors).straight? 
+						 _then
+							 >>  construction_line.new_with_coords(sects[1].coords[1],sects[1].coords[2],world_size)
+						 _else
+							 >>  construction_circle.new_cp(sects[1].coords[1], sects[1].coords[2],world_size)
+						 _endif 
+					     
+				     _elif geom.app_type _is :line
+				     _then
+					     >>  construction_line.new_with_coords(geom.first_coord,geom.last_coord,world_size)
+				     _elif geom.app_type _is :circle
+				     _then
+					     >> construction_circle.new_cp(geom.first_coord, geom.last_coord,world_size)
+				     _elif geom.app_type _is :arc
+				     _then
+					     a_arc << arc.check_type(geom.sectors[1])
+					     ps << coordinate.check_type(a_arc[1])
+					     pc << coordinate.check_type(a_arc[2])
+					     pe << coordinate.check_type(a_arc[3])
+					     major? << a_arc.major_arc?
+					     >>  construction_arc.new_ppc(ps,pe,pc, major?, world_size)
+				     _elif geom.app_type _is :point
+				     _then
+					     # as there are no action which works on selected :point type
+					     # geometry ( construction point), so do no include in the list
+					     # of constructions_geometries.
+					     
+					     _continue 
+				     _else
+					     
+					     _leave  
+				     _endif
+			# set the selected geometries, at the maximum we need only two
+			# geometries for doing construction related operation, so
+			# capped at 2
+			constructions_geoms[geom_nr] << cons_geom
+			geom_nr +<<1
+		_endloop
+	_else
+		# more than 2 geometries are selected so no change
+	_endif
+	>> constructions_geoms
+_endmethod
+$

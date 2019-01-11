@@ -1,0 +1,633 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_construction_manager
+##
+## Class used to handle generation of construction lines for
+## pointing rule interactions (and trail interactions in general).
+##
+
+def_slotted_exemplar(:mss_ptrule_construction_manager,
+{
+	{:static_geometry, _unset, :readable},
+	{:dynamic_geometry, _unset, :readable},
+	{:dynamic_geometry_lookup, _unset, :readable},
+	{:options, _unset, :readable},
+	{:construction_line_style, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_construction_manager.def_property(:render_priority,
+	:type, :integer,
+	:default_value, 10,
+	:description, "Z priority of rendering")
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_construction_manager.define_shared_constant(
+	:databus_consumer_data_types,
+	{:active_map_view, :map_trail},
+	:public)
+$
+
+# Implementation note: I would like to use the
+# :additional_hit_geometry protocol here, rather than having a
+# custom hook into restricted map trail protocols.  However,
+# I think the :additional_hit_geometry protocol is
+# insufficient, as it does not pass information about the
+# coordinate being probed (which is needed to dynamically
+# generate a hit list based on where a pointing occurs).
+#
+# Therefore, I will continue to use a custom hook into
+# restricted map trail protocols, and see if the
+# :additional_hit_geometry protocol improves in later
+# versions.
+#
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_construction_manager.define_shared_constant(
+	:databus_producer_data_types,
+	{},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_construction_manager.define_shared_constant(
+	:core_default_options,
+	## Default values for core options.
+	property_list.new_with(
+		:use_centerline?, _true,
+		:extend_distance, 0.0,
+		:use_offset?, _true,
+		:offset_distance, 0.0,
+		:use_dynamic?, _false,
+		:dynamic_mode, :all),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable})
+_method mss_ptrule_construction_manager.dynamic_mode_options
+	## 
+	## Available options for dynamic mode.  This is a vector of
+	## items that can be passed directly to a new text_choice_item:
+	## each item in this vector is a two-item vector consisting of
+	## the internal and external name of the option.
+	##
+	## This may be redefined in conjunction with the
+	## dynamic_geometry_candidates() method.
+	##
+
+	_return {{:all, _self.message(:dynamic_mode_all)}}
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.init(name, a_framework)
+	## 
+	## 
+
+	_super.init(name, a_framework)
+	.static_geometry << geometry_set.new()
+	.dynamic_geometry << geometry_set.new()
+	.dynamic_geometry_lookup << equality_hash_table.new()
+	.options << _self.core_default_options.copy()
+	.construction_line_style << line_style.new_with_properties(
+					    :foreground_colour, colour.new_rgb(0.5, 0.5, 0.5),
+					    :width, 0,
+					    :dash_pattern, dash_pattern.short_dash)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.post_init_plugins()
+	## 
+	## 
+
+	_if (mm << _self.get_service_provider(:map_manager)) _isnt _unset
+	_then
+		# Note: this is a :post_render_sets rather than a
+		# :transient_drawer, because the set of things being drawn can
+		# be big, and transient draws can be triggered a lot (any
+		# window damage).
+		mm.add_post_renderer(_self, _self.render_priority, :post_render_sets)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :active_map_view
+	_then
+		_self.set_current_map_view(data)
+	_elif data_type_name _is :map_trail
+	_then
+		data[2].mss_register_probe_geom_provider(_self)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.post_render_sets(a_world, bounds, render_status)
+	## 
+	## Return post render sets for drawing self's construction geometry.
+	##
+
+	gset << composite_geometry_set.new_with(.static_geometry, .dynamic_geometry)
+	_if a_world _isnt _unset
+	_then
+		gset << gset.select(:world, a_world)
+	_endif
+	_if bounds _isnt _unset
+	_then
+		gset << gset.select(:bounds_interacting_with, bounds)
+	_endif
+	
+	_return gset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.get_option(key)
+	## 
+	## 
+
+	_return .options[key]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.set_option(key, value)
+	## 
+	## 
+
+	.options[key] << value
+	_self.changed(:set_option, {key, value})
+
+	# If the option affects caching of dynamic offsets, uncache them.
+	_if {:use_centerline?, :extend_distance,
+	     :use_offset?, :offset_distance,
+	     :use_dynamic?, :dynamic_mode}.includes?(key)
+	_then
+		_self.clear_dynamic_construction_geometry()
+	_endif
+	
+	_return value
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.get_length_display_format()
+	## 
+	## Obtain this from the map manager.
+	##
+
+	_if (mm << _self.application.get_service_provider(:map_manager)) _isnt _unset _andif
+	    (mp << mm.current_map) _isnt _unset
+	_then
+		_return mp.get_length_display_format()
+	_endif 
+	
+	# No reference found - use :mm as default.
+	_return :mm
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.set_current_map_view(new_map_view)
+	##
+	## Maintain dependencies for working with the current map_view
+	## NEW_MAP_VIEW. 
+	## 
+	
+	_if new_map_view _isnt _unset _andif
+	    (tr << new_map_view.trail) _isnt _unset
+	_then
+		tr.mss_register_probe_geom_provider(_self)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.mss_probe_geoms_for(a_trail, hit_set, a_coord, hit_radius, hit_types, last_xy)
+	## 
+	## Return a geometry_set of the additional probe geoms to
+	## consider when placing the trail A_TRAIL.
+	##
+
+	_if .static_geometry.an_element() _isnt _unset
+	_then
+		res << .static_geometry
+	_else
+		res << _unset 
+	_endif
+
+	_if _self.get_option(:use_dynamic?) _is _true
+	_then
+		hit_list << hit_set.hit_list(a_coord, hit_radius, 10, hit_types, last_xy)
+		_self.dynamic_process_hit_list(a_trail, hit_list, a_coord)
+			
+		_if .dynamic_geometry.an_element() _isnt _unset
+		_then
+			_if res _is _unset
+			_then
+				res << .dynamic_geometry
+			_else
+				res << composite_geometry_set.new({res, .dynamic_geometry})
+			_endif
+		_endif
+	_endif 
+	
+	_if res _is _unset
+	_then
+		_return _unset
+	_endif 
+	res << res.select(:world, a_trail.world)
+	_if res.an_element() _is _unset 
+	_then
+		_return _unset
+	_endif
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.dynamic_process_hit_list(a_trail, hit_list, a_coord)
+	## 
+	## Parse through the HIT_LIST (generated at A_COORD) to decide
+	## what dynamic geometries are of interest.  A_TRAIL is the
+	## trail that is initiating this.
+	##
+
+	ext_dist << _self.get_option(:extend_distance).default(0.0)
+	off_dist << _self.get_option(:offset_distance).default(0.0)
+	_if ext_dist <= 0.0 _andif
+	    off_dist <= 0.0
+	_then
+		_return
+	_endif
+
+	us << unit_system.new(:mm, (my_world << a_trail.world).unit.name)
+	max_tol << (ext_dist.max(off_dist)) * 2.5
+	max_tol << us.convert_output(max_tol)
+	
+	dyn_mode << _self.get_option(:dynamic_mode)
+	all_geom_candidates << equality_set.new()
+	_for hit_item _over hit_list.default({}).fast_elements()
+	_loop
+		hit_item_geom << hit_item[1]
+		_if hit_item_geom.species _is sector_rope.species
+		_then
+			# This happens for simple_areas.  I am considering turning
+			# these into pseudo_areas for subsequent processing, but this
+			# may have a negative impact if SOMs are displayed.  (Or maybe,
+			# it is a positive impact, if this dynamic offsetting gets
+			# enabled for SOMs data).  But without SOMs test data, I will
+			# leave this alone for now.
+		_endif 
+		_if (geom_candidates << _self.dynamic_geometry_candidates(dyn_mode, hit_item_geom)) _isnt _unset
+		_then
+			all_geom_candidates.add_all(geom_candidates)
+		_endif
+	_endloop 
+
+	# Remove ones that are no longer in the list.  Do this by
+	# creating a copy and transferring things across to it, so that
+	# stale handles can be managed.
+	_if .dynamic_geometry_lookup.an_element() _isnt _unset
+	_then 
+		new_dg_lookup << equality_hash_table.new()
+		to_be_removed << _unset 
+		_for a_geom, cons_geoms _over .dynamic_geometry_lookup.keys_and_elements()
+		_loop
+			_if a_geom.is_a_datastore_object? _andif
+			    _not a_geom.is_valid?
+			_then
+				# Stale handles get removed.
+				_if to_be_removed _is _unset
+				_then
+					to_be_removed << geometry_set.new()
+				_endif
+				to_be_removed.add_all(cons_geoms)
+				_continue 
+			_endif 
+
+			_if all_geom_candidates.includes?(a_geom)
+			_then
+				# Keep this one.
+				new_dg_lookup[a_geom] << cons_geoms
+				_continue
+			_endif
+
+			# At this point, look at distance to the correlation point to
+			# decide whether or not to keep it.
+			_if a_geom.geom_category _is :area
+			_then
+				within? << a_geom.boundary_distance_to_within?(a_coord, max_tol)
+			_else
+				within? << a_geom.distance_to_within?(a_coord, max_tol)
+			_endif
+			_if _not within?
+			_then
+				# Remove this from the construction geometry list.
+				_if to_be_removed _is _unset
+				_then
+					to_be_removed << geometry_set.new()
+				_endif
+				to_be_removed.add_all(cons_geoms)
+			_else
+				# Keep this one.
+				new_dg_lookup[a_geom] << cons_geoms
+			_endif
+		_endloop
+
+		# Save the new table, and undraw enything that needs undrawing.
+		.dynamic_geometry_lookup << new_dg_lookup
+		_if to_be_removed _isnt _unset
+		_then
+			_self.databus_make_data_available(:geometry_to_undraw, {to_be_removed})
+
+			# After undrawing the dynamic ones being removed, we may find
+			# that we've inadvertently undrawn a static one.  So, redraw
+			# them, but only if the cost isn't going to be too extreme.
+			_if .static_geometry.size <= 50
+			_then
+				_self.databus_make_data_available(:geometry_to_draw, {.static_geometry})
+			_endif 
+		_endif 
+	_endif
+	
+	# Add in new ones.
+	_for a_geom _over all_geom_candidates.fast_elements()
+	_loop
+		_if .dynamic_geometry_lookup[a_geom] _isnt _unset
+		_then
+			# Already got it.
+			_continue
+		_endif
+
+		new_cons_geoms << _unset 
+		_if (gcat << a_geom.geom_category) _is :linear
+		_then
+			new_cons_geoms << _self.get_chains_from_sectors(a_geom.sectors, a_geom.world)
+		_elif gcat _is :area
+		_then
+			new_cons_geoms << _self.get_chains_from_area(a_geom)
+		_endif
+		_if new_cons_geoms _isnt _unset _andif
+		    new_cons_geoms.size > 0
+		_then
+			.dynamic_geometry_lookup[a_geom] << new_cons_geoms
+			_for add_geom _over new_cons_geoms.fast_elements()
+			_loop 
+				_self.databus_make_data_available(:geometry_to_draw, {add_geom})
+			_endloop
+		_endif
+	_endloop
+	
+	# Update dynamic_geometry from the lookup table.
+	.dynamic_geometry.empty()
+	_for i _over .dynamic_geometry_lookup.fast_elements()
+	_loop
+		.dynamic_geometry.add_all(i)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable})
+_method mss_ptrule_construction_manager.dynamic_geometry_candidates(dyn_mode, a_geom_thing)
+	## 
+	## Return all actual geometries of interest for dynamic mode
+	## DYN_MODE, and A_GEOM_THING (which may be a real geometry,
+	## pseudo geometry, sector rope, or pretty much anything
+	## geometry-ish).
+	##
+	## The default implementation only considers actual chain and
+	## area geometries.  This may be redefined to optionally
+	## consider other things, based on DYN_MODE.
+	##
+
+	_if _not a_geom_thing.is_a_datastore_object?
+	_then
+		_return
+	_endif
+	r << rope.new()
+	_if a_geom_thing.is_geometry?
+	_then
+		r.add_last(a_geom_thing)
+		_return r
+	_endif
+	
+	_for a_geom _over a_geom_thing.top_level_geoms()
+	_loop
+		_if {:linear, :area}.includes?(a_geom.geom_category)
+		_then
+			r.add_last(a_geom)
+		_endif
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.add_construction_geometry(src_geom, cons_geom)
+	## 
+	## Add CONS_GEOM to self's construction geometry set - based on
+	## creating it from SRC_GEOM.
+	##
+
+	.static_geometry.add(cons_geom)
+	_self.databus_make_data_available(:geometry_to_draw, {cons_geom})
+	_return cons_geom
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.clear_static_construction_geometry()
+	## 
+	## Clear all static construction geometry
+	##
+
+	_if .static_geometry.an_element() _isnt _unset
+	_then 
+		_self.databus_make_data_available(:geometry_to_undraw, {.static_geometry})
+		.static_geometry.empty()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.clear_dynamic_construction_geometry()
+	## 
+	## Clear all dynamic construction geometry
+	##
+
+	_if .dynamic_geometry _isnt _unset _andif
+	    .dynamic_geometry.an_element() _isnt _unset 
+	_then 
+		_self.databus_make_data_available(:geometry_to_undraw, {.dynamic_geometry})
+		.dynamic_geometry.empty()
+	_endif 
+	.dynamic_geometry_lookup.empty()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.set_static_chain_from_area(sel_geom)
+	## 
+	## Create static construction chains from the selected area geometry
+	## SEL_GEOM. 
+	## 
+
+	_for a_geom _over _self.get_chains_from_area(sel_geom).fast_elements()
+	_loop
+		_self.add_construction_geometry(sel_geom, a_geom)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.set_static_chain_from_chain(sel_geom)
+	## 
+	## Create static construction chains from the selected chain
+	## geometry SEL_GEOM.
+	## 
+
+	_for a_geom _over _self.get_chains_from_sectors(sel_geom.sectors, sel_geom.world).fast_elements()
+	_loop
+		_self.add_construction_geometry(sel_geom, a_geom)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.set_static_chain_from_sectors(sr, my_world)
+	## 
+	## Create static construction chains from sector rope SR in world
+	## MY_WORLD. 
+	## 
+
+	_for a_geom _over _self.get_chains_from_sectors(sr, my_world).fast_elements()
+	_loop
+		_self.add_construction_geometry(_unset, a_geom)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.get_chains_from_area(sel_geom)
+	## 
+	##
+
+	r << rope.new()
+	my_world << sel_geom.world
+	world_unit << my_world.unit.name
+	ls << .construction_line_style
+
+	_if _self.get_option(:use_centerline?) _is _true
+	_then 
+		pc << pseudo_chain.new_with(sel_geom.sectors, :world, my_world, :style_info, ls)
+		r.add_last(pc)
+	_endif
+	
+	_if _self.get_option(:use_offset?) _is _true _andif
+	    (off_dist << _self.get_option(:offset_distance).default(0.0)) > 0.0
+	_then
+		off_dist << unit_system.new(:mm, world_unit).convert_output(off_dist)
+
+		_if (off_area << sel_geom.buffer(off_dist, :square)) _isnt _unset
+		_then 
+			pc << pseudo_chain.new_with(off_area.sectors, :world, my_world, :style_info, ls)
+			r.add_last(pc)
+		_endif
+		
+		_if (off_area << sel_geom.buffer(-off_dist, :square)) _isnt _unset
+		_then 
+			pc << pseudo_chain.new_with(off_area.sectors, :world, my_world, :style_info, ls)
+			r.add_last(pc)
+		_endif 
+	_endif
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.get_chains_from_sectors(sr, my_world)
+	## 
+	##
+
+	r << rope.new()
+	world_unit << my_world.unit.name
+	base_sr << sr.sectors.deep_copy()
+	ls << .construction_line_style
+
+	# Value is in mm: convert to unit system
+	ext_dist << _self.get_option(:extend_distance).default(0.0)
+	ext_dist << unit_system.new(:mm, world_unit).convert_output(ext_dist)
+	_if ext_dist > 0.0
+	_then
+		base_sr.extend_at_start(ext_dist)
+		base_sr.extend_at_end(ext_dist)
+	_endif
+
+	_if _self.get_option(:use_centerline?) _is _true
+	_then 
+		pc << pseudo_chain.new_with(base_sr, :world, my_world, :style_info, ls)
+		r.add_last(pc)
+	_endif
+	
+	_if _self.get_option(:use_offset?) _is _true _andif
+	    (off_dist << _self.get_option(:offset_distance).default(0.0)) > 0.0
+	_then
+		off_dist << unit_system.new(:mm, world_unit).convert_output(off_dist)
+
+		_if (off_sr << base_sr.offset_left(off_dist, :square)) _isnt _unset
+		_then 
+			pc << pseudo_chain.new_with(off_sr, :world, my_world, :style_info, ls)
+			r.add_last(pc)
+		_endif
+		
+		_if (off_sr << base_sr.offset_right(off_dist, :square)) _isnt _unset
+		_then 
+			pc << pseudo_chain.new_with(off_sr, :world, my_world, :style_info, ls)
+			r.add_last(pc)
+		_endif 
+	_endif
+
+	_return r
+	
+_endmethod
+$

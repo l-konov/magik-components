@@ -1,0 +1,460 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-09 08:45:58 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-17-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+_pragma(classify_level=basic, topic={GUI})
+## This mixin provides behavior to support a plugin
+## automatically creating its GUI on an embedded area such as a
+## tab box or building a floating dialog to house its GUI. In
+## order to make use of this, you must at a minimum provide a
+## property or slot on the plugin to hold the launch_panel,
+## such as:
+##
+##  my_plugin.define_property(:launched_panel, :object, "The
+##                                   widget representing this plugin",_true,_true,_unset)
+##
+## AND:
+##   Subclasses should call init_embedding_actions() from
+## the init_actions() method to get the acftiions in place.
+## After that, the action called <class_name>_activate can be
+## used to launch the standalone or embedded version of this plugin
+##
+## You can also setup properties to control this behavior as
+## shown here:
+##
+## _pragma(classify_level=basic, usage={redefinable})
+## my_plugin.define_property(:embedded_role_name, :string,
+##                    "The name of the GUI item role which defines where I should be embedded in my framework",
+## 		      _true, _true,"embed_embedding_plugin_mixin" )
+##
+## _pragma(classify_level=basic, usage={redefinable})
+## my_plugin.define_property(:activate_embedded_image_name, :string,
+##                    "The file name of bitmap for my activate toolbar button",
+## 		      _true, _true,"activate_plugin.dib" )
+##
+## _pragma(classify_level=basic, usage={redefinable})
+## my_plugin.define_property(:activate_embedded_image_module_name, :symbol,
+##                    "The file name of bitmap for my activate toolbar button",
+## 		      _true, _true,:embedding_plugin )
+##
+##
+## If you want to have support for peeling and rembedding the
+## panel in a seperate frame, see place_embedded_close_action()
+##
+#######################################
+def_mixin(:embedding_plugin_mixin)
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method embedding_plugin_mixin.get_embedded_role_name
+	## This defines the name of the role to use to locate me. This
+	## will attempt to locate a property called :embedded_role_name
+	## and use its value if possible. If not, we just backstop to 
+	## :embed_embedding_plugin
+	##
+
+	# (02-17-2005 Brad Sileo): created.
+	_try
+		name << _self.embedded_role_name
+	_when does_not_understand
+		name << :embed_embedding_plugin
+	_endtry 
+	>> name 		
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method embedding_plugin_mixin.get_activate_embedded_image_info
+	## returns the name and module of the image resource to locate for my
+	## activate action. If there is no property called
+	## activate_embedded_image_name then we just return activate_plugin.dib
+	## Liewise for activate_embedded_image_module_name we use :embedding_plugin_mixin
+	##
+
+	# (02-17-2005 Brad Sileo): created.
+	_try
+		name << _self.activate_embedded_image_name 
+	_when does_not_understand
+		name << "activate_plugin.dib"
+	_endtry
+	_try
+		module_name << _self.activate_embedded_image_module_name 
+	_when does_not_understand
+		module_name << :mclib_embedding_plugin_mixin
+	_endtry
+	
+	>> {name,module_name}
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI})
+_method embedding_plugin_mixin.init_embedding_actions()
+	## setupo the actions used for embedding and launching my GUI
+	## 
+	##
+
+	# (01-18-2005 Brad Sileo, TenSails): created.
+	_self.add_action(sw_action.new(:close_launched_panel,
+				       :engine,_self,
+				       :action_message,:|close_launched_panel()| ,
+				       :toolbar_control,:image_button_item ,
+				       :image, {:close_pane, :ui_resources},
+				       :enabled?,_true,
+				       :caption,_self.message(:close_panel),
+				       :tooltip,_self.message(:close_panel_tt)  
+				   )
+	      )
+	_self.add_action(sw_action.new(:peel_embedded_panel,
+				       :engine,_self,
+				       :action_message,:|peel_embedded_panel()| ,
+				       :toolbar_control,:image_button_item ,
+				       :image, {:peel_pane, :mclib_embedding_plugin_mixin},
+				       :enabled?,_true,
+				       :caption,_self.message(:peel_panel),
+				       :tooltip,_self.message(:peel_panel_tt)  
+				   )
+	      )
+	_self.add_action(sw_action.new(:reembed_panel,
+				       :engine,_self,
+				       :action_message,:|reembed_launched_panel()| ,
+				       :toolbar_control,:image_button_item ,
+				       :image, {:reembed_pane, :mclib_embedding_plugin_mixin},
+				       :enabled?,_false,
+				       :caption,_self.message(:reembed_panel),
+				       :tooltip,_self.message(:reembed_panel_tt)  
+				   )
+	      )
+	tag_name << _self.class_name + :_activate
+	_self.add_action(sw_action.new(:activate_embedded_or_standalone,
+				       :engine,_self,
+				       :action_message,:|activate_embedded_or_standalone()|,
+				       :toolbar_control,:image_button_item,
+				       :image, _self.get_activate_embedded_image_info,
+				       :caption,_self.message(tag_name),
+				       :short_help_text,_self.message(tag_name + :_sh  ),
+				       :tooltip,_self.message(tag_name +:_tt)  )
+	      ) 
+	
+	
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.activate_embedded_or_standalone(_optional force_standalone?)
+	## Launch my GUI area as either am embedded panel or a
+	## standalone dialog. it will be embedded is we can locate a
+	## GUI element in my framework with role set to match my
+	## embedded_gui_role property
+	## 
+	##
+
+	# (01-17-2005 Brad Sileo, TenSails): created.
+	_if _self.launched_panel _is _unset _orif
+	    _self.embedded? _orif
+	    force_standalone? _is _true 
+	_then
+		_if force_standalone? _isnt _true _andif
+		    ( _self.framework _isnt _unset _andif
+		      _self.get_embedded_role_name _isnt _unset _andif 
+		      (gui_el << _self.framework.get_gui_element_with_role ( _self.get_embedded_role_name )) _isnt _unset )
+		_then
+			_if _self.launched_panel _isnt _unset 
+			_then
+				_self.launched_panel.manage()
+			_else
+				_self.launched_panel <<_self.build_gui ( gui_el )
+			_endif
+		_else
+			# Closedown any existing panel, then start the standalone one.
+			_if _self.launched_panel _isnt _unset 
+			_then
+				_self.launched_panel.unmanage()	
+			_endif
+			_self.launched_panel << _self.activate_standalone()
+		_endif
+	_endif
+	_self.manage_embedding_actions()
+	_self.activate_launched_panel()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.manage_embedding_actions()
+	## Update the actions used for embedding based on the current
+	## state or me.
+	## 
+	##
+
+	# (04-08-2005 Brad Sileo): created.
+	embedded? << _self.embedded?
+	_self.action(:close_launched_panel).enabled? << embedded?
+	_self.action(:peel_embedded_panel).enabled? << embedded?
+	_self.action(:reembed_panel).enabled? << _not embedded?
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.activate_standalone()
+	## This is the default method to launch me in standalone mode,
+	## which creates a dialog_frame and builds my GUI in it. This
+	## can be replaced for more complex cases where you might
+	## want to allow a gui_framework to build everything, including
+	## the frame.
+	## This method should return the widget which will be processed
+	## by activate_launched_panel() and others interacting with
+	## _self.launched_panel which might be a frame object
+	## This version returns the created dialog_frame object
+
+	# (04-08-2005 Brad Sileo): created.
+	# setting the launched_panel before calling build_gui() is important
+	# since this makess sure that the value of embedded? is coprrect
+	# within place_embedded_close_action()
+	_if _self.framework _isnt _unset 
+	_then
+		_self.launched_panel << pan << dialog_frame.new ( _self.message(:title) )
+		pan.agent.model << _self
+		pan.parent << _self.framework.top_frame
+	_else
+		_self.launched_panel << pan << frame.new ( _self.message(:title) )
+		pan.agent.model << _self
+	_endif 
+	_self.build_gui( pan)
+	>> pan
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.wm_close()
+	## Handles me being closed in a case where I was activated
+	## standalone inside a dialog frame
+	## 
+	##
+
+	# (02-11-2005 Brad Sileo): created.
+	_self.close()
+_endmethod
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.close()
+	## Called whenever I am being closed. This ensures that it is
+	## Ok to terminate (permission_to_terminate?()) and sends on_deactivation()
+	## 
+	##
+	_try _with cond
+	     _self.permission_to_terminate?()
+	     _self.on_deactivation()
+	     _self.terminate()
+	_when termination_aborted
+	      _self.show_alert( cond.report_contents_string )
+	_endtry
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.peel_embedded_panel()
+	## peel the embedded-panel off into a seperate dialog frame
+	## 
+	##
+
+	# (01-18-2005 Brad Sileo, TenSails): created.
+	>> _self.activate_embedded_or_standalone(_true)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.reembed_launched_panel()
+	## return a launched dialog for me to the embedded state
+	## Note that if I can not be embedded, this just activates me
+	## standalone again.
+	##
+
+	# (01-18-2005 Brad Sileo, TenSails): created.
+	_if _self.launched_panel _isnt _unset 
+	_then
+		_self.launched_panel.unmanage()
+		_if _self.launched_panel.is_kind_of?(frame)
+		_then
+			_self.launched_panel.active? << _false 
+		_endif
+		_self.launched_panel << _unset
+		
+	_endif
+	>> _self.activate_embedded_or_standalone()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.activate_launched_panel()
+	## startup the display of my launched_panel, which can be
+	## either embedded or in a seperate frame. This method ensures
+	## that appropriate pre and post activation methods are called
+	## and delas with botht eh case where this is a frame or is
+	## inside a tab_box.
+	## 
+	##
+
+	# (01-17-2005 Brad Sileo, TenSails): created.
+	_if _self.launched_panel _is _unset
+	_then
+		_return
+	_endif
+
+	_if _self.launched_panel.active? _is _false 
+	_then
+		parent << _self.launched_panel.parent
+		_if parent.is_kind_of? ( property_page ) _andif
+		    ( tb << parent.parent_window ).is_kind_of? ( tab_box )
+		_then
+			_self.pre_activation()
+			tb.active_page << _self.launched_panel
+			_self.post_activation()
+		_else
+			_self.pre_activation()
+			_self.launched_panel.active? << _true
+			_self.post_activation()
+		_endif
+		_self.launched_panel.set_focus ()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.close_launched_panel()
+	## Close my embedded panel or a separate dialog if that was opened.
+	## 
+	##
+
+	# (01-17-2005 Brad Sileo, TenSails): created.
+	_if _self.launched_panel _isnt _unset
+	_then
+		_try 
+			_self.launched_panel.unmanage ()
+			_self.close()
+		_when error
+		      # Ignore any errors as the _self.launched panel might have been
+		      # destroyed by someone else already.
+		_endtry
+
+		_if ( app << _self.application ) _isnt _unset _andif
+		    ( top << app.top_frame ) _isnt _unset
+		_then
+			top.set_focus ()
+		_endif 
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.embedded?
+	## true if I am activated embedded, false otherwise.
+	## 
+	##
+
+	# (01-17-2005 Brad Sileo, TenSails): created.
+	>> _if _self.launched_panel _isnt _unset
+	   _then
+		   >> _not _self.launched_panel.is_kind_of?(frame)
+	   _else
+		   >> _self.can_embed?
+	   _endif 
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.can_embed?
+	## True if there is a GUI element setup to match my role for embedding.
+	## 
+	##
+
+	# (01-18-2005 Brad Sileo, TenSails): created.
+	_if _self.framework _is _unset _orif
+	    _self.get_embedded_role_name _is _unset 
+	_then
+		_return _false
+	_endif 
+	>> _self.framework.get_gui_element_with_role ( _self.get_embedded_role_name ) _isnt _unset
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method embedding_plugin_mixin.place_embedded_close_action(a_rowcol, _optional no_peel?)
+	## Create an embedded close button on A_CONTAINER if I am
+	## actually in embedded mode only.  The placed control is
+	## returned. This is generally called at the top of build GUI
+	## and is setup to work with code like this:
+	##  
+	## _method class.build_gui(a_container)
+	##	rc << rowcol.new(a_container,_unset,1)
+	##      _self.place_embedded_close_action(rc)
+	##      .....
+	##  _endmethod
+	##
+	## This will place a small "X" in the top right of the panel
+	## which will close it, only when we are embedded.
+	## 
+	## Unless no_peel? is TRUE, we also provide the "peel" action
+	## which takes the embedded pane and makes it available as a
+	## separate dialog.
+	##
+	## If I am not currently embedded, but I can be, then the
+	## reembed action is added instead.
+	##
+	## NOTE:   You must ensure that init_embedding_actions() is called
+	## before this, normally from the init_actions() method
+	
+	# (01-17-2005 Brad Sileo, TenSails): created.
+	#debug show(_self.embedded?, _self.launched_panel, _self.can_embed?)
+	_if _self.embedded?
+	_then
+		my_rc << rowcol.new(a_rowcol,1,_unset)
+		my_rc.col_alignment << :right
+		_if no_peel? _isnt _true 
+		_then
+			np << _self.action(:peel_embedded_panel).place_control_on(my_rc,:dialog)
+			np.set_property ( :has_border?, _false )
+			np.allow_keyboard_navigation? << _false
+			np.col_alignment << :right
+		_endif
+		tb << _self.action(:close_launched_panel).place_control_on(my_rc,:dialog)
+		tb.set_property ( :has_border?, _false )
+		tb.allow_keyboard_navigation? << _false
+		tb.col_alignment << :right
+	_elif _self.can_embed?
+	_then
+		tb << _self.action(:reembed_panel).place_control_on(a_rowcol,:dialog)
+		tb.set_property ( :has_border?, _false )
+		tb.allow_keyboard_navigation? << _false
+		tb.col_alignment << :right	
+	_endif 
+	>> tb
+_endmethod
+$

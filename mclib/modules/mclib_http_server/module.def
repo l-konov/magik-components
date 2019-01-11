@@ -1,0 +1,11 @@
+mclib_http_server	4000
+
+description
+end
+
+requires
+	mclib_framework_display
+	mclib_plugin_threading_mixin
+	mclib_action_property_mixin
+	component_framework
+end

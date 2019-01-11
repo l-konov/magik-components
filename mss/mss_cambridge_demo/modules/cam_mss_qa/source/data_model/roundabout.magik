@@ -1,0 +1,120 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method roundabout.mss_qa_roundabout_connectivity(qa_engine, qa_check)
+	## 
+	## Perform a QA check to locate roundabouts that are not
+	## connected to a road of some sort.  If not connected, and if
+	## a road is found within a given tolerance, an attempt will be
+	## made to auto-fix by connecting to that road.
+	##
+
+	_if (l << _self.location) _is _unset
+	_then
+		condition.raise(:mss_qa_information,
+				:string, "Location is not set - cannot validate connectivity",
+				:record, _self,
+				:severity, :error,
+				:error_code, :roundabout_connectivity,
+				:error_sub_code, :no_location,
+				:locating_geometry, _unset,
+				:auto_fix_data, _unset)
+		_return
+	_endif
+
+	# If there is any connected chain, that is good enough.
+	n << l.node
+	_for conn_geom _over n.top_level_geoms()
+	_loop
+		_if conn_geom.geom_category _is :linear
+		_then
+			_return
+		_endif
+	_endloop
+	
+	# Error - not connected.  Try to find a road to connect to.
+	afd << _unset
+	best_cand << _unset
+	_if (tol << qa_check.get_parameter(:tolerance)) _isnt _unset _andif
+	    tol > 0
+	_then
+		best_dist << tol
+		pa << pseudo_area.new(bounding_box.new_centred(l.coord.x, l.coord.y, tol))
+		pa.world << l.world
+		cands << _self.source_view.collections[:min_road].
+			 select(predicate.interacts(:centre_line, {pa}))
+		_for cand_road _over cands.fast_elements()
+		_loop
+			_if (cand_geom << cand_road.centre_line) _isnt _unset _andif
+			    (cand_dist << cand_geom.distance_to(l)) _isnt _unset _andif
+			    cand_dist < best_dist
+			_then
+				best_cand << cand_road
+				best_dist << cand_dist
+			_endif
+		_endloop
+
+		_if best_cand _isnt _unset
+		_then
+			afd << property_list.new_with(
+				       :record, _self,
+				       :method, :|mss_qa_autofix_roundabout_connectivity()|,
+				       :road, best_cand)
+		_endif 
+	_endif
+
+	_if afd _is _unset
+	_then
+		msg << "Not connected to a road"
+	_else
+		us << unit_system.new(l.world.unit_name, :m)
+		best_dist_m << us.convert_output(best_dist).as_float
+		msg << write_string("Not connected to a road - nearest is ",
+				    best_dist_m.as_fixed_string(0, 2), " away.")
+	_endif
+	
+	condition.raise(:mss_qa_information,
+			:string, msg,
+			:record, _self,
+			:severity, :error,
+			:error_code, :coundabout_connectivity,
+			:error_sub_code, :no_connection,
+			:locating_geometry, _unset,
+			:auto_fix_data, afd)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method roundabout.mss_qa_autofix_roundabout_connectivity(pl)
+	## 
+	## Auto-fix self's location so that it is connected to the road
+	## identified in PL.
+	##
+
+	_dynamic !current_world!
+	
+	_if (road << pl[:road]) _is _unset _orif
+	    _not road.is_valid? _orif
+	    (road_geom << road.centre_line) _is _unset _orif
+	    (l << _self.location) _is _unset 
+	_then
+		_return _false
+	_endif
+
+	!current_world! << l.world
+	new_coord << road_geom.segpoint_near(l.coord)
+	new_ori << l.orientation
+	_self.unset_geometry(:location, _true, _false)
+	_self.make_geometry(:location, new_coord, new_ori)
+	_return _true
+	
+_endmethod
+$

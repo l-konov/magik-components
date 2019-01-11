@@ -1,0 +1,295 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_properties_plugin.magik
+##
+## Plugin for editing properties of mss_scheduled_task record.
+##
+
+def_slotted_exemplar(:mss_scheduler_properties_plugin,
+{
+	{:cur_object, _unset, :readable},
+	{:cur_task_type, _unset, :readable},
+	{:cur_task_handler, _unset, :readable},
+	{:cur_properties_config, _unset, :readable},
+	{:property_tree, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+mss_scheduler_properties_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:current_object, :proposed_value},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+mss_scheduler_properties_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:proposed_values_for_insert, :proposed_values_for_update},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_properties_plugin.init(_gather args)
+	## 
+	##
+
+	_super.init(_scatter args)
+	.cur_object << _unset 
+	.cur_task_type << _unset
+	.cur_task_handler << _unset
+	.cur_properties_config << _unset
+	.property_tree << rope.new()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_properties_plugin.build_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.start_row()
+	tree_item.new(p,
+		      :grid_lines?, _true,
+		      :model, _self,
+		      :aspect, :property_tree,
+		      :data_selector, :property_tree,
+		      :editor_required_notifier, :|editor_required()|,
+		      :height_in_chars, 6,
+		      :column_widths, {150, 200},
+		      :column_headings, {_self.message(:ch_property_name),
+					 _self.message(:ch_property_value)},
+		      :distribute_spare_width, :always,
+		      :column_allow_sort?, _false,
+		      :mode, :one,
+		      :resize_x?, _true,
+		      :resize_y?, _true) 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_scheduler_properties_plugin.editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## Allow in-place editing of property_value column.
+	##
+
+	_if value_id _isnt :property_value
+	_then
+		_return
+	_endif
+
+	_if .cur_properties_config _is _unset _orif
+	    (cur_config << .cur_properties_config[a_tree.key]) _is _unset
+	_then
+		_return
+	_endif
+
+	field_type << cur_config[1]
+	_if cur_config.size >= 2
+	_then
+		ed << in_place_choice_editor.new(an_agent, :items, cur_config[2])
+	_elif field_type _is :boolean
+	_then
+		ed << in_place_boolean_editor.new(an_agent)
+	_elif field_type _is :date
+	_then
+		ed << in_place_date_editor.new(an_agent)
+	_elif field_type _is :date_time
+	_then
+		ed << in_place_date_time_editor.new(an_agent)
+	_elif field_type _is :filename
+	_then
+		ed << in_place_file_editor.new(an_agent)
+	_else
+		ed << in_place_value_editor.new(an_agent)
+		_if field_type _is :integer
+		_then
+			ed.manager << numeric_value_manager.new_with_properties(:integer?, _true)
+		_elif field_type _is :float
+		_then
+			ed.manager << numeric_value_manager.new_with_properties(:integer?, _false)
+		_endif 
+	_endif 
+
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_properties_plugin.update_property_tree()
+	## 
+	## 
+
+	r << .property_tree << rope.new()
+	
+	_if .cur_task_type _isnt _unset
+	_then
+		.cur_task_type << .cur_task_type.as_symbol()
+	_endif 
+	_if (task_handler << mss_scheduler_engine.get_task_handler_exemplar(.cur_task_type)) _isnt _unset _andif
+	    (pl << task_handler.parameters_for_task_type(.cur_task_type)) _isnt _unset
+	_then
+		.cur_task_handler << task_handler
+		.cur_properties_config << pl
+		
+		sstr << styled_string.new(:value, :property_name, :tab,
+					  :value, :property_value)
+		_if (cur_obj << _self.databus_request_data(:current_object)) _isnt _unset
+		_then
+			cur_props << mss_scheduled_task.property_list_for_parameter_text(cur_obj.parameter_text)
+		_else
+			cur_props << _unset
+		_endif
+		
+		_for i, j _over pl.fast_keys_and_elements()
+		_loop
+			msg << task_handler.message(i)
+			_if cur_props _is _unset
+			_then
+				init_pval << _unset
+			_else
+				init_pval << cur_props[i]
+			_endif 
+			val << property_list.new_with(:property_name, task_handler.message(i),
+						      :property_value, init_pval)
+			dt << display_tree.new(i, val)
+			dt.styled_string << sstr
+			r.add_last(dt)
+		_endloop
+	_else
+		.cur_task_handler << _unset
+		.cur_properties_config << _unset
+	_endif
+
+	_self.changed(:property_tree, :renew)
+	_return r
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_properties_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :current_object
+	_then
+		_if (cur_obj << .cur_object) _isnt _unset _andif
+		    _not cur_obj.is_valid?
+		_then
+			cur_obj << .cur_object << _unset
+		_endif 
+		_if data _is _unset
+		_then
+			new_val << _unset
+		_else
+			new_val << data.type
+		_endif
+
+		# I'm not sure how the task type could change while the current
+		# object stays the same, but just in case that ever happens,
+		# this must refresh itself.
+		_if data ~= cur_obj _orif
+		    new_val ~= .cur_task_type
+		_then
+			.cur_object << data
+			.cur_task_type << new_val
+			_self.update_property_tree()
+		_endif
+		
+	_elif data_type_name _is :proposed_value
+	_then
+		_if data.field_descriptor.name _is :type
+		_then
+			new_val << data.value
+			_if new_val _is _unset
+			_then
+				# This can occur during a call to clear_proposed_values(),
+				# and in this case, don't make a change.
+				_if .cur_object _isnt _unset _andif
+				    .cur_object.is_valid?
+				_then
+					_return
+				_endif
+			_endif 
+			_if new_val ~= .cur_task_type
+			_then
+				.cur_task_type << new_val
+				_self.update_property_tree()
+			_endif
+		_endif
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_properties_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_dynamic !print_float_precision!
+	_if !print_float_precision! < 12
+	_then
+		!print_float_precision! << 12
+	_endif
+	
+	_if data_type_name _is :proposed_values_for_insert _orif
+	    data_type_name _is :proposed_values_for_update
+	_then
+		pl << property_list.new()
+		_for dt _over .property_tree.fast_elements()
+		_loop
+			data_type << _unset 
+			_if .cur_properties_config _isnt _unset _andif 
+			    (cur_config << .cur_properties_config[dt.key]) _isnt _unset
+			_then
+				data_type << cur_config[1]
+			_endif
+
+			val << dt.value[:property_value]
+
+			# In most cases, the editor itself takes care of formatting.
+			# However, the following deals with some cases that are not handled.
+			_if val _isnt _unset
+			_then
+				_if data_type _is :integer
+				_then
+					val << val.as_number().rounded
+				_elif data_type _is :float
+				_then
+					val << val.as_number().as_float
+				_elif data_type _is :symbol
+				_then
+					val << val.as_symbol()
+				_endif
+			_endif
+			
+			pl[dt.key] << val
+		_endloop
+	_endif
+
+	str << _self.framework.collection.record_exemplar.parameter_text_for_property_list(pl)
+	retval << property_list.new_with(:parameter_text, str)
+	_return retval
+	
+_endmethod
+$

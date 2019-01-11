@@ -1,0 +1,13 @@
+Release notes for MSS V4.0 2005.05.30:
+
+Developers who are upgrading from a previous version are encouraged to read this in
+its entirety and to perform source code compares from your previous version if you
+have made any changes to MSS code.  However, if you can't be bothered with the details,
+at least review the items flagged with DEVELOPER NOTE to look at the important things
+which may affect you.
+
+
+New Modules:
+	
+
+Module Changes:

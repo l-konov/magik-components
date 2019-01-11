@@ -1,0 +1,10 @@
+mss_http_server	1
+
+description
+	Minimal HTTP server implementation
+end
+
+requires
+	mss_component_framework
+	mss_http_client
+end

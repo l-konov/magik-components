@@ -1,0 +1,733 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## This component provides services to analyze Magik code.
+## Currently an analysis is based on the tokens the Magik
+## parser created from the Magik source code.
+##
+def_slotted_exemplar( :sf!token_analyzer,
+{
+	{ :gui_items,   _unset },
+	{ :input,       _unset },
+	{ :input_line,  _unset },
+	{ :scanner,     _unset },
+	{ :method_info, _unset },
+	{ :token_list,  _unset }
+},
+{ :sw_component, :sf!component_mixin } )
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_slot_access( :gui_items, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_slot_access( :input, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_slot_access( :input_line, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_slot_access( :scanner, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_slot_access( :method_info, :write, :private )
+$
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_slot_access( :token_list, :write, :private )
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+##
+## This constant defines which analysis can be performed
+## (on methods or just within methods).
+## 
+sf!token_analyzer.define_shared_constant( :method_based_analysis_options,
+	sw:property_list.new_with(
+		:call_analysis,		{ :|analyze_method_calls()| },
+		:common_expressions,	{ :|analyze_expressions()| },
+		:unused_variables,	{ :|find_unused_variables()| }
+	),
+	:private)
+$
+
+
+##
+##	R E D E F I N E D   C A L L B A C K S
+##	_____________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_shared_constant( :databus_consumer_data_types,
+	{
+		:process_file
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!token_analyzer.define_shared_constant( :databus_producer_data_types,
+	{
+		:method_data
+	},
+	:public )
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.init( _gather args )
+
+	## Initialize and return _self.
+
+	_super.init( _scatter args )
+
+	.scanner     << sf!magik_lexical_scanner.copy()
+	.method_info << sw:property_list.new_with(
+				   :private?,    _false,
+				   :iterator?,   _false,
+				   :source_file, _unset,
+				   :param_names, sw:rope.new() )
+	.gui_items   << sw:property_list.new()
+	.input_line  << _unset
+	.token_list  << {}
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!token_analyzer.sw_databus_data_available( data_type_name, data )
+
+	## Listen on the databus for any information that might
+	## be of interest to us...
+
+	_if data_type_name _is :process_file
+	_then
+		_self.read_file( data )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!token_analyzer.build_in_framework( a_container )
+
+	## Build the widgets that allow the user to access
+	## functionality from _self.
+
+	_local gi   << .gui_items
+	_local rows << 2
+	_local row  << 1
+	_local col  << 1
+	_local ctn
+	_local ok?
+
+	#
+	# Find out if someone else already built the container for me...
+	#
+	ctn << _self.framework.get_gui_container_for( :analysis_container )
+
+	#
+	# No container exists - build a new one...
+	#
+	_if ctn _is _unset
+	_then
+		a_container.start_row()
+		gb  << sw:group_box.new( a_container,
+					 _self.message( :analysis_options ) )
+		ctn << sw:rowcol.new( gb, rows, _unset, :pixel )
+	_else
+		#
+		# The container should be a group box;
+		# take the rowcol from that group box...
+		#
+		ctn << ctn.items.an_element()
+	_endif
+
+	#
+	# Build all the toggle items for things that can be analyzed...
+	#
+	_for a_key,data _over _self.method_based_analysis_options.
+			      fast_keys_and_elements()
+	_loop
+		ok?  << _self.method( data.first ) _isnt _unset
+		gi[ a_key ] <<
+			sw:toggle_item.new( ctn, _self.message( a_key ),
+				:model,    _self,
+				:value,    ok?,
+				:enabled?, ok?,
+				:balloon_help_text,
+				    _self.message( a_key + :|_tt| ),
+				:short_help_text,
+				    _self.message( a_key + :|_sht| ),
+				:row, row, :col, col )
+		
+		row +<< 1
+		_if row > rows _then ( row, col ) << ( 1, col + 1 ) _endif
+	_endloop
+_endmethod
+$
+
+
+##
+##	N E W   F U N C T I O N A L I T Y
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!token_analyzer.read_file( a_file_path )
+
+	## This is the main work-horse!
+	## It reads a file (line by line) and tries to find the start
+	## of a method. If a _method keyword was found, the Magik
+	## parser is used to analyze the calls in that method.
+
+	_dynamic !sf!current_line_number!
+
+	_local options    << _self.method_based_analysis_options
+	_local selections << _self.gui_items
+	_local enabled?   << sw:property_list.new()
+	_local a_scanner  << _self.scanner
+	_local f_strm
+	_local str
+
+	_self.input_line << 0
+
+	_for a_key _over options.keys()
+	_loop
+		enabled?[ a_key ] << _self.gui_items[ a_key ].value
+	_endloop
+
+	_protect
+		f_strm << _self.input <<
+			sw:external_text_input_stream.new( a_file_path )
+
+		f_strm.check_text_encoding()
+
+		_self.method_info[ :source_file ] << a_file_path.copy()
+
+		_for a_string,a_line_no _over _self.get_line_from_file()
+		_loop
+			!sf!current_line_number! << a_line_no
+
+			_self.look_for_method_blocks( a_string, a_scanner,
+						      enabled?, options )
+		_endloop
+	_protection
+		_if f_strm _isnt _unset
+		_then
+			f_strm.close()
+			_self.input << _unset
+		_endif
+		_self.token_list << _unset
+	_endprotect
+_endmethod
+$
+
+
+##
+##	I N T E R N A L   C O D E
+##	_________________________
+##
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _iter _method sf!token_analyzer.get_line_from_file()
+
+	## This helper method centralizes the task to read an entire
+	## line from the (Magik,QA) input file. It also 
+
+	_local a_string
+
+	_loop
+		a_string << _self.input.get_line()
+		_if a_string _is _unset _then _leave _endif
+
+		_loopbody( a_string, _self.input_line +<< 1 )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.look_for_method_blocks(
+			 a_string, a_scanner, enabled?, options )
+
+	## This method looks out for tokens that indicate the start
+	## of a method (e.g. _private, _iter or _method).
+
+	_local tokens
+	_local type
+	_local analyze?
+
+	_if a_scanner _is _unset _then a_scanner << _self.scanner _endif
+
+	tokens << a_scanner.scan_string( a_string )
+
+	_for pos,a_lexeme _over tokens.fast_keys_and_elements()
+	_loop
+		#
+		# Look out for something that starts a method...
+		#
+		_if ( type << a_lexeme.type ) <> :private _andif
+		    type <> :iter _andif
+		    type <> :method
+		_then
+			_continue
+		_endif
+
+		#
+		# Collect all tokens until the _endmethod keyword is
+		# found (analyze? will be true is that token was found).
+		#
+		_self.token_list << tokens.subseq( pos )
+		analyze? << _self.collect_method_tokens( a_scanner )
+
+		#
+		# Check the contents of the method - if one was found...
+		#
+		_if analyze?
+		_then
+			_self.analyze_method_token_stream(
+				enabled?, options )
+			_leave
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.collect_method_tokens( a_scanner )
+
+	## This method collects all tokens that belong to one method.
+	## In other words: All input is read until an _endmethod
+	## token is found. All tokens read during this process are
+	## gathered in slot token_list.
+	## This code assumes that after the _endmethod token has been
+	## read no other significant information follows.
+	##
+	## The method returns a Boolean value to indicate if a
+	## method was read or not.
+
+	_dynamic !sf!current_line_number!
+
+	_local tok_list << _self.token_list
+	_local method?  << _false
+	_local tokens
+
+	_for a_string, a_line_no _over _self.get_line_from_file()
+	_loop @outer
+		!sf!current_line_number! << a_line_no
+
+		tokens << a_scanner.scan_string( a_string )
+
+		tok_list.add_all_last( tokens )
+
+		_for a_lexeme _over tokens.fast_elements()
+		_loop
+			_if a_lexeme.type = :endmethod
+			_then
+				method? << _true
+				_leave @outer
+			_endif
+		_endloop
+	_endloop
+
+	>> method?
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.analyze_method_token_stream(
+			 option_enabled?, options )
+
+	## The actual work-horse of this code:
+	## - Cleans up the token list,
+	## - extracts all necessary information about the current method
+	## - analyzes the call structure in the method
+
+	_local tok_list << _self.token_list
+	_local type
+
+	_self.cleanup_token_list()
+	
+	_self.get_additional_method_info()
+
+	_for a_key,actions _over options.fast_keys_and_elements()
+	_loop
+		_if option_enabled?[ a_key ]
+		_then
+			_self.perform_private( _scatter actions )
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.cleanup_token_list()
+
+	## Remove all eoln tokens from the list - we do not
+	## care too much about them because all tokens know
+	## on which line they are...
+
+	_local list << _self.token_list
+
+	_for pos,a_lexeme _over list.keys_and_elements_in_reverse()
+	_loop
+		_if a_lexeme.type = :eoln
+		_then
+			list.remove_nth( pos )
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.get_additional_method_info()
+
+	## This method help to figure out some "basics" out the
+	## method itself - e.g. is it private or an iterator.
+	## All this information is stored in the property_list
+	## that is kept in slot method_info.
+	## IN addition, two offsets are stored in this list:
+	## - :meth_offset
+	##   Identifies the index in the token list where the
+	##   _method token/keyword can be found.
+	## - :code_offset
+	##   Identifies the index in the token list where the
+	##   actual code of the method begins.
+
+	_local tok_list    << _self.token_list
+	_local info        << _self.method_info
+	_local paren?      << _false 
+	_local meth_offset << 1
+	_local code_offset
+	_local token
+	_local type
+
+	info[ :private? ]   << _false
+	info[ :iterator? ]  << _false
+	info[ :param_names ].empty()
+
+	#
+	# Check if the method is
+	# - a public
+	# - a private
+	# - an iterator
+	#
+	_for a_tok _over _self.token_list.fast_elements()
+	_loop
+		_if ( type << a_tok.type ) = :method _then _leave _endif
+		_if type = :private
+		_then
+			info[ :private? ] << _true
+
+		_elif type = :iter
+		_then
+			info[ :iterator? ] << _true
+		_endif
+
+		meth_offset +<< 1
+	_endloop
+
+	#
+	# try to get full method name as it might be used in Magik,QA;
+	# e.g. collect parentheses and all also parameter names...
+	#
+	code_offset << meth_offset + 4
+
+	_if paren? << ( tok_list[ code_offset ].type = :lparen )
+	_then
+		( code_offset, param_names ) <<
+			_self.scan_parameter_tokens( tok_list, code_offset )
+
+		info[ :param_names ].add_all_last( param_names )
+	_endif
+
+	#
+	# Set up the basic method info in the method_info slot...
+	#
+	info[ :call_stats ]  << _unset
+	info[ :meth_offset ] << meth_offset
+	info[ :code_offset ] << code_offset
+	info[ :class_name ]  << tok_list[ meth_offset + 1 ].value
+	info[ :method_id ]   << tok_list[ meth_offset + 3 ].value
+	info[ :method_name ] << _if paren?
+				_then >> info[ :method_id ].with_parentheses
+				_else >> info[ :method_id ]
+				_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.scan_parameter_tokens( a_token_list, an_offset )
+
+	## This method scans the parameter list in A_TOKEN_LIST.
+	## If A_TOKEN_LIST[ AN_OFFSET ] is not :lparen, this method
+	## does nothing.
+	## The method returns an index (the position in A_TOKEN_LIST
+	## after the closing bracket) und the names of parameters.
+
+	_if a_token_list[ an_offset ].type <> :lparen
+	_then
+		_return an_offset, {}
+	_endif
+
+	_local last_tok_pos << a_token_list.size
+	_local param_list   << sw:rope.new()
+	_local token
+	_local type
+
+	_loop
+		_if ( an_offset +<< 1 ) > last_tok_pos _then _leave _endif
+		
+		token << a_token_list[ an_offset ]
+		_if ( type << token.type ) = :rparen
+		_then
+			#
+			# Move one position ahead to point at the next
+			# available token...
+			#
+			an_offset +<< 1
+			_leave
+
+		_elif type = :identifier
+		_then
+			param_list.add_last( token.value )
+		_endif
+	_endloop
+
+	#
+	# Make sure we are not pointing past the last token...
+	#
+	>> an_offset.min( last_tok_pos ), param_list
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.analyze_method_calls()
+
+	## The basic idea behind this method is to look for
+	## a pattern like [global_]identifier dot identifier.
+
+	_local tok_list << _self.token_list
+	_local mi       << _self.method_info.deep_copy()
+	_local pos      << mi[ :code_offset ]
+	_local max_idx  << tok_list.size - 1
+	_local mcs
+	_local new_pos
+
+	mi[ :call_stats ] << mcs <<
+		mclib:sf!method_call_stats.new(
+		       mi[ :method_name ], mi[ :class_name ],
+		       tok_list[ mi[ :meth_offset ] ].sf!line_no,
+		       _true, mi[ :source_file ] )
+	mi[ :line_number ] << tok_list.first.sf!line_no
+			      
+	_loop
+	    #
+	    # At this position we "start from scratch";
+	    # nothing that looks like a method call has been seen at
+	    # this point in time and
+	    # - we have to look for an identifier and
+	    # - we need to be at least 2 tokens before the end
+	    #   of the token list (else this won't be a method call!)
+	    #
+	    _if pos + 2 > max_idx _then _leave _endif
+
+	    new_pos << _self.find_call_sequence( pos, max_idx, mcs )
+
+	    pos << _if new_pos = pos _then >> pos + 1 _else >> new_pos _endif
+	_endloop
+
+	_self.databus_make_data_available( :method_data, mi )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.find_call_sequence(
+			 idx, max_idx, a_method_call_stat_object )
+
+	## The actual work-horse to find method calls.
+	##
+	## IDX
+	##    The position in _self.token_list where we start
+	##    searching for a call sequence.
+	## MAX_IDX
+	##    The last possible index in _self.token_list where
+	##    we can look for a call sequence.
+	## A_METHOD_CALL_STAT_OBJECT
+	##    A Magik,QA object that will store call information.
+
+	_local tok_list << _self.token_list
+	_local type
+	_local r_tok
+	_local m_tok
+	_local rcv_name
+	_local meth_name
+	_local leave_inner?
+
+	return_on_rparen? << return_on_rparen? _is _true
+
+	_loop @outer
+	    _if idx + 2 > max_idx _then _leave _endif
+
+	    type << ( r_tok << tok_list[ idx +^<< 1] ).type
+
+	    _if type = :rparen _then _leave _endif
+		
+	    _if ( type <> :identifier _andif
+		  type <> :self _andif
+		  type <> :global_identifier )
+	    _then
+		    _continue
+	    _endif
+
+	    rcv_name << _if type = :identifier
+		      _then >> r_tok.value
+		      _elif type = :self
+		      _then >> :|_self|
+		      _else >> r_tok.value.first + %: + r_tok.value.last
+		      _endif
+
+	    #
+	    # At this point in time we have seen either an identifier
+	    # or just have processed a method call. token_list[ idx ]
+	    # must be :dot so that this can actually be a method call.
+	    #
+	    _loop @inner
+		    _if idx + 1 > max_idx _then _leave _endif
+
+		    _if tok_list[ idx ].type <> :dot _orif
+			( m_tok << tok_list[ idx + 1 ] ).type <> :identifier
+		    _then
+			    _continue @outer
+		    _endif
+
+		    #
+		    # Special case:
+		    # sometimes we can find an code fragment like this:
+		    # abc.new()
+		    # .slot << :test
+		    # We must not confuse the slot access with a method
+		    # call following the new() call!
+		    #
+		    _if tok_list[ idx ].sf!line_no <>
+			tok_list[ idx - 1 ].sf!line_no
+		    _then
+			    _continue @outer
+		    _endif
+
+		    #
+		    # We found a method call - e.g. something like <id>.<id>
+		    # check for special cases of the 2nd identifier like:
+		    # - <id>()		:lparen
+		    # - <id> <<		:chevron
+		    # - <id> ^<<		:boot_chevron
+		    # - <id> <op> <<	:operator + :chevron
+		    # - <id> <op> ^<<	:operator + :boot_chevron
+		    #
+		    idx   +<< 1
+		    meth_name << m_tok.value
+
+		    _if ( idx +<< 1 ) > max_idx _then _leave @outer _endif
+		
+		    _if ( type << tok_list[ idx ].type ) = :lparen
+		    _then
+			    stop    << _self.find_closing_rparen_in(
+					       tok_list, idx, max_idx )
+			    new_idx << _self.find_call_sequence(
+					       idx + 1, stop,
+					       a_method_call_stat_object )
+			
+			    meth_name << meth_name.with_parentheses
+			    idx       << stop + 1
+
+		    _elif type = :chevron _orif type = :boot_chevron
+		    _then
+			    meth_name << meth_name.with_chevron
+
+		    _elif type = :operator _andif
+			  ( ( idx +<< 1 ) < max_idx ) _andif
+			  ( n_type << tok_list[ idx ].type ) = :chevron _orif
+			  n_type = :boot_chevron
+		    _then
+			    meth_name << meth_name.with_chevron
+		    _endif
+
+		    a_method_call_stat_object.add_call_info(
+			    meth_name, rcv_name, m_tok.sf!line_no )
+
+		    rcv_name << meth_name
+	    _endloop
+	_endloop 
+
+	>> idx
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!token_analyzer.find_closing_rparen_in(
+			 a_token_list, idx, max_idx )
+
+	## This method should only be called if the current token
+	## (A_TOKEN_LIST[ IDX ]) is an opening round bracket.
+	## The task of this method is to find the corresponding
+	## closing bracket and return its position in A_TOKEN_LIST.
+
+	_local open_count << 0
+	_local type
+
+	_loop
+		_if idx = max_idx _then _leave _endif
+
+		type << a_token_list[ idx ].type
+		_if type = :lparen
+		_then
+			open_count +<< 1
+		_elif type = :rparen
+		_then
+			open_count -<< 1
+		_endif
+
+		_if open_count = 0 _then _leave _endif
+
+		idx +<< 1
+	_endloop
+
+	>> idx
+_endmethod
+$

@@ -1,0 +1,131 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.mss_primary_connection_press(a_window, pos)
+	## 
+	## For rules that place a primary_connection and a
+	## secondary_connection in a two-point operation, dynamically
+	## swap to placing a primary_connection on the first pointing.
+	##
+
+	_if .user_data[:primary_connection] _isnt _unset
+	_then
+		# Primary correlation has already happened.
+		_return
+	_endif
+
+	pin_1_name << .detached_record.mss_ptrule_pin_1_name
+	pin_2_name << .detached_record.mss_ptrule_pin_2_name
+	
+	# The rule will have been set up to create a secondary_connection
+	# geometry.  Switch the drag sectors to the primary_connection.
+	pdr << .pdr_data
+	a_map_view << a_window.user_data
+	gf << .detached_record.all_fields[pin_1_name]
+	.detached_geometry.style_info << gf
+	style << a_map_view.style_for(.detached_geometry)
+
+	old_secs << pdr[:drag_sectors]
+	pdr[:drag_sectors] << .detached_geometry.contour_for(style, a_window)
+	
+	_if _self.insert_enabled?(:release)
+	_then
+		a_window.xor_sector_rope_transform(line_style, old_secs)
+		a_window.xor_sector_rope_transform(line_style, pdr[:drag_sectors])
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.mss_primary_connection_pre_release(a_window, pos)
+	## 
+	## For rules that place a primary_connection and a
+	## secondary_connection in a two-point operation, validate
+	## connections. 
+	##
+
+	pdr << .pdr_data
+	_if pdr[:last_correlation_geometry] _is _unset
+	_then
+		# In order to connect, something must have been correlated on.
+		condition.raise(:user_error, :string, "Must correlate on an electric conductor.")
+	_endif
+
+	_if .user_data[:primary_connection] _is _unset
+	_then
+		# Store primary_connection data for now, and suspend rule so
+		# that another pointing is done to set the secondary_connection.
+		pp << .detached_geometry.transformed(pdr[:transform])
+		pp.world << .detached_geometry.world
+		.user_data[:primary_connection] << pp
+		.user_data[:primary_connection_drag_sectors] << pdr[:drag_sectors]
+		.user_data[:primary_connection_map_view] << a_window.user_data
+		_self.one_shot_properties[:suspended?] << _true
+
+		# Draw the drag sectors once more, so the user can see where
+		# this will go.
+		a_window.xor_sector_rope_transform(line_style, pdr[:drag_sectors])
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.mss_primary_connection_release(a_window, pos)
+	## 
+	## For rules that place a primary_connection and a
+	## secondary_connection in a two-point operation, place the
+	## primary_connection geometry once all data has been
+	## gathered. 
+	##
+
+	_if _not _self.insert_enabled?(:release)
+	_then
+		_return
+	_endif
+	
+	pdr << .pdr_data
+	_if (pp << .user_data[:primary_connection]) _is _unset
+	_then
+		_return
+	_endif
+	new_map_view << .user_data[:primary_connection_map_view]
+	
+	pin_1_name << .detached_record.mss_ptrule_pin_1_name
+	pin_2_name << .detached_record.mss_ptrule_pin_2_name
+		
+	# Undraw the ghost outline drawn in the pre-release method.
+	a_window.xor_sector_rope_transform(line_style, .user_data[:primary_connection_drag_sectors])
+	
+	new_geom << .current_record.make_geometry(pin_1_name, pp)
+	orig_geom << .current_record.perform(pin_2_name)
+
+	a_map_view << a_window.user_data
+
+	# The following is only for cosmetic purposes, since triggers
+	# on transformer directly set orientation of geometry to point
+	# to each other, but without undrawing/redrawing.
+	.manager.undraw_geometry(new_geom, new_map_view.style_for(new_geom))
+	.manager.undraw_geometry(orig_geom, a_map_view.style_for(orig_geom))
+
+	# Force triggers to do reorientation.
+	.current_record.source_collection.update(.current_record.detached())
+	
+	# Re-get geometries, in case triggers did something unexpected.
+	new_geom << .current_record.perform(pin_1_name)
+	orig_geom << .current_record.perform(pin_2_name)
+
+	# And redraw...
+	.manager.draw_geometry(new_geom, new_map_view.style_for(new_geom))
+	.manager.draw_geometry(orig_geom, a_map_view.style_for(orig_geom))
+	
+_endmethod
+$

@@ -1,0 +1,21 @@
+#
+# Ths file contains class and method names that are to be ignored
+# (e.g. not displayed).
+# The data is organized in two columns:
+# - the first column contains a class name,
+# - the second column contains a method name.
+#
+
+_self		message()
+*		message()
+panel		new()
+rowcol		new()
+group_box	new()
+button_item	new()
+button_item	new_safe()
+button_item	new_safe_transaction()
+label_item	new()
+text_item	new()
+toggle_item	new()
+text_window	new()
+tree_item	new()

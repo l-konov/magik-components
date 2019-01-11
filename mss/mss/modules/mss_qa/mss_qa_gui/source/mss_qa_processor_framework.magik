@@ -1,0 +1,61 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_qa})
+##
+## mss_qa_processor_framework
+##
+## GUI framework for handling MSS Quality Assurance
+## functionality. 
+##
+
+def_slotted_exemplar(:mss_qa_processor_framework,
+{},
+{:gui_framework})
+$
+
+_pragma(classify_level=basic)
+mss_qa_processor_framework.define_shared_constant(
+	:databus_consumer_data_types,
+	{:run_status_string, :status_string},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_framework.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:close,
+				       :engine, _self,
+				       :action_message, :|close()|))
+	_self.add_action(sw_action.new(:help,
+				       :engine, _self,
+				       :action_message, :|help()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_framework.sw_databus_data_available(data_type_name, data)
+	## 
+	## Update the status bar to indicate status messages from any
+	## plugin.
+	##
+
+	_if data_type_name _is :run_status_string
+	_then
+		_self.update_statusbar(:run_status_string, :text, data)
+	_elif data_type_name _is :status_string
+	_then
+		_self.update_statusbar(:status_string, :text, data)
+	_endif
+	
+_endmethod
+$

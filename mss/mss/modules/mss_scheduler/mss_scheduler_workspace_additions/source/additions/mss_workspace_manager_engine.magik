@@ -1,0 +1,118 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.submit_post_design_task(rec, parms)
+	## 
+	## Submit a scheduled task to post the design REC.  PARMS is a
+	## list of parameters to pass to the task.
+	##
+
+	tbl << mss_scheduler_engine.scheduled_task_collection
+	
+	# Format the parameter text.
+	pl << property_list.new_with(:design_id, rec.id)
+	_if (x << parms[:conflict_mode]) _isnt _unset
+	_then
+		pl[:conflict_mode] << x
+	_endif
+	_if (x << parms[:post_complete_state]) _isnt _unset
+	_then
+		pl[:post_complete_state] << x
+	_endif
+	_if (x << parms[:post_fail_state]) _isnt _unset
+	_then
+		pl[:post_fail_state] << x
+	_endif
+	parm_text << tbl.record_exemplar.parameter_text_for_property_list(pl)
+
+	# Create a transaction to insert this record.
+	pl << property_list.new_with(
+		      :type, :post_design,
+		      :submitter, gis_program_manager.login_name,
+		      :priority, parms[:priority].default(5),
+		      :scheduled_start_time, parms[:scheduled_start_time].default(date_time.now()),
+		      :schedule_interval, 0,
+		      :parameter_text, parm_text)
+	rt << record_transaction.new_insert(tbl, pl)
+	rt.run()
+										  
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.submit_state_transtition_task(rec, parms)
+	## 
+	## Submit a scheduled task to post the design REC.  PARMS is a
+	## list of parameters to pass to the task.
+	##
+
+	tbl << mss_scheduler_engine.scheduled_task_collection
+	
+	# Format the parameter text.
+	_if rec.source_collection.name _is :mss_job
+	_then
+		type << :job_state_transition
+		pl << property_list.new_with(:job_id, rec.id)
+	_else
+		type << :design_state_transition
+		pl << property_list.new_with(:design_id, rec.id)
+	_endif
+	pl[:from_state_name] << parms[:from_state_name]
+	pl[:to_state_name] << parms[:to_state_name]
+	parm_text << tbl.record_exemplar.parameter_text_for_property_list(pl)
+
+	# Create a transaction to insert this record.
+	pl << property_list.new_with(
+		      :type, type,
+		      :submitter, gis_program_manager.login_name,
+		      :priority, parms[:priority].default(7),
+		      :scheduled_start_time, parms[:scheduled_start_time].default(date_time.now()),
+		      :schedule_interval, 0,
+		      :parameter_text, parm_text)
+	rt << record_transaction.new_insert(tbl, pl)
+	rt.run()
+										  
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.submit_delete_designs_task(parms)
+	## 
+	## Submit a scheduled task to delete completed and/or cancelled
+	## jobs and designs.  PARMS is a list of parameters to pass to
+	## the task. 
+	##
+
+	tbl << mss_scheduler_engine.scheduled_task_collection
+	
+	# Format the parameter text (N.B.: no user-definable parameters
+	# right now).
+	pl << property_list.new()
+	parm_text << tbl.record_exemplar.parameter_text_for_property_list(pl)
+
+	# Default to a one-day interval.
+	_if (sch_int << parms[:schedule_interval]) _is _unset
+	_then
+		sch_int << unit_value.new(1, :day)
+	_endif
+	
+	# Create a transaction to insert this record.
+	pl << property_list.new_with(
+		      :type, :delete_designs,
+		      :submitter, gis_program_manager.login_name,
+		      :priority, parms[:priority].default(3),
+		      :scheduled_start_time, parms[:scheduled_start_time].default(date_time.now()),
+		      :schedule_interval, sch_int,
+		      :parameter_text, parm_text)
+	rt << record_transaction.new_insert(tbl, pl, property_list.new_with(:description, ""))
+	rt.run()
+										  
+_endmethod
+$

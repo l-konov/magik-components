@@ -1,0 +1,97 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable})
+_method mss_ptrule_construction_manager.dynamic_mode_options
+	## 
+	## Available options for dynamic mode.  This is a vector of
+	## items that can be passed directly to a new text_choice_item:
+	## each item in this vector is a two-item vector consisting of
+	## the internal and external name of the option.
+	##
+	## This may be redefined in conjunction with the
+	## dynamic_geometry_candidates() method.
+	##
+
+	# Changed from core to add a streets_only mode.
+	
+	_return {{:all, _self.message(:dynamic_mode_all)},
+		 {:streets_only, _self.message(:dynamic_mode_streets_only)}}
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable})
+_method mss_ptrule_construction_manager.dynamic_geometry_candidates(dyn_mode, a_geom_thing)
+	## 
+	## Return all actual geometries of interest for dynamic mode
+	## DYN_MODE, and A_GEOM_THING (which may be a real geometry,
+	## pseudo geometry, sector rope, or pretty much anything
+	## geometry-ish).
+	##
+	## The default implementation only considers actual chain and
+	## area geometries.  This may be redefined to optionally
+	## consider other things, based on DYN_MODE.
+	##
+
+	# Changed from core to add a streets_only mode.
+	
+	_if _not a_geom_thing.is_a_datastore_object?
+	_then
+		_return
+	_endif
+
+	mode << _self.get_option(:dynamic_mode)
+	
+	r << rope.new()
+	_if a_geom_thing.is_geometry?
+	_then
+		_if _self.cam_db_geom_ok_for_dynamic_mode?(a_geom_thing, mode)
+		_then 
+			r.add_last(a_geom_thing)
+		_endif 
+		_return r
+	_endif
+	
+	_for a_geom _over a_geom_thing.top_level_geoms()
+	_loop
+		_if {:linear, :area}.includes?(a_geom.geom_category) _andif
+		    _self.cam_db_geom_ok_for_dynamic_mode?(a_geom, mode)
+		_then 
+			r.add_last(a_geom)
+		_endif
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_construction_manager.cam_db_geom_ok_for_dynamic_mode?(a_geom, mode)
+	## 
+	## Return true if A_GEOM can be used as a construction geometry
+	## in dynamic mode MODE.
+	##
+
+	# This is actually a new method, but it is used in conjunction
+	# with the basic changes above.
+	_if mode _is :all
+	_then
+		_return _true
+	_elif mode _is :streets_only
+	_then
+		_if {:min_road, :trunk_road}.includes?(a_geom.rwo_type)
+		_then
+			_return _true
+		_endif
+	_endif
+	_return _false
+	
+_endmethod
+$

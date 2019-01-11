@@ -1,0 +1,139 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# The following code will define the workflow named "Standard
+# Workflow", along with all related states and state transitions.
+#
+
+_block
+	_local wf
+	_local ocf_pl
+	_local ocf
+	_local agf_pl
+	_local agf
+	
+	mss_workflow.remove_workflow_definition(:standard_workflow)
+	wf << mss_workflow.new(:standard_workflow, "Standard Workflow")
+
+	ocf_pl << property_list.new_with(
+			  :reassign_tracking_records?, _false,
+			  :copy_tracking_records?, _true,
+			  :reassign_cus?, _false,
+			  :copy_cus?, _true)
+	ocf << {{:simple_workflow, "Constructed", ocf_pl},
+		{:standard_workflow, "Approved", ocf_pl},
+		{:standard_workflow, "Constructed", ocf_pl}}
+	agf_pl << property_list.new_with(
+			  :conflict_mode, :force_parent_with_manifold_interaction,
+			  :create_tracking_records?, _true)
+	agf << {{:simple_workflow, "In Design", agf_pl},
+		{:simple_workflow, "Approved", agf_pl},
+		{:standard_workflow, "In Design", agf_pl},
+		{:standard_workflow, "Approved", agf_pl}}
+	mss_state.new(wf, "New", :progress_score, 0, :initial_for_job?, _true, :initial_for_design?, _true,
+		      :readonly?, _true)
+	mss_state.new(wf, "Cancelled", :progress_score, 10, :readonly?, _true)
+	mss_state.new(wf, "On Hold", :progress_score, 20, :readonly?, _true)
+	mss_state.new(wf, "In Design", :progress_score, 30, :overlay_copy_from, ocf)
+	mss_state.new(wf, "Analysis Only", :progress_score, 32, :aggregate_from, agf, :readonly?, _true)
+	mss_state.new(wf, "Prepare Partial Post", :progress_score, 35, :overlay_copy_from, ocf)
+	mss_state.new(wf, "Partial Post Pending", :can_delete_job?, _false, :can_delete_design?, _false,
+		      :progress_score, 36, :readonly?, _true)
+	mss_state.new(wf, "Approved", :progress_score, 40, :singular?, _true, :readonly?, _true)
+	mss_state.new(wf, "Approved Post Pending", :can_delete_job?, _false, :can_delete_design?, _false,
+		      :progress_score, 50, :singular?, _true, :readonly?, _true)
+	mss_state.new(wf, "Released For Construction", :can_delete_job?, _false, :can_delete_design?, _false,
+		      :progress_score, 60, :singular?, _true, :readonly?, _true)
+	mss_state.new(wf, "Constructed", :can_delete_job?, _false, :can_delete_design?, _false,
+		      :progress_score, 70, :singular?, _true)
+	mss_state.new(wf, "Constructed Post Pending", :can_delete_job?, _false, :can_delete_design?, _false,
+		      :progress_score, 80, :singular?, _true, :readonly?, _true)
+	mss_state.new(wf, "Completed", :progress_score, 90, :singular?, _true, :readonly?, _true)
+
+	_local sjs << :|synchronize_job_status()|
+	_local ead << :|ensure_active_design()|
+	_local del_wps << :|delete_mss_cu_work_points()|
+	_local del_cus << :|delete_non_material_cu_references()|
+	_local proc_cus << :|process_cu_state_transition()|
+	_local stc << :|cam_constructed_state_change()|
+	_local tu << "Trusted Users"
+	_local sa << "system_admin"
+	
+	mss_state_transition.new(wf, :design, "New", "Cancelled", _unset, {}, {sjs},
+				 :require_confirmation?, _true)
+	mss_state_transition.new(wf, :design, "New", "In Design", _unset, {}, {sjs})
+	mss_state_transition.new(wf, :design, "New", "Analysis Only", _unset, {}, {sjs},
+				 :require_confirmation?, _true)
+	mss_state_transition.new(wf, :design, "New", "Prepare Partial Post", _unset, {}, {sjs},
+				 :require_confirmation?, _true)
+
+	mss_state_transition.new(wf, :design, "On Hold", "In Design", _unset, {}, {sjs})
+	
+	mss_state_transition.new(wf, :design, "In Design", "Cancelled", _unset, {}, {sjs},
+				 :require_confirmation?, _true)
+	mss_state_transition.new(wf, :design, "In Design", "On Hold", _unset, {}, {sjs})
+	mss_state_transition.new(wf, :design, "In Design", "Analysis Only", _unset, {}, {sjs},
+				 :require_confirmation?, _true)
+	mss_state_transition.new(wf, :design, "In Design", "Approved", _unset, {}, {sjs})
+
+	mss_state_transition.new(wf, :design, "Prepare Partial Post", "Partial Post Pending", {tu}, {ead}, {sjs},
+				 :post_data?, _true,
+				 :post_complete_state, "Prepare Partial Post",
+				 :post_fail_state, "Prepare Partial Post")
+
+	# Note that in the "Partial Post Pending" state, there are
+	# generally no authorized transitions:
+	# - If anything fails, there is an option for an administrator to
+	#   go back to the "Prepare Partial Post" state.
+	mss_state_transition.new(wf, :design, "Partial Post Pending", "Prepare Partial Post", {sa}, {}, {sjs})
+	
+	mss_state_transition.new(wf, :design, "Approved", "Cancelled", _unset, {}, {sjs},
+				 :require_confirmation?, _true)
+	mss_state_transition.new(wf, :design, "Approved", "On Hold", _unset, {}, {sjs})
+	mss_state_transition.new(wf, :design, "Approved", "In Design", _unset, {}, {sjs})
+	mss_state_transition.new(wf, :design, "Approved", "Approved Post Pending", {tu}, {ead}, {sjs},
+				 :post_data?, _true,
+				 :post_complete_state, "Released For Construction",
+				 :post_fail_state, "Approved")
+
+	# Note that in the "Approved Post Pending" state, there are
+	# generally no authorized transitions:
+	# - The hidden transition to the "Released For Construction"
+	#   state is done automatically after the data has been posted OK.
+	# - If anything fails, there is an option for an administrator to
+	#   go back to the "Approved" state.
+	mss_state_transition.new(wf, :design, "Approved Post Pending", "Released For Construction", :none, {}, {sjs})
+	mss_state_transition.new(wf, :design, "Approved Post Pending", "Approved", {sa}, {}, {sjs})
+
+	mss_state_transition.new(wf, :design, "Released For Construction", "Constructed", _unset,
+				 {ead, del_wps, del_cus, proc_cus, stc}, {sjs},
+				 :merge_data?, _true,
+				 :require_confirmation?, _true)
+	
+	mss_state_transition.new(wf, :design, "Constructed", "Constructed Post Pending", {tu}, {ead}, {sjs},
+				 :post_data?, _true,
+				 :post_complete_state, "Completed",
+				 :post_fail_state, "Constructed")
+
+	# Note that in the "Constructed Post Pending" state, there are
+	# generally no authorized transitions:
+	# - The hidden transition to the "Completed" state is done
+	#   automatically after the data has been posted OK. 
+	# - If anything fails, there is an option for an administrator to
+	#   go back to the "Constructed" state.
+	mss_state_transition.new(wf, :design, "Constructed Post Pending", "Completed", :none, {}, {sjs})
+	mss_state_transition.new(wf, :design, "Constructed Post Pending", "Constructed", {sa}, {}, {sjs})
+
+	mss_job_type.remove_job_type_definition("Standard job - gis and electricity")
+	mss_job_type.remove_job_type_definition("Standard job - gis only")
+
+	mss_job_type.new("Standard job - gis and electricity", wf, {:gis, :electricity})
+	mss_job_type.new("Standard job - gis only", wf, {:gis})
+_endblock
+$

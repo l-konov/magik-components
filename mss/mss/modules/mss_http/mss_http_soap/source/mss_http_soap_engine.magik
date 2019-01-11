@@ -1,0 +1,335 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_soap_engine
+##
+## Tool to simplify conversion of data to SOAP format suitable
+## for sending over HTTP protocol.
+##
+## Example use:
+## - soap_eng << mss_http_soap_engine.new()
+## - soap_eng.add_to_body(simple_xml_thing.new("getCurrentTime"))
+## - y << soap_eng.document
+##
+## Developer note: this is not even close to a standards
+## compliant implementation.  It does contain a minimal
+## starting point that may be suitable for your local
+## environment. 
+##
+
+def_slotted_exemplar(:mss_http_soap_engine,
+{
+	{:soap_envelope_namespace, _unset},
+	{:soap_envelope_schema, _unset},
+	{:soap_encoding_namespace, _unset},
+	{:soap_encoding_schema, _unset},
+	{:document, _unset}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_soap_engine.define_slot_access(
+	:soap_envelope_namespace,
+	## The namespace of the SOAP envelope: defaults to "SOAP-ENV".
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_soap_engine.define_slot_access(
+	:soap_envelope_schema,
+	## The URL of the SOAP envelope schema: defaults to
+	## "http://schemas.xmlsoap.org/soap/envelope/".
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_soap_engine.define_slot_access(
+	:soap_encoding_namespace,
+	## The namespace of the SOAP envelope: defaults to "SOAP-ENC".
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_soap_engine.define_slot_access(
+	:soap_encoding_schema,
+	## The URL of the SOAP envelope schema: defaults to
+	## "http://schemas.xmlsoap.org/soap/encoding/".
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.new(_gather keys_and_vals)
+	## 
+	##
+
+	_return _clone.init(_scatter keys_and_vals)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_engine.init(_gather keys_and_vals)
+	## 
+	## Initialize standard defaults, and override these with
+	## whatever is provided in KEYS_AND_VALS.
+	##
+
+	_self.init_defaults()
+	
+	args << property_list.new_with(_scatter keys_and_vals)
+	_for i, j _over args.fast_keys_and_elements()
+	_loop
+		_self.perform(i.with_chevron, j)
+	_endloop
+	_return _self 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_engine.init_defaults()
+	## 
+	## Set standard defaults for this tool.
+	## 
+
+	.soap_envelope_namespace << "SOAP-ENV"
+	.soap_envelope_schema << "http://schemas.xmlsoap.org/soap/envelope/"
+	.soap_encoding_namespace << "SOAP-ENC"
+	.soap_encoding_schema << "http://schemas.xmlsoap.org/soap/encoding/"
+	.document << _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_engine.document
+	## 
+	## The current SOAP envelope document.
+
+	_if .document _is _unset
+	_then
+		.document << _self.template_document()
+	_endif
+	_return .document
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.soap_envelope_namespace
+	## 
+	## Return the soap_envelope_namespace property, and the
+	## namespace separator string.
+	##
+
+	# I'm sure there's a nicer way to handle namespaces, but I'll
+	# brute-force it for now.
+	_if (ns << .soap_envelope_namespace.default("")) = ""
+	_then
+		ns_sep << ""
+	_else
+		ns_sep << ":"
+	_endif 
+	_return ns, ns_sep
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.soap_encoding_namespace
+	## 
+	## Return the soap_encoding_namespace property, and the
+	## namespace separator string.
+	##
+
+	# I'm sure there's a nicer way to handle namespaces, but I'll
+	# brute-force it for now.
+	_if (ns << .soap_encoding_namespace.default("")) = ""
+	_then
+		ns_sep << ""
+	_else
+		ns_sep << ":"
+	_endif 
+	_return ns, ns_sep
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_engine.template_document()
+	## 
+	## Return a template document for SOAP communication.
+	##
+
+	(ns, ns_sep) << _self.soap_envelope_namespace
+	(enc_ns, enc_ns_sep) << _self.soap_encoding_namespace
+	
+	# TODO: this must be made more generic.  Work out how, once
+	# I've got more examples...
+
+	attrs << rope.new()
+	_if ns ~= ""
+	_then
+		attrs.add_all_last({write_string("xmlns:", ns), _self.soap_envelope_schema})
+	_endif
+	_if enc_ns ~= ""
+	_then
+		attrs.add_all_last({write_string("xmlns:", enc_ns), _self.soap_encoding_schema})
+	_endif
+	
+	x << simple_xml_thing.new(write_string(ns, ns_sep, "Envelope"), _unset, attrs)
+
+	x2 << simple_xml_thing.new(write_string(ns, ns_sep, "Header"))
+	x.elements.add(x2)
+
+	x3 << simple_xml_thing.new(write_string(ns, ns_sep, "Body"))
+	x.elements.add(x3)
+	
+	y << simple_xml_document.new_for_write(x)
+
+	_return y
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.reset()
+	## 
+	## Reset self for reuse.
+	##
+
+	_self.set_document(_unset)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.set_document(a_doc)
+	## 
+	## Set the current SOAP envelope document to A_DOC.
+	##
+
+	.document << a_doc
+	_return a_doc
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_engine.auto_set_soap_envelope_namespace()
+	## 
+	## If self has a document that contains what appears to be a
+	## valid SOAP envelope, then auto-set the namespace.
+	##
+
+	_if (d << .document) _isnt _unset _andif
+	    d.elements _isnt _unset _andif
+	    d.elements.size > 0
+	_then
+		e << d.elements[1]
+		e_type << e.type.write_string
+		_if e_type = "Envelope"
+		_then
+			.soap_envelope_namespace << ""
+		_elif (idx << e_type.rindex_of_seq(":Envelope")) _isnt _unset
+		_then
+			.soap_envelope_namespace << e_type.slice(1, idx - 1)
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.header_element()
+	##
+	## Return the header element of the SOAP envelope.
+	##
+
+	_self.auto_set_soap_envelope_namespace()
+	(ns, ns_sep) << _self.soap_envelope_namespace
+	_for i _over _self.document.elements[1].
+		elements_matching_name(write_string(ns, ns_sep, "Header"))
+	_loop
+		_return i
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.add_to_header(a_thing)
+	## 
+	## Add A_THING, a simple_xml_thing, to the header of the document.
+	##
+
+	_self.header_element().elements.add(a_thing)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.body_element()
+	##
+	## Return the body element of the SOAP envelope.
+	##
+
+	_self.auto_set_soap_envelope_namespace()
+	(ns, ns_sep) << _self.soap_envelope_namespace
+	_for i _over _self.document.elements[1].
+		elements_matching_name(write_string(ns, ns_sep, "Body"))
+	_loop
+		_return i
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.add_to_body(a_thing)
+	## 
+	## Add A_THING, a simple_xml_thing, to the body of the document.
+	##
+
+	_self.body_element().elements.add(a_thing)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_engine.document_as_string(_optional doc, encoding)
+	## 
+	## Convert document DOC to a string (if not specified, defaults
+	## to self's document).  ENCODING is the text encoding to use -
+	## defaults to :utf8. 
+	##
+
+	_if doc _is _unset _then doc << _self.document _endif
+	encoding << encoding.default(:utf8)
+
+	s1 << internal_text_output_stream.new()
+	s2 << xml_output_stream.new(s1)
+
+	# N.B.: support for text encoding on internal streams is only
+	# managed via a shared variable, so set it as safely as possible.
+	old_dte << s2.default_text_encoding
+	_protect
+		s2.default_text_encoding << encoding
+		simple_xml.write_document_on(s2, doc)
+	_protection
+		s2.default_text_encoding << old_dte
+	_endprotect
+
+	_return s2.string
+	
+_endmethod
+$

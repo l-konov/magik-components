@@ -1,0 +1,199 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## RADIO_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+radio_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :change_selector,:string,
+					  :key,:string),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over radio_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.key 
+	## 
+	## Return SELF's key.
+	>> _self.properties[:key].default(_self.dialog_element_id)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.key << new_val
+	## 
+	## Set SELF's key.
+	_self.properties[:key] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.default_min_width
+	## 
+	##  Return the minimum default rendering width.
+
+	vts << vtext_style.new(_self.font)
+	lab << _self.message_from_keyed_message(_self.label)
+	>> 20 + vts.box_coordinates(lab).bounds.width.rounded
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.default_min_height
+	## 
+	##  Return the minimum default rendering height.
+
+	>> 12
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.id_changed()
+	## 
+	## Respond to a change in ID.
+	
+	n << _self.get_property(:dialog_element_id).write_string.split_by(%_).last.as_number()
+	.value << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	>> _self.new(rc,_unset,:row,row,:col,col)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.	
+
+	>> _self.new(parent,props[:label],_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	_if _self.value.default(_true)
+	_then
+		img << smallworld_product.get_raster_image(:radio_item,:dialog_designer)
+	_else
+		img << smallworld_product.get_raster_image(:radio_item_off,:dialog_designer)	
+	_endif
+
+	!dialog_element_footprints![pbb] << _self
+	
+	canv.render_raster(img,pbb.xmin,pbb.ymin,_true)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	lab << _self.message_from_keyed_message(_self.label)
+	canv.draw_text(ts,bb.xmin+17,bb.ymax+1,lab)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	_dynamic !current_radio_group!
+
+	_if !current_radio_group! _is _unset 
+	_then
+		_return 
+	_endif
+
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id,
+		  "] << radio_item.new(",parent_id,",_unset,:model,_self")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		# The "key" value is used by the 'menu_group' (end of this method)
+		_if n  = "key"
+		_then
+			_continue 
+		_endif
+		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, _self.message(",km[1],%))
+		_else
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, ",%",km[2],%")
+		_endif
+	_endif 
+		
+	txt.write(" )",%newline)
+	
+	txt.write(%tab,!current_radio_group!,".manage_child(.items[:",
+		  _self.dialog_element_id,"], :|",_self.key,"|)",%newline)
+
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+radio_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method radio_item.set_logical_properties(_optional all?)
+	##
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_if all?.default(_false)
+	_then
+		_self.change_selector << _self.dialog_element_id + "_changed()"
+	_endif
+
+_endmethod
+$

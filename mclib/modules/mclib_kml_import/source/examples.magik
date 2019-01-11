@@ -1,0 +1,23 @@
+#% text_encoding = cp1252
+########################################################################
+##
+##
+## Created By: Brad Sileo
+## Date: 08-10-2007
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+_block
+	# add the google earth document type
+	mclib:http_response.xml_document_types["application/vnd.google-earth.kml+xml"] << kml_document
+	kml2 << mclib:http_request.new_for_url(:test,_unset,"http://www.localisite.com/londonMaps/gin-locations.kml").connect().smart_result()
+_endblock
+$

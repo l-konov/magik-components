@@ -1,0 +1,6558 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+########################################################################
+##
+## @author Graham Garlick
+##
+## Dialog Designer - A GUI class for designing Smallworld
+## Dialogs.  All key code is accessed via this class.
+##
+########################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dialog_designer,
+		     {
+			     {:canvas,_unset,:writable},
+			     {:mc,_unset,:writable},
+			     {:items,_unset,:writable},
+			     {:footprints,_unset,:writable},
+			     {:rowcol_cells,_unset,:writable},
+			     {:dialog_list,_unset,:writable}
+		     },:plugin)
+$
+
+# List of widgets that have an associated insertion mode.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(
+	:widget_actions,
+	{
+		:select_mode,
+		:paste_element,
+		:rowcol,
+		:paned_window,
+		:group_box,
+		:tab_box,
+		:window_stack,
+		
+		:button_item,
+		:image_button_item, 
+		:toggle_item,          
+		:image_toggle_item,
+		:text_choice_item,
+		:text_item,
+		:dd_number_input,
+		:unit_text_item,
+		:slider_item,
+		:rowcol_separator,
+		
+		:label_item,        
+		:radio_group,        
+		:radio_item,         
+		:simple_list_item,    
+		:text_window,
+		:tabular_list,
+		:tree_item,
+		:recordset,
+		:canvas,
+
+		:open_file_dir,
+		:style_choice_item,
+		:plugin_item,
+		:dd_date_time_item,
+		:dd_outlook_bar,
+		:panel_separator
+	}
+	,:public)
+$
+
+# List of widget classes with their associated exemplars,  this
+# could be replaced with a simple method ...
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(
+	:widget_exemplars,
+	property_list.new_with(
+		:rowcol,            rowcol,
+		:paned_window,      paned_window,
+		:button_item,       button_item,
+		:group_box,         group_box,
+		:image_button_item, image_button_item,
+		:image_toggle_item, image_toggle_item,
+		:label_item,        label_item,
+		:radio_group,       radio_group,
+		:radio_item,        radio_item,
+		:simple_list_item,  simple_list_item,
+		:text_choice_item,  text_choice_item,
+		:text_item,         text_item,
+		:dd_number_input,   dd_number_input,
+		:unit_text_item,    unit_text_item,
+		:text_window,       text_window,
+		:toggle_item,       toggle_item, 
+		:tabular_list,      dd_tabular_list,
+		:tree_item,         dd_tree_list,
+		:slider_item,       slider_item,
+		:recordset,         dd_recordset_gui_component,
+		:canvas,            scrollable_canvas,
+		:tab_box,           tab_box,
+		:window_stack,      window_stack,
+		:open_file_dir,     dd_open_file_dir,
+		:style_choice_item, dd_style_choice_item,
+		:plugin_item,       dd_plugin_item,
+		:dd_date_time_item, dd_date_time_item,
+		:dd_outlook_bar,    dd_outlook_bar,
+		:panel_separator,   panel_separator,
+		:rowcol_separator,  rowcol_separator
+		      )
+	,:public)
+$
+
+# Selection line style
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(
+	:selection_line_style,
+	line_style.new_with_properties(:foreground_colour,colour.called(:green),
+				       :width,3),
+	:public)
+$
+# Insertion drop area line style
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(
+	:insertion_line_style,
+	line_style.new_with_properties(:foreground_colour,colour.called(:red),
+				       :width,2),
+	:public)
+$
+# The list of classes that act like rowcols, rowcol of course
+# and a few new classes developed to make the dialog designer
+# easier to use - they are used instead of specialty container
+# objects so the rowcol methods can be used by all.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(
+	:rowcol_like_objects,
+	{:rowcol,:dd_paned_window,:dd_group_box,:dd_radio_group},
+	:public)
+$
+
+# The list of actions used in the GUI with a generic type which
+# keys a standard action specification.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(:widget_specs,
+	property_list.new_with(
+		:select_mode,          :widget_toggle,
+		:rowcol,               :widget_toggle,
+		:paned_window,         :widget_toggle,
+		:paste_element,        :widget_toggle,
+		:button_item,          :widget_toggle,
+		:group_box,            :widget_toggle,
+		:image_button_item,    :widget_toggle,
+		:image_toggle_item,    :widget_toggle,
+		:label_item,           :widget_toggle,
+		:open_file_dir,        :widget_toggle,
+		:radio_group,          :widget_toggle,
+		:radio_item,           :widget_toggle,
+		:text_window,          :widget_toggle,
+		:simple_list_item,     :widget_toggle,
+		:text_choice_item,     :widget_toggle,
+		:text_item,            :widget_toggle,
+		:dd_number_input,      :widget_toggle,
+		:unit_text_item,       :widget_toggle,
+		:toggle_item,          :widget_toggle,
+		:tabular_list,         :widget_toggle,
+		:tree_item,            :widget_toggle,
+		:slider_item,          :widget_toggle,
+		:recordset,            :widget_toggle,
+		:canvas,               :widget_toggle,
+		:style_choice_item,    :widget_toggle,
+		:plugin_item,          :widget_toggle,
+		:tab_box,              :widget_toggle,
+		:window_stack,         :widget_toggle,
+		:dd_date_time_item,    :widget_toggle,
+		:dd_outlook_bar,       :widget_toggle,
+		:panel_separator,      :widget_toggle,
+		:rowcol_separator,     :widget_toggle
+		      ),
+	:public)
+$
+# The list of actions used in the GUI with a generic type which
+# keys a standard action specification.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(:action_specs,
+	property_list.new_with(
+		:refresh_view,         :image_button,
+		:copy_element,         :image_button,
+		:cut_element,          :image_button,
+		:delete_element,       :image_button,
+		:interrupt_refresh,    :image_button,
+		:new_dialog,           :image_button,
+		:copy,                 :image_button,
+		:save_to_file,         :image_button,
+		:load_from_file,       :image_button,
+		:save_as,              :image_button,
+		:snapshot,             :image_button,
+		:exit,                 :image_button,
+		:dialog_designer_help, :image_button,
+		:use_menubar,          :toggle,
+		:use_statusbar,        :toggle,
+		:use_docks,            :toggle,
+		:use_databus,          :toggle,
+		:use_magik_xml,        :toggle,
+		:use_module_properties,:toggle,			
+		:use_messages,         :toggle,
+		:show_rowcol_cells,    :toggle,
+		:dialog_list,          :text_choice,
+		:delete_dialog,        :image_button,
+		:set_module_path,      :image_button,
+		:sort_messages,        :button,
+		:copy_image_files,     :button,
+		:build_module,         :button,
+		:build_and_activate,   :button,
+		:explore_code,         :image_button,
+		:code_find_prev,       :image_button,
+		:code_find_next,       :image_button,
+		:message_find_prev,    :image_button,
+		:message_find_next,    :image_button,
+		:reactivate_dialog,    :button,
+		:dialog_class_list,    :text_choice,
+		:dialog_method_list,   :text_choice,
+		:dialog_default_method,:button,
+		:refresh_app_list,     :image_button,
+		:dd_documentation,     :button,
+		:dd_release_notes,     :button,
+		:about_dialog_designer,:button
+		      ),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(:auto_date_code?,_true,:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_variable(:cursor_for_mode,property_list.new(),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_constant(:frame_like_classes,
+	{:frame,:dd_tab_box,:dd_group_box,:dd_window_stack},:private)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_constant(:dialog_xml,
+	{:frame,:dd_tab_box,:dd_group_box,:dd_window_pane},:private)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.build_action(k,e)
+	## 
+	## Build an action of type E with key K.
+	
+	_if e _is :button
+	_then
+		_self.add_action(sw_action.new(k,
+					       :dialog_control,:button_item,
+					       :toolbar_control,:image_button_item,
+					       :caption,_self.message(k),
+					       :engine,_self,
+					       :action_message,k.with_parentheses,
+					       :image,{k,_self.module_name}))
+	_elif e _is :image_button
+	_then
+		_self.add_action(sw_action.new(k,
+					       :toolbar_control,:image_button_item,
+					       :menubar_control,:button_item,
+					       :caption,_self.message(k),
+					       :engine,_self,
+					       :action_message,k.with_parentheses,
+					       :image,{k,_self.module_name}))
+	_elif e _is :toggle
+	_then
+		_self.add_action(sw_action.new(k,
+					       :toolbar_control,:image_toggle_item,
+					       :menubar_control,:toggle_item,
+					       :caption,_self.message(k),
+					       :engine,_self,
+					       :value_change_message,k.with_parentheses,
+					       :image,{k,_self.module_name}))
+	_elif e _is :widget_toggle
+	_then
+		_self.add_action(sw_action.new(k,
+					       :toolbar_control,:image_toggle_item,
+					       :menubar_control,:toggle_item,
+					       :caption,_self.message(k),
+					       :engine,_self,
+					       :value_change_message,{:|set_insertion_mode()|,k},
+					       :image,{k,_self.module_name}))
+	_elif e _is :text_choice
+	_then
+		_self.add_action(sw_action.new(k,
+					       :toolbar_control,:text_choice_item,
+					       :caption,_self.message(k),
+					       :engine,_self,
+					       :items,_self.perform(k+:|_items()|),
+					       :value_change_message,k+:|_value_changed()|,
+					       :image,{k,_self.module_name}))
+	_elif e _is :text_item
+	_then
+		_self.add_action(sw_action.new(k,
+					       :toolbar_control,:text_item,
+					       :caption,_self.message(k),
+					       :engine,_self,
+					       :value_change_message,k+:|_value_changed()|))
+	_endif
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.init_actions()
+	## 
+	## Initialize the actions ...
+
+	dissabled_actions << {:delete_dialog,
+			      :delete_element,
+			      :paste_element,
+			      :cut_element,
+			      :copy_element,
+			      :radio_item,
+			      :reactivate_dialog,
+			      :copy_image_files,
+			      :explore_code}
+
+	_for k,e _over _self.action_specs.fast_keys_and_elements()
+	_loop
+		_self.build_action(k,e)
+	_endloop
+
+	_for k,e _over _self.widget_specs.fast_keys_and_elements()
+	_loop
+		_self.build_action(k,e)
+	_endloop
+
+	# Dissable some actions.
+	_for a _over dissabled_actions.fast_elements()
+	_loop
+		_self.action(a).enabled? << _false
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.build_gui(f, _optional xml_element )
+	##
+	## Activate the GUI.
+	##
+
+	.items << hash_table.new()
+	.dialog_list << rope.new()
+
+	rc << rowcol.new(f,_unset,1,:pixel,:style,:nested,
+		     :resize?,_true,
+		     :default_col_alignment,:fill,
+		     :default_row_alignment,:fill)
+
+	.items[:ws] << ws << window_stack.new(rc)
+
+	rc << rowcol.new(ws,_unset,1,:pixel,:style,:nested,
+		     :resize?,_true,
+		     :default_col_alignment,:fill,
+		     :default_row_alignment,:fill)
+
+	.items[:tb] << tb <<
+   		   tab_box.new(ws,:resize?, _true,
+				    :model,_self,
+				    :page_change_selector, :tab_changed|()|)
+	tb.name << :tab_box
+
+	_self.gui_layout_tab(tb)
+	_self.menubar_tab(tb)
+	_self.statusbar_tab(tb)
+	_self.docks_tab(tb)
+	_self.databus_tab(tb)
+	_self.code_tab(tb)
+	_self.module_properties_tab(tb)
+	_self.outlook_bar_tab(tb)
+	_self.messages_tab(tb)
+	_self.reset_rendering_position()
+
+	>> rc
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.reset_rendering_position(_optional render?)
+	## 
+	## Reset the rendering position to zero so the top-left corner
+	## of the GUI design will appear just inside the top-left
+	## corner of the 'GUI Layout' window.
+	
+	.items[:xoffset] << 0
+	.items[:yoffset] << 0
+	.items[:old_xoffset] << 0
+	.items[:old_yoffset] << 0
+
+	_if render?.default(_false)
+	_then
+		_self.render_current_dialog()
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.tab_changed(val)
+	## 
+	## Respond when the tab is changed
+
+	# Hide the 'Outlookbar editor' tab if it is not being used.
+	_if val _isnt 8 _andif .items[:tb].pages.size > 7
+	_then
+		.items[:tb].pages[8].unmanage()
+	_endif
+	
+	_self.sw4_compatability()
+	
+	_if val _is 1 
+	_then
+		_self.set_cursor_status(.items[:current_mode].default(:select_mode))
+
+		_if .canvas _isnt _unset
+		_then
+			.canvas.set_focus()
+		_endif
+	_else
+		_self.refresh_magik_xml(val)
+		
+		msg_key << write_string("prompt_",val).as_symbol()
+		_self.framework.update_statusbar(:prompt,:text,
+						 _self.message(msg_key,_self.current_dialog().dialog_class))
+	_endif
+
+	_if val _is 5
+	_then
+		_self.refresh_databus()
+	_else
+		_self.save_dialog_databus()
+	_endif
+
+	# Only allow a snapshot when on the GUI Layout tab.
+	_self.action(:snapshot).enabled? << val _is 1
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.sw4_compatability()
+	## 
+	## Since there is no :change_selector for text_windows in SW4 we
+	## call the :change_selector code directly so the data is
+	## stored in the dialog_design.
+	##
+
+	_if _self.top_frame _isnt _unset
+	_then 	
+		_self.diag_types_changed()
+		_self.dialog_change_module_requires()
+		_self.dialog_class_user_messages_changed()
+	_else
+		#debug show(:no_top_frame)
+	_endif 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_magik_xml(tab_num,_optional force?)
+	## 
+	## Force the Magik/XML to refresh when then the user switches
+	## to that tab.
+
+	_if tab_num _is 6
+	_then
+		cla << _self.current_dialog().dialog_class
+		_self.dialog_class_list_value_changed(cla)
+
+		mth << _self.action(:dialog_method_list).value.write_string
+		_self.dialog_method_list_value_changed(mth)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.current_dialog()
+	## 
+	## Return the current dialog being edited.
+	
+	_if .items _isnt _unset _andif
+	    .items[:current_dialog_i] _isnt _unset _andif
+	    .dialog_list _isnt _unset 
+	_then
+		_return .dialog_list[.items[:current_dialog_i]]
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.gui_layout_tab(tb)
+	## 
+	## Define the main GUI for placing, dragging and deleting GUI
+	## elements of the dialog design.
+	
+	_local top_rc << rowcol.new(tb,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill,
+				:top_spacing,1,
+				:left_spacing,1,
+				:col_spacing,2,
+				:tab_label,_self.message(:gui_layout))
+
+	_self.gui_layout_buttons(top_rc)
+
+	pw << paned_window.new(top_rc,:side_by_side?,_true,
+			       :col_resize_values,{100,0})
+
+	rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+
+	cws << .items[:cws] << window_stack.new(rc)
+
+	# Scrollable Canvas for rendering the GUI Design
+	a << canvas_agent.new( _unset ) 
+	.canvas << scrollable_canvas.new(cws, 500, 200, a,
+					 :resize?, _true,
+					 :has_vertical_scrollbar?,_false,
+					 :has_horizontal_scrollbar?,_false,
+					 :name,:render)
+
+	.mc << memory_canvas.new(1500,1000)
+	.mc.clear()
+	
+	a.define_redraw( :|refresh_view()|,_self)
+	a.define_button_press( :|button_pressed()|,_self,:select)
+	a.define_button( :|button_released()|,_self,:select)
+	a.define_locator( :|changed_mouse_position()|,_self,:move)
+	a.define_locator( :|dragged_mouse_position()|,_self,:drag)
+	a.define_key({:|set_insertion_mode()|,:select_mode,_true},_self,%space)
+
+	# Canvas for snapshot to clipboard
+#	a << canvas_agent.new( _unset ) 
+#	.items[:snapshot_canvas] << canvas.new(cws, 300, 200, a,
+#					 :resize?, _true,
+#					 :name,:snapshot)
+#
+	cws.value << :render
+	
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	.items[:wa_editor] << dd_element_editor.new(:gui_layout)
+	.items[:wa_editor].build_gui(top_rc)
+	.items[:wa_editor].element_type << :gui_layout
+_endmethod
+$
+
+# List of actions specifically for the work area, in order.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_constant(:gui_layout_actions,
+					  {
+						  :show_rowcol_cells,
+						  :refresh_view,
+						  :separator,
+						  :copy_element,
+						  :paste_element,
+						  :cut_element,
+						  :select_mode,
+						  :separator,
+						  :rowcol,
+						  :paned_window,
+						  :group_box,
+						  :radio_group,
+						  :tab_box,
+						  :window_stack,
+						  :separator,
+						  :button_item,
+						  :label_item,
+						  :text_item,
+						  :unit_text_item,
+						  :radio_item,
+						  :toggle_item,
+						  :image_button_item,
+						  :image_toggle_item,
+						  :slider_item,
+						  :dd_number_input,
+						  :text_choice_item,
+						  :rowcol_separator,
+						  :separator,
+						  :style_choice_item,
+						  :open_file_dir,
+						  :plugin_item,
+						  :dd_date_time_item,
+						  :dd_outlook_bar,
+						  :panel_separator,
+						  :separator,
+						  :text_window,
+						  :simple_list_item,
+						  :tabular_list,
+						  :recordset,
+						  :tree_item,
+						  :canvas
+					  },:private)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.gui_layout_buttons(rc)
+	## 
+	## Place the insert-gui-element actions on RC.
+	
+	_local brc << rowcol.new(rc,_unset,1,:pixel,:style,:nested,
+				:resize?,_false,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill,
+				:top_spacing,1,
+				:row_spacing,-3,
+				:col_spacing,0,
+				:row_spacing,0,
+				:tab_label,_self.message(:gui_layout))
+
+	_for w _over _self.gui_layout_actions.fast_elements()
+	_loop
+		# Horizontal separator line between groups of 
+		_if w _is :separator
+		_then
+			src << rowcol.new(brc,_unset,1,:pixel,:style,:nested,
+					  :left_spacing,-10,
+					  :right_spacing,-10)
+			p << panel.new(src,_unset,:col_alignment,:fill)
+			panel_separator.new(p,:vertical?,_false,:style,:sunken,:width,47)
+
+			irc << _unset 
+		_else
+			_if irc _is _unset 
+			_then
+				irc << rowcol.new(brc,_unset,2,:pixel,:style,:nested,
+							 :resize?,_false,
+							 :row_spacing,0,
+							 :col_spacing,0,
+							 :top_spacing,0,
+							 :bottom_spacing,0)		
+			_endif
+			
+			_self.action(w).place_control_on(irc,:toolbar,:has_border?,_false)	
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_tab(tb)
+	## 
+	## Define the GUI for menubar manipulation.
+	
+	pw << paned_window.new(tb,:side_by_side?,_true,
+			       :col_resize_values,{100,0},
+			       :tab_label,_self.message(:menubar))
+
+	.items[:menubar_tab] << pw
+
+	rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	_local l_style_holder << string_styles_holder.new_with()
+	l_style_holder.add_image_scheme(:selected_scheme,
+					:default, :closed_folder,
+					:selected, {:menubar_pullout,:dialog_desinger})
+	
+	.items[:menubar] <<
+		tree_item.new(rc,
+			      :model,        _self,
+			      :mode,:one,
+			      :allow_dragging_notifier,   :|menubar_allow_dragging?()|,
+			      :release_dragging_notifier, :|menubar_release_dragging?()|,
+
+			      :editors,                {{:name, in_place_value_editor}},
+			      :edit_on_click?, _true,
+			      :edit_start_notifier, :start_editing|()|,
+			      :edit_stop_notifier, :stopped_editing|()|,
+
+			      :select_notifier,:|menubar_selection_made()|,
+			      :style_holder, l_style_holder, 
+			      :aspect,       :menubar_list)
+	
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	.items[:menubar_editor] << dd_element_editor.new(:menubar)
+	.items[:menubar_editor].build_gui(top_rc)
+	.items[:menubar_editor].element_type << :menubar
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.start_editing(p_tree)
+	## 
+	## Control tree editing, no edits of separator elements are allowed.
+	
+	_if p_tree.value[:name] = "-"*30
+	_then
+		.items[:menubar].agent.stop_edit()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.stopped_editing(p_tree)
+	## 
+	## Update the GUI when the user has finished editing the
+	## menubar tree.
+
+	.items[:menubar].tree_manager.selection.empty()
+
+	.items[:menubar_editor].edit("")
+	.items[:menubar_editor].set_choice_items(_self.menubar_element_list())
+	
+	.items[:menubar].selection.add(p_tree)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_elements()
+	## 
+	## Return a list of the menubar elements.
+	
+	>> rope.new_from_iter(.items[:menubar].tree_manager,:|fast_trees()|)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_selection_made(what)
+	## 
+	## React when a menubar element is selected.
+	
+	_if (dt << what.an_element()) _is _unset
+	_then
+		.items[:menubar].popup_menu <<  _unset
+		_return 
+	_endif
+
+	# Update Menubar Element editor
+	.items[:menubar_editor].choose_element(dt.value[:name])
+
+	# Update popup menu
+	pm << popup_menu.new(.items[:menubar])
+	button_item.new_safe(pm,_self.message(:add_button),_self,{:|modify_menubar()|,{:add_button|()|,dt}})
+	_if dt.level _is 2
+	_then
+		button_item.new_safe(pm,_self.message(:add_menu),_self,{:|modify_menubar()|,{:add_menu|()|,dt}})
+	_else
+		button_item.new_safe(pm,_self.message(:add_separator),_self,{:|modify_menubar()|,{:add_separator|()|,dt}})
+		button_item.new_safe(pm,_self.message(:add_submenu),_self,{:|modify_menubar()|,{:add_submenu|()|,dt}})
+	_endif
+	
+	separator_item.new(pm)
+	button_item.new_safe(pm,_self.message(:delete),_self,{:|modify_menubar()|,{:delete_menu|()|,dt}})
+	separator_item.new(pm)
+	button_item.new_safe(pm,_self.message(:reinit),_self,:init_menubar|()|)
+
+	.items[:menubar].popup_menu << pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.init_menubar()
+	## 
+	## Initialise the menubar.
+	
+	_self.current_dialog().init_menubar()
+	_self.changed(:menubar_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.init_statusbar()
+	## 
+	## Initialise the statusbar.
+	
+	_self.current_dialog().init_statusbar()
+	_self.changed(:statusbar_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.init_docks(which)
+	## 
+	## Initialise the docks.
+	
+	_self.current_dialog().init_docks(which)
+	.items[:docks_editor].set_choice_items(_self.docks_element_list())
+	_self.changed(:docks_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_allow_dragging?(p_tree, p_row_index, p_col_index,
+						   p_selection, p_event, p_default_mouse,
+						   _optional p_first_time?)
+	## Parameters    : P_TREE: Display tree that has been clicked on (unset
+	##                    if it is in the column headings or below
+	##                    the last one)
+	##                 P_ROW_INDEX: Index in the list of visible
+	##                    display trees.
+	##                 P_COL_INDEX: Index in the list of columns.
+	##                 P_SELECTION: Display tree selection which is
+	##                    the current set of selected trees, i.e. the ones that are
+	##                    being dragged onto P_TREE.
+	##                 P_EVENT: Event that has been raised.
+	##                 P_DEFAULT_MOUSE: Depending on modmask of P_EVENT:
+	##                    When just Ctrl or Shft are pressed, :copy is the default;
+	##                    For Alt or combinations, this is :link; and
+	##                    With no modifier, this defaults to :move.
+	##                 [P_FIRST_TIME?]: _true if this is the first
+	##                    time the dragging notifier is called for
+	##                    this drag operation. (This allows to setup caches).
+	## Returns       : 1) _false if P_TREE is an invalid destination;
+	##                    _true if it is valid, when draggin is allowed
+	##                 2) If (1) is _true, then the type of
+	##                    dragging that will be done is returned:
+	##                    either :copy or :move. 
+	## Function      : If P_SELECTION is dragged to a P_TREE on the
+	##                 same level, a :move operation is allowed.
+	##                 If P_SELECTION is dragged to a P_TREE on a different level,
+	##                 this might be a valid copy operation as long as we are not
+	##                 trying to copy a tree into itself, and if P_TREE's parent
+	##                 does not already contain a child with that key.
+	## Function      : If we are dragging P_TREE onto something that is not in P_SELECTION,
+	##                 andif non of its parent is in P_SELECTION, 
+	##                 dragging is allowed.
+	##                 (This is so, since we do not allow a parent to
+	##                 become its own child.)
+	# we are dragging the selection, and should not be dragged onto itself
+
+	_for i_parent _over p_tree.branch_to_root()
+	_loop
+		_if i_parent.value _is _unset _then _continue _endif 
+
+		_if i_parent.selected?
+		_then
+			_return _false 
+		_endif
+	_endloop
+
+	# Don't allow dropping onto the menu root, only allow dropping
+	# below this level.
+	_if p_selection.an_element().level _is 2 _andif p_tree.level _is 2
+	_then
+		_return _true,:move 
+	_elif p_selection.an_element().level _is 2 _orif  p_tree.level _is 2
+	_then
+		_return _false 
+	_endif
+
+	# Now check if the new parent already contains a child with
+	# this key (only if the new parent is not the same as the
+	# current parent)
+	_local l_destination_parent << p_tree.parent
+
+	_for i_sel_tree _over p_selection.fast_elements()
+	_loop
+		_if l_destination_parent _isnt i_sel_tree.parent
+		_then
+			_leave 
+		_endif
+	_finally
+		# we can move this tree
+		_return (_true, :move)
+	_endloop
+	
+	_for i_sel_tree _over p_selection.fast_elements()
+	_loop
+		_if (l_destination_parent.child_with_key(i_sel_tree.key) _isnt _unset) 
+		_then
+			_return _false 
+		_endif
+	_endloop
+	
+	>> (_true, :move)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_release_dragging?(p_tree, p_row_index, p_col_index, p_selection,
+						     _optional p_event, p_default_mouse)
+	## Parameters    : P_TREE: Display tree that has been clicked on (unset
+	##                    if it is in the column headings or below
+	##                    the last one)
+	##                 P_ROW_INDEX: Index in the list of visible
+	##                    display trees.
+	##                 P_COL_INDEX: Index in the list of columns.
+	##                 P_SELECTION: Display tree selection which is
+	##                    the current set of selected trees, i.e. the ones that are
+	##                    being dragged onto P_TREE.
+	##                 P_EVENT: Event that has been raised.
+	##                 P_DEFAULT_MOUSE: As returned as the second
+	##                    argument of the :allow_dragging_notifier.
+	##                     When just Ctrl is pressed, :copy is the default;
+	##                    For Alt, this is :link; and
+	##                    otherwise this defaults to :move.
+	##                 [P_FIRST_TIME?]: _true if this is the first
+	##                    time the dragging notifier is called for
+	##                    this drag operation. (This allows to setup caches).
+	## Returns       : -
+	## Function      : If P_SELECTION is dragged to a P_TREE on the
+	##                 same level, all display_trees in P_SELECTION are first detached,
+	##                 then attached again to P_TREE's parent at the right position below P_TREE.
+	##                 If P_SELECTION is dragged to a P_TREE on a different level,
+	##                 the trees in P_SELECTION are all copied (including complete substructure).
+	# The move operation is is a simplification of the release
+	# dragging implemented on tree_agent, which deals with dragging
+	# a (>1)-size selection in a better/safer way.
+
+	#show(p_tree, p_row_index, p_col_index, p_selection, p_event, p_default_mouse)
+	
+	_if (p_tree _is _unset) _then _return _endif
+
+	_local l_destination_parent << p_tree.parent
+	_local l_destination_index << l_destination_parent.index_of_child(p_tree)
+	_dynamic !updating_trees?! << _true
+
+	_if p_selection.an_element().level _is 2 _andif
+	    p_tree.level _is 2
+	_then
+		_self.current_dialog().move_menu(p_selection.an_element(),p_tree)
+	_else 
+		
+		_for i_sel_tree _over p_selection.fast_elements()
+		_loop
+			p_sel_tree << i_sel_tree.parent
+			pp_sel_tree << i_sel_tree.parent.parent
+			
+			i_sel_tree.detach()
+			l_destination_parent.add_child(i_sel_tree, l_destination_index +^<< 1)
+			
+			_if p_sel_tree.children.empty?
+			_then
+				pp_sel_tree.remove_child(p_sel_tree)
+			_endif 	
+		_endloop
+	_endif 
+
+	!updating_trees?! << _false
+
+	# now redraw
+	_self.changed(:menubar_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.modify_menubar(args)
+	## 
+	## Modify the menubar.
+
+	_self.current_dialog().perform(_scatter args)
+
+	_self.changed(:menubar_list,:refresh)
+	.items[:menubar].tree_manager.selection.empty()
+
+	.items[:menubar_editor].edit("")
+	.items[:menubar_editor].set_choice_items(_self.menubar_element_list())
+
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_list
+	## 
+	## Return a list of menubar elements suitable for the dd_element_editor.
+
+	_if (d << _self.current_dialog()) _isnt _unset
+	_then
+		_return d.menubar
+	_endif 
+
+	_return rope.new()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_tab(tb)
+	## 
+	## Define the GUI for maniplating the statusbar.
+	
+	pw << paned_window.new(tb,:side_by_side?,_true,
+			       :col_resize_values,{100,0},
+			       :tab_label,_self.message(:statusbar))
+
+	.items[:statusbar_tab] << pw
+
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	rc << rowcol.new(top_rc,_unset,1,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,1,	
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	a << canvas_agent.new( _unset ) 
+	.items[:statusbar_canvas] <<
+		scrollable_canvas.new(rc, 300, 26, a,
+				      :resize?, _true,
+				      :has_vertical_scrollbar?,_false )
+	
+	a.define_redraw( :|refresh_statusbar()|,_self)
+	a.define_button( :|statusbar_canvas_button_pressed()|,_self,:select)
+	
+	_local l_style_holder << string_styles_holder.new_with()
+	l_style_holder.add_image_scheme(:selected_scheme,
+					:default, :closed_folder,
+					:selected, {:menubar_pullout,:dialog_desinger})
+	
+	.items[:statusbar] <<
+		tree_item.new(rc,
+			      :model,        _self,
+			      :mode,:one,
+			      :allow_dragging_notifier,   :|statusbar_allow_dragging?()|,
+			      :release_dragging_notifier, :|statusbar_release_dragging?()|,
+			      :select_notifier,:|statusbar_selection_made()|,
+			      :style_holder, l_style_holder, 
+			      :aspect,       :statusbar_list)
+
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	.items[:statusbar_editor] << dd_element_editor.new(:statusbar)
+	.items[:statusbar_editor].build_gui(top_rc)
+	.items[:statusbar_editor].element_type << :statusbar
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_statusbar_list_popup(what)
+	## 
+	## Set the popup menu for the statusbar list.
+	
+	_if (dt << what.an_element()) _is _unset
+	_then
+		.items[:statusbar].popup_menu <<  _unset
+		_return 
+	_endif
+
+	pm << popup_menu.new(.items[:statusbar])
+	
+	button_item.new_safe(pm,_self.message(:add_pane),_self,
+			     {:|modify_statusbar()|,{:add_pane|()|,dt.key}})
+
+	# The statusbar can only have one progress bar pane.
+	_if _not _self.has_progress_bar?
+	_then
+		button_item.new_safe(pm,_self.message(:add_progressbar_pane),_self,
+				     {:|modify_statusbar()|,{:add_progressbar_pane|()|,dt.key}})
+	_endif
+
+#	button_item.new_safe(pm,_self.message(:add_popup_action_to_pane),_self,
+#			     {:|modify_statusbar()|,{:add_popup_action_to_pane|()|,dt}})
+
+	# The statusbar must have at least one pane.
+	_if (d << _self.current_dialog()) _isnt _unset _andif
+	    (sb << d.statusbar) _isnt _unset _andif 
+	    sb.size > 1
+	_then
+		separator_item.new(pm)
+		button_item.new_safe(pm,_self.message(:delete_pane),_self,
+				     {:|modify_statusbar()|,{:delete_pane|()|,dt.key}})
+	_endif
+	separator_item.new(pm)
+	button_item.new_safe(pm,_self.message(:reinit),_self,:init_statusbar|()|)
+
+	.items[:statusbar].popup_menu << pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.has_progress_bar?
+	## 
+	## Return TRUE if the current dialog has a progress_bar pane in
+	## its statusbar.
+
+	
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (sb << d.statusbar) _is _unset
+	_then
+		_return (d.progress_bar_element() _isnt _unset)
+	_endif
+
+	_return _false 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_canvas_button_pressed(x,y)
+	## 
+	## React when the select button is pressed in statusbar canvas,
+	## change the currently selected statusbar element if necessary.
+
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (sb << d.statusbar) _is _unset
+	_then
+		_return 
+	_endif
+
+	_if (i << d.element_at(x,y)) _isnt _unset
+	_then 
+		.items[:statusbar].selection.add(.items[:statusbar].tree_manager.data[i])
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_selection_made(what)
+	## 
+	## React when the user selects from the list of statusbar
+	## panes, update the status bar canvas render.
+	
+	_self.set_statusbar_list_popup(what)
+	
+	_if (dt << what.an_element()) _is _unset
+	_then
+		_self.refresh_statusbar()
+		_return 
+	_endif
+
+	.items[:statusbar_editor].choose_element(dt.value[:id])
+
+	_self.refresh_statusbar()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.modify_statusbar(args)
+	## 
+	## Perform ARGS on the current dialog and update the GUI.
+
+	_self.current_dialog().perform(_scatter args)
+
+	.items[:statusbar].tree_manager.selection.empty()
+	_self.changed(:statusbar_list,:refresh)
+
+	.items[:statusbar_editor].set_choice_items(_self.statusbar_element_list())
+
+	_self.refresh_statusbar()
+
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_list
+	## 
+	## Return a list of statusbar elements suitable for the dd_element_editor.
+
+	rp << rope.new()
+
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (sb << d.statusbar) _is _unset
+	_then
+		_return rp
+	_endif
+
+	cnt << 0
+
+	_for i _over 1.upto(sb.size)
+	_loop
+		p << sb[i]
+
+		dt << display_tree.new(cnt+<<1,p.values)
+		dt.styled_string << {p.values[:id]}
+
+		rp.add(dt)
+	_endloop
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_statusbar()
+	## 
+	## Refresh the graphic render of the statusbar.
+
+	c << .items[:statusbar_canvas]
+
+	c.clear()
+
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (sb << d.statusbar) _is _unset
+	_then
+		_return 
+	_endif
+
+	css << .items[:statusbar].selection.an_element()
+	
+	d.render_statusbar(c,0,4,4,css)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_element_list()
+	## 
+	## Return a list of statusbar elements suited to the choice
+	## item of the dd_element_editor.
+	
+	_if (d << _self.current_dialog()) _isnt _unset 
+	_then
+		_return d.statusbar_element_list()
+	_endif 
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_allow_dragging?()
+	## 
+	## Allow dragging of statusbar elements.
+	
+	>> _true,:move
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.statusbar_release_dragging?(p_tree, p_row_index, p_col_index, p_selection,
+						_optional p_event, p_default_mouse)
+	## 
+	## Control statusbar dragging and update the statusbars render.
+
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (sb << d.statusbar) _is _unset
+	_then
+		_return 
+	_endif
+
+	from_i << p_selection.an_element().key
+	to_i << p_row_index
+
+	_if to_i > from_i
+	_then
+		to_i -<< 1
+	_endif
+
+	from << sb[from_i].deep_copy()
+	sb.remove_nth(from_i)
+	sb.add_nth(from,to_i)
+
+	# now redraw
+	_self.changed(:statusbar_list,:refresh)
+	_self.refresh_statusbar()
+
+	.items[:statusbar].selection.empty()
+	.items[:statusbar].selection.add(.items[:statusbar].tree_manager.data[to_i])
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.docks_tab(tb)
+	## 
+	## Define the GUI for manipulating dock elements.
+	
+	pw << paned_window.new(tb,:side_by_side?,_true,
+			       :col_resize_values,{100,0},
+			       :tab_label,_self.message(:docks))
+
+	.items[:docks_tab] << pw
+
+	rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	.items[:docks] <<
+		tree_item.new(rc,
+			      :model,        _self,
+			      :mode,:one,
+			      :allow_dragging_notifier,   :|dock_allow_dragging?()|,
+			      :release_dragging_notifier, :|dock_release_dragging?()|,
+			      :select_notifier,:|dock_selection_made()|,
+			      :aspect,       :docks_list)
+	
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	.items[:docks_editor] << dd_element_editor.new(:dock)
+	.items[:docks_editor].build_gui(top_rc)
+	.items[:docks_editor].element_type << :docks
+
+	>> pw
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.start_dock_editing(p_tree)
+	## 
+	## Control dock editing, do not allow the top_level docks to be
+	## changed as they are system constant (:top,:bottom,:right,:left)
+	
+	_if p_tree.level _is 2
+	_then
+		.items[:docks].agent.stop_edit()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.stopped_dock_editing(p_tree)
+	## 
+	## Update the GUI when the dock tree is modified.
+
+	.items[:docks].tree_manager.selection.empty()
+
+	.items[:docks_editor].edit("")
+	.items[:docks_editor].set_choice_items(_self.docks_element_list())
+	
+	.items[:docks].selection.add(p_tree)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dock_selection_made(what)
+	## 
+	## React when an element of the dock is selected.
+
+	_if (dt << what.an_element()) _is _unset
+	_then
+		.items[:docks].popup_menu <<  _unset
+		_return 
+	_endif
+
+	# Update Docks Element editor
+	.items[:docks_editor].choose_element(dt.value[:name])
+
+	# Update popup menu
+	pm << popup_menu.new(.items[:docks])
+
+	_if dt.level _is 2
+	_then
+		_if dt.children.an_element() _isnt _unset
+		_then
+			button_item.new_safe(pm,_self.message(:add_section),
+					     _self,{:|modify_docks()|,{:add_section|()|,dt}})
+		_else
+			button_item.new_safe(pm,_self.message(:add_action),
+					     _self,{:|modify_docks()|,{:add_action|()|,dt}})	
+			button_item.new_safe(pm,_self.message(:add_pulldown),
+					     _self,{:|modify_docks()|,{:add_pulldown|()|,dt,_true}})
+		_endif
+	_elif dt.level _is 3 
+	_then
+		button_item.new_safe(pm,_self.message(:add_toolbar),
+				     _self,{:|modify_docks()|,{:add_toolbar|()|,dt}})
+	_elif dt.level _is 4 
+	_then
+		button_item.new_safe(pm,_self.message(:add_action),
+				     _self,{:|modify_docks()|,{:add_action|()|,dt}})
+		button_item.new_safe(pm,_self.message(:add_pulldown),
+				     _self,{:|modify_docks()|,{:add_pulldown|()|,dt,_true}})
+	_elif dt.level _is 5 _andif dt.value[:type] _is :pulldown
+	_then
+		button_item.new_safe(pm,_self.message(:add_action),
+				     _self,{:|modify_docks()|,{:add_action|()|,dt}})
+	_endif
+
+	# Only allow deleting when there is a sibling orif the
+	# 'Section' is currently selected.
+	_if dt.level > 2 _andif (dt.parent.children.size > 1) _orif dt.level _is 3
+	_then
+		_if dt.level < 5
+		_then
+			separator_item.new(pm)		
+		_endif
+		
+		button_item.new_safe(pm,_self.message(:delete),_self,{:|modify_docks()|,{:delete_dock_element|()|,dt}})
+	_endif 
+
+	# Allow the clearing of current or ALL docks when the top_level
+	# dock is selected.
+	_if dt.level _is 2
+	_then
+		separator_item.new(pm)
+		button_item.new_safe(pm,_self.message(:reinit_dock),_self,{:init_docks|()|,dt.key})
+		separator_item.new(pm)
+		button_item.new_safe(pm,_self.message(:reinit_all),_self,{:init_docks|()|,:all})
+	_endif 
+	
+	.items[:docks].popup_menu << pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.docks_list
+	## 
+	## Return a list suited to the dd_element_editor.
+
+	_if (d << _self.current_dialog()) _isnt _unset 
+	_then
+		d.validate_dock_list()
+		_return d.docks
+	_endif
+
+	>> rope.new()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dock_allow_dragging?(p_tree, p_row_index, p_col_index,
+						   p_selection, p_event, p_default_mouse,
+						   _optional p_first_time?)
+	## Parameters    : P_TREE: Display tree that has been clicked on (unset
+	##                    if it is in the column headings or below
+	##                    the last one)
+	##                 P_ROW_INDEX: Index in the list of visible
+	##                    display trees.
+	##                 P_COL_INDEX: Index in the list of columns.
+	##                 P_SELECTION: Display tree selection which is
+	##                    the current set of selected trees, i.e. the ones that are
+	##                    being dragged onto P_TREE.
+	##                 P_EVENT: Event that has been raised.
+	##                 P_DEFAULT_MOUSE: Depending on modmask of P_EVENT:
+	##                    When just Ctrl or Shft are pressed, :copy is the default;
+	##                    For Alt or combinations, this is :link; and
+	##                    With no modifier, this defaults to :move.
+	##                 [P_FIRST_TIME?]: _true if this is the first
+	##                    time the dragging notifier is called for
+	##                    this drag operation. (This allows to setup caches).
+
+	# No dragging tree roots (keeps the top,bottom,left,right order)
+	# But allow dragging from a toolbar into a pulldown and back again.
+	_if p_tree.level _is 2 _orif (p_tree.level <> p_selection.an_element().level _andif
+				      p_tree.level * p_selection.an_element().level _isnt 30)
+	_then 
+		_return _false 
+	_endif
+
+	# now check if the new parent already contains a child with
+	# this key (only if the new parent is not the same as the
+	# current parent)
+	_local l_destination_parent << p_tree.parent
+
+	_for i_sel_tree _over p_selection.fast_elements()
+	_loop
+		_if l_destination_parent _isnt i_sel_tree.parent
+		_then
+			_leave 
+		_endif
+	_finally
+		# we can move this tree
+		_return (_true, :move)
+	_endloop
+	
+	_for i_sel_tree _over p_selection.fast_elements()
+	_loop
+		_if (l_destination_parent.child_with_key(i_sel_tree.key) _isnt _unset) 
+		_then
+			_return _false 
+		_endif
+	_endloop
+	>> (_true, :move)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dock_release_dragging?(p_tree, p_row_index, p_col_index, p_selection,
+						     _optional p_event, p_default_mouse)
+	## Parameters    : P_TREE: Display tree that has been clicked on (unset
+	##                    if it is in the column headings or below
+	##                    the last one)
+	##                 P_ROW_INDEX: Index in the list of visible
+	##                    display trees.
+	##                 P_COL_INDEX: Index in the list of columns.
+	##                 P_SELECTION: Display tree selection which is
+	##                    the current set of selected trees, i.e. the ones that are
+	##                    being dragged onto P_TREE.
+	##                 P_EVENT: Event that has been raised.
+	##                 P_DEFAULT_MOUSE: As returned as the second
+	##                    argument of the :allow_dragging_notifier.
+	##                     When just Ctrl is pressed, :copy is the default;
+	##                    For Alt, this is :link; and
+	##                    otherwise this defaults to :move.
+	##                 [P_FIRST_TIME?]: _true if this is the first
+	##                    time the dragging notifier is called for
+	##                    this drag operation. (This allows to setup caches).
+	## Returns       : -
+
+	#show(p_tree, p_row_index, p_col_index, p_selection, p_event, p_default_mouse)
+	
+	_if (p_tree _is _unset) _then _return _endif
+
+	_local l_destination_parent << p_tree.parent
+	_local l_destination_index << l_destination_parent.index_of_child(p_tree)
+	_dynamic !updating_trees?! << _true
+	
+	_for i_sel_tree _over p_selection.fast_elements()
+	_loop
+		p_sel_tree << i_sel_tree.parent
+		pp_sel_tree << i_sel_tree.parent.parent
+
+		i_sel_tree.detach()
+		l_destination_parent.add_child(i_sel_tree, l_destination_index +^<< 1)
+
+		_if p_sel_tree.children.empty?
+		_then
+			pp_sel_tree.remove_child(p_sel_tree)
+		_endif 	
+	_endloop
+
+	_if p_selection.an_element().level _is 2 _andif
+	    p_tree.level _is 2
+	_then
+		_self.current_dialog().move_menu(p_selection.an_element(),p_tree)
+	_endif
+	
+	!updating_trees?! << _false
+
+	# now redraw
+	_self.changed(:docks_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.modify_docks(args)
+	## 
+	## Perform ARGS on the current dialog and then update the GUI.
+
+	_self.current_dialog().perform(_scatter args)
+
+	.items[:docks].tree_manager.selection.empty()
+	.items[:docks_editor].edit("")
+	.items[:docks_editor].set_choice_items(_self.docks_element_list())
+
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.databus_tab(tb)
+	## 
+	## Define the GUI for specifying the producer and consumer
+	## datatypes for the design.
+	
+	rowcol_01 << rowcol.new(tb,3,2,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	6,
+		:col_resize_values,	{50,50},
+		:col_spacing,	7,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:left_spacing,	6,
+		:right_spacing,	6,
+		:row_resize_values,	{0,50,50},
+		:row_spacing,	6,
+		:tab_label,       _self.message(:databus),
+		:top_spacing,	6)
+
+	rowcol_02 << rowcol.new(rowcol_01,1,3,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:col,	1,
+		:col,	1,
+		:col_resize_values,	{0,100,0},
+		:col_spacing,	0,
+		:col_alignment,	:fill,
+		:row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:row,	1,
+		:row,	1,
+		:row_spacing,	6,
+		:top_spacing,	0)
+
+	label_item.new(rowcol_02,_self.message(:app),:row,1,:col,1)
+	.items[:app_list] << text_choice_item.new(rowcol_02,"",
+			:model,   _self,
+			:items,   _self.app_list,
+			:change_selector, :|update_app_pro_con_lists()|,
+			:col,	2,
+			:col_alignment,	:fill,
+			:row,	1,
+			:row_alignment,	:top )
+
+	_self.action(:refresh_app_list).place_control_on(rowcol_02,:dialog,
+		:has_border?, _false,
+		:control_type, { :image_button_item,
+			:col,	3,
+			:col_alignment,	:right,
+			:row,	1,
+			:row_alignment,	:top} )
+
+	gb << group_box.new(rowcol_01,_self.message(:app_produced_data_types),:row,2,:col,1)
+
+	dd_group_box_01 << rowcol.new(gb,1,1,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:top_spacing,	0)
+
+	.items[:app_pro_types] << simple_list_item.new(dd_group_box_01,
+			:col,	1,
+			:col_alignment,	:fill,
+			:width,   50,
+			:mode, :many,
+			:row,	1,
+			:row_alignment,	:fill,
+			:height,   50)
+	
+	.items[:app_pro_types].menu << _self.appcon_popup(:app_pro_types)
+
+	gb << group_box.new(rowcol_01,_self.message(:dialog_consumed_data_types),:row,2,:col,2)
+
+	dd_group_box_03 << rowcol.new(gb,1,1,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:top_spacing,	0)
+
+	.items[:diag_con_types] << text_window.new(dd_group_box_03,_unset,_unset,_unset,
+# SW4.1 only		:change_selector,  :|diag_types_changed()|,
+			:col,	1,
+			:col_alignment,	:fill,
+			:cols,	20,
+			:editable?,	_true,
+			:font_size,	12,
+			:horizontal_scrollbar?,	_false,
+			:row,	1,
+			:row_alignment,	:fill,
+			:rows,	6,
+			:vertical_scrollbar?,	_true )
+
+	gb << group_box.new(rowcol_01,_self.message(:app_consumed_data_types),:row,3,:col,1)
+
+	dd_group_box_02 << rowcol.new(gb,1,1,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:top_spacing,	0)
+
+	.items[:app_con_types] << simple_list_item.new(dd_group_box_02,
+			:col,	1,
+			:col_alignment,	:fill,
+			:width,   50,
+			:row,	1,
+			:mode, :many,
+			:row_alignment,	:fill,
+			:height,   50)
+
+	.items[:app_con_types].menu << _self.appcon_popup(:app_con_types)
+
+	gb << group_box.new(rowcol_01,_self.message(:dialog_produced_data_types),:row,3,:col,2)
+
+	dd_group_box_04 << rowcol.new(gb,1,1,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:top_spacing,	0)
+
+	.items[:diag_pro_types] << text_window.new(dd_group_box_04,_unset,_unset,_unset,
+# SW4.1+ only		:change_selector,  :|diag_types_changed()|,
+			:col,	1,
+			:col_alignment,	:fill,
+			:cols,	20,
+			:editable?,	_true,
+			:font_size,	12,
+			:horizontal_scrollbar?,	_false,
+			:row,	1,
+			:row_alignment,	:fill,
+			:rows,	6,
+			:vertical_scrollbar?,	_true )
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.appcon_popup(which)
+	## 
+	## Set the popup for WHICH application data types list.
+	pm << popup_menu.new(.items[which])
+
+	button_item.new_safe(pm,_self.message(:add_to_list),
+			     _self,{:|add_datatypes()|,which})
+
+	button_item.new_safe(pm,_self.message(:remove_from_list),
+			     _self,{:|remove_datatypes()|,which})
+	>> pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.add_datatypes(which)
+	## 
+	## Add selected datatypes (in WHICH item) to corresponding
+	## Dialog dataypes list.
+	## 
+	target << _if which _is :app_con_types
+		  _then
+			  >> :diag_pro_types
+		  _else 
+			  >> :diag_con_types
+		  _endif
+
+	sp << .items[target].contents.default("").split_by(%newline)
+
+	txt << .items[target].contents.write_string
+
+	sel << .items[which].selected_items
+
+	_for s _over sel.fast_elements()
+	_loop
+		_if sp.index_equal_of(s.lowercase) _is _unset 
+		_then
+			txt +<< write_string(s.lowercase,%newline)
+		_endif
+	_endloop
+
+	.items[target].contents << txt
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.remove_datatypes(which)
+	## 
+	## Remove selected datatypes (in WHICH item) from corresponding
+	## Dialog dataypes list.
+	
+	target << _if which _is :app_con_types
+		  _then
+			  >> :diag_pro_types
+		  _else 
+			  >> :diag_con_types
+		  _endif
+
+	sp << .items[target].contents.default("").split_by(%newline)
+
+	txt << ""
+
+	sel << .items[which].selected_items
+
+	_for s _over sp.fast_elements()
+	_loop
+		_if sel.index_equal_of(s) _is _unset 
+		_then
+			txt +<< write_string(s,%newline)
+		_endif
+	_endloop
+
+	.items[target].contents << txt
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.app_list
+	## 
+	## Return the list of currently running SW applications, if any.
+	
+	rp << rope.new()
+
+	_for a _over smallworld_product.applications.fast_elements()
+	_loop
+		rp.add({a.application_name,a.external_name})
+	_endloop
+
+	_if rp.empty?
+	_then
+		rp.add({:none,_self.message(:no_app_running)})
+	_endif
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_app_list()
+	## 
+	## Refresh the list of applications, necessary as the user can
+	## open and close applications anytime.
+	
+	.items[:app_list].items << _self.app_list
+	_self.update_app_pro_con_lists()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.update_app_pro_con_lists()
+	## 
+	## Update the listed datatypes that the chosen application
+	## produces and consumes.
+	
+	_if (app_name << .items[:app_list].value) _is :none _orif
+	    smallworld_product.application(app_name) _is _unset 
+	_then
+		.items[:app_con_types].items << {"None"}
+		.items[:app_pro_types].items << {"None"}
+	_else
+		db << smallworld_product.application(app_name).databus
+		cm << db.dd_consumer_manager
+		pm << db.dd_producer_manager
+
+		# App Consumer data types
+		deps << set.new()
+		_for p _over cm.dependencies()
+		_loop
+			_if p.class_name _isnt :symbol
+			_then
+#				write("odd Application CONSUMER dependency :")
+#				print(p)
+				_continue 
+			_endif 
+			deps.add(p)
+		_endloop
+		deps.remove(_unset)
+
+		s_deps << sorted_collection.new_with(_scatter deps)
+
+		items << rope.new()
+		_for d _over s_deps.fast_elements()
+		_loop
+			items.add_last(write_string(d))
+		_endloop
+		
+		.items[:app_con_types].items << items
+
+		# App Producer Data Types
+		# Usually the Consumer and Producer Data Types are the same but
+		# they MAY be different, so we have to compile separately
+		deps << set.new()
+		_for p _over pm.dependencies()
+		_loop
+			_if p.class_name _isnt :symbol
+			_then
+#				write("odd Application PRODUCER dependency :")
+#				print(p)
+				_continue 
+			_endif 
+			deps.add(p)
+		_endloop
+		deps.remove(_unset)
+
+		s_deps << sorted_collection.new_with(_scatter deps)
+
+		items << rope.new()
+		_for d _over s_deps.fast_elements()
+		_loop
+			items.add_last(write_string(d))
+		_endloop
+		
+		.items[:app_pro_types].items << items
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.diag_types_changed()
+	## 
+	## Update the producer and consumers types for the dialog when
+	## they are modified in the GUI.
+
+	_if .items[:diag_con_types] _is _unset _orif
+	    .items[:diag_pro_types] _is _unset _then _return _endif 
+
+	cons << .items[:diag_con_types].contents
+	pros << .items[:diag_pro_types].contents
+
+	cons.substitute_character(%newline,%,)
+	cons.substitute_character(% ,%,)
+	
+	pros.substitute_character(%newline,%,)
+	pros.substitute_character(% ,%,)
+
+	_self.current_dialog().databus[:produce] << pros
+	_self.current_dialog().databus[:consume] << cons
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_databus(val)
+	## 
+	## Make the databus tab visible if VAL=TRUE else hide it.
+
+	_dynamic !switching_dialogs?!
+	_if !switching_dialogs?!.default(_false)
+	_then
+		_return 
+	_endif
+	
+	_if val
+	_then
+		.items[:tb].pages[5].manage()
+		.items[:tb].active_page << .items[:tb].pages[5]
+		_self.tab_changed(5)
+	_else 
+		.items[:tb].pages[5].unmanage()
+	_endif
+
+	_self.current_dialog().use_databus? << val
+
+	_self.changed(:databus_list,:refresh)
+	_self.refresh_view()
+
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.modify_databus(args)
+	## 
+	## Perform ARGS on the current dialog.
+
+	_self.current_dialog().perform(_scatter args)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_databus()
+	## 
+	## Set the databus datatypes listed with those from the
+	## current dialog.
+	
+	db << _self.current_dialog().databus()
+
+	pros << db[:produce].default("").write_string.split_by(%,)
+	cons << db[:consume].default("").write_string.split_by(%,)
+
+	# remove empty rows from the list
+	pros_txt << ""
+	_for a _over pros.fast_elements()
+	_loop
+		pros_txt +<< write_string(a,%newline)
+	_endloop
+	
+	cons_txt << ""
+	_for a _over cons.fast_elements()
+	_loop
+		cons_txt +<< write_string(a,%newline)
+	_endloop
+
+	.items[:diag_pro_types].contents << pros_txt
+	.items[:diag_con_types].contents << cons_txt
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.save_dialog_databus(_optional clear?)
+	##
+	## Save the current GUI databus values to the current dialog design.
+
+	_if (d << _self.current_dialog()) _isnt _unset 
+	_then
+		db << d.databus
+		
+		pro << .items[:diag_pro_types].contents.default("")
+		db[:produce] << pro.substitute_character(%newline,%,)
+		con << .items[:diag_con_types].contents.default("")
+		db[:consume] << con.substitute_character(%newline,%,)
+		
+		_if clear?.default(_false)
+		_then
+			.items[:diag_pro_types].contents << ""
+			.items[:diag_con_types].contents << ""
+		_endif
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.code_tab(tb)
+	## 
+	## Define the GUI for displaying the Magik and XML that is
+	## going to be generated for the current dialog.  This GUI
+	## allows the user to preview the code before generating any.
+	##
+	## The Dialog Designer can be used this way to generate code
+	## snippets ready for inclusion in existing dialogs.
+	
+	_local rc << rowcol.new(tb,_unset,1,:pixel,:style,:nested,
+				:resize?,_true,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill,
+				:top_spacing,1,
+				:row_spacing,1,
+				:tab_label,_self.message(:code))
+	.items[:magik_xml] << rc
+
+	rc1 << rowcol.new(rc,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:col_spacing,0,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+
+	_self.action(:dialog_class_list).place_control_on(rc1,:dialog)
+ 	_self.action(:dialog_method_list).place_control_on(rc1,:dialog)
+	_self.action(:explore_code).place_control_on(rc1,:dialog,:has_border?,_false)
+	label_item.new(rc1,_unset)
+
+	# Text box where all the code will be displayed.
+	.items[:auto_generated_code] <<
+		text_window.new(rc,_unset,_unset,_unset,
+				:col_alignment, :fill,
+				:row_alignment, :fill,
+				:font,font.new_with_properties(:type,:logical,:name,"fixed",:point_size,12),
+				:editable?,_false)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_class_list_items()
+	## 
+	## Return the list of classes for the current dialog.
+
+	>> _if (d << _self.current_dialog()) _isnt _unset
+	   _then
+		   >> rope.new_with(d.dialog_class,
+				    d.dialog_class+"_framework",
+				    d.dialog_class+"_plugin",
+				    "XML")
+	   _else
+		   >> rope.new()
+	   _endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_class_list_value_changed(val)
+	## 
+	## React when a different class is selected. The list of
+	## methods and the displayed code is updated.
+
+	val << _self.action(:dialog_method_list).value.deep_copy()
+	its << _self.action(:dialog_method_list).items << _self.dialog_method_list_items()
+
+	_if its.includes?(val)
+	_then
+		_self.dialog_method_list_value_changed(val)
+	_else
+		_self.dialog_method_list_value_changed(its.an_element())
+	_endif 
+
+	_self.clear_selection_bb(_true)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_method_list_items()
+	## 
+	## Return a list of methods suitable to the method list choice item.
+	
+	>> _if (a_class << _self.action(:dialog_class_list).value) _isnt _unset 
+	   _then
+		   >> _self.current_dialog().class_methods(a_class)
+	   _else
+		   >> rope.new()
+	   _endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_method_list_value_changed(meth)
+	## 
+	## Update the displayed code when METH is chosen from the
+	## method choice list.
+
+	.items[:auto_generated_code].contents <<
+		_if (d << _self.current_dialog()) _isnt _unset _andif
+		    (a_class << _self.action(:dialog_class_list).value) _isnt _unset 
+		_then
+			_dynamic window_stack_driver_methods << d.window_stack_driver_methods()
+
+			>> d.dialog_method(a_class,meth.as_symbol())
+		_else
+			>> ""
+		_endif
+
+	.items[:auto_generated_code].point << 0
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.validate_class_name(str)
+	## 
+	## Validate the potential dialog_class STR.  Substitutes
+	## underscores for spaces, removes non-alpha-numerics (except
+	## underscore) and changes to lowercase.  A valide class name
+	## is returned as a char16_vector.
+
+	str << str.lowercase.substitute_character(% ,%_)
+	
+	new_str << ""
+	alpha << "_abcdefghijklmnopqrstuvwxyz0123345679"
+	found? << _false 
+
+	# Compile the class name with only ALPHA-numeric characters.
+	_for i _over 1.upto(str.size)
+	_loop
+		_if alpha.index_of(str[i]) _isnt _unset 
+		_then
+			new_str +<< str[i]
+		_endif
+	_endloop
+
+	# Remove 'plugin' or 'framework' sub-strings.
+	_for txt _over {"plugin","framework"}.elements()
+	_loop
+		_loop @inner
+			_if (i << new_str.index_of_seq(txt)) _isnt _unset
+			_then
+				pre << new_str.slice(1,i-1)
+				post << new_str.slice_to_end(i+txt.size)
+				new_str << pre + post
+
+				found? << _true 
+			_else
+				_leave @inner
+			_endif
+		_endloop 
+	_endloop
+
+	# Remove leading digits.
+	_loop
+		_if _not new_str[1].ascii_alphabetic?
+		_then
+			found? << _true
+			new_str << new_str.slice_to_end(2)
+		_else
+			_leave 
+		_endif 
+	_endloop 
+
+	# Remove trailing '_'
+	_loop
+		_if new_str.last _is %_
+		_then
+			new_str << new_str.slice(1,new_str.size-1)
+		_else
+			_leave 
+		_endif 
+	_endloop 
+
+	>> new_str,found?
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.change_dialog(what)
+	## 
+	## React to a change in a dialog property.
+
+	# Validate uniqueness of new dialog_class entry.
+	_if what _is :dialog_class 
+	_then
+		(new_class,base_class_error?) << _self.validate_class_name(.items[what].value)
+		.items[what].value << new_class
+		
+		_if new_class <> _self.current_dialog().dialog_class _andif
+		    _self.used_dialog_class?(new_class) 
+		_then
+			_if .items[:alert_down?].default(_true)
+			_then
+				.items[:alert_down?] << _false 
+				_self.show_alert(_self.message(:warning_used_dialog_class,new_class))
+				.items[what].value << _self.current_dialog().dialog_class
+				
+				.items[:alert_down?] << _true 
+			_endif
+
+			_return 
+		_endif
+
+		name_ver << .items[:build_module_name].value.split_by(% )
+		.items[:build_module_name].value << write_string(new_class," ",name_ver[2])
+
+		.items[:pragma_topic].value << write_string(new_class)
+		_self.current_dialog().pragma_topic <<  write_string(new_class)
+		_self.change_dialog(:build_module_name)
+
+	_elif what _is :build_module_name
+	_then
+		name_ver << ""
+		val << .items[what].value.default("")
+
+		_for i _over 1.upto(val.size)
+		_loop
+			_if val[i].ascii_alphanumeric? _orif
+			    val[i] _is %  _orif val[i] _is %_
+			_then
+				name_ver +<< val[i].lowercase
+			_endif
+		_endloop
+		
+		sp << name_ver.split_by(% )
+
+		_if sp.size _isnt 2
+		_then
+			_return _self.show_alert(_self.message(:invalid_module_name_and_version))
+		_endif
+		
+		val << "\" + sp.first.lowercase  #"
+		
+		.items[:build_module_name_for_dir].value << val
+		.items[what].value << name_ver.lowercase
+	_elif what _is :dialog_extra_slots
+	_then
+		new_class << .items[:dialog_class].value
+
+		# If we change the slots we need to remove the exemplar
+		remex(new_class.as_symbol())
+	_endif
+
+	# Ensure the package name is valid
+	.items[:dialog_package].value << .items[:dialog_package].value.lowercase
+	.items[:dialog_language].value << .items[:dialog_language].value.lowercase
+
+	# Update the list of dialogs
+	_self.current_dialog().perform(what.with_chevron,.items[what].value)
+	_self.action(:dialog_list).items << _self.dialog_list_items()
+
+	# Update the dialog class list
+	_self.action(:dialog_class_list).items << _self.dialog_class_list_items()
+	_self.dialog_class_list_value_changed(_self.action(:dialog_class_list).value)
+
+	_self.update_titlebar()
+
+	_if base_class_error? _is _true
+	_then
+		_self.show_alert(_self.message(:bad_base_class))
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.module_properties_tab(tb)
+	## 
+	## Define the GUI for modifying module properties.
+	
+	_local top_rc << rowcol.new(tb,2,2,:pixel,:style,:nested,
+				:resize?,_true,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill,
+				:top_spacing,1,
+				:left_spacing,0,
+				:col_resize_values,{100,0},
+				:tab_label,_self.message(:build))
+	.items[:build_module] << top_rc
+
+	# BASE CLASS Group Box.
+	.items[:properties_gb1] <<
+	bm_gb << group_box.new(top_rc,_self.message(:base_class_def),
+			       :col_alignment,:fill,
+			       :row_alignment,:top,
+			       :row,1,:col,1,
+			       :resize_y?,_false,
+			       :max_height,108)
+
+	bm_rc << rowcol.new(bm_gb,_unset,2,:pixel,
+			  :style,:group_box,
+			  :resize_x?,_true,
+			  :default_col_alignment,:fill,
+			  :col_spacing,0,
+			  :row_spacing,3,
+			  :col_resize_values,{0,0,100},
+			  :default_row_alignment,:top,
+			  :bottom_spacing,0)
+	# Base Class 
+	label_item.new(bm_rc,_self.message(:dialog_class))
+
+	bcrc << rowcol.new(bm_rc,1,_unset,:pixel,
+			  :style,:nested,:resize?,_true,
+			  :col_spacing,0,
+			  :default_col_alignment,:fill,
+			  :col_resize_values,{100,0,0})
+	
+	.items[:dialog_class] <<
+		text_item.new(bcrc,_unset,
+			      :model,_self,
+			      :width, 100,
+			      :value,_self.message(:dialog_class_default),
+			      :change_selector,{:change_dialog|()|,:dialog_class},
+			      :activate_selector,{:change_dialog|()|,:dialog_class})
+	
+	# Package definition
+	label_item.new(bcrc," "*4 + _self.message(:dialog_package),:col_alignment,:right)
+	.items[:dialog_package] <<
+		combo_box_item.new(bcrc,_unset,
+				     :items,rope.new_from_iter(package.all_packages,:|fast_keys()|),
+				     :value,package.all_packages.an_element().name,
+				     :min_width,50,
+				     :model,_self,
+				     :incremental_change_selector,{:change_dialog|()|,:dialog_package},
+				     :balloon_help_text,_self.message(:dialog_package_tt))
+	
+	# Base Class extra slots
+	label_item.new(bm_rc,_self.message(:dialog_extra_slots))
+	.items[:dialog_extra_slots] <<
+		text_item.new(bm_rc,_unset,:value,"",
+			      :model,_self,
+			      :balloon_help_text,_self.message(:dialog_extra_slots_tt),
+			      :change_selector,{:change_dialog|()|,:dialog_extra_slots},
+			      :activate_selector,{:change_dialog|()|,:dialog_extra_slots})
+	
+	# Pragma Classification input
+	label_item.new(bm_rc,_self.message(:dialog_pragma))
+
+	prc << rowcol.new(bm_rc,1,_unset,:pixel,
+			  :style,:nested,:resize?,_true,
+			  :col_spacing,2,
+			  :default_col_alignment,:fill,
+			  :col_resize_values,{0,0,100})
+	
+	.items[:pragma_classify_level] <<
+		text_choice_item.new(prc,_unset,
+				     :items,{"basic",
+					     "advanced",
+					     "restricted",
+					     "debug",
+					     "deprecated"},
+				     :value,"restricted",
+				     :model,_self,
+				     :change_selector,{:change_dialog|()|,:pragma_classify_level},
+				     :balloon_help_text,_self.message(:pragma_classify_level_tt))
+					     
+	.items[:pragma_usage] <<
+		combo_box_item.new(prc,_unset,
+				     :items,{"",
+					     "internal",
+					     "external",
+					     "input",
+					     "output"},
+				     :min_width,100,
+				     :model,_self,
+				     :incremental_change_selector,{:change_dialog|()|,:pragma_usage},
+				     :balloon_help_text,_self.message(:pragma_usage_tt))
+
+	.items[:pragma_topic] <<
+		text_item.new(prc,_unset,:value,"",
+			      :model,_self,
+			      :value,"default_class",
+			      :resize?,_true,
+			      :model,_self,
+			      :change_selector,{:change_dialog|()|,:pragma_topic},
+			      :activate_selector,{:change_dialog|()|,:pragma_topic},
+			      :balloon_help_text,_self.message(:pragma_topic_tt))
+	
+	# MODULE PROPERTIES Group Box.
+	bm_gb2 << group_box.new(top_rc,_self.message(:build_module_def),
+				:row,2,:col,1,
+				:col_alignment,:fill,
+				:row_alignment,:fill)
+	
+	bm_rc1 << rowcol.new(bm_gb2,_unset,2,:pixel,
+			  :style,:group_box,
+			  :resize?,_true,
+			  :default_col_alignment,:fill,
+			  :col_spacing,0,
+			  :row_spacing,3,
+			  :col_resize_values,{0,100},
+			  :default_row_alignment,:fill,
+			  :bottom_spacing,0)
+	
+	# Output Module Path
+	bm_rc2 << rowcol.new(bm_rc1,_unset,2,:pixel,
+			  :style,:nested,
+			  :resize?,_true,
+			  :col_resize_values,{100,0})
+	label_item.new(bm_rc2,_self.message(:set_module_path))
+
+	_self.action(:set_module_path).place_control_on(bm_rc2,:dialog,:has_border?,_false)
+
+	# Path input and module suffix
+	bm_rc3 << rowcol.new(bm_rc1,1,_unset,:pixel,
+			  :style,:nested,
+			  :col_alignment,:fill,
+			  :resize?,_true,
+			  :col_resize_values,{100,0})
+	.items[:build_module_dir] <<
+		text_item.new(bm_rc3,_unset,
+			      :value,"c:\temp", #system.getenv("temp"),
+			      :col_alignment,:fill,
+			      :change_selector,{:change_dialog|()|,:build_module_dir},
+			      :model,_self)
+
+	val << "\"+_self.message(:build_module_name_default).split_by(% ).first          #"
+	.items[:build_module_name_for_dir] <<
+		label_item.new(bm_rc3,val,
+			       :resize?,_true,
+			       :col_alignment,:right)
+
+	# Module Name
+	label_item.new(bm_rc1,_self.message(:build_module_name))
+	bm_rc4 << rowcol.new(bm_rc1,1,_unset,:pixel,
+			  :style,:nested,
+			  :col_alignment,:fill,
+			  :resize?,_true,
+			  :col_resize_values,{100,0,0})
+	
+	.items[:build_module_name] <<
+		text_item.new(bm_rc4,_unset,
+			      :value,_self.message(:build_module_name_default),
+			      :model,_self,
+			      :resize?,_true,
+			      :col_alignment,:fill,
+			      :change_selector,{:change_dialog|()|,:build_module_name},
+			      :activate_selector,{:change_dialog|()|,:build_module_name})
+	
+	# Language definition
+	label_item.new(bm_rc4," "*4 + _self.message(:dialog_language),:col_alignment,:right)
+	items << rope.new()
+	_for lang _over !current_languages!.fast_elements()
+	_loop
+		items.add(lang.write_string)
+	_endloop
+	.items[:dialog_language] <<
+		combo_box_item.new(bm_rc4,_unset,
+				     :items,items,
+				     :value,items.an_element(),
+				     :min_width,50,
+				     :model,_self,
+				     :incremental_change_selector,{:change_dialog|()|,:dialog_language},
+				     :balloon_help_text,_self.message(:dialog_language_tt))
+	# Description
+	label_item.new(bm_rc1,_self.message(:build_module_description),:col_alignment,:right)
+	.items[:build_module_description] <<
+		text_item.new(bm_rc1,_unset,
+			      :model,_self,
+			      :value,_self.message(:build_module_description_default),
+			      :change_selector,{:change_dialog|()|,:build_module_description},
+			      :activate_selector,{:change_dialog|()|,:build_module_description})
+
+	# Requirements
+	label_item.new(bm_rc1,_self.message(:build_module_requires),:row_alignment,:top,:col_alignment,:right)
+
+	req_rc << rowcol.new(bm_rc1,1,_unset,:pixel,
+			    :style,:nested,
+			    :resize?,_true,
+			    :row_alignment,:fill,
+			    :col_resize_values,{50,50})
+
+	simple_font << font.new_with_properties(:type,:logical,:name,"fixed",:point_size,12)
+	.items[:build_module_requires] <<
+		text_window.new(req_rc,4,20,_unset,
+				:contents,_self.message(:build_module_requires_default),
+				:font,simple_font,
+				:resize?,_true,
+				:min_width,100,
+				:model,_self,
+# SW 4.1+ only 		         :change_selector,:dialog_change_module_requires|()|,
+				:col_alignment,:fill,
+				:row_alignment,:fill,
+				:horizontal_scrollbar?,_true )
+
+	adm << _self.all_defined_modules("")
+	
+	tm_gb << .items[:all_def_module_gb] <<
+		group_box.new(req_rc,_self.message(:defined_modules,adm.size,adm.size),
+			       :resize?,_true,
+			       :col_alignment,:fill,:row_alignment,:fill)
+
+	tm_gb_rc << rowcol.new(tm_gb,_unset,1,:pixel,:style,:nested,:resize?,_true)
+	.items[:all_def_module_filter] <<
+		text_item.new(tm_gb_rc,_self.message(:defined_module_filter_label),
+			      :model,_self,
+			      :width,10,
+			      :resize?,_true,
+			      :col_alignment,:fill,
+			      :balloon_help_text,_self.message(:defined_module_filter_tt),
+			      :incremental_change_selector,:|filter_defined_module_list()|)
+	
+	.items[:all_def_modules] <<
+		simple_list_item.new(tm_gb_rc,
+				     :items,adm,
+				     :mode,:many,
+				     :max_width,50,
+				     :col_alignment,:fill,
+				     :row_alignment,:fill,
+				     :resize?,_true)
+	.items[:all_def_modules].menu << _self.all_defined_modules_popup()
+	
+	# TEST MODULE Group Box.
+	tm_rc << rowcol.new(top_rc,_unset,1,:pixel,
+			    :style,:nested,
+			    :resize?,_true,
+			    :col_resize_values,{0,100},:row,2,:col,2)
+
+	tm_gb << group_box.new(tm_rc,_self.message(:test),:resize?,_true)
+	tm_rc1 << rowcol.new(tm_gb,_unset,1,:pixel,
+			     :style,:button_box,
+			     :row_spacing,4)
+	
+	.items[:dd_show_alerts?] << toggle_item.new(tm_rc1,_self.message(:alerts?))
+	.items[:dd_allow_code_overwrite?] << toggle_item.new(tm_rc1,_self.message(:allow_overwrite?))
+	.items[:dd_auto_date_code?] << toggle_item.new(tm_rc1,_self.message(:auto_date_code?))
+	
+	_self.action(:build_module).place_control_on(tm_rc1,:dialog)
+	_self.action(:build_and_activate).place_control_on(tm_rc1,:dialog)
+	_self.action(:reactivate_dialog).place_control_on(tm_rc1,:dialog)
+
+	.items[:activation_position] <<
+		text_choice_item.new(tm_rc1,_unset,
+				     :items,_self.activation_positions(),
+				     :value,:activate_right,
+				     :balloon_help_text,_self.message(:activation_position_tt))
+
+	>> top_rc
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.activation_positions()
+	## 
+	## Return the list of activation positions.
+
+	items << rope.new()
+
+	_for p _over {:activate_right,:activate_below,:activate_front,:activate_cascade}.fast_elements()
+	_loop
+		items.add({p,_self.message(p)})
+	_endloop
+
+	>> items
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.all_defined_modules(filter)
+	## 
+	## Return a rope of all defined module names.
+	
+	rp << rope.new()
+
+	_for m _over sw_module_manager.defined_modules.fast_elements()
+	_loop
+		_if m.name _isnt _unset 
+		_then
+			_if filter.empty? _orif
+			    m.name.index_of_seq(filter) _isnt _unset 
+			_then
+				rp.add(m.name.write_string.trim_spaces())
+			_endif
+		_endif
+	_endloop
+
+	>> rp
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.all_defined_modules_popup()
+	## 
+	## Return the popup for moving defined module names to and
+	## from the 'Requires' list.
+	
+	pm << popup_menu.new(.items[:all_def_modules])
+
+	button_item.new_safe(pm,_self.message(:add_to_requires),
+			     _self,:|add_to_requires()|)
+
+	button_item.new_safe(pm,_self.message(:remove_from_requires),
+			     _self,:|remove_from_requires()|)
+	>> pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.filter_defined_module_list()
+	## 
+	## Filter the defined modules list based on the filter text.
+	
+	filter << .items[:all_def_module_filter].value.default("")
+	adm << _self.all_defined_modules(filter)
+	siz << sw_module_manager.defined_modules.size
+	
+	.items[:all_def_modules].items << adm
+	.items[:all_def_module_gb].label << _self.message(:defined_modules,adm.size,siz)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.add_to_requires()
+	## 
+	## Add selected elements to the requires list, if they are not
+	## already there.
+	
+	sel << .items[:all_def_modules].selected_items
+	sp  << .items[:build_module_requires].contents.default("").split_by(%newline)
+	txt << .items[:build_module_requires].contents.write_string
+
+	_for s _over sel.fast_elements()
+	_loop
+		_if sp.index_equal_of(s) _is _unset 
+		_then
+			txt +<< write_string(s,%newline)
+		_endif
+	_endloop
+
+	.items[:build_module_requires].contents << txt
+
+	_self.current_dialog().build_module_requires << txt
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.remove_from_requires()
+	## 
+	## Remove selected elements from the requires list, if present.
+	## 
+
+	target << :build_module_requires
+	
+	sp << .items[target].contents.default("").split_by(%newline)
+
+	txt << ""
+
+	sel << .items[:all_def_modules].selected_items
+
+	_for s _over sp.fast_elements()
+	_loop
+		_if sel.index_equal_of(s) _is _unset 
+		_then
+			txt +<< write_string(s,%newline)
+		_endif
+	_endloop
+
+	.items[target].contents << txt
+	_self.current_dialog().build_module_requires << txt
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_module_path()
+	## 
+	## Select a system path.
+
+	_if .items[:select_path] _is _unset 
+	_then
+		.items[:select_path] << file_dialog.new(_self,:|int!set_module_path()|,:class_name,
+							:operation,:select_directory,
+							:title,_self.message(:select_module_path))
+	_else
+		.items[:select_path].directory << .items[:build_module_dir].value
+	_endif
+	
+	.items[:select_path].activate()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.int!set_module_path(dir)
+	## 
+	## Store the module path based on user input.
+	.items[:build_module_dir].value  << dir
+
+	_self.current_dialog().build_module_dir << dir
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.build_module()
+	## 
+	## Build the module directory structure and write the dialog code to the class files.
+
+	mod_name << .items[:build_module_name].value.split_by(% ).first.as_symbol()
+
+	_dynamic !dd_show_alerts?! << .items[:dd_show_alerts?].value.default(_false)
+
+	# Run SW4 compatability code ...
+	_self.sw4_compatability()
+
+	# Refresh the module's key files and reload the module defintion.
+	_if _self.build_module_structure() _is _unset _then _return _false _endif
+
+	_self.auto_date_code? << .items[:dd_auto_date_code?].value
+	
+	_if sw_module_manager.module_is_defined?(mod_name) 
+	_then
+		sw_module_manager.reload_module_definition(mod_name)
+	_else
+		sw_module_manager.load_module_definition(.items[:build_module_dir].value + "\" + mod_name) #"
+	_endif
+
+	# Short circuit if the user does not want to overwrite existing code.
+	_if _not _self.write_code_to_module().default(_true)
+	_then
+		_return _false
+	_endif
+	
+	_self.copy_icons_to_module()
+	_self.save_xml_description_to_module()
+	_self.load_module()
+
+	_self.action(:reactivate_dialog).enabled? << _true 
+	_self.action(:copy_image_files).enabled? << _true 
+	_self.action(:explore_code).enabled? << _true
+	_self.current_dialog().built? << _true
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.validate_package()
+	## 
+	## Check that the dialog package exists and create it if missing.
+	_if (pname << .items[:dialog_package].value).default("").lowercase.empty?
+	_then
+		pname << "user"
+	_endif
+
+	pname << pname.as_symbol()
+
+	_if package.all_packages[pname] _is _unset
+	_then
+		# Create the package so the dialog code can be loaded.
+		package.new(pname)
+
+		# Update the package chooser to in include the new package
+		.items[:dialog_package].items << sorted_collection.new_from_iter(package.all_packages,:|fast_keys()|)
+		.items[:dialog_package].value << pname.write_string
+	_endif 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.module_missing?(mod_name)
+	## 
+	## Return TRUE if the module.def for the module MOD_NMAME is missing.
+	
+	parent_dir << .items[:build_module_dir].value
+	sp << .items[:build_module_name].value.split_by(% )
+
+	>> _not system.file_exists?(parent_dir + "\" + sp.first + "\module.def")    #"
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.check_product_def(parent_dir)
+	## 
+	## Check for a product.def higher up the directory tree from
+	## PARENT_DIR. 
+	
+	pd << parent_dir.write_string
+
+	_loop
+		_if system.file_exists?(pd+"\product.def")
+		_then
+			_return 
+		_endif
+
+		_if (i << pd.rindex_of_seq("\")) _is _unset #"
+		_then
+			_leave
+			
+		_endif 
+
+		pd << pd.slice(1,i-1)
+	_endloop
+
+	# No product.def found ... make one.
+
+	_protect 
+		file << external_text_output_stream.new(parent_dir+"\product.def")
+		file.write(_self.message(:default_product_def))
+	_protection
+		file.close()
+	_endprotect 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.build_module_structure()
+	## 
+	## Build the module structure ready for population with
+	## autogenerated code and copied resources.
+	
+	_if (parent_dir << .items[:build_module_dir].value.default("")) = "" _orif 
+	    parent_dir = "unset" 
+	_then
+		_self.show_alert(_self.message(:no_base_path))
+		_return
+	_elif _not system.file_exists?(parent_dir)
+	_then
+		_self.show_alert(_self.message(:bad_base_path,parent_dir))
+		_return 	
+	_endif
+
+	_self.check_product_def(parent_dir)
+
+	sp << .items[:build_module_name].value.split_by(% )
+	module_dir << parent_dir + "\" + sp.first     #"
+	module_ver << sp.last
+	
+	args          << args.default( {} )
+	
+	description << .items[:build_module_description].value.default("")
+	requires    << .items[:build_module_requires].contents.default("").write_string
+	_if (msg_lang << .items[:dialog_language].value) = ""
+	_then
+		msg_lang << "en_gb"
+	_endif 
+	resource_data << property_list.new_with( :base, {:data, :bitmaps}, msg_lang.as_symbol(), {:messages, :help})
+
+	# Create module directory
+	_self.make_or_reuse_directory( module_dir )
+	
+	# Create source directory
+	source_dir << system.pathname_down( module_dir, :source )
+	_self.make_or_reuse_directory( source_dir )
+
+	# Create source\additions directory
+	additions_dir << system.pathname_down( source_dir, :additions )
+	_self.make_or_reuse_directory( additions_dir )
+
+	# Create source\changes directory
+	changes_dir << system.pathname_down( source_dir, :changes )
+	_self.make_or_reuse_directory( changes_dir )
+
+	# Create source\glue directory
+	glue_dir << system.pathname_down( source_dir, :glue )
+	_self.make_or_reuse_directory( glue_dir )
+
+	# Create load_list.txt file in module root containing source/
+	load_list_file << system.pathname_down( module_dir, "load_list.txt" )
+	stream << external_text_output_stream.new( load_list_file )
+	_protect
+		stream.write( "source/", newline_char )
+	_protection
+		_if stream _isnt _unset
+		_then
+			stream.close()
+		_endif
+	_endprotect
+
+	# Create an empty load_list.txt file in source directory
+	load_list_file << system.pathname_down( source_dir, "load_list.txt" )
+	stream << external_text_output_stream.new( load_list_file )
+	_if stream _isnt _unset
+	_then
+		stream.close()
+	_endif
+
+	# Create empty load_list.txt files in the additions & changes
+	# directories if they do not exist.
+	_for dir _over {additions_dir,changes_dir,glue_dir}.elements()
+	_loop
+		pth << system.windows_short_pathname(dir) + "\load_list.txt"
+
+		_if _not system.file_exists?(pth)
+		_then
+			_if (stream << external_text_output_stream.new( pth )) _isnt _unset
+			_then
+				stream.close()
+			_endif 
+		_endif
+	_endloop
+	
+	# Create the module.def file
+	def_file << system.pathname_down( module_dir, "module.def" )
+	stream << external_text_output_stream.new( def_file )
+	_protect
+		stream.write( sp.first, tab_char, module_ver, newline_char )
+		_if description _isnt _unset
+		_then
+			stream.write( newline_char, "description", newline_char )
+			stream.write( tab_char, description, newline_char )
+			stream.write( "end", newline_char, newline_char )
+
+			stream.write( "requires", newline_char )
+			_for r _over requires.split_by(newline_char).fast_elements()
+			_loop
+				_if _not r.write_string.empty?
+				_then
+					tr << r.trim_spaces()
+					stream.write( tab_char, tr, newline_char)					
+				_endif
+			_endloop
+			
+			stream.write( "end", newline_char, newline_char )
+		_endif
+	_protection
+		_if stream _isnt _unset
+		_then
+			stream.close()
+		_endif
+	_endprotect
+
+	# If any resources have been specified create the appropriate directories
+	_if _not resource_data.empty?
+	_then
+		# Create resources directory
+		resources_dir << system.pathname_down( module_dir, :resources )
+		_self.make_or_reuse_directory( resources_dir )
+
+		_for lang, resources _over resource_data.fast_keys_and_elements()
+		_loop
+			# Create language directories
+			lang_dir << system.pathname_down( resources_dir, lang )
+			_self.make_or_reuse_directory( lang_dir )
+
+			_for resource _over resources.fast_elements()
+			_loop
+				dir << system.pathname_down( lang_dir, resource )
+				_self.make_or_reuse_directory( dir )
+			_endloop
+		_endloop
+	_endif
+
+	>> _true
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.write_code_to_module()
+	## 
+	## Write the generated code to the module.
+
+	parent_dir << .items[:build_module_dir].value
+	sp << .items[:build_module_name].value.split_by(% )
+
+	source_dir << parent_dir  + "\" + sp.first + "\source"   #"
+
+	# Short circuit if the user does not allow code overwrite.
+	_if _self.no_overwrite?(source_dir)
+	_then
+		_return _false 
+	_endif
+	
+	_self.current_dialog().write_source_files(source_dir)
+
+	# XML files
+	xml_dir << parent_dir + "\" + sp.first + "\resources\base\data"   #"
+	_self.current_dialog().write_xml_files(xml_dir)
+
+	# MSG files
+	_if (msg_lang << .items[:dialog_language].value) = ""
+	_then
+		msg_lang << "en_gb"
+	_endif 
+	msg_dir << parent_dir + "\" + sp.first + "\resources\" + msg_lang +"\messages"   #"
+	_self.current_dialog().write_msg_files(msg_dir)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.no_overwrite?(source_dir)
+	## 
+	## Check for modified magik files in the SOURCE_DIR and show an
+	## alert to confirm the overwriting of an existing file.
+		
+	dc << _self.current_dialog().dialog_class.default("dialog_class")
+	ll << file_status.new(system.pathname_down( source_dir, "load_list.txt" ))
+	ow? << .items[:dd_allow_code_overwrite?].value.default(_false)
+
+	_for c _over {dc,dc+"_framework",dc+"_plugin"}.fast_elements()
+	_loop
+		filename << system.pathname_down( source_dir, c + ".magik" )
+		
+		_if system.file_exists?(filename)
+		_then
+			fs << file_status.new(filename)
+			
+			_if fs.modify_time > ll.modify_time _andif _not ow?
+			_then
+				res <<  _self.show_query({_self.message(:yes),_self.message(:yes_always),_self.message(:no)},
+							 {:yes,:yes_always,:no},:no,_self.message(:prompt_overwrite?,c,source_dir))
+
+				_if res _is :yes_always
+				_then
+					.items[:dd_allow_code_overwrite?].value << _true 
+				_endif
+
+				_return res _is :no
+			_endif
+		_endif
+	_endloop
+	
+	>> _false 	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.save_xml_description_to_module()
+	## 
+	## Automatically save a copy of the XML description for the
+	## current dialog into the autogenerated module directory.
+	
+	parent_dir << .items[:build_module_dir].value
+	sp << .items[:build_module_name].value.split_by(% )
+	
+	dir << parent_dir + "/" + sp.first + "/resources/base/data/"
+
+	filename << write_string(dir,_self.current_dialog().dialog_class,".xml")
+	
+	_protect
+		f << external_text_output_stream.new(filename)
+		f.write(_self.current_dialog().xml_description())
+	_protection
+		f.close()
+	_endprotect 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.copy_icons_to_module()
+	## 
+	## Copy icons from SELF's resources to the target module.
+	
+	parent_dir << .items[:build_module_dir].value
+	sp << .items[:build_module_name].value.split_by(% )
+	
+	# Raster Image files
+	dir << parent_dir + "/" + sp.first + "/resources/base/bitmaps/"
+	_self.current_dialog().copy_icon_files(dir)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_private _method dialog_designer.make_or_reuse_directory( dirname )
+	##
+	## Make or reuse directories as appropriate.
+
+	_if _not system.file_exists?( dirname )
+	_then
+		system.mkdir( dirname )
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.load_module()
+	## 
+	## Load the module generated for the current design.
+	
+	sp << .items[:build_module_name].value.split_by(% )
+
+	_local mn << sp.first.as_symbol()
+
+	parent_dir << .items[:build_module_dir].value
+	module_dir << parent_dir + "\" + sp.first   #"
+
+	_if _not sw_module_manager.module_is_defined?(mn) 
+	_then
+		write(%newline,_self.message(:begin_loading_module_definition,mn,module_dir))
+		sw_module_manager.load_module_definition(module_dir)	
+	_endif
+
+	# Remex the base classes so they can be re-defined.
+	bc << _self.current_dialog().dialog_class.as_symbol()
+
+			do_nothing << _proc()
+					      # ignore
+				      _endproc
+
+	_block
+			_handling global_changing_nature _with do_nothing
+			_handling condition_exists _with do_nothing
+			_handling exemplar_already_exists _with do_nothing
+
+			_for cl _over {bc,bc+:_plugin,bc+:_framework}.fast_elements()
+			_loop
+				_try
+					remove_exemplar(cl)
+				_when error
+					#ignore :global_not_a_class errors
+				_endtry
+				
+			_endloop
+			
+			sw_module_manager.load_module(mn,_unset,:force_reload?,_true)
+	_endblock 
+	write(_self.message(:end_loading))
+	
+	_return _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.build_and_activate()
+	## 
+	## Build, load and open the module dialog.  The process
+	## switches to the package defined for this dialog while
+	## compiling and re-activating.
+
+	_self.validate_package()
+	
+	_dynamic !current_package!
+
+	pack << _self.current_dialog().dialog_package.as_symbol()
+	_if (diag_package << package.all_packages[pack]) _isnt _unset
+	_then 
+		!current_package! << diag_package
+	_endif 
+
+	_self.close_test_dialog()
+	_if _self.build_module().default(_true)
+	_then 
+		_self.reactivate_dialog()
+	_endif 
+
+	!current_package! <<  package.all_packages[:user]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.reactivate_dialog()
+	## 
+	## Re-activate the design WITHOUT re-loading the module, the
+	## bitmap cache is cleared so modified images will be visible.
+
+	_self.close_test_dialog()
+
+	smallworld_product.clear_bitmap_cache()
+	
+	# Wait for the module load to complete before continuing...
+	_self.load_module()
+
+	.items[:test_module] << _self.current_dialog().test_dialog()
+	_local ap << .items[:activation_position].value
+
+	tf << _self.top_frame
+
+	pos << _if ap _is :activate_right
+	       _then
+		       >> pixel_coordinate(tf.position.x + tf.width.floor + 8,tf.position.y)
+	       _elif ap _is :activate_below
+	       _then
+		       >> pixel_coordinate(tf.position.x,tf.position.y + tf.height.floor + 46)  
+	       _elif ap _is :activate_front
+	       _then
+		       >> pixel_coordinate(tf.position.x,tf.position.y)  
+	       _elif ap _is :activate_cascade
+	       _then
+		       >> pixel_coordinate(tf.position.x + 15,tf.position.y + 15)
+	       _endif
+
+	do_nothing << _proc()
+			      ## do nothing
+		      _endproc 
+
+	_block
+		_handling resource_not_found_in_module_warning _with do_nothing
+		
+		.items[:test_module].activate_dialog().top_frame.position << pos
+	_endblock
+
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.explore_code()
+	## 
+	## Launch the Windows file explorer 
+	
+	parent_dir << .items[:build_module_dir].value
+	sp << .items[:build_module_name].value.split_by(% )
+	source_dir << parent_dir  + "\" + sp.first + "\source"    #"
+	
+	cmd << write_string("explorer.exe ",%",source_dir,%")
+
+	system.do_command(cmd)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.messages_tab(tb)
+	## 
+	## Define the GUI for displaying any messages the user would
+	## like define for the dialog_class.
+	
+	_local rc << rowcol.new(tb,_unset,1,:pixel,:style,:nested,
+				:resize?,_true,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill,
+				:top_spacing,1,
+				:row_spacing,1,
+				:tab_label,_self.message(:messages))
+	.items[:messages] << rc
+
+	# Paned window with class msgs above and class_plugin msgs below
+	pw << paned_window.new(rc,:side_by_side?,_false,
+			       :row_resize_values,{100,0},
+			       :tab_label,_self.message(:docks))
+
+	# Class messages
+	rc1 << rowcol.new(pw,_unset,1,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,0,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	rc1s << rowcol.new(rc1,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,0,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+
+	.items[:dialog_class_user_messages_label] << label_item.new(rc1s,"")
+
+	# Base Class Message Search
+	rc1s2 << rowcol.new(rc1s,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,0,
+				:col_resize_values,{100,0,0},
+				:col_spacing,-1,
+				:default_col_alignment,:right,
+				:default_row_alignment,:fill)
+	_self.action(:message_find_prev).place_control_on(rc1s2,:dialog,:has_border?,_false)
+	.items[:dialog_class_user_messages_search] <<
+		text_item.new(rc1s2,_unset,:model,_self,
+			      :balloon_help_text,  _self.message(:user_messages_search_tt),
+			      :font,font.new_with_properties(:type,:logical,:name,"fixed",:point_size,12),
+			      :incremental_change_selector,:|user_message_search_inc_change()|,
+			      :activate_selector,:|message_find_next()|,
+			      :display_length,	20,
+			      :row_alignment,	:top )
+	_self.action(:message_find_next).place_control_on(rc1s2,:dialog,:has_border?,_false)
+
+	.items[:dialog_class_user_messages] <<
+		text_window.new(rc1,_unset,_unset,_unset,
+				:col_alignment, :fill,
+				:row_alignment, :fill,
+				:font,font.new_with_properties(:type,:logical,:name,"fixed",:point_size,12),
+				:horizontal_scrollbar?,_false,
+# SW 4.1+ only			:change_selector,:dialog_class_user_messages_changed|()|,
+				:model,_self,
+				:editable?,_true)
+	# Class_plugin messages
+	rc2 << rowcol.new(pw,_unset,1,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,0,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+
+	.items[:plugin_class_user_messages_label] << label_item.new(rc2,"")
+
+	.items[:plugin_class_user_messages] <<
+		text_window.new(rc2,5,_unset,_unset,
+				:col_alignment, :fill,
+				:row_alignment, :fill,
+				:font,font.new_with_properties(:type,:logical,:name,"fixed",:point_size,12),
+				:horizontal_scrollbar?,_false,
+# SW 4.1+ only			:change_selector,:dialog_class_user_messages_changed|()|,
+				:model,_self,
+				:editable?,_true)
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.user_message_search_inc_change()
+	## Make the prev search available if reasonable.
+	_self.action(:message_find_prev).enabled? << .items[:dialog_class_user_messages].point > 0	
+	_self.action(:message_find_next).enabled? << .items[:dialog_class_user_messages].point < .items[:dialog_class_user_messages].contents.size	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_class_user_messages_changed()
+	## 
+	## Keep the current dialog's custom messages up to date.
+	_self.current_dialog().class_messages << .items[:dialog_class_user_messages].value
+	_self.current_dialog().plugin_messages << .items[:plugin_class_user_messages].value
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_messages()
+	## 
+	## Refresh the messages shown by DD as those for the current dialog.
+
+	.items[:dialog_class_user_messages].contents << _self.current_dialog().class_messages.default("")
+	.items[:plugin_class_user_messages].contents << _self.current_dialog().plugin_messages.default("")
+
+	.items[:dialog_class_user_messages].point << 0
+	.items[:plugin_class_user_messages].point << 0
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.message_find_prev()
+	## Search backwards through the messages to find the current
+	## search text.
+	_self.message_find_next(_true)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.message_find_next(_optional prev?)
+	## Find the next (or PREV?) of the current search string. Case
+	## is ignored.
+
+	prev? << prev? _is _true
+
+	# We have to adjust for %newline characters as the
+	# .index_of_seq() method appears to ignore them.
+	st << .items[:dialog_class_user_messages_search].value.lowercase
+
+	# The 'point' attribute of the text window counts 2 characters
+	# for the %newline character ... so we do a quick replace of
+	# each %newline character with "@@".
+	msg_txt << .items[:dialog_class_user_messages].contents.lowercase
+	msg_txt << msg_txt.substitute_character(% ,%@)
+	sp_txt << msg_txt.split_by(%newline,_true)
+	msg_txt << ""
+	_for sp _over sp_txt.fast_elements()
+	_loop
+		_if sp.empty? 
+		_then
+			msg_txt << "".concatenation(msg_txt,"@@")
+		_else
+			msg_txt << "".concatenation(msg_txt,sp,"@@")
+		_endif
+	_endloop
+
+	# Get the current cursor position (in case the user has changed it)
+	start_idx << .items[:dialog_class_user_messages].point
+	
+	# Find the character index of the start of the next (or prev)
+	# instance of the text string.  This is the call that requires the
+	# %newline->"@@" replacement.
+	_if prev?.default(_false)
+	_then
+		idx << msg_txt.rindex_of_seq(st,start_idx - st.size - 1).default(0) - 1
+	_else 
+		idx << msg_txt.index_of_seq(st,start_idx + 2).default(0) - 1
+	_endif
+
+	# Handle not finding the search string.
+	_if idx _is -1 
+	_then
+		_self.show_alert(_self.message(:class_msg_txt_not_found,.items[:dialog_class_user_messages_search].value))
+
+		_if prev?.default(_false)
+		_then
+			.items[:dialog_class_user_messages].point << msg_txt.size
+			.items[:dialog_class_user_messages].ensure_point_visible()
+			
+			_self.action(:message_find_prev).enabled? << _true
+			_self.action(:message_find_next).enabled? << _false
+		_else 
+			.items[:dialog_class_user_messages].point << 0
+			.items[:dialog_class_user_messages].ensure_point_visible()
+			
+			_self.action(:message_find_prev).enabled? << _false 
+			_self.action(:message_find_next).enabled? << _true
+		_endif
+		
+		_return 
+	_endif
+
+	# Select the search text and move the focus to the text_box so
+	# the selected text is visible.
+	.items[:dialog_class_user_messages].point << idx
+	.items[:dialog_class_user_messages].set_selection(idx,st.size)
+	.items[:dialog_class_user_messages].ensure_point_visible()
+	.items[:dialog_class_user_messages].set_selection(idx,st.size)
+	.items[:dialog_class_user_messages].set_focus()
+
+	_self.action(:message_find_prev).enabled? << .items[:dialog_class_user_messages].point > 0
+	_self.action(:message_find_next).enabled? << .items[:dialog_class_user_messages].point < msg_txt.size
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_change_module_requires()
+	## 
+	## Update the module prerequisites for the current design from
+	## the DD values entered.
+	_self.current_dialog().build_module_requires << .items[:build_module_requires].contents.default("").write_string
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlook_bar_tab(tb)
+	## 
+	## Define the GUI for modifying am an OutlookBar element.
+	
+	pw << paned_window.new(tb,:side_by_side?,_true,
+			       :col_resize_values,{100,0},
+			       :tab_label,_self.message(:dd_outlook_bar))
+
+	.items[:outlookbar_tab] << pw
+
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	rc << rowcol.new(top_rc,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:col_spacing,1,	
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	a << canvas_agent.new( _unset ) 
+	.items[:outlookbar_canvas] <<
+		scrollable_canvas.new(rc, 150,200, a,
+				      :resize?, _true,
+				      :has_vertical_scrollbar?,_false )
+	
+	a.define_redraw( :|refresh_outlookbar()|,_self)
+	a.define_button( :|outlookbar_canvas_button_pressed()|,_self,:select)
+	
+	_local l_style_holder << string_styles_holder.new_with()
+	l_style_holder.add_image_scheme(:selected_scheme,
+					:default, :closed_folder,
+					:selected, {:menubar_pullout,:dialog_desinger})
+	
+	.items[:outlookbar] <<
+		tree_item.new(rc,
+			      :model,        _self,
+			      :mode,:one,
+			      :allow_dragging_notifier,   :|outlookbar_allow_dragging?()|,
+			      :release_dragging_notifier, :|outlookbar_release_dragging?()|,
+			      :select_notifier,:|outlookbar_selection_made()|,
+			      :style_holder, l_style_holder, 
+			      :aspect,       :outlookbar_list)
+
+	top_rc << rowcol.new(pw,1,_unset,:pixel,:style,:nested,
+				:resize?,_true,
+				:row_spacing,2,
+				:top_spacing,1,
+				:default_col_alignment,:fill,
+				:default_row_alignment,:fill)
+	
+	.items[:outlookbar_editor] << dd_element_editor.new(:outlookbar)
+	.items[:outlookbar_editor].build_gui(top_rc)
+	.items[:outlookbar_editor].element_type << :outlookbar
+	.items[:outlookbar_editor].databus << _self.databus
+_endmethod 
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.edit_outlook_bar(ob)
+	## 
+	## Edit the Outlookbar widget OB.  Enables the 'Outlook Bar'
+	## full tab editor for OB.
+
+	# Swap in the selected outlook bar element
+	d << _self.current_dialog()
+	d.outlookbar << ob
+	_self.update_outlookbar_list_data()
+
+	# Enable the outlook bar editor
+	.items[:tb].pages[8].manage()
+	.items[:tb].active_page << .items[:tb].pages[8]
+
+	_self.changed(:outlookbar_list,:refresh)
+	.items[:outlookbar].tree_manager.selection.empty()
+
+	.items[:outlookbar_editor].edit("")
+	.items[:outlookbar_editor].set_choice_items(_self.outlookbar_element_list())
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_list
+	## 
+	## Return a list of outlookbar elements suitable for the dd_element_editor.
+
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (ob << d.outlookbar) _is _unset
+	_then
+		_return {}
+	_endif
+
+	>> ob.categories
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.update_outlookbar_list_data()
+	## 
+	## Update the outlookbar tree_item data so it will refresh with
+	## the latest values.
+
+	el << .items[:outlookbar_editor].element
+
+	_for m _over _self.current_dialog().outlookbar.categories.fast_elements()
+	_loop
+		_for dt _over m.fast_trees()
+		_loop
+			_if el _isnt _unset _andif dt.value[:name] = el.name
+			_then
+				_for p _over el.dd_properties().fast_keys()
+				_loop
+					dt.value[p] << el.perform(p)
+				_endloop
+			_endif 
+
+			ifn << dt.value[:image_file_name].default("")
+			imn << dt.value[:image_module_name].default("")
+			
+			_if _not ifn.empty? _andif _not imn.empty?
+			_then
+				dt.styled_string << {:image,{ifn.as_symbol(),imn.as_symbol()},:value,:caption}
+			_endif
+		_endloop
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_outlookbar()
+	## 
+	## Refresh the graphic render of the outlookbar.
+
+	_if (d << _self.current_dialog()) _is _unset _orif
+	    (ob << d.outlookbar) _is _unset
+	_then
+		_return 
+	_endif
+
+	c << .items[:outlookbar_canvas]
+
+	css << .items[:outlookbar].selection.an_element()
+
+	.items[:outlookbar_fp] << d.render_outlookbar(c,6,5,css).default(.items[:outlookbar_fp])
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_element_list()
+	## 
+	## Return a list of outlookbar elements suited to the choice
+	## item of the dd_element_editor.
+	
+	_if (d << _self.current_dialog()) _isnt _unset 
+	_then
+		_return d.outlookbar_element_list()
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_selection_made(sel)
+	## 
+	##
+	## React when a outlookbar element is selected.
+
+
+	el << sel.an_element()
+
+	_if el _is _unset _orif
+	    .items[:last_outlookbar_el] _is _unset _orif
+	    .items[:last_outlookbar_el].parent_at_level(2) <> el.parent_at_level(2)
+	_then
+		.items[:last_outlookbar_el] << el
+		.items[:outlookbar_fp] << _self.current_dialog().render_outlookbar(.items[:outlookbar_canvas],6,5,el)	
+	_endif
+
+	_if el _is _unset
+	_then
+		.items[:outlookbar].popup_menu <<  _unset
+		_return
+	_endif
+
+	.items[:outlookbar_editor].edit("")
+	.items[:outlookbar_editor].set_choice_items(_self.outlookbar_element_list())
+	
+	# Update Outlookbar Element editor 
+	obe << .items[:outlookbar_editor].choose_element(el.value[:name])
+
+	_for k _over obe.dd_properties().fast_keys()
+	_loop
+		el.value[k] << obe.perform(k)
+	_endloop
+
+	# Update popup menu
+	pm << popup_menu.new(.items[:outlookbar])
+	button_item.new_safe(pm,_self.message(:add_sub_category),_self,{:|modify_outlookbar()|,{:add_sub_category|()|,el}})
+	
+	_if el.level _is 2
+	_then
+		button_item.new_safe(pm,_self.message(:add_category),_self,{:|modify_outlookbar()|,{:add_category|()|,el}})
+	_endif
+	
+	separator_item.new(pm)
+	button_item.new_safe(pm,_self.message(:delete),_self,{:|modify_outlookbar()|,{:delete_outlookbar|()|,el}})
+	.items[:outlookbar].popup_menu << pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.modify_outlookbar(args)
+	## 
+	## Modify the menubar.
+
+	_self.current_dialog().perform(_scatter args)
+
+	_self.changed(:outlookbar_list,:refresh)
+	.items[:outlookbar].tree_manager.selection.empty()
+
+	.items[:outlookbar_editor].edit("")
+	.items[:outlookbar_editor].set_choice_items(_self.outlookbar_element_list())
+
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_allow_dragging?(p_tree, p_row_index, p_col_index,p_selection)
+	## 
+	## Only allow dragging to the same level but not to drag away
+	## the last sub-category of a category.
+
+	p_sel << p_selection.an_element()
+
+	last_sub? << p_sel.level _is 3 _andif p_sel.parent.children.size _is 1
+
+	>> p_tree.level _is  p_sel.level _andif _not last_sub?
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_release_dragging?(p_tree, p_row_index, p_col_index, p_selection,
+						     _optional p_event, p_default_mouse)
+	##
+	## Update the outlook tree when a drag completes.
+	
+	_if (p_tree _is _unset) _then _return _endif
+
+	_local l_destination_parent << p_tree.parent
+	_local l_destination_index << l_destination_parent.index_of_child(p_tree)
+	_dynamic !updating_trees?! << _true
+	
+	_for i_sel_tree _over p_selection.fast_elements()
+	_loop
+		p_sel_tree  << i_sel_tree.parent
+		pp_sel_tree << i_sel_tree.parent.parent
+
+		i_sel_tree.detach()
+		l_destination_parent.add_child(i_sel_tree, l_destination_index +^<< 1)
+
+		_if p_sel_tree.children.empty?
+		_then
+			pp_sel_tree.remove_child(p_sel_tree)
+		_endif 	
+	_endloop
+
+	_if p_selection.an_element().level _is 2 _andif
+	    p_tree.level _is 2
+	_then
+		_self.current_dialog().move_outlook_category(p_selection.an_element(),p_tree)
+	_endif
+	
+	!updating_trees?! << _false
+
+	# now redraw
+	_self.changed(:outlookbar_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_canvas_button_pressed(x,y)
+	## 
+	## When the user clicks on the Outlookbar rendering within the
+	## outlook editor tab, make the clicked item current.
+	ds << _unset
+
+	_for k,fp _over .items[:outlookbar_fp].fast_keys_and_elements()
+	_loop
+		_if fp _isnt _unset _andif fp.at?(x,y)
+		_then
+			ds << k
+		_endif
+	_endloop
+
+	_if ds _isnt _unset 
+	_then
+		.items[:outlookbar].selection.add(ds)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.update_titlebar()
+	## 
+	## Update the titlebar to show the current dialog class as well.
+	_self.top_frame.title << _self.message(:dialog_designer,_self.current_dialog().dialog_class)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.post_activation()
+	## 
+	## Last jobs as the GUI activates.  Since a number of the tabs
+	## will be hidden, the tab box is hidden from the user using a
+	## window stack.  Once all the tabs that we want to hide are
+	## gone, the tab_box is made visible as a whole.  This avoids
+	## the multiple re-rendering flashes that occur whenever a tab
+	## changes visibility.
+
+	_if .items _is _unset _then _return _endif 
+
+	.items[:properties_gb1].height << 108
+	
+	_self.action(:new_dialog).execute_action()
+	_self.action(:show_rowcol_cells).value << _true
+	_self.action(:select_mode).value << _true
+
+	# Hide some of the tabs ..
+	_for i _over {2,3,4,5,7}.fast_elements()
+	_loop 
+		.items[:tb].pages[i].unmanage()
+	_endloop
+
+	_self.action(:use_magik_xml).value << _true
+	_self.action(:use_module_properties).value << _true
+	_self.action(:use_messages).value << _true
+
+	# Make the "GUI Layout" tab the foremost.
+	.items[:tb].active_page << .items[:tb].pages[1]
+
+	# Set the databuses for the element editors.
+	.items[:wa_editor].databus << _self.databus
+	.items[:menubar_editor].databus << _self.databus
+	.items[:statusbar_editor].databus << _self.databus
+	.items[:docks_editor].databus << _self.databus
+
+	# Make the tab box visible.
+	.items[:ws].value << :tab_box
+
+	# Update the application consumer/producer lists
+	_self.update_app_pro_con_lists()
+
+	# Toggle the auto_date_code? to TRUE
+	.items[:dd_auto_date_code?].value << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_insertion_mode(type,val)
+	## 
+	## If VAL = TRUE, switch to TYPE mode, else reset to
+	## SELECT_MODE.
+
+	_if .items[:changing_mode?].default(_false)
+	_then
+		_return 
+	_endif
+
+	.items[:changing_mode?] << _true
+	
+	_if val 
+	_then
+		_self.set_widget_toggles(type)
+	_else
+		_self.set_widget_toggles(:select_mode)
+	_endif
+	
+	.items[:changing_mode?] << _false
+	
+	_self.set_cursor(type,val)
+	_self.clear_selection_bb(_true)	
+	_self.clear_insertion_area()
+	_self.reset_focus()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.reset_focus()
+	## 
+	## Reset the focus to the canvas to avoid the annoying 'current'
+	## gui widget indicator.
+	
+	.canvas.set_focus()
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.int!set_insertion_mode(type)
+	## 
+	## Toggle/Untoggle the action TYPE.
+	
+	_self.action(type).value << _not _self.action(type).value.default(_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_cursor(type,val)
+	## 
+	## if VAL=TRUE Set the cursor to be TYPE, else set it to
+	## 'select_mode'.
+	
+	_if _not val 
+	_then
+		type << :select_mode
+	_endif
+
+	type << type.default(:select_mode)
+
+	_if _self.cursor_for_mode[type] _is _unset 
+	_then
+		cur << smallworld_product.get_cursor(type,:dialog_designer)
+		_self.cursor_for_mode[type] << cur
+	_endif
+
+	pbb  << .canvas.bounds
+	hs << hotspot.new(_self.cursor_for_mode[type],{0,0,0,pbb.ymax,pbb.xmax,pbb.ymax,pbb.xmax,0,0,0})
+
+	.canvas.hotspots << {hs}
+
+	.items[:current_mode] << type
+
+	_self.set_cursor_status(type)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_cursor_status(type)
+	## 
+	## Update the statusbar text (:dialog_info) to prompt the
+	## user. 
+
+	_if type _isnt :select_mode
+	_then
+		msg << _self.message(:insert_prompt,_self.message(type))
+	_else
+		msg << _self.message(type)
+	_endif
+	
+	_self.framework.update_statusbar(:prompt,:text,msg)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_widget_toggles(type)
+	## 
+	## Manager the widget toggles, only one can be TRUE.
+
+	_for a _over _self.widget_actions.fast_elements()
+	_loop
+		_self.action(a).value << _self.action(a).name _is type
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.new_dialog()
+	## 
+	## Create a new dialog and make it current in the GUI.
+
+	_self.action(:new_dialog).enabled? << _false
+	
+	next_class << _self.next_dialog_class()
+
+	_local dd << dialog_design.new(next_class)
+	
+	.dialog_list.add_last(dd)
+
+	_self.action(:dialog_class_list).items << _self.dialog_class_list_items()
+	_self.dialog_list_value_changed(.dialog_list.size)
+	
+	.items[:wa_editor].edit(_unset)
+	.items[:wa_editor].set_choice_items(_self.element_list())
+
+	_self.changed(:menubar_list,:refresh)
+	_self.changed(:statusbar_list,:refresh)
+
+	_self.action(:dialog_list).items << _self.dialog_list_items()
+	_self.action(:dialog_list).value << .items[:current_dialog_i]
+
+	_self.action(:delete_dialog).enabled? << .dialog_list.size > 1
+
+	_self.change_dialog(:build_module_name)
+
+	_self.action(:new_dialog).enabled? << _true
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.used_dialog_class?(test_name)
+	## 
+	## Return TRUE if TEST_NAME is already in the list of dialogs.
+	
+	_for d _over .dialog_list.default({}).fast_elements()
+	_loop
+		_if d.dialog_class = test_name
+		_then
+			_return _true 
+		_endif
+	_endloop
+
+	>> _false 
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.next_dialog_class()
+	## 
+	## Return the next dialog class that is not in the current list
+	## of dialog classes.
+	
+	base_name << "default_class"
+	test_name << "default_class"
+	cnt << 0
+
+	_loop
+		_if _self.used_dialog_class?(test_name)
+		_then
+			dig << _if (cnt +<<1) < 10
+			       _then
+				       >> write_string("0",cnt)
+			       _else
+				       >> cnt.write_string
+			       _endif
+			
+			test_name << base_name + "_" + dig
+
+			_continue
+		_else
+			_leave 
+		_endif
+	_endloop
+
+	>> test_name
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_menubar(val)
+	## 
+	## Hide/Unhide the menubar tab depending on VAL.
+
+	_dynamic !switching_dialogs?!
+	_if !switching_dialogs?!.default(_false)
+	_then
+		_return 
+	_endif
+	
+	_self.current_dialog().use_menubar? << val
+	
+	_if val
+	_then
+		.items[:tb].pages[2].manage()
+		.items[:tb].active_page << .items[:tb].pages[2]
+		_self.tab_changed(2)
+	_else 
+		.items[:tb].pages[2].unmanage()
+
+		_self.changed(:menubar_list,:refresh)
+		_self.refresh_view()
+	_endif
+
+	.items[:menubar_editor].edit("")
+	.items[:menubar_editor].set_choice_items(_self.menubar_element_list())
+	
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_spec_update(which,what,newval)
+	## 
+	## Update the menubar GUI when WHICH element's WHAT field gets
+	## the value NEWVAL.
+
+	_for m _over _self.current_dialog().menubar.fast_elements()
+	_loop
+		_for dt _over m.fast_trees()
+		_loop
+			_if dt.value[:name] = which.name
+			_then
+				dt.value[what] << newval
+			_endif
+		_endloop
+	_endloop
+
+	sel << .items[:menubar].tree_manager.selection
+
+	.items[:menubar_editor].edit("")
+	.items[:menubar_editor].set_choice_items(_self.menubar_element_list())
+
+	.items[:menubar].tree_manager.selection << sel
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.outlookbar_spec_update(which,what,newval)
+	## 
+	## Update the outlookbar GUI when WHICH element's WHAT field gets
+	## the value NEWVAL.
+
+	_for m _over _self.current_dialog().outlookbar.categories.fast_elements()
+	_loop
+		_for dt _over m.fast_trees()
+		_loop
+			_if dt.value[:name] = which.name
+			_then
+				dt.value[what] << newval
+			_endif
+		_endloop
+	_endloop
+
+	sel << .items[:outlookbar].tree_manager.selection
+
+	.items[:outlookbar_editor].edit("")
+	.items[:outlookbar_editor].set_choice_items(_self.outlookbar_element_list())
+
+	.items[:outlookbar].tree_manager.selection << sel
+	_self.changed(:outlookbar_list,:refresh)
+	_self.refresh_outlookbar()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_statusbar(val)
+	## 
+	## Hide/Unhide the statusbar tab depending on VAL.
+
+	_dynamic !switching_dialogs?!
+	_if !switching_dialogs?!.default(_false)
+	_then
+		_return 
+	_endif
+	
+	_if val
+	_then
+		.items[:tb].pages[3].manage()
+		.items[:tb].active_page << .items[:tb].pages[3]
+		_self.tab_changed(3)
+	_else 
+		.items[:tb].pages[3].unmanage()
+	_endif
+	
+	 _self.current_dialog().use_statusbar? << val
+	
+	.items[:statusbar_editor].edit("")
+	.items[:statusbar_editor].set_choice_items(_self.statusbar_element_list())
+	
+	_self.changed(:statusbar_list,:refresh)
+	_self.refresh_view()
+	_self.update_gui_for_dialog()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_docks(val)
+	## 
+	## Hide/Unhide the docks tab depending on VAL.
+
+	_dynamic !switching_dialogs?!
+	_if !switching_dialogs?!.default(_false)
+	_then
+		_return 
+	_endif
+	
+	_if val
+	_then
+		.items[:tb].pages[4].manage()
+		.items[:tb].active_page << .items[:tb].pages[4]
+		_self.tab_changed(4)
+	_else
+		.items[:tb].pages[4].unmanage()
+	_endif
+	
+	 _self.current_dialog().use_docks? << val
+
+	.items[:docks_editor].edit("")
+	.items[:docks_editor].set_choice_items(_self.docks_element_list())
+	
+	_self.changed(:docks_list,:refresh)
+	_self.refresh_view()
+	_self.update_gui_for_dialog()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.docks_update(which,what,newval)
+	## 
+	## Update the docks GUI when WHICH element's WHAT field gets
+	## the value NEWVAL.
+
+	sel << .items[:docks].tree_manager.selection
+
+	obj << sel.an_element()
+
+	_if obj.level > 4  
+	_then
+		obj.value[:name] << which.name
+		obj.value[:plugin_name] << which.plugin_name
+		obj.value[:action_name] << which.action_name
+		obj.value[:image] << {which.image_file_name,which.image_module_name}
+		obj.value[:action_message] << which.action_message
+		obj.value[:control_type] << which.control_type
+		obj.value[:mode] << which.mode
+		obj.value[:execute] << which.execute
+		obj.value[:style] << which.style
+
+		_if which.is_class_of?(toolbar_pulldown_element)
+		_then
+			obj.styled_string.int!styled_string[2] <<
+				{which.image_file_name.default(:dock_action),which.image_module_name}
+			obj.value[:image_file_name] << which.image_file_name.default(:dock_action)
+			obj.value[:image_module_name] << which.image_module_name.default(:dialog_designer)
+		_endif
+	_else
+		obj.value[:name] << which.name 
+	_endif
+
+	sel.empty()
+	sel.add(obj)
+
+	.items[:docks_editor].edit("")
+	.items[:docks_editor].set_choice_items(_self.docks_element_list())
+	.items[:docks].tree_manager.selection << sel
+
+	_self.changed(:docks_list,:refresh)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_view()
+	## 
+	## Refresh the rendered gui in the "GUI Layout" tab and the
+	## editor in that tab.
+
+	_if _self.current_dialog() _isnt _unset 
+	_then
+		_self.render_current_dialog()	
+	_endif
+
+	# Reset Editors for current dialog (since with Tabs and
+	# WindowStacks the only elements visible on the active page are
+	# listed in the gui_layout_editor).
+	.items[:wa_editor].set_choice_items(_self.element_list())
+
+	_self.reset_focus()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.render_current_dialog()
+	## 
+	## Render the current dialog.  This rendering will populate all
+	## the element footprints and drop area rectangles across the dialog.
+
+	_self.clear_selection_bb(_true)
+	
+	_dynamic !dialog_element_footprints! << equality_hash_table.new()
+	_dynamic !rowcol_cells! << equality_hash_table.new()
+	_dynamic !show_rowcol_cells?! << _self.action(:show_rowcol_cells).value.default(_false)
+	_dynamic !dialog_pseudo_buttons! << equality_hash_table.new()
+
+	# Render onto the memory canvas
+	_self.current_dialog().render_on(.mc,.items[:xoffset],.items[:yoffset])
+
+	# Render the memory canvas onto the GUI Layout canvas - cleaner update.
+	.canvas.render_raster(.mc,0,0,_false)
+	
+	.footprints   << !dialog_element_footprints!
+	.rowcol_cells << !rowcol_cells!
+	.items[:pseudo_buttons] << !dialog_pseudo_buttons!
+
+	_self.refresh_selection_bb()
+
+	# Enable/dissable save button 
+	_self.action(:save_to_file).enabled? << _self.current_dialog().save_filename _isnt _unset
+	_self.action(:save_to_file).tooltip  << write_string(_self.message(:save),"  ",
+							     _self.current_dialog().save_filename.default(""))
+
+	# Update Snapshot button tooltip
+	tmp_dir << _if system.file_exists?("c:\temp")
+		   _then
+			   >> "c:\temp"
+		   _else
+			   >> system.getenv("temp").default("c:")
+		   _endif
+
+	d_class << _self.current_dialog().dialog_class
+	def_png_name << write_string(tmp_dir,"\",d_class)  #"
+
+	mod_dir << .items[:build_module_dir].value + write_string(%\,d_class)
+
+	_if system.file_exists?(mod_dir)
+	_then
+		sn_filename << write_string(mod_dir,%\,d_class)
+	_else 
+		sn_filename << def_png_name
+	_endif
+
+	.items[:snapshot_filename] << sn_filename
+
+	_self.action(:snapshot).tooltip << write_string(_self.message(:snapshot_tt,mod_dir))
+
+	# Clear the memory canvas so is ready for the next refresh
+	.mc.clear()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.refresh_selection_bb()
+	## 
+	## Refresh the selection bounding box.
+	
+	.items[:xor_bb] << _unset
+	_self.set_current_element(.items[:wa_editor].element)	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.update_insertion_availability()
+	## 
+	## Control if the radio_item should be insertable ... can only
+	## insert radio buttons inside a radio_group object.
+
+	radio_item? << _false
+	
+	_for el _over _self.current_dialog().gui_elements().fast_elements()
+	_loop
+		_if el.is_class_of?(dd_radio_group)
+		_then
+			radio_item? << _true
+			_leave 
+		_endif
+	_endloop
+
+	_self.action(:radio_item).enabled? << radio_item?
+
+	# RowCol Separator
+	# Requires SW v4.2+ and at least one rowcol obj that has exactly one
+	# row or one column containing at least 2 elements.
+	(a,b,c) << smallworld_product.release_version
+	good_version? << a > 3 _andif b >= 2
+	possible_rc? << _false 
+
+	_if good_version?
+	_then
+		_for el _over _self.current_dialog().gui_elements(:rowcol).fast_elements()
+		_loop
+			_if min(el.nrows,el.ncols) = 1 _andif  max(el.nrows,el.ncols)>1
+			_then
+				possible_rc? << _true
+				_leave 
+			_endif
+		_endloop
+	_endif
+	
+	_self.action(:rowcol_separator).enabled? << good_version? _andif possible_rc?
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.show_rowcol_cells()
+	## 
+	## Refresh the view, the rowcol cell will be shown depending on
+	## the state of the "show_rowcol_cells" toggle.
+
+	_self.refresh_view()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.clear_insertion_area()
+	## 
+	## Clear the insertion area indicator.
+	
+	_if .items[:xor_bb] _isnt _unset 
+	_then 
+		.canvas.xor_line(_self.insertion_line_style,.items[:xor_bb].coords)
+		.items[:xor_bb] << _unset
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.changed_mouse_position(x,y,c)
+	## 
+	## React to the mouse moving across the "GUI Layout" canvas.
+
+	_if .items[:tb].current_page _isnt 1 	    
+	_then
+		_return 
+	_endif
+	
+	c.set_focus()
+
+	(footprint,chevron?) << _self.footprint_at(x,y)
+
+	_if footprint _isnt _unset _orif chevron?
+	_then
+		wgt << .footprints[footprint]
+		mode <<  .items[:current_mode].default(:select_mode)
+
+		_if chevron?
+		_then
+			_self.resizable_frame_prompt()
+		_elif mode _is :select_mode
+		_then
+			_self.select_prompt(wgt)
+		_elif mode _is :rowcol_separator _andif _not _self.valid_rcs_place?(wgt,x,y)
+		_then
+			_self.clear_insertion_area()
+		
+		_elif ((mode _isnt :radio_item _andif _self.rowcol_like_objects.includes?(wgt.class_name)) _orif
+		       (mode _is :radio_item _andif wgt.is_class_of?(dd_radio_group)))
+		_then 
+			_self.insert_prompt(wgt,x,y)
+		_else
+			_self.show_insertion_area(_unset , _false)
+		_endif
+	_elif .items[:current_mode].default(:select_mode) _is :select_mode
+	_then
+		_self.framework.update_statusbar(:prompt,:text,_self.message(:select_mode))
+	_else
+		_self.clear_insertion_area()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.valid_rcs_place?(wgt,x,y)
+	## 
+	## Return TRUE if a rowcol_separater can be placed the WGT at
+	## X,Y.  Rules:
+	##    WGT must be a rowcol
+	##    Must inbetween existing Cells (not in first/last row/col)
+	##    WGT can have multiple rows or columns but not both.
+	##    No neighboring objects can be a rowcol_separator.
+
+	# Only can insert a rowcol_separator into a single row or col
+	# of cells of an existing rowcol.
+	_if wgt.class_name _isnt :rowcol _orif min(wgt.ncols,wgt.nrows) > 1
+	_then
+		_return _false 
+	_endif
+	
+	_for bb,v _over .rowcol_cells.fast_keys_and_elements()
+	_loop
+		_if v[1] = wgt _andif bb.at?(x,y)
+		_then
+			ncols << wgt.ncols
+			nrows << wgt.nrows
+
+			_if (v[2] > 1 _andif v[2] < nrows) _orif 
+			    (v[3] > 1 _andif v[3] < ncols)
+			_then
+				_return _true 
+			_endif
+
+			_return _false
+		_endif
+	_endloop
+
+	>> _false 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dragged_mouse_position(x,y,c)
+	## 
+	## React when the mouse is dragged to position X,Y.  If the
+	## user starts the drag outside the rendered dialog the entire
+	## dialog will be repositioned.
+
+	_if (footprint << _self.footprint_at(x,y)) _is _unset _orif
+	    .items[:current_gui_layout_element] _is _unset 
+	_then
+		_self.framework.update_statusbar(:prompt,:text,"")
+
+		# Show the dragged frame if the user is dragging from a
+		# non-element point.
+		_if .items[:current_gui_layout_element] _is _unset 
+		_then
+			_self.show_dragged_frame(x,y,c)
+		_endif
+	_else
+		wgt << .footprints[footprint]
+		cel << .items[:current_gui_layout_element]
+		mode << cel.class_name
+
+		# No dragging of the frame or the topmost rowcol.
+		_if mode _is :frame _orif cel.parent.is_class_of?(frame)
+		_then
+			_return
+		_endif 
+		
+		_if (mode _isnt :radio_item _andif
+		      _self.rowcol_like_objects.includes?(wgt.class_name)) _orif
+		      (mode _is :radio_item _andif wgt.is_class_of?(dd_radio_group))
+		_then
+			_self.insert_prompt(wgt,x,y)
+
+			.items[:dragged?] << .items[:start_drag_xy] _isnt _unset _andif
+					     (.items[:start_drag_xy] - pixel_coordinate(x,y)).abs > 20
+		_else
+			_self.show_insertion_area(_unset , _false)
+			_self.framework.update_statusbar(:prompt,:text,"")
+		_endif
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.show_dragged_frame(x,y,c)
+	## 
+	## Re-render the dragged frame.
+	
+	_if (dfr << .items[:dragged_frame]) _isnt _unset 
+	_then
+		_self.xor_dragged_frame(dfr.x,dfr.y,c)
+	_endif
+
+	_self.xor_dragged_frame(x,y,c)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.xor_dragged_frame(x,y,c)
+	## 
+	## Show the outline of the design for easy re-alignment when dragging.
+
+	_if .items[:start_drag_xy] _is _unset 
+	_then
+		_return 
+	_endif
+	
+	dx << x-.items[:start_drag_xy].x
+	dy << y-.items[:start_drag_xy].y
+
+	_if dx _is 0 _andif dy _is 0
+	_then
+		_return 
+	_endif
+
+	do << _self.current_dialog().drag_outline
+	pbb << pixel_bounding_box.new(do.xmin+dx,
+				      do.ymin+dy,
+				      do.xmax+dx,
+				      do.ymax+dy)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:grey),:width,1)
+
+	c.xor_line(ls,pbb.coords)
+
+	.items[:dragged_frame] << pixel_coordinate(x,y)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.insert_prompt(rc,x,y)
+	## 
+	## Update the statusbar prompt based on where the cursor is.
+
+	_for bb,v _over .rowcol_cells.fast_keys_and_elements()
+	_loop
+		_if v[1] = rc _andif bb.at?(x,y)
+		_then
+			_if v[2].is_class_of?(1.0) _orif v[3].is_class_of?(1.0)
+			_then
+				_self.show_insertion_area(bb,_true)		
+
+			_elif rc.empty_cell?(v[2],v[3])  
+			_then
+				_if .items[:current_mode].default(:select_mode) _isnt :select_mode _orif
+				    .items[:dragged?].default(_false) 
+				_then
+					insert_wgt << _self.message(.items[:current_mode])
+					msg << _self.message(:insert_prompt,insert_wgt)
+					_self.framework.update_statusbar(:prompt,:text,msg)
+
+					_self.show_insertion_area(bb,_true)
+				_endif				
+			_endif
+
+			# Exit early.
+			_return 
+		_endif
+	_endloop
+
+	_self.clear_insertion_area()
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.show_insertion_area(bb, check?)
+	## 
+	## Show the insertion area BB.  If Check=FALSE and BB = the
+	## current insertion area, then no action is taken.
+
+	_if (check? _andif bb = .items[:xor_bb]) 
+	_then
+		_return 
+	_endif
+
+	_if .items[:xor_bb] _isnt _unset 
+	_then
+		.canvas.xor_line(_self.insertion_line_style,.items[:xor_bb].coords)
+	_endif
+
+	_if bb _isnt _unset 
+	_then
+		.canvas.xor_line(_self.insertion_line_style,bb.coords)	
+	_endif
+	.items[:xor_bb]  << bb
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.select_prompt(wgt)
+	## 
+	## Update the statusbar to show an appropriate prompt for the
+	## the current insertion widget type.
+	
+	_self.framework.update_statusbar(:prompt,:text,
+					 _self.message(:select_prompt,
+						       _self.message(wgt.class_name),
+						       wgt.dialog_element_id))
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.resizable_frame_prompt()
+	## 
+	## Update the statusbar to remind the user that the double
+	## chevron means the dialog WILL be expandable once activated.
+	
+	_self.framework.update_statusbar(:prompt,:text,
+					 _self.message(:resizable_frame_prompt))
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.button_pressed(x,y)
+	## 
+	## React when the user clicks on the "GUI Layout" canvas.
+	
+	_if .items[:current_mode].default(:select_mode) _is :select_mode
+	_then
+		_self.select_an_element(x,y)			
+	_else
+		_self.insert_an_element(x,y)
+	_endif
+
+	.items[:start_drag_xy] << pixel_coordinate(x,y)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.button_released(x,y,c)
+	## 
+	## React when the user releases the mouse button within the
+	## "GUI Layout" canvas.
+
+	frame_dragged? << _false 
+
+	_if .items[:current_mode].default(:select_mode) _is :select_mode _andif
+	    .items[:dragged?].default(_false) _andif
+	    _not .items[:current_gui_layout_element].parent.is_class_of?(frame)
+	_then
+		_self.drop_an_element(x,y)
+		
+	_elif .items[:current_gui_layout_element] _is _unset _andif
+	      .items[:start_drag_xy] _isnt _unset 
+	_then
+		dx << (x-.items[:start_drag_xy].x)
+		dy << (y-.items[:start_drag_xy].y)
+		
+		oldx << .items[:xoffset]
+		oldy << .items[:yoffset]
+
+		.items[:xoffset] +<< dx
+		.items[:yoffset] +<< dy
+
+		.items[:old_xoffset] << oldx
+		.items[:old_yoffset] << oldy
+
+		frame_dragged? << _true
+		
+		.items[:dragged_frame] << _unset
+		.items[:start_drag_xy] << _unset 
+	_endif
+
+	_self.clear_insertion_area()
+	
+	.items[:dragged?] << _false
+
+	_if frame_dragged? 
+	_then
+		_self.render_current_dialog()
+		_self.set_gui_layout_popup(_unset)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.drop_an_element(x,y)
+	## 
+	## Drag an element to a drop point at XY.
+
+	_if _self.self_drag_at?(x,y)
+	_then
+		_return 
+	_endif
+
+	start_fp << .items[:current_fp]
+	start_el << .footprints[start_fp]
+
+	.items[:element_for_pasting] << start_el
+	.items[:xml_for_pasting] << _self.xml_copy(start_el)
+	
+	end_fp << _self.footprint_at(x,y)
+	end_el << .footprints[end_fp] 
+	
+	# Loop over the target rowcol to find the drop cell, if between
+	# existing cells then insert a row & col first.
+	good_drag? << _false 
+	_for bb,v _over .rowcol_cells.fast_keys_and_elements()
+	_loop
+		_if v[1] = end_el _andif bb.at?(x,y) 
+		_then
+			# Handle insertion between existing RowCol cells.
+			_if (v[2] + v[3]).is_class_of?(1.0)
+			_then
+				end_el.expand_at(v[2],v[3])
+				v[2] << v[2].ceiling
+				v[3] << v[3].ceiling
+			_endif
+
+			_dynamic !dropped_element?! << _true 
+
+			_self.paste_elements(end_el,v[2],v[3],start_el)
+
+			good_drag? << _true 
+			_leave 
+		_endif
+	_endloop
+
+	_if good_drag?
+	_then 
+		_self.delete_footprint(.footprints[start_fp])
+		_self.update_gui_for_dialog()
+		_self.update_insertion_availability()
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.self_drag_at?(x,y)
+	## 
+	## Check if this dragging event is a self drag.
+	
+	_if (start_fp << .items[:current_fp]) _is _unset _orif
+	    (start_el << .footprints[start_fp]) _is _unset _orif
+	    .items[:xor_bb] _is _unset 
+	_then
+		_return _true
+	_endif
+
+	end_fp << _self.footprint_at(x,y)
+	_if (end_el << .footprints[end_fp]) _is _unset
+	_then
+		_return _true
+	_endif
+	
+	>> _self.dragging_into_self?(end_el.dialog_element_id, start_el)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dragging_into_self?(end_id,start_rc)
+	## 
+	## Return TRUE if element ID already exists inclusively in rowcol RC.
+
+	_if (start_id << start_rc.dialog_element_id) = end_id
+	_then
+		_return _true
+	_endif
+	
+	_for e _over start_rc.dd_child_elements()
+	_loop
+		_if e.dialog_element_id = end_id
+		_then
+			_return _true 
+		_endif
+	_endloop
+
+	>> _false 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.select_an_element(x,y)
+	## 
+	## Select a design gui element at XY.
+
+	_self.clear_selection_bb(_true)
+
+	_if _self.do_pseudo_button_at(x,y) _then _return _endif
+	
+	_if (fp << _self.footprint_at(x,y)) _isnt _unset 	    
+	_then
+		ls << _self.selection_line_style
+
+		s << fp.boundary.sectors
+		s.xor_on(.canvas,ls)
+
+		.items[:selection_sr] << s
+
+		el << .footprints[fp]
+
+		# Update Work Area Editor to show current selection.
+		.items[:wa_editor].edit(el)
+	_endif
+
+	_self.set_gui_layout_popup(fp)
+
+	el << .items[:current_gui_layout_element] << .footprints[fp]
+	_self.update_dd_clipboard_actions(el)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.update_dd_clipboard_actions(el)
+	## 
+	## Update the availability of clipboard actions (:delete,:copy)
+	## based on the element EL.
+
+	frame? << el _is _unset _orif el.is_class_of?(frame)
+	bad? << el _is _unset _orif el.is_class_of?(frame) _orif 
+		_self.frame_like_classes.includes?(el.parent.class_name) 
+
+	_self.action(:delete_element).enabled? << _not bad? 
+	_self.action(:copy_element).enabled? << _not frame? 
+	_self.action(:cut_element).enabled? << _not bad? 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.do_pseudo_button_at(x,y)
+	## 
+	## React to the user clicking on rendered "button" in the "GUI
+	## Layout" canvas.  If there is a button at XY then some action occurs.
+	
+	_for fp,val _over .items[:pseudo_buttons].fast_keys_and_elements()
+	_loop
+		_if fp.at?(x,y)
+		_then
+			args << val.slice_to_end(2)
+			val[1].default(_self).perform(_scatter args)
+
+			_self.update_gui_for_dialog()
+			
+			_self.refresh_view()
+			_self.databus_make_data_available(:elements,1)
+
+			_return _true 
+		_endif
+	_endloop
+
+	_return _false 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_gui_layout_popup(fp,_optional el)
+	## 
+	## Set the popup menu for the GUI Layout canvas depending on
+	## which elementt is currently selected.
+	
+	el << el.default(.footprints[fp])
+	pm << popup_menu.new(.canvas)
+
+	_if el _is _unset 
+	_then
+
+		_if .items[:xoffset] _isnt 0 _orif
+		    .items[:yoffset] _isnt 0
+		_then
+			button_item.new_safe(pm,_self.message(:reset_rendering),_self,{:|reset_rendering_position()|,_true})
+		_endif
+
+		.canvas.menu << pm
+
+	_elif el.is_class_of?(frame)
+	_then 
+		.canvas.menu << _unset
+	_else
+		_if el.is_class_of?(dd_tab_box)
+		_then
+			button_item.new_safe(pm,_self.message(:add_tab),_self,{:|add_tab()|,el})
+			_if el.items.size > 1
+			_then
+				button_item.new_safe(pm,_self.message(:delete_tab),_self,{:|delete_tab()|,el})	
+			_endif
+
+			_self.move_actions(pm,el)
+			separator_item.new(pm)
+
+		_elif el.is_class_of?(dd_window_stack)
+		_then
+			button_item.new_safe(pm,_self.message(:add_stack_window),_self,{:|add_tab()|,el})
+			button_item.new_safe(pm,_self.message(:delete_stack_window),_self,{:|delete_tab()|,el})
+			separator_item.new(pm)
+
+		# Special editor for Outlook Bar elements
+		_elif el.is_class_of?(dd_outlook_bar)
+		_then
+			button_item.new_safe(pm,_self.message(:edit),_self,{:|edit_outlook_bar()|,el})
+			separator_item.new(pm)
+		_endif
+
+		# Don't allow removal to top-level rowcol or the frame.
+		_if (el.parent.class_name _isnt :frame) _andif 
+		    (el.class_name _isnt :frame)
+		_then
+			button_item.new_safe(pm,_self.message(:delete_element),_self,{:|delete_footprint()|,el})
+			button_item.new_safe(pm,_self.message(:cut_element),_self,{:|cut_element()|,el})
+		_endif
+
+		_if _self.action(:copy_element).enabled?.default(_false)
+		_then
+			button_item.new_safe(pm,_self.message(:copy_element),_self,{:|copy_element()|,el})
+		_endif
+
+		# Allow emptying of rowcol-like objects.
+		_if _self.rowcol_like_objects.includes?(el.class_name) _andif
+		    _not el.items.empty?
+		_then
+			button_item.new_safe(pm,_self.message(:empty),_self,{:|empty_rowcol()|,el})		
+
+			# If a rowcol-like object only contains ONE element then allow
+			# the user to 'remove' it.
+			_if _not {:frame,:dd_tab_box,:dd_window_stack}.includes?(el.parent.class_name) _andif 
+			    el.items.size _is 1
+			_then
+				button_item.new_safe(pm,_self.message(:delete_container),_self,{:|delete_container()|,el})		
+			_endif
+		_endif
+
+		.canvas.menu << pm
+	_endif
+
+	.items[:current_fp] << fp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.move_actions(pm,el)
+	## 
+	## Populate the gui_layout popup_menu with the actions to move
+	## a tab to another position in the tab order.
+	
+	n << el.properties[:active_page_n]
+	s << el.items.size
+	
+	_if s > 1
+	_then
+		# Move tabs around
+		pd << pulldown_menu.new()
+		menu_button_item.new(pm,_self.message(:move_tab,n,s),pd)
+		
+		_for i _over 1.upto(s)
+		_loop
+			_if i <> n
+			_then
+				button_item.new_safe(pd,write_string(i,"  ",el.items[i].tab_label),_self,{:|move_tab()|,el,i})
+			_endif
+		_endloop
+
+		# Change to a specific tab
+		pd << pulldown_menu.new()
+		menu_button_item.new(pm,_self.message(:change_to_tab),pd)
+
+		_for i _over 1.upto(s)
+		_loop
+			_if i <> n
+			_then
+				button_item.new_safe(pd,write_string(i,"  ",el.items[i].tab_label),_self,{:|change_to_tab()|,el,i})
+			_endif
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.tab_refresh(tb)
+	## 
+	## Refresh the view, tailored for when modifying tabs?
+	
+	_self.set_element_dialog_id(tb.active_page)
+	_self.update_gui_for_dialog()
+	_self.refresh_view()
+	_self.databus_make_data_available(:current_gui_layout_element,_unset)
+	_self.databus_make_data_available(:elements,1)			
+	_self.current_dialog().update_ws_driver(tb,tb.text_choice_item_driver,"")
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.add_tab(tb)
+	## 
+	## Add a tab to the design tab_box TB, then refresh/update the GUI.
+	
+	tb.add_tab()
+	_self.tab_refresh(tb)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.delete_tab(tb)
+	## 
+	## Delete a tab from the design tab_box TB, then refresh/update the GUI.
+
+	tb.delete_tab()
+	_self.tab_refresh(tb)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.move_tab(tb,to)
+	## 
+	## Move the current tab of tab_box TB to position TO in the tab order.
+	
+	tb.move_tab(to)
+	_self.tab_refresh(tb)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.change_to_tab(tb,tab_n)
+	## 
+	## Change the tab of the tab_box TB to TAB_N.
+	## Refresh the design rendering.
+	
+	tb.properties[:active_page_n] << tab_n
+	_self.tab_refresh(tb)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.delete_element()
+	## 
+	## Delete the currently selected design element.
+
+	el << .items[:current_gui_layout_element]
+
+	_if .items[:tb].current_page _is 1 _andif
+	    (el << .items[:current_gui_layout_element]) _isnt _unset _andif
+	    _not el.is_class_of?(frame) _andif
+	    _not el.parent.is_class_of?(frame)
+	_then
+		_self.delete_footprint(el)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.delete_footprint(el)
+	## 
+	## Delete the footprint FP (and consequently the element
+	## referenced by FP), then refresh the view.
+
+	el.parent.remove_element(el)
+
+	_self.update_gui_for_dialog()
+
+	_self.refresh_view()
+	_self.databus_make_data_available(:current_gui_layout_element,_unset)
+	_self.databus_make_data_available(:elements,1)		
+
+	.items[:wa_editor].clear()
+
+	# Clear the popup menu
+	_self.set_gui_layout_popup(_unset)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.delete_container(rc)
+	## 
+	## Delete the RowCol element RC but retain the single element
+	## RC contains in RC's position in the Design.
+
+	el << rc.items.an_element()
+	el.parent << rc.parent
+	el.row << rc.row
+	el.col << rc.col
+
+	p << rc.parent
+	p.items.remove(rc)
+	p.items.add(el)
+
+	_self.update_gui_for_dialog()
+
+	_self.refresh_view()
+	_self.databus_make_data_available(:current_gui_layout_element,_unset)
+	_self.databus_make_data_available(:elements,1)		
+
+	.items[:wa_editor].clear()
+
+	# Clear the popup menu
+	_self.set_gui_layout_popup(_unset)
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.cut_element()
+	## 
+	## Make a copy of the current element and the delete it.
+	
+	_self.copy_element()
+	_self.delete_element()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.copy_element()
+	## 
+	## Copy the currently selected element along with all elements
+	## it may contain.
+	
+	_if .items[:tb].current_page _is 1 _andif
+	    (el << .items[:current_gui_layout_element]) _isnt _unset 
+	_then
+		.items[:element_for_pasting] << el
+		.items[:xml_for_pasting] << _self.xml_copy(el)
+
+		_self.action(:paste_element).enabled? << _true
+		_self.action(:paste_element).tooltip << _self.paste_element_tooltip()
+
+		# Press the 'paste' button to change to mode.
+		_self.action(:paste_element).execute_action()
+
+		_self.action(:copy_element).enabled? << _false
+		_self.action(:cut_element).enabled? << _false
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.paste_element_tooltip()
+	## 
+	## Return a tooltip string appropriate for the current element
+	## on the clipboard.
+	
+	cn << .items[:element_for_pasting].class_name
+
+	cnt << 0
+	_for i _over .items[:element_for_pasting].dd_child_elements()
+	_loop
+		cnt +<< 1
+	_endloop
+
+	>> _if cnt > 0
+	   _then
+		   >> _self.message(:paste_element_tt_n,cn,cnt)
+	   _else
+		   >> _self.message(:paste_element_tt_0,cn)
+	   _endif
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.empty_rowcol(rc)
+	## 
+	## Removes all elements from the RowCol RC, then refreshed the view.
+	
+	rc.empty_rowcol()
+	
+	_self.refresh_view()
+	_self.databus_make_data_available(:current_gui_layout_element,rc)
+	_self.databus_make_data_available(:elements,1)		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.clear_selection_bb(_optional clear_cache?)
+	## 
+	## Clear the selection highlighting box.
+	
+	_if .items[:selection_sr] _isnt _unset 
+	_then
+		.items[:selection_sr].xor_on(.canvas,_self.selection_line_style)
+
+		_if clear_cache?.default(_false)
+		_then
+			.items[:selection_sr] << unset
+		_endif
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.element_at(x,y)
+	## 
+	## Return the element at XY.
+	
+	fp << _self.footprint_at(x,y)
+	>> .footprints[fp]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_current_element(which)
+	## 
+	## Set the current element to WHICH.
+	
+	_self.clear_selection_bb(_true)
+
+	_if .footprints _is _unset 
+	_then
+		_return 
+	_endif
+	
+	_for fp,e _over .footprints.fast_keys_and_elements()
+	_loop
+		_if e = which
+		_then
+			ls << _self.selection_line_style
+			
+			s << fp.boundary.sectors
+
+			s.xor_on(.canvas,ls)
+
+			.items[:selection_sr] << s
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_current_menubar_element(a_menubar_element)
+	## 
+	## Set the current menubar element to A_MENUBAR_ELEMENT.
+
+	sel << .items[:menubar].selection
+	el << sel.an_element()
+
+	_if a_menubar_element = ""
+	_then
+		.items[:menubar].selection.empty()
+		_return 
+	_endif
+	 
+	_if (el << sel.an_element()) _is _unset _orif
+	     el.value[:name] <> a_menubar_element.name
+	_then
+		.items[:menubar].selection.empty()
+
+		_for dt _over .items[:menubar].tree_manager.fast_trees()
+		_loop
+			_if dt.value[:name] = a_menubar_element.name
+			_then
+				.items[:menubar].selection.add(dt)
+				_return 
+			_endif
+		_endloop
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_current_statusbar_element(a_statusbar_element)
+	## 
+	## Set the current statusbar element to A_STATUSBAR_ELEMENT.
+
+	sel << .items[:statusbar].selection
+	el << sel.an_element()
+
+	_if a_statusbar_element = ""
+	_then
+		.items[:statusbar].selection.empty()
+		_return 
+	_endif
+	 
+	_if (el << sel.an_element()) _is _unset _orif
+	     el.value[:name] <> a_statusbar_element.id
+	_then
+		.items[:statusbar].selection.empty()
+
+		_for dt _over .items[:statusbar].tree_manager.data.fast_elements()
+		_loop
+			_if dt.value[:id] = a_statusbar_element.id
+			_then
+				.items[:statusbar].selection.add(dt)
+				_return 
+			_endif
+		_endloop
+	_endif
+
+	_self.refresh_statusbar()
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.footprint_at(x,y)
+	## 
+	## Return the smallest footprint that overlaps X,Y.
+	
+	footprint << _unset
+	chevron? << _false 
+
+	_for fp,el  _over .footprints.default(property_list.new()).fast_keys_and_elements()
+	_loop
+		_if fp.class_name _is :symbol 
+		_then
+			_continue
+		_endif
+		
+		_if fp.at?(x,y) _andif
+		    (footprint _is _unset _orif
+		     fp.area < footprint.area)
+		_then
+			footprint << fp
+			chevron? << el _is :resize_chevron
+		_endif
+	_endloop
+
+	_if chevron?
+	_then
+		_return _unset,_true
+	_else
+		_return footprint,_false
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.insert_an_element(x,y)
+	## 
+	## Insert an element at XY of type corresponding to the active
+	## inserion widget toggle.
+	
+	_if _self.do_pseudo_button_at(x,y) _then _return _endif 
+	
+	el << _self.element_at(x,y)
+
+	_for bb,v _over .rowcol_cells.fast_keys_and_elements()
+	_loop
+		_if v[1] = el _andif
+		    bb.at?(x,y) _andif el.empty_cell?(v[2],v[3])
+		_then
+			ex << _self.widget_exemplars[.items[:current_mode]]
+
+			# Handle insertion between existing RowCol cells.
+			_if (v[2] + v[3]).is_class_of?(1.0)
+			_then
+				el.expand_at(v[2],v[3])
+				v[2] << v[2].ceiling
+				v[3] << v[3].ceiling
+			_endif
+
+			_if (ex.is_class_of?(radio_item) _andif _not el.is_class_of?(dd_radio_group)) _orif
+			    (ex.is_class_of?(rowcol_separator) _andif _not _self.valid_rcs_place?(el,x,y))
+			_then
+				_continue 
+			_endif
+
+			wgt << _unset 
+
+			_if .items[:current_mode] _is :paste_element
+			_then
+				_self.paste_elements(el,v[2],v[3],.items[:element_for_pasting])
+			_else 	
+				wgt << ex.new_dialog_default(el,v[2],v[3],.items[:current_mode])
+
+				_self.handle_paned_window_parent(el,wgt,v[2],v[3])
+				
+				_self.set_element_dialog_id(wgt)
+				
+				wgt.id_changed()
+			_endif
+
+			_self.render_current_dialog()
+
+			.items[:wa_editor].set_choice_items(_self.element_list())
+		_endif
+	_endloop
+
+	_self.update_gui_for_dialog()
+	_self.update_dd_clipboard_actions(_unset)
+	_self.update_insertion_availability()
+
+	# Select the inserted wgt.
+	.items[:wa_editor].edit(wgt)
+
+	_self.set_gui_layout_popup(_unset,wgt)
+	.items[:wa_editor].optimise_column_widths()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.paste_elements(parent,row,col,el)
+	## 
+	## Paste the element EL and all its child elements into the
+	## [ROW,COL] cell of PARENT.
+
+	# Define the current list of IDs so we can check for duplicates
+	# after the element (and sub-elements) are pasted.
+	e_ids << _self.element_ids()
+
+	# Create new GUI element instance to 'paste' based on the XML
+	# description of a 'copied' element.   This avoids the
+	# recursion limit encountered when :deep_copy(ing) an element
+	# inside a large GUI design.
+	_local temp_rc << rowcol.new(frame.new("temp_frame"))
+	temp_rc.parse_items_xml(.items[:xml_for_pasting],el.parent.dialog_element_id)
+	cel << temp_rc.items.an_element()  
+
+	cel.parent << parent  # This inserts CEL into the PARENT, a container object.
+	cel.row << row
+	cel.col << col
+
+	parent.items.add(cel)
+
+	_dynamic !pasted_element?! << _true
+	_dynamic !dropped_element?!
+ 
+	_if !dropped_element?! _isnt _true
+	_then
+		e_ids << _self.set_element_dialog_id(cel,e_ids)
+		
+		# Update all the child elements so there are no repeated dialog_element_ids
+		_for child_e _over cel.dd_child_elements()
+		_loop
+			e_ids << _self.set_element_dialog_id(child_e,e_ids)
+		_endloop
+	_endif 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.handle_paned_window_parent(el,wgt,r,c)
+	## 
+	## Special handling when inserting into a paned_window.
+	
+	_if _not el.is_class_of?(dd_paned_window) _then _return _endif 
+
+	rc << max(r,c)
+	s << el.items.size
+
+	_if rc < s
+	_then
+		el.items.remove_last()
+		el.items.add_nth(wgt,rc)
+	_endif
+_endmethod 
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method dialog_designer.fast_elements()
+	## 
+	## Iterator for the all the elements in the current_dialog.
+
+	_for fp,el _over .footprints.default({}).fast_keys_and_elements()
+	_loop
+		_loopbody(el)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.element_list()
+	## 
+	## List of elements in the current dialog.
+	
+	>> rope.new_from_iter(_self,:|fast_elements()|)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.menubar_element_list()
+	## 
+	## Return a list of menubar elements suited to the dd_element_editor.
+	
+	_if (d << _self.current_dialog()) _isnt _unset 
+	_then
+		_return d.menubar_element_list()
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.docks_element_list()
+	## 
+	## Return a list of dock elements suited to the dd_element_editor.
+
+	_if (d << _self.current_dialog()) _isnt _unset 
+	_then
+		_return d.docks_element_list()
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.element_ids()
+	## 
+	## Return a list of current element IDs for the current objects.
+	
+	rp << rope.new_with(:rowcol_01)
+	ht << hash_table.new()
+
+	_for el _over _self.current_dialog().gui_layout[:top_rc].gui_elements()
+	_loop
+		id << el.dialog_element_id.default("").as_symbol()
+		rp.add(id)
+
+		ht[id] << ht[id].default(0) + 1
+	_endloop
+
+	>> rp,ht
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_element_dialog_id(wgt,_optional e_ids)
+	## 
+	## Set the element id of WGT to a unique value relative to the list E_IDS.
+
+	_dynamic !pasted_element?!
+	
+	_if {:dd_tab_box,:dd_window_stack}.includes?(wgt.class_name)
+	_then
+		_self.set_element_dialog_id(wgt.active_page,e_ids)
+	_endif
+
+	cn << wgt.dd_class_name
+
+	_if cn.index_of_seq("dd_") _is 1
+	_then
+		cn << cn.slice_to_end(4)
+	_endif
+
+	_if e_ids _is _unset 
+	_then
+		e_ids << _self.element_ids()
+	_endif
+	cnt << 1
+	id << wgt.dialog_element_id
+	_loop
+		_if _not id.default("").empty? _andif e_ids.index_of(id) _is _unset 
+		_then
+			wgt.set_property(:dialog_element_id,id)
+			wgt.dialog_element_id << id  # Code above is not sufficient for rowcol_separator - core problem?
+			_if !pasted_element?! _isnt _true
+			_then 
+				wgt.set_logical_properties()
+			_endif
+			
+			e_ids.add(id)
+			_return e_ids
+		_endif
+
+		id << write_string(cnt,%_,cn).as_symbol()
+
+		id << _if cnt < 10
+		      _then
+			      >> write_string(cn,:_0,cnt).as_symbol()
+		      _else
+			      >> write_string(cn,%_,cnt).as_symbol()
+		      _endif
+		
+		# This arbitrary max is set to ensure the loop exists
+		# eventually.  Normally, you will only approach this maximum
+		# with rowcol elements in a large structured GUI design.  Even
+		# when this maximum is reached the element will be inserted
+		# ... but its dialog_element_id will not be set.
+		_if (cnt +<< 1) > 10000
+		_then
+			write("Too many elements of type '",cn,"' ... ",cnt)
+			_leave 
+		_endif
+	_endloop
+_endmethod
+$
+
+#####################################################
+#
+# Databus
+#
+#####################################################
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_constant(:databus_producer_data_types,
+					  {:elements,
+					   :all_element_ids,
+					   :menubar_elements,
+					   :statusbar_elements},
+					  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.sw_databus_data_requested(data_type)
+	## 
+	## Respond to data requests.
+
+	_if data_type _is :elements
+	_then
+		_return _self.element_list()
+	_elif data_type _is :all_element_ids
+	_then
+		_return _self.element_ids()
+	_elif data_type _is :menubar_elements
+	_then
+		_return _self.menubar_element_list()
+	_elif data_type _is :statusbar_elements
+	_then
+		_return _self.statusbar_element_list()
+	_endif
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_constant(:databus_consumer_data_types,
+					  {:current_gui_layout_element,
+					   :current_menubar_element,
+					   :current_statusbar_element,
+					   :current_outlookbar_element,
+					   :refresh,
+					   :refresh_selection_bb,
+					   :refresh_magik_xml,
+					   :ws_driver,
+					   :menubar_spec_update,
+					   :outlookbar_spec_update},
+					  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.sw_databus_data_available(data_type,data)
+	## 
+	## Respond to available data.
+
+	_if data_type _is :current_gui_layout_element
+	_then
+		_self.set_current_element(data)
+	_elif data_type _is :current_menubar_element
+	_then
+		_self.set_current_menubar_element(data)
+	_elif data_type _is :current_statusbar_element
+	_then
+		_self.set_current_statusbar_element(data)
+	_elif data_type _is :current_outlookbar_element
+	_then
+		_self.set_current_outlookbar_element(data)
+	_elif data_type _is :ws_driver
+	_then
+		_self.current_dialog().update_ws_driver(_scatter data)
+	_elif data_type _is :refresh
+	_then
+		_if data _is :gui_layout
+		_then
+			# Make sure the Magik/XML is upto date.
+			_self.dialog_class_list_value_changed(_self.action(:dialog_class_list).value)
+
+			# Refresh the render to pick up changes.
+			_self.render_current_dialog()
+		_elif data _is :menubar
+		_then 
+			_self.changed(:menubar_list,:refresh)
+		_elif data _is :docks _andif (ce << .items[:docks_editor].element.default("")) <> ""
+		_then
+			_self.docks_update(ce,:name,ce.name)
+		_elif data _is :statusbar
+		_then
+			_self.changed(:statusbar_list,:refresh)
+			_self.refresh_statusbar()
+		_elif data _is :outlookbar
+		_then
+			_self.update_outlookbar_list_data()
+			_self.changed(:outlookbar_list,:refresh)
+			_self.refresh_outlookbar()
+		_elif data _is :wa_editor_choice_list
+		_then
+			.items[:wa_editor].set_choice_items(_self.element_list())
+		_endif
+	_elif data_type _is :refresh_selection_bb
+	_then
+		_self.refresh_selection_bb()
+	_elif data_type _is :refresh_magik_xml
+	_then
+		_self.refresh_magik_xml(6,_true)
+	_elif data_type _is :menubar_spec_update
+	_then
+		_self.menubar_spec_update(_scatter data)
+	_elif data_type _is :outlookbar_spec_update
+	_then
+		_self.outlookbar_spec_update(_scatter data)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_current_outlookbar_element(a_outlookbar_element)
+	## 
+	## Set the current outlookbar element to A_OUTLOOKBAR_ELEMENT.
+
+	sel << .items[:outlookbar].selection
+	el << sel.an_element()
+
+	_if a_outlookbar_element = ""
+	_then
+		.items[:outlookbar].selection.empty()
+		_return 
+	_endif
+	 
+	_if (el << sel.an_element()) _is _unset _orif
+	     el.value[:name] <> a_outlookbar_element.name
+	_then
+		.items[:outlookbar].selection.empty()
+
+		_for dt _over .items[:outlookbar].tree_manager.fast_trees()
+		_loop
+			_if dt.value[:name] = a_outlookbar_element.name
+			_then
+				.items[:outlookbar].selection.add(dt)
+				_return 
+			_endif
+		_endloop
+	_endif
+
+	_self.refresh_outlookbar()
+
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.file_selector(which)
+	## 
+	## Create a file selector of type WHICH (:save, :save_as or :open)
+	
+	_if .items[:file_selector] _is _unset 
+	_then
+		dir << sw_module_manager.module(:dialog_designer).safe_full_directory
+		
+		.items[:file_selector] <<
+			file_dialog.new(_self,:|int!load_from_file()|,:class_name,
+					:filter,"*.xml",
+					:directory, dir)
+	_else
+		.items[:file_selector].directory << .items[:file_selector_dir]
+	_endif
+
+	fs << .items[:file_selector]
+
+	_if which _is :open
+	_then
+		fs.operation << :open
+		fs.title << _self.message(:load_dialog_xml)
+		fs.ok_message << :|int!load_from_file()|
+	_elif which _is :save
+	_then 
+		fs.operation << :save
+		fs.title << _self.message(:save_dialog_xml)
+		fs.ok_message << {:|int!save_to_file()|,_false}
+	_else
+		# Save As ...
+		fs.operation << :save
+		fs.title << _self.message(:save_dialog_xml)
+		fs.ok_message << {:|int!save_to_file()|,_true}
+	_endif
+
+	>> .items[:file_selector]
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.load_from_file()
+	## 
+	## Activate the file selector and update the GUI after the file
+	## selector has finished.
+	
+	_self.file_selector(:open).activate()
+	
+#	_self.update_gui_for_dialog()
+#	_self.update_titlebar()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.int!load_from_file(filename)
+	## 
+	## Load a dialog design from the XML file FILENAME.
+
+	# Save the diretory we are loading from.
+	.items[:file_selector_dir] << filename
+
+	_self.framework.status << :busy
+	_self.framework.update_statusbar(:prompt,:text, _self.message(:loading_from_file,filename))
+
+	sx << simple_xml.read_element_file(filename)
+	sx_class << sx.attributes["class"]
+
+	# Handle a duplicate dialog class
+	_if _self.used_dialog_class?(sx_class)
+	_then
+		_if _not _self.show_query(
+				 {_self.message(:yes), _self.message(:no)},
+				 {_true,_false},_false,
+				 _self.message(:overwrite_existing_class?,sx_class))
+		_then
+			_return
+		_endif
+
+		_self.select_dialog_named(sx_class)
+		_self.empty_rowcol(_self.current_dialog().gui_layout[:top_rc])
+		_self.current_dialog().delete_menubar()
+		_self.current_dialog().delete_statusbar()
+
+		_self.set_insertion_mode(:select_mode,_true)
+		_self.refresh_view()
+		_self.update_gui_for_dialog()
+		_self.update_titlebar()
+	_else
+		_self.new_dialog()
+	_endif
+
+	# Parse the XML into the design ... show progress in the status bar.
+	_local me << _self
+	_local pcnt << 0
+	show_parsing_progress << _proc(cond)
+					 _import me,pcnt
+
+					 msg << me.message(:parsing_progress,cond.data[2],pcnt+<<1)
+					 me.framework.update_statusbar(:prompt,:text,msg)
+				 _endproc 
+								   
+	_block
+		_handling dd_xml_parsing_progress _with show_parsing_progress
+		
+		_self.current_dialog().parse_xml_into_design(sx)
+	_endblock
+	
+	_self.update_gui_for_dialog()
+
+	_if _self.current_dialog().use_docks? 
+	_then
+		.items[:docks_editor].set_choice_items(_self.docks_element_list())
+	_endif
+	
+	_self.current_dialog().save_filename << filename
+
+	_self.render_current_dialog()
+	.items[:wa_editor].set_choice_items(_self.element_list())
+
+	_self.action(:dialog_list).items << _self.dialog_list_items()
+
+	_self.framework.status << :ready
+	_self.framework.update_statusbar(:prompt,:text,"")
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.select_dialog_named(name)
+	## 
+	## Make the dialog NAME current.
+	
+	_for e _over _self.action(:dialog_list).items.fast_elements()
+	_loop
+		_if e[2] = name
+		_then
+			_self.action(:dialog_list).value << e[1]
+			_return 
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.save_to_file()
+	## 
+	## Save an XML description for the current dialog.  This save
+	## overwrites the existing file at that location.
+
+	# Run SW4 compatability code ...
+	_self.sw4_compatability()
+
+	_if _self.current_dialog().save_filename _is _unset 
+	_then
+		_return _self.save_as()
+	_endif
+
+	_self.int!save_to_file(_false,_self.current_dialog().save_filename)
+	_self.action(:save_to_file).enabled? << _false 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.save_as()
+	## 
+	## Save the current dialog to a new name, overwriting a
+	## pre-existing is verified.
+	
+	_self.file_selector(:save_as).activate()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.snapshot()
+	## 
+	## Save a snapshot of the design to PNG.
+
+	_self.reset_rendering_position(_true)
+
+	do << _self.current_dialog().drag_outline.expand(7)
+
+	mc << memory_canvas.new(do.width,do.height)
+	mc.set_background(colour.called(:white))
+
+	# Remove old snapshots.
+	cmd << write_string("del ",.items[:snapshot_filename],"*.png")
+	system.start_command_with_io(cmd,_false,_false,_false)
+
+	# Make sure the above delete finishes before kicking off the
+	# render generator.
+	_thisthread.sleep(300)
+
+	cnt << 0
+	_for r _over _self.different_renders()
+	_loop
+		mc.clear_bounding_box(mc.bounds)
+		mc.copy_area(do.xmin-2,do.ymin-1,do.xmax+2,do.ymax+5,.canvas,4,0)
+
+		cnt_str << _if (cnt +<< 1) < 10
+			   _then
+				   >> write_string(%0,cnt)
+			   _else
+				   >> cnt.write_string
+			   _endif
+	 	
+		mc.write_to_file(.items[:snapshot_filename]+" ["+cnt_str+"].png",:png)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method dialog_designer.different_renders()
+	## 
+	## Calculate the different renderings of SELF.  This is NOT a
+	## exhaustive list of all possible renderings but trys to show
+	## all all the tabs/stacked_windows of SELF.
+
+	rc << _self.current_dialog().gui_layout[:top_rc]
+
+	# Compile complete list of all the tab_boxes and window_stacks
+	tab_boxes << rope.new()
+	_for el _over rc.gui_elements()
+	_loop
+		_if el.class_name _is :dd_tab_box _orif
+		    el.class_name _is :dd_window_stack
+		_then
+		 	tab_boxes.add(el)
+		_endif
+	_endloop
+
+	orig_tab_state << _self.current_tab_boxes_state(tab_boxes)
+	used_states << rope.new()
+
+	_for el _over tab_boxes.fast_elements()
+	_loop
+		# Make sure EL is visible
+		_self.make_visible(el)
+		
+		_for i _over 1.upto(el.items.size)
+		_loop
+			_self.change_to_tab(el,i)
+			
+			cur_tab_state << _self.current_tab_boxes_state(tab_boxes)
+			
+			# Don't iterate duplicates.
+			_if used_states.index_equal_of(cur_tab_state) _is _unset
+			_then
+				_loopbody(el,i)
+				used_states.add(cur_tab_state)
+			_endif
+		_endloop
+	_endloop
+
+	# Return at least one 'render'
+	_if tab_boxes.empty?
+	_then
+		_loopbody(rc,1)
+	_endif
+
+	# Return to the starting state of the dialog.
+	_self.set_tab_box_states(tab_boxes,orig_tab_state)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.make_visible(el)
+	##
+	## Force the element EL to be visible by recursively making the
+	## GUI elements it is within visible.
+
+	elp << el.parent
+	
+	_if elp.class_name _is :dd_tab_box _orif
+	    elp.class_name _is :dd_window_stack
+	_then
+		apn << elp.properties[:active_page_n]
+
+		_for i _over 1.upto(elp.items.size)
+		_loop
+			_if elp.items[i] = el
+			_then
+				elp.properties[:active_page_n] << i
+				_leave
+			_endif
+		_endloop
+	_endif
+	
+	_if _not _self.element_visible?(el)
+	_then
+		_self.make_visible(el.parent)
+	_endif
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.element_visible?(el)
+	## 
+	## Return TRUE if the element EL is visible.
+
+	_for k,e _over .footprints.fast_keys_and_elements()
+	_loop
+		_if e = el
+		_then
+			_return _true 
+		_endif
+	_endloop
+
+	>> _false 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.current_tab_boxes_state(tbs)
+	## 
+	## Return a unique identifier for the tab state of the passed TBS.
+	txt << ""
+
+	_for i _over 1.upto(tbs.size)
+	_loop
+		txt +<< write_string(%_,tbs[i].properties[:active_page_n])
+	_endloop
+
+	>> txt
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.set_tab_box_states(tbs,state_txt)
+	## 
+	## Set the dialog's tab_boxs/window_stacks (TBS) active pages based on
+	## the STATE_TXT.
+
+	sp << state_txt.split_by(%_)
+
+	_for i _over 1.upto(tbs.size)
+	_loop
+		tbs[i].properties[:active_page_n] << sp[i].as_number()
+	_endloop
+
+	_self.render_current_dialog()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.int!save_to_file(check_for_existing?,filename)
+	## 
+	## Save the current dialog's XML description to FILENAME.  If
+	## CHECK_FOR_EXISTING? is TRUE then overwriting an existing
+	## file has to be confirmed by the user.
+
+	filename << filename.split_by(%.).first + ".xml"
+
+	_if check_for_existing? _andif
+	    system.file_exists?(filename) _andif
+	    _not _self.show_query(
+			 {_self.message(:yes), _self.message(:no)},
+			 {_true,_false},_false,
+			 _self.message(:overwrite_existing_file?))
+	_then
+		_return 
+	_endif
+
+	# Run SW4 Compatibility code
+	_self.sw4_compatability()
+
+	_protect
+		f << external_text_output_stream.new(filename)
+		f.write(_self.current_dialog().xml_description())
+
+		_self.current_dialog().save_filename << filename
+		_self.action(:save_to_file).enabled? << _true 
+	_protection
+		f.close()
+	_endprotect 
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.delete_dialog()
+	## 
+	## Delete the current dialog.
+	
+	_if _not _self.show_query(
+			 {_self.message(:yes), _self.message(:no)},
+			 {_true,_false},_false,
+			 _self.message(:delete_current_dialog?,_self.current_dialog().dialog_class))
+	_then
+		_return
+	_endif 
+
+	i << .items[:current_dialog_i]
+
+	next_i << _if i > 1
+		  _then
+			  >> i-1
+		  _else
+			  >> 1
+		  _endif
+	
+	.dialog_list.remove_nth(i)
+	
+	_self.action(:dialog_list).items << _self.dialog_list_items()
+	_self.action(:dialog_list).value << next_i
+
+	_self.update_gui_for_dialog()
+	
+	_self.refresh_view()
+	.items[:tb].active_page << .items[:tb].pages[1]
+	_self.tab_changed(1)
+
+	_self.action(:delete_dialog).enabled? << .dialog_list.size > 1
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.exit()
+	## 
+	## Close the framework, exiting the dialog designer.
+
+	_self.close_test_dialog()
+	_self.framework.close()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.close_test_dialog()
+	## 
+	## Close the test dialog, if activated.
+	
+	_if .items[:test_module] _isnt _unset _andif
+	    (d << .items[:test_module].dialogs.an_element()) _isnt _unset 
+	_then
+		d.close()
+	_endif	
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_magik_xml(val)
+	## 
+	## Hide/Unhide the Magik/XML tab.
+
+	_if val
+	_then
+		.items[:magik_xml].manage()
+		.items[:tb].active_page << .items[:tb].pages[6]
+	_else
+		.items[:tb].active_page << .items[:tb].pages[1]
+		_self.tab_changed(1)
+		.items[:magik_xml].unmanage()	
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_module_properties(val)
+	## 
+	## Hide/Unhide the "Module" tab.
+
+	_if val
+	_then
+		.items[:build_module].manage()
+		.items[:tb].active_page << .items[:tb].pages[7]
+	_else
+		.items[:tb].active_page << .items[:tb].pages[1]
+		_self.tab_changed(1)
+		.items[:build_module].unmanage()	
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.use_messages(val)
+	## 
+	## Hide/Unhide the "Messages" tab.
+
+	_if val
+	_then
+		.items[:messages].manage()
+		.items[:tb].active_page << .items[:tb].pages[8]
+	_else
+		.items[:tb].active_page << .items[:tb].pages[1]
+		_self.tab_changed(1)
+		.items[:messages].unmanage()	
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_list_items()
+	## 
+	## Return the items list for the dialog choice item in the main toolbar.
+	
+	items << rope.new()
+
+	_for i _over 1.upto(.dialog_list.default({}).size)
+	_loop
+		d << .dialog_list[i]
+		items.add_last({i,d.dialog_class})
+	_endloop
+
+	>> items
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dialog_list_value_changed(val)
+	## 
+	## Update the GUI when the selected dialog is changed.
+
+	# If we are not switching from a deleted design, make sure that
+	# the current design reflects the latest messages and databus values.
+	_if .dialog_list.size >= .items[:current_dialog_i].default(1)
+	_then
+		_self.save_current_gui_settings_to_dialog()
+	_endif
+
+	# Now change to the new dialog.
+	.items[:current_dialog_i] << val
+	
+	_self.update_gui_for_dialog()
+
+	# Change the action toggles but don't update the GUI
+	_dynamic !switching_dialogs?! << _true
+
+	d << _self.current_dialog()
+	.items[:dialog_class_user_messages].contents << d.class_messages.default("")
+	.items[:dialog_class_user_messages_label].value << _self.message(:messages_for,d.dialog_class)
+	.items[:plugin_class_user_messages].contents << d.plugin_messages.default("")
+	.items[:plugin_class_user_messages_label].value << _self.message(:messages_for,d.dialog_class + :_plugin)
+
+	.items[:dialog_class_user_messages].point << 0
+	.items[:plugin_class_user_messages].point << 0
+
+	_self.refresh_databus()
+
+	_self.action(:use_menubar).value   << d.use_menubar?
+	_self.action(:use_statusbar).value << d.use_statusbar?
+	_self.action(:use_docks).value     << d.use_docks?
+	_self.action(:use_databus).value   << d.use_databus?
+
+	!switching_dialogs?! << _false
+
+	# Reset the rendering position, but do not refresh.
+	_self.reset_rendering_position()
+
+	# Make the GUI Layout tab visible.
+	.items[:tb].active_page << .items[:tb].pages[1]
+	_self.tab_changed(1)
+	
+	_self.update_gui_for_dialog()
+	_self.update_titlebar()
+	_self.refresh_view()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.save_current_gui_settings_to_dialog()
+	##
+	## Explicitly set the slots of the current dialog from widget
+	## values of the GUI.
+
+	_if (d << _self.current_dialog()) _is _unset _then _return _endif 
+
+	# Update dialog properties from the GUI
+	d.class_messages <<           .items[:dialog_class_user_messages].contents.write_string
+	d.plugin_messages <<          .items[:plugin_class_user_messages].contents.write_string
+	d.dialog_class <<             .items[:dialog_class].value 
+	d.dialog_extra_slots <<       .items[:dialog_extra_slots].value 
+	d.pragma_classify_level <<    .items[:pragma_classify_level].value 
+	d.pragma_usage <<             .items[:pragma_usage].value
+	d.pragma_topic <<             .items[:pragma_topic].value
+	d.build_module_name <<        .items[:build_module_name].value
+	d.build_module_dir <<         .items[:build_module_dir].value
+	d.build_module_description << .items[:build_module_description].value
+	d.build_module_requires <<    .items[:build_module_requires].contents
+
+	_self.save_dialog_databus(_true)
+
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.reset_editors()
+	## 
+	## Reset editors to 'no selection' state.
+	
+	.items[:wa_editor].edit("")
+	.items[:wa_editor].set_choice_items(_self.element_list())
+	
+	.items[:menubar_editor].edit("")
+	.items[:menubar_editor].set_choice_items(_self.menubar_element_list())
+	
+	.items[:statusbar_editor].edit("")
+	.items[:statusbar_editor].set_choice_items(_self.statusbar_element_list())	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.update_gui_for_dialog()
+	## 
+	## Update the GUI to match the current dialog.
+	##
+	## Reset the editors.
+	## Refresh menubar,statusbar and docks lists.
+	## Refresh databus and statusbar GUIs.
+	## Hide/Unhide tabs as needed.
+	## Populate module properties with current values.
+
+	# Reset Editors for current dialog.
+	_self.reset_editors()
+
+	# Reset Menubar and Statusbar lists for current dialog.
+	_self.changed(:menubar_list,:refresh)
+	_self.changed(:statusbar_list,:refresh)
+	_self.changed(:docks_list,:refresh)
+	_self.refresh_statusbar()
+	_self.refresh_databus()	
+	_self.refresh_messages()
+
+	d << _self.current_dialog()
+
+	# Update tab visibility to match the toggles
+	_if d.use_menubar?
+	_then	
+		.items[:tb].pages[2].manage()		
+	_else 
+		.items[:tb].pages[2].unmanage()		
+	_endif
+
+	_if d.use_statusbar?
+	_then
+		.items[:tb].pages[3].manage()		
+	_else 
+		.items[:tb].pages[3].unmanage()		
+	_endif
+	
+	_if d.use_docks?
+	_then
+		.items[:tb].pages[4].manage()		
+	_else 
+		.items[:tb].pages[4].unmanage()		
+	_endif
+
+	_if d.use_databus?
+	_then
+		.items[:tb].pages[5].manage()		
+	_else 
+		.items[:tb].pages[5].unmanage()		
+	_endif
+
+	# Update module properties in the GUI
+	.items[:dialog_class].value <<             d.dialog_class.write_string
+	.items[:dialog_extra_slots].value <<       d.dialog_extra_slots.write_string
+	.items[:pragma_classify_level].value <<    d.pragma_classify_level
+	.items[:pragma_usage].value <<             d.pragma_usage
+	.items[:pragma_topic].value <<             d.pragma_topic
+	.items[:build_module_name].value <<        d.build_module_name.write_string
+	.items[:build_module_dir].value <<         d.build_module_dir.default("c:\temp")
+	.items[:build_module_description].value << d.build_module_description.write_string
+	.items[:build_module_requires].contents << d.build_module_requires.default("").write_string
+
+	_self.action(:dialog_class_list).items << _self.dialog_class_list_items()
+	_self.action(:dialog_class_list).value << d.dialog_class
+	_self.dialog_class_list_value_changed(d.dialog_class)
+
+	# Force the GUI to update with respect to the module name
+	_self.change_dialog(:build_module_name)
+
+	save? << _self.current_dialog().save_filename _isnt _unset
+	_self.action(:save_to_file).enabled? << save?
+
+	# Control the reactivate and goto_explorer
+	activate? << _self.current_dialog().built? _is _true
+	_self.action(:explore_code).enabled? << activate?
+	_self.action(:reactivate_dialog).enabled? << activate?
+	_self.action(:copy_image_files).enabled? << activate?
+	_self.action(:copy_image_files).tooltip << _self.message(:copy_image_files,d.dialog_class)
+		
+	_self.action(:delete_dialog).enabled? << _self.action(:dialog_list).items.size > 1
+
+	# Messages
+	.items[:dialog_class_user_messages].contents << d.class_messages.default("")
+	.items[:dialog_class_user_messages_label].value << _self.message(:messages_for,d.dialog_class)
+	.items[:plugin_class_user_messages].contents << d.plugin_messages.default("")
+	.items[:plugin_class_user_messages_label].value << _self.message(:messages_for,d.dialog_class + :_plugin)
+
+	.items[:dialog_class_user_messages].point << 0
+	.items[:plugin_class_user_messages].point << 0
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.sort_messages()
+	## 
+	## Sort the user defined messages alphabetically by key.  A
+	## spacer line is inserted between sets of message-keys beginnning
+	## with the same letter.
+
+	# Gather the messages ...
+	msgs <<  .items[:dialog_class_user_messages].value.split_by(%newline,_true)
+
+	_local ht << equality_hash_table.new()
+
+	msg << ""
+	_for lin _over msgs.fast_elements()
+	_loop
+		_if _not lin.empty? _andif lin[1] _is %:
+		_then
+			ht[key] << msg
+			
+			key << lin.split_by(%tab).first.split_by(% ).first
+			len << key.size
+			msg << lin.slice_to_end(min(lin.size+1,len+1))
+		_else
+			msg +<< write_string(%newline,lin)
+		_endif
+	_endloop
+
+	ht[key] << msg
+
+	# Now sort them
+	sc << sorted_collection.new()
+	_for k _over ht.fast_keys()
+	_loop
+		_if k _isnt _unset _then sc.add(k) _endif 
+	_endloop
+
+	sorted_msgs << internal_text_output_stream.new()
+	last_key << sc.an_element().default(%a)
+	
+	_for k _over sc.fast_elements()
+	_loop
+		# Add a space between alphabetic groups of messages
+		_if k[2] _isnt last_key[2] _andif
+		    ht[last_key].last _isnt %newline
+		_then
+			sorted_msgs.write(%newline)
+		_endif
+
+		last_key << k
+
+		sorted_msgs.write(k,ht[k],%newline)
+	_endloop
+
+	.items[:dialog_class_user_messages].value << sorted_msgs.string	
+	.items[:dialog_class_user_messages].point << 0
+
+	_self.current_dialog().class_messages << sorted_msgs.string
+	_self.action(:save_to_file).enabled? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.copy_image_files()
+	## 
+	## Copy foreign image files into the current dialog's module 
+	## bitmap directory and update image/module references to use
+	## those image files.
+
+	_self.current_dialog().copy_image_files()
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.open()
+	## 
+	## Open a new instance of SELF.  No caching is done so each
+	## time a new instance is created and activated.
+	
+	d << dialog_designer_plugin.new()
+	>> d.activate_dialog().component(:dialog_designer)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.xml_copy(el)
+	## 
+	## Return the XML representation of EL.
+	
+	txt << "<xml_copy>" + %newline
+	txt +<< el.xml_copy()
+	txt +<< "</xml_copy>"
+ 
+	>> simple_xml.read_document_string(txt).top_element
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.remove_extraneous_containers()
+	## 
+	## Find and remove all rowcols containing less than 2 sub-elements.
+	## Repeat until no such rowcols are found.
+	#
+	# NOTE : this function is still being tested ... it seems to
+	# work well but is not exposed in the GUI.  
+
+	rem_cnt << 0
+	_loop
+		changed? << _false 
+
+		_for rc _over _self.current_dialog().gui_elements(:rowcol).fast_elements()
+		_loop
+			_if _not {:frame,:dd_tab_box,:dd_window_stack}.includes?(rc.parent.class_name) _andif
+			    rc.items.size _is 1
+			_then
+				el << rc.items.an_element()
+				el.parent << rc.parent
+				el.row << rc.row
+				el.col << rc.col
+				
+				p << rc.parent
+				p.items.remove(rc)
+				p.items.add(el)
+
+				rem_cnt +<< 1
+				changed? << _true 
+			_endif
+		_endloop
+
+		# Find and remove empty RowCols
+		_for rc _over _self.current_dialog().gui_elements(:rowcol).fast_elements()
+		_loop
+			_if rc.parent.class_name _isnt :frame _andif rc.items.empty?
+			_then
+				rc.parent.remove(rc)
+				rem_cnt +<< 1
+				changed? << _true
+			_endif
+		_endloop
+
+		_if _not changed?
+		_then
+			_leave 
+		_endif
+	_endloop
+
+	write("Removed ",rem_cnt," RowCols.")
+	
+	_self.update_gui_for_dialog()
+
+	_self.refresh_view()
+	_self.databus_make_data_available(:current_gui_layout_element,_unset)
+	_self.databus_make_data_available(:elements,1)		
+
+	.items[:wa_editor].clear()
+
+	# Clear the popup menu
+	_self.set_gui_layout_popup(_unset)
+	
+_endmethod
+$

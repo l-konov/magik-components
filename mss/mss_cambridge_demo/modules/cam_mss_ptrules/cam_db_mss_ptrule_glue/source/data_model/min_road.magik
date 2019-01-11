@@ -1,0 +1,43 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method min_road.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to roads.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    corr_rwo.source_collection.name _is :min_road _andif
+	    corr_geom.geom_category _is :linear
+	_then
+		_return _true
+	_endif
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method min_road.mss_ptrule_update_from_correlation(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to roads, and update self's attributes from
+	## that road.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    corr_rwo.source_collection.name _is :min_road
+	_then
+		_self.name << corr_rwo.name
+		_self.carriage_type << corr_rwo.carriage_type
+		_self.road_type << corr_rwo.road_type
+	_endif
+	
+_endmethod
+$

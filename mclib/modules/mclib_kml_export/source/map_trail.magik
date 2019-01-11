@@ -1,0 +1,107 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-06-29 16:52:42 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 06-17-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method map_trail.as_kml()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	namespaces << property_list.new_with(:xmlns,"http://earth.google.com/kml/2.0")
+	>> simple_xml_thing_ns.new("kml",
+				{_self.as_kml_placemark()},
+				_unset,
+				namespaces)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method map_trail.as_kml_placemark()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	elems << _self.kml_placemark_elements()
+	res <<  simple_xml_thing.new("Placemark",
+			     elems)
+	#debug simple_xml.write_element_on(!output!,res)
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method map_trail.kml_placemark_elements(_optional look_at?)
+	## returns the elemants for showing me as a KML placemark. This
+	## is a rope of simple_xml_things.
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	elems << rope.new()
+	elems.add_last(simple_xml_text.new(:name,"Trail"))
+	_if look_at? _is _true 
+	_then
+		look_at << pseudo_point.new(_self.bounds.centre)
+		look_at.world << rope.new_from_iter(_self,:all_geometry|()|).an_element().world
+		elems.add_last(look_at.as_kml_lookat(4000,45,-125) )
+		elems.add_last(simple_xml_thing.new("Visibility",{1}))
+		elems.add_last(simple_xml_thing.new("Open",{0}))
+	_endif
+	_if (st << _self.kml_style()) _isnt _unset
+	_then 
+		elems.add_last(st)
+	_endif
+	_if (a_geom << _self.kml_geometry()) _isnt _unset
+	_then 
+		elems.add_last(a_geom)
+	_endif 
+	>> elems
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method map_trail.kml_style()
+	## returns the XML for a style used for me in KML
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic user:!GEARTH_STYLE_SYSTEM!
+	>> .default_styles[:normal_line_style].fg_style.kml_style()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method map_trail.kml_geometry(_optional a_field_name, height)
+	## returns the representation of my geometry A_FIELD_NAME, or the
+	## default if not specified, for use in KML
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_if (pg << _self.as_pseudo_geometry) _is _unset 
+	_then
+		_return _unset 
+	_endif
+	>> pg.as_kml_entity()
+_endmethod
+$
+

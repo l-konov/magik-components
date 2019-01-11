@@ -1,0 +1,9 @@
+cam_mss_qa	1
+
+description
+	Cambridge customizations for MSS Quality Assurance
+end
+
+requires
+	mss_qa
+end

@@ -1,0 +1,9 @@
+mclib_pseudo_rwo	4000
+
+description
+	provides the pseudo_rwo object which serves as a proxy for database records.
+end
+
+requires
+	mclib_package	
+end

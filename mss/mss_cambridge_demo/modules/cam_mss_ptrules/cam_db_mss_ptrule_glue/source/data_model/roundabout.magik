@@ -1,0 +1,56 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method roundabout.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to roads.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif
+	    corr_rwo.source_collection.name _is :min_road _andif
+	    corr_geom.geom_category _is :linear
+	_then
+		_return _true
+	_endif
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method roundabout.mss_populate_from_gui_plugin(ptrule, view, pos)
+	## 
+	## Populate the name of self based on the
+	## custom GUI plugin.
+	##
+
+	_if (pi << ptrule.get_property(:gui_plugin)) _is _unset _orif
+	    (val << pi.input_value(:name)) _is _unset _orif
+	    val = ""
+	_then
+		condition.raise(:user_error, :string,
+				"Enter a value for roundabout name on the custom input tab")
+	_endif
+	_self.name << val
+
+	# If any child pointing rule hs set to display an annotation
+	# for self, enable it based on the create_annotation? setting
+	# of the gui plugin.
+	_for child_ptrule _over ptrule.child_ptrules.fast_elements()
+	_loop
+		_if child_ptrule.is_kind_of?(mss_simple_add_geometry_ptrule) _andif
+		    child_ptrule.geometry_name _is :annotation
+		_then
+			child_ptrule.backstop_properties[:suspended?] << _not pi.create_annotation?
+		_endif
+	_endloop
+	
+_endmethod
+$

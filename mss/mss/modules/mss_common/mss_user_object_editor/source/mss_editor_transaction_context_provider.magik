@@ -1,0 +1,69 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+##
+## mss_editor_transaction_context_provider
+##
+## Plugin that provides a transaction context for an object editor.
+##
+
+def_slotted_exemplar(:mss_editor_transaction_context_provider,
+{},
+{:plugin})
+$
+
+_pragma(classify_level=restricted)
+mss_editor_transaction_context_provider.define_shared_constant(
+	:databus_producer_data_types,
+	{:build_transaction_context},
+	:public )
+$
+
+_pragma(classify_level=restricted)
+mss_editor_transaction_context_provider.define_shared_constant(
+	:databus_consumer_data_types,
+	{:pre_transaction},
+	:public )
+$
+
+_pragma(classify_level=restricted)
+_method mss_editor_transaction_context_provider.sw_databus_data_available(data_type_name, data)
+	## 
+	## On a pre_transaction notification, build the transaction
+	## context.
+	##
+
+	_if data_type_name _is :pre_transaction
+	_then
+		_self.build_transaction_context(data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_editor_transaction_context_provider.build_transaction_context(a_transaction)
+	## 
+	## Set the transaction context for A_TRANSACTION.
+	##
+
+	pl << property_list.new_with(
+		      :context_provider, _self,
+		      :transaction, a_transaction,
+		      :editor, _self.framework)
+
+	# Let any plugins who are interested in this know about the new
+	# context, so they can add to it.
+	_self.databus_make_data_available(:build_transaction_context, pl)
+	
+	a_transaction.set_transaction_context(pl)
+	
+_endmethod
+$

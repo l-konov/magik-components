@@ -1,0 +1,8 @@
+mss_code_triggers	1
+
+description
+	Support for record-level triggers in core (in addition to in data dictionary)
+end
+
+requires
+end

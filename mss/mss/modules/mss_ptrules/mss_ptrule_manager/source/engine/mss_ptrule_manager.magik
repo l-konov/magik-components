@@ -1,0 +1,1908 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_manager
+##
+## Class used to handle interactions made in mss_ptrule mode.
+##
+
+def_slotted_exemplar(:mss_ptrule_manager,
+{
+	{:current_mgf, _unset, :readable},
+	{:current_map_view, _unset, :readable},
+	{:current_ptrule_gui, _unset, :readable},
+	{:enabled?, _unset, :readable},
+	{:interaction_mode, _unset, :readable},
+	{:modmask, _unset, :readable},
+	{:ptrule_stack, _unset, :readable},
+	{:pdr_running_ptrule, _unset, :readable},
+	{:run_thread, _unset, :readable},
+	{:correlation_information, _unset, :readable},
+	{:probes, _unset, :readable},
+	{:options, _unset, :readable}
+},
+{:plugin, :trail_interaction_mode_mixin})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_manager.def_property(:render_priority,
+	:type, :integer,
+	:default_value, 10,
+	:description, "Z priority of rendering")
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_manager.define_shared_constant(
+	:databus_consumer_data_types,
+	##
+	## The various types this plugin gets from the databus.
+	##
+	{:current_document,
+	 :active_map_view,
+	 :map_trail,
+	 :mss_set_active_ptrule,
+	 :mss_terminate_active_ptrule,
+	 :mss_dynamic_trail},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_manager.define_shared_constant(
+	:databus_producer_data_types,
+	##
+	## The various types this plugin puts on the databus.
+	##
+	{},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_manager.define_shared_constant(
+	:core_default_options,
+	## Default values for core options.
+	property_list.new_with(
+		:placement_mode, :design,
+		:offset_distance, 0,
+		:offset_direction, :left,
+		:move_disconnect_before_transform?, _false),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={redefinable})
+mss_ptrule_manager.define_shared_constant(
+	:custom_default_options,
+	## Default values for custom options.
+	property_list.new(),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={redefinable})
+mss_ptrule_manager.define_shared_variable(
+	:defined_ptrule_gui_plugins,
+	## A hash table of all defined GUI plugins, which may
+	## optionally be used to provide additional GUI input for a
+	## pointing rule.
+	hash_table.new(),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.init(name, a_framework)
+	## 
+	## 
+
+	_super.init(name, a_framework)
+
+	.current_mgf << _unset
+	.current_map_view << _unset
+	.enabled? << _false
+	
+	.ptrule_stack << limited_stack.new(100)
+	.correlation_information << property_list.new()
+	.probes << rope.new_for(10)
+
+	_self.init_interaction_modes()
+	_self.init_options()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.post_init_plugins()
+	## 
+	## 
+
+	_if (mm << _self.get_service_provider(:map_manager)) _isnt _unset
+	_then
+		# Note: this is a :post_render_sets rather than a
+		# :transient_drawer, because the stuff it is drawing
+		# post-render is not very important, and transient draws can be
+		# triggered a lot (any window damage).
+		mm.add_post_renderer(_self, _self.render_priority, :post_render_sets)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:complete_ptrule,
+				       :engine, _self,
+				       :action_message, :|complete_active_ptrule()|))
+	_self.add_action(sw_action.new(:terminate_ptrule,
+				       :engine, _self,
+				       :image, {:back, :ui_resources},
+				       :enabled?, _false,
+				       :action_message, :|terminate_active_ptrule()|))
+	_self.add_action(sw_action.new(:terminate_all_ptrules,
+				       :engine, _self,
+				       :image, {:clear, :ui_resources},
+				       :enabled?, _false,
+				       :action_message, :|terminate_all_ptrules()|))
+	_self.add_action(sw_action.new(:terminate_one_shot_ptrule,
+				       :engine, _self,
+				       :action_message, :|terminate_one_shot_ptrule()|))
+	_self.add_action(sw_action.new(:hotkey_1,
+				       :engine, _self,
+				       :action_message, :|hotkey_1()|))
+	_self.add_action(sw_action.new(:hotkey_2,
+				       :engine, _self,
+				       :action_message, :|hotkey_2()|))
+	_self.add_action(sw_action.new(:hotkey_3,
+				       :engine, _self,
+				       :action_message, :|hotkey_3()|))
+	_self.add_action(sw_action.new(:hotkey_4,
+				       :engine, _self,
+				       :action_message, :|hotkey_4()|))
+	_self.add_action(sw_action.new(:hotkey_5,
+				       :engine, _self,
+				       :action_message, :|hotkey_5()|))
+
+	_self.build_proxy_actions(map_trail, "trail_")
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.init_options()
+	## 
+	## 
+
+	.options << _self.core_default_options.copy()
+	_for i, j _over _self.custom_default_options.fast_keys_and_elements()
+	_loop
+		.options[i] << j
+	_endloop
+	_return .options
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.check_enabled()
+	##
+	## If self looks like it is enabled in any map_gui_framework, set
+	## the enabled? slot to true, and activate pointing rules.
+	## 
+
+	new_val << _false
+	_if .current_mgf _isnt _unset
+	_then
+		_if .current_mgf.interaction_handler.mss_current_persistent_mode_name _is :mss_ptrule
+		_then
+			new_val << _true
+		_elif (tr << _self.current_trail) _is _unset
+		_then
+			# If any map gui handling my trail is in :mss_ptrule mode,
+			# that's good enough.
+			_for i _over .current_mgf.map_manager.map_gui_frameworks_for_trail(tr)
+			_loop
+				_if i.interaction_handler.mss_current_persistent_mode_name _is :mss_ptrule
+				_then 
+					new_val << _true
+					_leave
+				_endif 
+			_endloop
+		_endif
+	_endif
+
+	old_val << .enabled?
+	.enabled? << new_val
+	
+	_if new_val ~= old_val
+	_then
+		_if (ptrule << _self.active_ptrule) _isnt _unset
+		_then
+			_if .enabled?
+			_then
+				ptrule.reactivate()
+			_else
+				# If this is a one-shot rule, and a probe has been set, then
+				# clear the probe, as the user likely set it for this
+				# particular rule.
+				_if ptrule.get_property(:one_shot?) _is _true _andif
+				    (tr << _self.current_trail) _isnt _unset
+				_then
+					tr.clear_one_shot_probe()
+				_endif
+				
+				ptrule.deactivate()
+				_self.terminate_one_shot_ptrule()
+			_endif
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.force_enabled(new_val)
+	## 
+	## Forcibly change the enabled? slot to be NEW_VAL.
+	##
+
+	_return .enabled? << new_val
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.get_length_display_format()
+	## 
+	## 
+
+	_return .current_mgf.map_manager.current_map.get_length_display_format()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.init_interaction_modes()
+	## 
+	## Initialize interaction modes for self (there is actually
+	## only a single interaction mode).
+	##
+
+	.interaction_mode << m << interaction_mode.new(:mss_ptrule, _unset)
+	_self.setup_trail_interaction(m)
+	_self.reset_interaction_modes()
+
+	# The following bit is a copy of document_gui_framework.int!define_pan_accelerator().
+	# See the "Hmm" comment in map_gui_framework.define_trail_interaction_mode()
+	# for a fuzzy explanation of why it is copied here.  Remove it
+	# at a future version if/when setup_trail_interaction() does
+	# the whole thing comprehensively.
+	_for i _over 0.upto(7)
+	_loop 
+		# click or drag MIDDLE mouse button to pan.
+		m.set_click_action(:middle, i, :pan)
+		m.set_drag_actions(:middle, i, {:start_pan, _unset, :end_pan, :change_to_pan})
+		m.set_xor_worker(_self, _unset, :middle, i)
+		# special handling for abort of the pan action
+		m.set_key_action(%escape, i, :abort_pan)
+	_endloop 
+	
+	# Curiously, there is no click action in trail mode when
+	# holding the shift key.
+	m.set_click_action(:left, 1, :mss_click_1)
+
+	m.set_key_action(%escape, 0, _self.action(:terminate_one_shot_ptrule))
+	_self.init_interaction_mode_hotkeys(m)
+	
+	_return m
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.reset_interaction_modes(_optional ptrule)
+	## 
+	## Reset properties about self's interaction modes.  If PTRULE
+	## is provided, the following properties of that ptrule are
+	## used to set interaction mode properties:
+	## - im_prompt_string
+	## - im_cursor
+	## - im_one_shot?
+	##
+
+	m << .interaction_mode
+	m.prompt_string << prompt_str << _self.message(:prompt_string)
+	m.set_cursor(0, "mss_ptrule", :mss_ptrule_manager)
+	m.one_shot? << _false
+
+	_if ptrule _isnt _unset
+	_then
+		_if (p << ptrule.get_property(:im_prompt_string)) _isnt _unset
+		_then
+			m.prompt_string << prompt_str << p
+		_endif
+		_if (p << ptrule.get_property(:im_cursor)) _isnt _unset _andif
+		    p ~= ""
+		_then
+			# N.B.: this sets the cursor for modifier state 0.
+			p_vec << p.split_by(%,)
+			mod_st << 0
+			cur_name << p_vec[1]
+			_if p_vec.size >= 2
+			_then 
+				mod_name << p_vec[2].as_symbol()
+			_else
+				mod_name << _unset
+			_endif
+			m.set_cursor(mod_st, cur_name, mod_name)
+		_endif
+		_if (p << ptrule.get_property(:im_one_shot?)) _is _true
+		_then
+			# Don't set one-shot if self is already active.
+			_if .current_mgf _isnt _unset _andif
+			    .current_mgf.current_interaction_mode _isnt m
+			_then
+				m.one_shot? << _true
+			_endif
+		_endif
+	_endif
+
+	_if .current_mgf _isnt _unset
+	_then
+		mm << .current_mgf.map_manager
+		_if (pane_name << mm.interaction_mode_statusbar_pane_name) _isnt _unset
+		_then 
+			_self.application.update_statusbar(pane_name, :text, prompt_str)
+		_endif
+	_endif
+	
+	_return m
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule}, usage={redefinable})
+_method mss_ptrule_manager.init_interaction_mode_hotkeys(m)
+	## 
+	## Initialize accelerator keys in mss_ptrule interaction mode
+	## M.  This may be redefined to bind the pointing rule hotkeys
+	## to different accelerator keys.
+	##
+
+	m.set_key_action(:f6, 0, _self.action(:hotkey_1))
+	m.set_key_action(:f7, 0, _self.action(:hotkey_2))
+	m.set_key_action(:f6, 1, _self.action(:hotkey_3))
+	m.set_key_action(:f7, 1, _self.action(:hotkey_4))
+	m.set_key_action(:f8, 1, _self.action(:hotkey_5))
+	m.set_key_action(:f9, 0, _self.action(:complete_ptrule))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.get_interaction_mode()
+	## 
+	## Protocol used by map_manager to get custom interaction
+	## modes.
+	##
+
+	_return .interaction_mode
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.get_interaction_mode_action()
+	## 
+	## Protocol used by map_manager to get custom interaction
+	## mode actions.
+	## 
+
+	_return sw_action.new(:mss_ptrule_mode,
+			      :engine, _self,
+			      :image, {:mss_ptrule_mode, :mss_ptrule_manager},
+			      :value, :mss_ptrule)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.set_current_map_gui_framework(new_mgf)
+	## 
+	## Set the current_mgf slot to NEW_MGF, and maintain
+	## dependencies.
+	##
+
+	# Technical note: there is only one mss_ptrule_manager in an
+	# application, and it is used to manage all pointing rule
+	# interactions across all map_gui_frameworks.  A different
+	# approach - which would make more sense in some respects -
+	# would be to have one mss_ptrule_manager per
+	# map_gui_framework.  In this way, we wouldn't need to care
+	# what the current_mgf is, or take any actions when it
+	# switches.  However, that approach gets confusing when coupled
+	# with a GUI which manages actions for self.  So, the upshot is
+	# that we'll keep track of the current_mgf, so that we know
+	# what map_gui_framework to use for certain interaction-related
+	# activities. 
+	
+	_if new_mgf ~= .current_mgf
+	_then
+		_if .current_mgf _isnt _unset
+		_then
+			.current_mgf.remove_dependent(_self, :interaction_mode)
+		_endif 
+		.current_mgf << new_mgf
+		_if .current_mgf _isnt _unset
+		_then
+			.current_mgf.add_dependent(_self, :interaction_mode)
+		_endif
+		_self.check_enabled()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.set_current_map_view(new_map_view)
+	## 
+	## Set the current_map_view slot to NEW_MAP_VIEW, and maintain
+	## dependencies.
+	## 
+
+	_if new_map_view ~= .current_map_view
+	_then
+		.current_map_view << new_map_view
+		_if new_map_view _isnt _unset
+		_then
+			_self.set_proxy_agents(new_map_view.trail, "trail_")
+			_if (new_mgf << new_map_view.map.manager.
+					map_gui_framework_for_window(new_map_view.window)) _isnt _unset
+			_then
+				_self.set_current_map_gui_framework(new_mgf)
+			_endif
+		_else 
+			_self.unset_proxy_agents(map_trail, "trail_")
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.note_change(who, what, data)
+	## 
+	##
+
+	_if what _is :interaction_mode
+	_then
+		_if data _isnt _unset _andif
+		    data.one_shot? 
+		_then
+			# Ignore one-shots.
+			_return 
+		_endif 
+		_self.changed_interaction_mode()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :current_document
+	_then
+		_self.set_current_map_gui_framework(data[2])
+
+	_elif data_type_name _is :active_map_view
+	_then
+		_self.set_current_map_view(data)
+		
+	_elif data_type_name _is :map_trail
+	_then
+		_if .current_map_view _isnt _unset
+		_then
+			a_window << .current_map_view.window
+		_else
+			a_window << _unset
+		_endif
+		_self.trail_changed(data[2], a_window)
+
+	_elif data_type_name _is :mss_set_active_ptrule
+	_then
+		ptrule << data[1]
+		_if ptrule.manager _is _unset _orif
+		    ptrule.manager _is _self
+		_then 
+			_self.start_ptrule(ptrule)
+		_endif 
+		
+	_elif data_type_name _is :mss_terminate_active_ptrule
+	_then
+		_if _self.active_ptrule _isnt _unset
+		_then 
+			_self.terminate_active_ptrule()
+		_endif 
+		
+	_elif data_type_name _is :mss_dynamic_trail
+	_then
+		_self.dynamic_trail_changed(data[1], data[2], data[3])
+
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.post_render_sets(a_world, bounds, render_status)
+	## 
+	## Return post render sets for drawing self's dynamically
+	## generated pointing rule geometry. 
+	## 
+
+	a_set << geometry_set.new()
+	_if (ptrule << _self.active_ptrule) _isnt _unset
+	_then 
+		_for i _over ptrule.all_child_ptrules(_true).fast_elements()
+		_loop
+			i.add_to_post_render_set(a_set)
+		_endloop
+		
+		_if a_world _isnt _unset
+		_then
+			a_set << a_set.select(:world, a_world)
+		_endif
+	_endif
+
+	_return a_set
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.changed_interaction_mode()
+	## 
+	## If interaction_mode changes, check to see if self should
+	## still be enabled.
+	##
+
+	_self.check_enabled()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.trail_changed(new_trail, _optional a_window)
+	## 
+	## 
+
+	_self.check_enabled()
+	_if .enabled? _andif (ptrule << _self.active_ptrule) _isnt _unset
+	_then
+		ptrule.trail_changed(new_trail, a_window)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.dynamic_trail_changed(new_trail, add_sectors, a_window)
+	## 
+	## 
+
+	_if .enabled? _andif (ptrule << _self.active_ptrule) _isnt _unset
+	_then
+		ptrule.dynamic_trail_changed(new_trail, add_sectors, a_window)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_manager.get_ptrule_dialog(ed_class_name)
+	## 
+	## Get a dialog of class name ED_CLASS_NAME, suitable for
+	## prompting for additional information for a mss_ptrule.
+	##
+
+	_if (d << _self.get_dialog(ed_class_name)) _is _unset
+	_then
+		ed_class << ed_class_name.write_string.evaluate()
+		d << ed_class.new(_unset, _self.application)
+		_self.cache_dialog(ed_class_name, d)
+	_endif
+	_return d
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_manager.get_pointing_definition_by_name(ptdef_name)
+	## 
+	## Return an mss_ptdef record with internal name PTDEF_NAME.
+	##
+	
+	_return _self.dbview.collections[:mss_ptdef].select(predicate.eq(:internal_name, ptdef_name)).an_element()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.add_pointing_rule_from_definition(a_mss_ptdef, _optional a_gui)
+	## 
+	## Given the pointing definition database record A_MSS_PTDEF,
+	## convert this to a pointing rule, and start executing it.
+	##
+	## A_GUI is optionally the GUI that initiated this.
+	##
+
+	_if (ptrule << a_mss_ptdef.as_pointing_rule(_self)) _is _unset
+	_then
+		_return
+	_endif
+
+	_if a_gui _isnt _unset
+	_then
+		.current_ptrule_gui << a_gui
+	_endif
+	
+	_return _self.start_ptrule(ptrule)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.start_ptrule(ptrule)
+	## 
+	## Start executing the given pointing rule.
+	##
+
+	_if ptrule.manager _is _unset
+	_then
+		ptrule.set_manager(_self)
+	_endif
+	
+	_if (old_ptrule << _self.active_ptrule) _isnt _unset
+	_then
+		old_ptrule.deactivate()
+	_endif
+	.ptrule_stack.push(ptrule)
+
+	_self.reset_interaction_modes(ptrule)
+	_if .current_mgf _isnt _unset
+	_then 
+		.current_mgf.set_interaction_mode(.interaction_mode)
+	_endif
+	
+	_self.active_ptrule_changed()
+
+	# Start the pointing rule in a protection, and if there is an
+	# error when starting, then terminate it.
+	ok? << _false
+	_protect 
+		ptrule.start(_true)
+		ok? << _true
+	_protection
+		_if _not ok?
+		_then
+			_self.terminate_active_ptrule()
+			_if .interaction_mode.one_shot?
+			_then
+				.interaction_mode.end_interaction()
+			_endif 
+		_endif
+	_endprotect
+	
+	_return ptrule
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.active_ptrule_changed()
+	## 
+	## Update dependencies when the active pointing rule changes.
+	##
+
+	ptrule << _self.active_ptrule
+	_self.changed(:active_ptrule, ptrule)
+	
+	_self.action(:terminate_ptrule).enabled? << ptrule _isnt _unset
+	_self.action(:terminate_all_ptrules).enabled? << ptrule _isnt _unset
+	_if ptrule _isnt _unset
+	_then
+		ptrule.reactivate()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable})
+mss_ptrule_manager.define_shared_constant(
+	:mss_config_dbview_name,
+	## Return the name of the database view used to store pointing
+	## definitions. 
+	:mss_config,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule}, usage={redefinable})
+mss_ptrule_manager.define_shared_constant(
+	:mss_config_spatial_object_controller_name,
+	## Return the name of the SOC used to store pointing
+	## definitions. 
+	:mss_config,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.dbview
+	## 
+	## Return the database used to store pointing definitions.
+	##
+
+	_return gis_program_manager.cached_dataset(_self.mss_config_dbview_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.mss_config_spatial_object_controller
+	## 
+	## Return the spatial object controller used to store pointing
+	## definitions. 
+	## 
+
+	_return gis_program_manager.spatial_object_controller(_self.mss_config_spatial_object_controller_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.dataset_group_for(ptrule)
+	## 
+	## Return a dataset_group for managing the transaction in PTRULE.
+	##
+
+	r << rope.new()
+	_for i _over _self.spatial_object_controller_for(ptrule).datasets()
+	_loop
+		_if i.is_kind_of?(ds_version_view) _andif
+		    i.writable?
+		_then
+			r.add_last(i)
+		_endif
+	_endloop
+	_return dataset_group.new(r)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.spatial_object_controller_for(ptrule)
+	## 
+	## Return a spatial_object_controller suitable for managing a
+	## database update operation for the given PTRULE.
+	##
+
+	# Note: explcitly using a spatial_object_controller here rather
+	# than a sw_database, because transactions can affect multiple
+	# datastores, and oddly enough a sw_database has less support
+	# for multi-datastore transactions at SW V4.0.
+
+	# Also note: this is ugly.  It should at least ask all child
+	# ptrules which dataset/SOC they want to work with, and pick the
+	# first one that responds.  But, this has only been tested with
+	# a single SOC anyways, so...
+	db << _self.application.database
+	_if (soc_name << db.initial_soc_name) _is _unset
+	_then
+		soc_name << smallworld_product.get_option(:soc).default(:gis)
+	_endif
+	_return gis_program_manager.spatial_object_controller(soc_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.active_ptrule
+	## 
+	## Return the pointing rule that is currently active.
+	##
+
+	_return .ptrule_stack.top_of_stack
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.handle_trail_mode_action(action_name, start_coord, _optional end_coord, a_window)
+	## 
+	## Do the work of handling a pointing in the mss_ptrule
+	## interaction mode.
+	##
+
+	_dynamic !suppress_trail_interaction_mode?!
+	
+	_if a_window _isnt _unset _andif
+	    action_name _isnt :mouse_move
+	_then
+		_self.set_current_map_view(a_window.user_data)
+	_endif
+
+	_if .current_mgf _is _unset
+	_then
+		# Shouldn't ever happen.
+		_return
+	_endif
+	
+	# Delegate pan/zoom operations to the current map_gui_framework.
+	_if {:start_pan, :pan, :end_pan, :abort_pan, :change_to_pan, :change_from_pan}.includes?(action_name)
+	_then
+		.current_mgf.handle_pan_action(action_name, start_coord, end_coord)
+		_return
+	_elif 	{:zoom_in, :zoom_out, :box_zoom_in, :box_zoom_out}.includes?(action_name)
+	_then
+		.current_mgf.handle_zoom_action(action_name, start_coord, end_coord)
+		_return
+	_endif
+
+	# When making a pointing, disallow if waiting for input.
+	_if {:add_coordinate, :move_coordinate}.includes?(action_name)
+	_then
+		_if .run_thread _isnt _unset _andif
+		    .run_thread.active?
+		_then
+			# Waiting on input from a previous interaction - don't carry on
+			# with starting a new one.
+			_self.reset_interaction()
+			_return
+		_endif
+	_endif
+	
+	# Make note of interactions that indicate that the shift key is
+	# being held down.
+	.modmask << 0
+	_if {:move_coordinate, :start_drag_vertex, :dragging_vertex,
+	     :end_drag_vertex, :mss_click_1}.includes?(action_name)
+	_then
+		.modmask << 1
+	_endif
+
+	# Make note of whether or not trails are enabled for the active
+	# pointing rule.  If they are, then delegate a bunch of work to
+	# the trail.
+	tr_enabled? << _self.trail_enabled?()
+	_if tr_enabled? _andif 
+	    _not {:mss_click_1}.includes?(action_name)
+	_then
+		!suppress_trail_interaction_mode?! << _true
+		
+		.current_mgf.handle_trail_mode_action(action_name, start_coord, end_coord, a_window)
+
+		# If performing a drag operation, immediately note the results.
+		_if {:dragging_vertex, :dragging_added_vertex}.includes?(action_name)
+		_then
+			# V4.2 note: not needed anymore, as :map_trail notification comes
+			# during these actions now.  But, unfortunately it issues the
+			# notification prematurely, before it has actually fully
+			# adjusted the map_trail.  See workaround note in
+			# mss_trail_insert_ptrule.trail_changed(), and continue to
+			# assess this to see if it gets fixed in core.
+			#_self.perform_with_handling(:|trail_changed()|, _self.current_trail, a_window)
+		_endif 
+	_endif
+
+	# From here on is the code necessary to handle interactions
+	# specific to the mss_ptrule interaction mode.
+	_if action_name _is :mouse_move
+	_then
+		# This common action can be ignored.
+		_return
+	_endif
+	
+	_if _not tr_enabled?
+	_then
+		# Deal with probe drawing here.
+		_self.xor_probes(a_window)
+	_endif
+	_self.clear_probes()
+	
+	_if (ptrule << _self.active_ptrule) _isnt _unset
+	_then
+		_if {:add_coordinate, :move_coordinate}.includes?(action_name)
+		_then
+			.pdr_running_ptrule << ptrule
+			_self.perform_with_handling(:|int!press()|, a_window, start_coord)
+			
+		_elif {:dragging_vertex, :dragging_added_vertex}.includes?(action_name)
+		_then
+			_self.perform_with_handling(:|int!drag()|, a_window, end_coord)
+			
+		_elif {:geometry, :mss_click_1,
+		       :end_drag_vertex, :end_drag_added_vertex}.includes?(action_name)
+		_then
+			# Pre-release is done in-line in this thread, and it is broken
+			# out separately to let custom actions make a last-second
+			# decision on whether or not they need a transaction.
+			_self.perform_with_handling(:|int!pre_release()|, a_window, end_coord)
+			
+			# Note that this gets done in a separate thread so that
+			# prompting can be performed.
+			.run_thread <<
+				_proc(me, a_window, pos)
+					me.perform_with_handling(:|int!release()|, a_window, pos)
+				_endproc.fork_at(_thisthread.vm_priority + 1, _self, a_window, end_coord)
+		_endif
+	_endif
+
+	_if _not tr_enabled?
+	_then
+		# Deal with probe drawing here.
+		_self.xor_probes(a_window)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.clear_probes()
+	## 
+	## 
+
+	.probes.empty()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_private _method mss_ptrule_manager.xor_probes(a_window)
+	## 
+	## Probe text will be XORRED on A_WINDOW
+	##
+
+	_for a_probe _over .probes.fast_elements()
+	_loop
+		_self.xor_probe(a_probe, a_window)
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_private _method mss_ptrule_manager.xor_probe(a_probe, a_window)
+	## 
+	## XORs A_PROBE on A_WINDOW
+	##
+
+	_if a_probe _is _unset _then _return _endif 
+	_if (a_string << a_probe.string) _is _unset _orif
+	    a_string = ""
+	_then
+		_return
+	_endif 
+	
+	a_coord << a_probe.coord
+	a_style << a_probe.style.default(_self.int!probe_style)
+	a_pc  << a_window.pixel_for(a_coord) + map_trail.probe_offset
+	
+	a_window.xor_text(a_style, a_pc.x, a_pc.y, a_string, _unset, _unset)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_manager.define_shared_constant(
+	:int!probe_style,
+	text_style.new_with_properties(:colour, colour.called(:black)),
+	:private)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.perform_with_handling(meth_name, _gather args)
+	## 
+	## If an error occurs while processing METH_NAME, reset self's
+	## PDR interaction.
+	##
+
+	_dynamic !mss_ptrule_initiator! << _self
+	_dynamic !mss_current_ptrule! << _self.active_ptrule
+	
+	_local me << _self
+
+	_block 
+		_handling error _with
+		_proc(cond)
+			_import me
+			me.reset_interaction()
+			cond.continue_handling()
+		_endproc
+		_self.perform(meth_name, _scatter args)
+	_endblock
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.reset_interaction()
+	## 
+	## Terminate self's PDR interaction.
+	##
+
+	.interaction_mode.mss_int!end_interaction()
+	_self.terminate_one_shot_ptrule()
+	_self.clear_probes()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.trail_enabled?()
+	## 
+	## Return true if the active pointing rule requires a trail.
+	##
+
+	_if (ptrule << _self.active_ptrule) _is _unset
+	_then
+		_return _false
+	_endif
+	_return ptrule.trail_enabled?()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.trail_enabled_for_interaction_mode_change?()
+	## 
+	## Return true if the active pointing rule requires a trail,
+	## specifically when an interaction handler is requesting a
+	## change to trail mode.
+	##
+
+	_if (ptrule << _self.active_ptrule) _is _unset
+	_then
+		_return _false
+	_endif
+	_return ptrule.trail_enabled_for_interaction_mode_change?()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!dispatch_hotkey(keyval)
+	## 
+	## 
+
+	_if (ptrule << .pdr_running_ptrule) _isnt _unset _orif
+	    (ptrule << _self.active_ptrule) _isnt _unset 
+	_then
+		ptrule.dispatch_hotkey(keyval)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!press(a_window, pos)
+	## 
+	## 
+
+	_if (ptrule << .pdr_running_ptrule) _isnt _unset
+	_then
+		_for i _over ptrule.all_child_ptrules(_true).fast_elements()
+		_loop 
+			i.one_shot_properties.empty()
+			i.pdr_data.empty()
+		_endloop
+		
+		_self.clear_correlation_information()
+		ptrule.press(a_window, pos)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!drag(a_window, pos)
+	## 
+	## 
+
+	_if (ptrule << .pdr_running_ptrule) _isnt _unset
+	_then
+		_self.clear_correlation_information()
+		ptrule.drag(a_window, pos)
+	_endif
+	
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!pre_release(a_window, pos)
+	## 
+	## 
+
+	_if (ptrule << .pdr_running_ptrule) _isnt _unset
+	_then
+		ptrule.pre_release(a_window, pos)
+	_endif
+	
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!release(a_window, pos)
+	## 
+	## 
+
+	_if (ptrule << .pdr_running_ptrule) _isnt _unset
+	_then
+		_protect
+			# One-shot probes are shared with the map_trail.
+			_if (cur_trail << _self.current_trail) _isnt _unset
+			_then
+				cur_trail.clear_one_shot_probe()
+			_endif
+			
+			need_trans? << _false
+			_for i _over ptrule.all_child_ptrules(_true).fast_elements()
+			_loop
+				_if i.transaction_required?(:release)
+				_then
+					need_trans? << _true
+					_leave
+				_endif
+			_endloop
+			
+			_if need_trans?
+			_then
+				ds_group << _self.dataset_group_for(ptrule)
+				trans << custom_record_transaction.new(
+						 ds_group, ptrule, :|release()|, {a_window, pos},
+						 _self.message(:ptrule_transaction_description, ptrule.name))
+				trans.run()
+			_else
+				ptrule.release(a_window, pos)
+			_endif
+		_protection
+			_self.terminate_one_shot_ptrule()
+		_endprotect 
+	_endif
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.terminate_one_shot_ptrule()
+	## 
+	## If running a one-shot pointing rule, clean it up now.
+	##
+
+	# In case a smooth pan is in progress, it must be cleanly
+	# terminated before dealing with the pointing rule.
+	_self.handle_trail_mode_action(:abort_pan, _unset)
+	
+	# Note: checking to see if the running rule is the same as the
+	# active rule, in case it has already taken care of terminating
+	# itself.
+	ptrule << _self.active_ptrule
+	clear_probe? << _false
+	_if .pdr_running_ptrule _isnt _unset
+	_then
+		need_to_reset? << (.pdr_running_ptrule _is ptrule)
+	_else
+		need_to_reset? << (ptrule _isnt _unset)
+	_endif
+
+	cur_os? << .interaction_mode.one_shot?
+	_protect 
+		_if need_to_reset?
+		_then 
+			_if ptrule.get_property(:one_shot?) _is _true
+			_then
+				clear_probe? << _true
+				
+				# The following is similar to what terminate_active_ptrule()
+				# does, but without forcibly setting the interaction mode.
+				.ptrule_stack.pop()
+				ptrule.terminate()
+				_self.reset_interaction_modes(_self.active_ptrule)
+				_self.active_ptrule_changed()
+			_endif
+		_endif 
+	_protection
+		.pdr_running_ptrule << _unset
+		_if cur_os? _is _true
+		_then
+			# No matter what happened above, forcibly ensure that the
+			# interaction mode has ended.
+			.enabled? << _false 
+			.interaction_mode.one_shot? << _true 
+			.interaction_mode.end_interaction()
+			.interaction_mode.one_shot? << _false
+		_endif
+	_endprotect 
+
+	_if clear_probe?
+	_then
+		# Clear any one-shot trail probe, based on the assumption that
+		# it probably goes with the one-shot pointing rule that just
+		# got stopped.
+		_if (cur_trail << _self.current_trail) _isnt _unset
+		_then
+			cur_trail.clear_one_shot_probe()
+		_endif
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_manager.complete_active_ptrule()
+	## 
+	## 
+
+	_if (ptrule << _self.active_ptrule) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_ptrule))
+	_endif
+
+	# If the active pointing rule requires use of the mss_ptrule
+	# interaction mode on completion, force that to be true.
+	_if ptrule.assert_mss_ptrule_mode_on_complete?()
+	_then
+		_if .current_mgf _isnt _unset _andif
+		    .current_mgf.current_interaction_mode _isnt .interaction_mode
+		_then 
+			.current_mgf.set_interaction_mode(.interaction_mode)
+		_endif 
+	_endif
+	
+	# Pre-complete is done in-line in this thread, and it is broken
+	# out separately to let custom actions make a last-second
+	# decision on whether or not they need a transaction.
+	_self.perform_with_handling(:|int!pre_complete()|)
+	
+	# Note that this only needs to be run in a separate thread if
+	# prompting is being done - but, to be consistent with the
+	# release action, we'll always put it in a separate thread.
+	_if .run_thread _isnt _unset _andif
+	    .run_thread.active?
+	_then
+		_return
+	_endif
+		
+	.run_thread <<
+		_proc(me)
+			me.perform_with_handling(:|int!complete_active_ptrule()|)
+		_endproc.fork_at(_thisthread.vm_priority + 1, _self)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!pre_complete()
+	## 
+	## 
+
+	_if (ptrule << _self.active_ptrule) _isnt _unset
+	_then
+		ptrule.pre_complete()
+	_endif
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.int!complete_active_ptrule()
+	## 
+	## 
+
+	# The following is redundant if invoked from
+	# complete_active_ptrule(), but maybe not if invoked in some
+	# other way.
+	_if (ptrule << _self.active_ptrule) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_ptrule))
+	_endif
+	
+	need_trans? << _false
+	_for i _over ptrule.all_child_ptrules(_true).fast_elements()
+	_loop
+		_if i.transaction_required?(:complete)
+		_then
+			need_trans? << _true
+			_leave
+		_endif
+	_endloop
+
+	_if need_trans?
+	_then 
+		ds_group << _self.dataset_group_for(ptrule)
+		trans << custom_record_transaction.new(
+				 ds_group, ptrule, :|complete()|, {},
+				 _self.message(:ptrule_transaction_description, ptrule.name))
+		trans.run()
+	_else
+		ptrule.complete()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.ace
+	## 
+	## 
+
+	_if (appl << _self.application) _isnt _unset _andif
+	   appl.responds_to?(:ace)
+	_then
+		_return appl.ace
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.get_option(key)
+	## 
+	## 
+
+	_return .options[key]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.set_option(key, value)
+	## 
+	## 
+
+	.options[key] << value
+	_self.changed(:set_option, {key, value})
+
+	_if key _is :placement_mode
+	_then
+		# Decache all pointing rules.
+		_self.terminate_all_ptrules()
+	_endif
+	
+	_if (key _is :offset_distance _orif
+	     key _is :offset_direction)
+	_then
+		# If the active pointing rule cares about offsetting from the
+		# trail, let it sort itself out now.
+		_self.trail_changed(_self.current_trail)
+	_endif
+	
+	_return value
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.hotkey_1()
+	## 
+	## 
+
+	_self.perform_safely(:|perform_with_handling()|, :|int!dispatch_hotkey()|, :hotkey_1)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.hotkey_2()
+	## 
+	## 
+
+	_self.perform_safely(:|perform_with_handling()|, :|int!dispatch_hotkey()|, :hotkey_2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.hotkey_3()
+	## 
+	## 
+
+	_self.perform_safely(:|perform_with_handling()|, :|int!dispatch_hotkey()|, :hotkey_3)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.hotkey_4()
+	## 
+	## 
+
+	_self.perform_safely(:|perform_with_handling()|, :|int!dispatch_hotkey()|, :hotkey_4)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.hotkey_5()
+	## 
+	## 
+
+	_self.perform_safely(:|perform_with_handling()|, :|int!dispatch_hotkey()|, :hotkey_5)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.current_trail
+	## 
+	## 
+
+	_if .current_map_view _isnt _unset _andif 
+	    (cur_trail << .current_map_view.trail) _isnt _unset
+	_then
+		_return cur_trail
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.clear_correlation_information()
+	## 
+	## 
+	
+	pl << .correlation_information
+	pl.empty()
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.get_correlation_information(a_window, pos, _optional mode)
+	## 
+	## If correlation has already happened in this pointing, return
+	## that information.  Otherwise, perform the correlation, and
+	## cache it.
+	## 
+
+	pl << _self.correlation_information
+	_if _not pl.empty?
+	_then
+		_return pl
+	_endif
+
+	_if (cur_map_view << .current_map_view) _is _unset _orif
+	    (cur_trail << _self.current_trail) _is _unset 
+	_then
+		_return pl
+	_endif
+	
+	_if mode _is :select
+	_then 
+		hit_set << cur_map_view.get_selectable_geometry_set()
+	_else 
+		hit_set << cur_map_view.get_hittable_geometry_set()
+		_if (trail_first_coord << cur_trail.first_coord) _isnt _unset 
+		_then
+			trail_geom_set << geometry_set.new()
+			_if (trail_sr << cur_trail.sectors).line_length = 0.0
+			_then
+				trail_geom_set.add(pseudo_point.new(trail_first_coord))
+			_else
+				trail_geom_set.add(pseudo_chain.new(trail_sr))
+			_endif 
+			hit_set << composite_geometry_set.new_with(hit_set, trail_geom_set)
+		_endif
+	_endif
+	
+	event_params << _self.event_parameters(a_window, cur_trail)
+	
+	hit_radius << event_params[:hit_radius]
+	hit_types << event_params[:hit_types]
+	(probe, hit_list) << _self.probe_from(cur_trail, pos, hit_set, hit_radius, hit_types)
+
+	pl[:adj_pos] << probe.coord
+	pl[:hit_list] << hit_list.default({})
+	pl[:probe] << probe
+	.probes.add_last(probe)
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.event_parameters(a_window, _optional a_trail)
+	## 
+	## Returns a subset of information that is available in the
+	## private method map_trail.event_parameters()
+	##
+
+	event_params << property_list.new()
+	_if a_trail _isnt _unset
+	_then
+		the_owner << a_trail.owner
+	_else 
+		the_owner << a_window.user_data.map
+	_endif
+	
+	p1 << a_window.world_for(coordinate(0, 0))
+	p2 << a_window.world_for(coordinate(0, the_owner.trail_snap_radius))
+
+	event_params[:hit_radius] << p1.distance_to(p2).abs * 2
+	probes << the_owner.hit_types
+	_if a_trail _isnt _unset _andif
+	    a_trail.one_shot_probe _isnt _unset
+	_then
+		probes << a_trail.one_shot_probe
+	_endif
+	event_params[:hit_types] << probes.get_hit_types
+
+	_return event_params
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_manager.probe_from(cur_trail, a_coord, _optional hit_set, hit_radius, hit_types, last_geom_loc)
+	##
+	## Perform identical processing to map_trail.probe_from(), but
+	## also return hit_list information.
+	##
+
+	_if hit_set _is _unset
+	_then
+		_return probe.new(a_coord), {}
+	_endif 
+
+	# Initialise.
+	probe_type << _unset
+	new_coord << a_coord
+	probed_geom << _unset
+	
+	hit_types  << hit_types.default(cur_trail.default_hit_types)
+	hit_radius << hit_radius.default(4)
+	
+	_if cur_trail.one_shot_probe _isnt _unset _and hit_types.includes?(1) _is _false 
+	_then
+		# free snap so return. 
+		_return probe.new(a_coord), {}
+	_endif
+
+	geometric_types   << hit_types.subseq(1, 8)
+	geometric_probes? << geometric_types.index_of(1) _isnt _unset
+
+	_if last_geom_loc _isnt _unset 
+	_then
+		last_xy << last_geom_loc.coord
+	_endif
+
+	_if (geom_set << cur_trail.self_hit_set) _isnt _unset 
+	_then
+		our_geom_sets << composite_geometry_set.new_with(cur_trail.dynamic_probe_set, geom_set)
+	_else
+		our_geom_sets << cur_trail.dynamic_probe_set
+	_endif
+	
+	our_hit_set << composite_geometry_set.new_with(hit_set, our_geom_sets)
+
+	# TM START CHANGE (from map_trail.probe_from())
+	mpgp << cur_trail.mss_probe_geom_providers.default({})
+	_for a_provider _over mpgp.fast_elements()
+	_loop
+		_if (a_provider_set << a_provider.mss_probe_geoms_for(
+					       cur_trail, hit_set, a_coord, hit_radius, hit_types, last_xy)) _isnt _unset
+		_then
+			our_hit_set << composite_geometry_set.new_with(our_hit_set, a_provider_set)
+		_endif
+	_endloop
+	# TM END CHANGE (from map_trail.probe_from())
+	
+	hit_list << our_hit_set.hit_list(a_coord, hit_radius, 10,
+					 hit_types, last_xy, probe.probe_priorities).default({})
+	
+	# The above implements
+	# - Free            type  0 (not implemented here, do not call me)
+	# - Near            type  1
+	# - Control         type  2
+	# - Centre          type  3
+	# - Mid             type  4
+	# - Tangent         type  5    (need last point)
+	# - Perpendicular   type  6    (need last point)
+	# - Seg             type  7
+
+	# See if we can find an intersection first (type 8)
+	_if hit_types[8] _is 1 _andif hit_list.size > 1
+	_then
+		tol << cur_trail.intersection_tolerance
+		max_distance << hit_radius
+		intersection_candidates << rope.new()
+		_for a_probe _over hit_list.fast_elements()
+		_loop
+			(t_geom, t_coord, t_distance, t_type) << (_scatter a_probe)
+			_if t_geom.responds_to?(:intersection_near|()|)
+			_then
+				_for i_cand _over intersection_candidates.fast_elements()
+				_loop
+					(i_geom, i_coord, i_distance, i_type) << (_scatter i_cand)
+
+					(p, r) << i_geom.intersection_near(t_geom, a_coord, max_distance, tol)
+
+					_if p _isnt _unset
+					_then
+						_if probe_type _is _unset 
+						_then
+							probe_type   << 8
+							new_coord    << p
+							probed_geom  << t_geom
+							probed_int   << i_geom
+							max_distance << r
+						_elif r < max_distance
+						_then 
+							new_coord     << p
+							probed_geom   << t_geom
+							probed_int    << i_geom
+							max_distance  << r
+						_endif
+					_endif
+				_endloop
+
+				intersection_candidates.add(a_probe)
+			_endif
+		_endloop
+
+		_if probe_type _isnt _unset 
+		_then
+			_return probe.new(new_coord, probe_type, probed_geom), hit_list
+		_endif
+	_endif
+
+	_if hit_list.size > 0
+	_then
+		# ... but ignore those that were added to find an intersection probe
+		ignore_near_probe? << hit_types[8] _is 1 _andif hit_types[1] _is 0
+		ignore_seg_probe?  << hit_types[8] _is 1 _andif hit_types[7] _is 0
+
+		_for a_probe _over hit_list.fast_elements()
+		_loop
+			probe_type << a_probe[4]
+			_if probe_type _is 1 _andif ignore_near_probe? _orif
+			    probe_type _is 7 _andif ignore_seg_probe?
+			_then
+				_continue
+			_endif
+
+			probed_geom << a_probe[1] 
+			new_coord   << a_probe[2]
+			_return probe.new( new_coord, probe_type, probed_geom), hit_list
+		_endloop
+	_endif
+
+	# N.B.: not implementing Protractor Relative (type 9) or
+	# Protractor Absolute (type 10) here, as they are only
+	# applicable to trails (at least, they are in the current
+	# implementation - that could change in the future).
+
+	# Snap to display grid (type 11)
+	_if probe_type _is _unset
+	_then
+		_if (new_probe << cur_trail.mss_probe_from_display_grid(a_coord, our_hit_set, hit_radius,
+									hit_types, last_xy)) _isnt _unset
+		_then
+			_return new_probe, hit_list
+		_endif
+	_endif
+	
+	# When still nothing found, return a default probe
+	new_probe << probe.new(new_coord)
+	
+	_return new_probe, hit_list
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.highlight_geometry(a_geom)
+	## 
+	## 
+
+	_if a_geom _isnt _unset
+	_then
+		_if a_geom.responds_to?(:is_valid?) _andif
+		    _not a_geom.is_valid?
+		_then
+			_return
+		_endif
+		
+		_self.databus_make_data_available(:geometry_to_highlight, a_geom)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.unhighlight_geometry(a_geom)
+	## 
+	## 
+
+	_if a_geom _isnt _unset
+	_then
+		_if a_geom.responds_to?(:is_valid?) _andif
+		    _not a_geom.is_valid?
+		_then
+			_return
+		_endif
+		
+		_self.databus_make_data_available(:geometry_to_unhighlight, a_geom)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.flash_geometry(a_geom)
+	## 
+	## 
+
+	_if a_geom _isnt _unset
+	_then
+		_if a_geom.responds_to?(:is_valid?) _andif
+		    _not a_geom.is_valid?
+		_then
+			_return
+		_endif
+
+		_for i _over 1.upto(3)
+		_loop
+			_thisthread.sleep(1)
+			_self.databus_make_data_available(:geometry_to_unhighlight, a_geom)
+			_thisthread.sleep(1)
+			_self.databus_make_data_available(:geometry_to_highlight, a_geom)
+		_endloop 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.draw_geometry(a_geom, a_style)
+	## 
+	## 
+
+	_if a_geom _isnt _unset
+	_then
+		_if a_geom.responds_to?(:is_valid?) _andif
+		    _not a_geom.is_valid?
+		_then
+			_return
+		_endif
+		
+		_self.databus_make_data_available(:geometry_to_draw, {a_geom, a_style})
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.undraw_geometry(a_geom, a_style)
+	## 
+	## 
+
+	_if a_geom _isnt _unset
+	_then
+		_if a_geom.responds_to?(:is_valid?) _andif
+		    _not a_geom.is_valid?
+		_then
+			_return
+		_endif
+		
+		_self.databus_make_data_available(:geometry_to_undraw, {a_geom, a_style})
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.get_selection_set()
+	## 
+	## Get the selection set of the map for self's current map view.
+	##
+
+	_if (cmv << .current_map_view) _isnt _unset
+	_then
+		_return cmv.map.current_selection
+	_else
+		_return {}
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_manager.set_selection_set(geom_set)
+	## 
+	## Set the selection set of the map for self's current map view
+	## to be GEOM_SET.
+	##
+
+	_if (cmv << .current_map_view) _isnt _unset
+	_then
+		# In case the data passed in is not actually a geometry set:
+		geom_set << geometry_set.new_from(geom_set)
+		cmap << cmv.map
+		cmap.set_current_selection(geom_set)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_manager.terminate_active_ptrule()
+	## 
+	## 
+
+	_if (ptrule << _self.active_ptrule) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_ptrule))
+	_endif
+
+	# The following processing will ultimately set self's one_shot?
+	# value based on the contents of the new ptrule on the top of
+	# the stack.  However, if self really is in one-shot mode now,
+	# preserve that setting once everything is done.
+	cur_os? << .interaction_mode.one_shot?
+	.ptrule_stack.pop()
+	.current_mgf.set_interaction_mode(.interaction_mode)
+	_protect 
+		ptrule.terminate()
+	_protection 
+		_self.reset_interaction_modes(_self.active_ptrule)
+		.interaction_mode.one_shot? << cur_os?
+		_self.active_ptrule_changed()
+	_endprotect 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_manager.terminate_all_ptrules()
+	## 
+	## 
+
+	
+	_protect
+		c << 0
+		_loop
+			# Just in case terminate() for any custom pointing rule is
+			# putting other stuff on the pointing rule stack, avoid
+			# infinite looping.
+			c +<< 1
+			_if c > 100
+			_then
+				.ptrule_stack.empty()
+				_leave
+			_endif 
+			
+			_if .ptrule_stack.size = 0 _then _leave _endif
+			ptrule << .ptrule_stack.pop()
+			ptrule.terminate()
+		_endloop 
+	_protection
+		_self.reset_interaction_modes()
+		_self.active_ptrule_changed()
+	_endprotect 
+	
+_endmethod
+$

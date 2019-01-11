@@ -1,0 +1,108 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, usage={redefinable, subclassable}, topic={mss_common})
+_method dd_record_mixin.mss_tid
+	## 
+	## Return a table identifier for self that is a positive
+	## integer, unique within self's view, and unchanging.
+	##
+
+	_return _self.descriptor.tid
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method dd_record_mixin.mss_complex_key?
+	## 
+	## Return true if self's key cannot be stored in a ds_uint.
+	##
+
+	_return  (kf << _self.key_fields).size ~= 1 _orif
+		kf[1].type.size ~= 1 _orif 
+		_not {:ds_uint, :ds_uint64}.includes?(kf[1].type.phys_type)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={subclassable}, topic={mss_common})
+_method dd_record_mixin.mss_convert_key_to_string()
+	## 
+	## Convert self's key value to a compact string
+	## representation.  This is subclassible, but it should be
+	## optimized for speed and minimum storage space rather than
+	## for generality - the result is stored in the
+	## mss_wtr_complex_key.complex_key field.
+	##
+	## The backstop implementation returns the write_string result
+	## of all key values, separated by a newline character.  This
+	## implementation is not necessarily suitable for all subclasses
+	## (c.f. the subclassed version of this method on
+	## dataless_rwo_record).
+	##
+
+	_if (kfn << _self.key_field_names).size = 1
+	_then
+		# Just write it out.
+		_return _self.perform(kfn[1]).write_string
+	_endif
+
+	# Build a stream of results.
+	s << internal_text_output_stream.new()
+	sep << ""
+	_for kf_name _over kfn.fast_elements()
+	_loop
+		s.write(sep, _self.perform(kf_name))
+		sep << newline_char
+	_endloop
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={subclassable}, topic={mss_common})
+_method dd_record_mixin.mss_convert_string_to_key(str)
+	## 
+	## Convert the string STR to a key value vector - this reverses
+	## the results of the convert_key_to_string() method.
+	##
+
+	_if (kfn << _self.key_field_names).size = 1
+	_then
+		keystrs << {str}
+	_else
+		# The following processing is basically similar to the
+		# split_by() method, but it doesn't trim spaces.
+		keystrs << rope.new()
+		idx << 1
+		len << str.size
+		_loop
+			_if (new_idx << str.index_of(newline_char, idx)) _is _unset
+			_then
+				keystrs.add_last(str.slice_to_end(idx))
+				_leave
+			_else
+				keystrs.add_last(str.slice(idx, new_idx - 1))
+				idx << new_idx + 1
+			_endif
+		_endloop 
+	_endif
+
+	# At this point, if the size of KEYSTRS and KFN do not match
+	# up, the data is invalid - let the caller handle the resulting mess.
+	res << simple_vector.new(kfn.size)
+	_for i _over 1.upto(kfn.size)
+	_loop
+		res[i] << _self.value_from_string(kfn[i], keystrs[i])
+	_endloop 
+	_return res
+	
+_endmethod
+$

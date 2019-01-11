@@ -1,0 +1,1567 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef_folder_config_plugin
+##
+
+def_slotted_exemplar(:mss_ptdef_folder_config_plugin,
+{
+	{:dbv, _unset, :readable},
+	{:items, _unset, :readable},
+	{:folder_list, _unset, :readable},
+	{:contents_list, _unset, :readable},
+	{:ptdef_list, _unset, :readable},
+	{:last_user_selected_list, _unset, :readable},
+	{:cut_copy_data, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptdef_folder_config_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:view_mode, :view_changes, :view_lwt},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.init(name, a_framework)
+	##
+	##
+
+	_super.init(name, a_framework)
+	.dbv << mss_ptrule_manager.dbview
+	.items << property_list.new()
+	_self.set_folder_list()
+
+	.contents_list << rope.new()
+	.ptdef_list << rope.new()
+	.last_user_selected_list << :folder
+	
+	_return _self
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:new_root_folder,
+				       :enabled?, .dbv.writable?,
+				       :engine, _self,
+				       :action_message, :|new_root_folder()|))
+	_self.add_action(sw_action.new(:new_sub_folder,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|new_sub_folder()|))
+	_self.add_action(sw_action.new(:delete_folder,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|delete_folder()|))
+	_self.add_action(sw_action.new(:folder_properties,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|folder_properties()|))
+	_self.add_action(sw_action.new(:export_selected_folder,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|export_selected_folder()|))
+	_self.add_action(sw_action.new(:contents_properties,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|contents_properties()|))
+	_self.add_action(sw_action.new(:delete_contents_relationship,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|delete_contents_relationship()|))
+	_self.add_action(sw_action.new(:add_to_contents,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|add_to_contents()|))
+	_self.add_action(sw_action.new(:export_selected_ptrules,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|export_selected_ptrules()|))
+
+	_self.add_action(sw_action.new(:cut,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|data_cut()|))
+	_self.add_action(sw_action.new(:copy,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|data_copy()|))
+	_self.add_action(sw_action.new(:paste,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|data_paste()|))
+	_self.add_action(sw_action.new(:refresh,
+				       :engine, _self,
+				       :action_message, :|refresh()|))
+	_self.add_action(sw_action.new(:edit_pointing_rule,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|edit_pointing_rule()|))
+	_self.add_action(sw_action.new(:clone_pointing_rule,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|clone_pointing_rule()|))
+	_self.add_action(sw_action.new(:import_pointing_rules,
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|import_pointing_rules()|))
+	_self.add_action(sw_action.new(:import_preserve_folders?,
+				       :caption, _self.message(:import_preserve_folders?),
+				       :value, _true,
+				       :engine, _self,
+				       :value_change_message, :|toggle_import_preserve_folders?()|,
+				       :menu_control, :toggle_item,
+				       :toolbar_control, :toggle_item))
+	_self.add_action(sw_action.new(:import_strict_folders?,
+				       :caption, _self.message(:import_strict_folders?),
+				       :value, _true,
+				       :engine, _self,
+				       :value_change_message, :|toggle_import_strict_folders?()|,
+				       :menu_control, :toggle_item,
+				       :toolbar_control, :toggle_item))
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.build_gui(a_container)
+	## 
+	## 
+
+	main_p << panel.new(a_container)
+	main_p.border_width << main_p.border_height << 0
+	main_p.height_spacing << 0
+	main_p.width_spacing << 0
+	main_p.resize_x? << main_p.resize_y? << _true
+	main_p.tab_label << _self.message(:tab_label)
+	.items[:top_panel] << main_p
+
+	pw << paned_window.new(main_p, :side_by_side?, _true, :resize_x?, _true, :resize_y?, _true)
+	
+	p << panel.new(pw)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << p.resize_y? << _true
+	
+	.items[:folder_list] <<
+		tree_item.new(p,
+			      :resize_x?, _true,
+			      :resize_y?, _true,
+			      :width_in_chars, 70,
+			      :height_in_chars, 24,
+			      :model, _self,
+			      :aspect, :folder_list,
+			      :mode, :one,
+			      :data_selector, :folder_list,
+			      :select_notifier, {:|perform_safely()|, :|folder_list_select()|})
+	.items[:folder_list].popup_menu << _self.framework.popup_for_folder_list(.items[:folder_list])
+
+	p2 << panel.new(pw)
+	p2.border_width << p2.border_height << 0
+	p2.height_spacing << 0
+	p2.width_spacing << 0
+	p2.resize_x? << p2.resize_y? << _true
+	
+	p3 << panel.new(p2)
+	p3.border_width << p3.border_height << 2
+	p3.height_spacing << 2
+	p3.width_spacing << 6
+	p3.resize_x? << p3.resize_y? << _true
+	
+	.items[:contents_list] <<
+		tree_item.new(p3,
+			      :resize_x?, _true,
+			      :resize_y?, _true,
+			      :width_in_chars, 50,
+			      :height_in_chars, 12,
+			      :model, _self,
+			      :aspect, :contents_list,
+			      :mode, :many,
+			      :data_selector, :contents_list,
+			      :select_notifier, {:|perform_safely()|, :|contents_list_select()|},
+			      :double_click_notifier, {:|perform_safely()|, :|contents_list_double_click()|})
+	.items[:contents_list].popup_menu << _self.framework.popup_for_folder_contents_list(.items[:contents_list])
+
+	p4 << panel.new(p2)
+	p4.set_right_of(_unset)
+	p4.set_below(p3)
+	p4.border_width << p4.border_height << 2
+	p4.height_spacing << 2
+	p4.width_spacing << 6
+	p4.resize_x? << p4.resize_y? << _true
+	
+	p4.start_row()
+	.items[:ptdef_filter] <<
+		text_item.new(p4, "",
+			      :display_length, 20,
+			      :max_length, 40)
+	button_item.new_safe(p4, _self.message(:filter),
+			     _self, :|apply_ptdef_filter()|,
+			     :min_width, 75)
+	
+	p4.start_row()
+	.items[:ptdef_list] <<
+		tree_item.new(p4,
+			      :resize_x?, _true,
+			      :resize_y?, _true,
+			      :width_in_chars, 50,
+			      :height_in_chars, 12,
+			      :model, _self,
+			      :aspect, :ptdef_list,
+			      :mode, :many,
+			      :data_selector, :ptdef_list,
+			      :select_notifier, {:|perform_safely()|, :|ptdef_list_select()|},
+			      :double_click_notifier, {:|perform_safely()|, :|ptdef_list_double_click()|})
+	.items[:ptdef_list].popup_menu << _self.framework.popup_for_folder_ptdef_list(.items[:ptdef_list])
+
+	_return main_p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.user_error(key, _gather args)
+	## 
+	## Shortcut for raising a user error condition.
+	##
+
+	condition.raise(:user_error, :string, _self.message(key, _scatter args))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :view_changes _orif
+	    data_type_name _is :view_lwt
+	_then
+		_self.refresh()
+	_elif data_type_name _is :view_mode
+	_then
+		_self.manage_actions_for_folder_list_selection()
+		_self.manage_actions_for_contents_list_selection()
+		_self.manage_actions_for_ptdef_list_selection()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.post_activation()
+	## 
+	## 
+
+	_super.post_activation()
+	_self.manage_actions_for_folder_list_selection()
+	_self.manage_actions_for_contents_list_selection()
+	_self.manage_actions_for_ptdef_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.folder_list_select(selection, user_sel?)
+	## 
+	## 
+
+	_if user_sel? _is _true
+	_then
+		.last_user_selected_list << :folder
+	_endif 
+	_self.manage_actions_for_folder_list_selection()
+	_self.set_contents_list()
+	_self.changed(:contents_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.contents_list_select(selection, user_sel?)
+	## 
+	##
+
+	_if user_sel? _is _true
+	_then
+		.last_user_selected_list << :contents
+	_endif 
+	_self.manage_actions_for_contents_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.contents_list_double_click(selection)
+	## 
+	## 
+
+	_if (rec << selection.value[:ptdef]) _isnt _unset _andif
+	    rec.is_valid?
+	_then
+		_self.framework.activate_editor_for_object(rec)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.ptdef_list_select(selection, user_sel?)
+	## 
+	## 
+
+	_self.manage_actions_for_ptdef_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.ptdef_list_double_click(selection)
+	## 
+	## 
+
+	_if (rec << selection.value[:ptdef]).is_valid?
+	_then
+		_self.framework.activate_editor_for_object(rec)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.set_folder_list()
+	## 
+	## Build the list of folders.
+	##
+
+	.folder_list << rope.new()
+
+	tbl << .dbv.collections[:mss_ptdef_folder]
+	sstr << {:image, :folder, :value, :description}
+
+	top_recs << sorted_collection.new(10,
+					  _proc(a, b)
+						  _return a.name _cf b.name
+					  _endproc)
+	top_recs.add_all(tbl.select(predicate.eq(:parent_id, _unset)))
+	
+	_for top_rec _over top_recs.fast_elements()
+	_loop 
+		# For each top_rec, add child folders recursively.
+		done << equality_set.new()
+		q << queue.new()
+		q.add({top_rec, _unset})
+		_loop
+			_if q.size = 0 _then _leave _endif
+			data << q.next()
+			rec << data[1]
+			parent_tree << data[2]
+			_if done.includes?(rec) _then _continue _endif
+			done.add(rec)
+			
+			pl << property_list.new_with(
+				      :folder, rec,
+				      :description, rec.name.as_charvec())
+			new_tree << display_tree.new(rec.id, pl, parent_tree)
+			new_tree.styled_string << sstr
+			_if parent_tree _is _unset
+			_then
+				# This is a top-level folder: add it to the list.
+				.folder_list.add_last(new_tree)
+			_endif
+
+			_for child_rec _over rec.child_folders.fast_elements()
+			_loop
+				q.add({child_rec, new_tree})
+			_endloop
+		_endloop 
+	_endloop
+
+	_return .folder_list
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.set_contents_list()
+	## 
+	## Build the list of contents of the selected folder.
+	##
+
+	.contents_list.empty()
+	_if (sel_rwo << _self.selected_folder) _isnt _unset
+	_then
+		sstr1 << {:image, :folder, :value, :description}
+		sstr2 << {:image, :internal_table, :value, :description}
+		
+		_for child_rec _over sel_rwo.child_folders.fast_elements()
+		_loop
+			pl << property_list.new_with(
+				      :folder, child_rec,
+				      :description, child_rec.name.as_charvec())
+			new_tree << display_tree.new(child_rec.id, pl)
+			new_tree.styled_string << sstr1
+			.contents_list.add_last(new_tree)
+		_endloop
+		
+		_for child_rec _over sel_rwo.child_ptdefs.fast_elements()
+		_loop
+			pl << property_list.new_with(
+				      :ptdef, child_rec,
+				      :parent_folder, sel_rwo,
+				      :description, child_rec.name.as_charvec())
+			new_tree << display_tree.new(child_rec.id, pl)
+			new_tree.styled_string << sstr2
+			.contents_list.add_last(new_tree)
+		_endloop
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.is_tab_active_page?(a_panel)
+	## 
+	## 
+
+	_return .items[:top_panel] _is a_panel
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.selected_folder
+	## 
+	## 
+
+	_if (ti << .items[:folder_list]) _is _unset
+	_then
+		_return _unset
+	_endif
+
+	sel_rwo << _unset 
+	_if ti.selection.size = 1
+	_then 
+		single_sel << ti.selection.an_element()
+		_if (sel_rwo << single_sel.value[:folder]) _isnt _unset _andif
+		    _not sel_rwo.is_valid?
+		_then
+			sel_rwo << _unset
+		_endif
+	_endif 
+	_return sel_rwo
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.selected_contents
+	## 
+	## 
+
+	_if (ti << .items[:contents_list]) _is _unset
+	_then
+		_return {}
+	_endif
+
+	r << rope.new()
+	_for i _over ti.selection.fast_elements()
+	_loop 
+		_if (sel_rwo << i.value[:folder]) _isnt _unset _andif
+		    sel_rwo.is_valid?
+		_then
+			r.add_last({sel_rwo, _unset})
+		_elif (sel_rwo << i.value[:ptdef]) _isnt _unset _andif
+		      sel_rwo.is_valid? _andif
+		      (sel_parent << i.value[:parent_folder]) _isnt _unset _andif
+		      sel_parent.is_valid?
+		_then
+			r.add_last({sel_rwo, sel_parent})
+		_endif
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.selected_ptdefs
+	## 
+	## 
+
+	_if (ti << .items[:ptdef_list]) _is _unset
+	_then
+		_return {}
+	_endif
+
+	r << rope.new()
+	_for i _over ti.selection.fast_elements()
+	_loop
+		_if (sel_rwo << i.value[:ptdef]) _isnt _unset _andif
+		    sel_rwo.is_valid?
+		_then
+			r.add_last(sel_rwo)
+		_endif
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.manage_actions_for_folder_list_selection()
+	## 
+	## 
+
+	sel_rwo << _self.selected_folder
+	sel? << sel_rwo _isnt _unset
+	w? << .dbv.writable?
+	
+	_self.action(:new_root_folder).enabled? << w?
+	_self.action(:new_sub_folder).enabled? << w? _andif sel?
+	_self.action(:delete_folder).enabled? << w? _andif sel?
+	_self.action(:folder_properties).enabled? << w? _andif sel?
+	_self.action(:export_selected_folder).enabled? << sel?
+	
+	_self.manage_copy_paste_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.manage_actions_for_contents_list_selection()
+	## 
+	## 
+
+	w? << .dbv.writable?
+
+	# If ALL selections in the contents_list are ptdefs (as opposed
+	# to folders), the following actions are available.
+	only_ptdef_sel? << _true
+	all_sel << rope.new()
+	_for i _over _self.selected_contents.fast_elements()
+	_loop
+		all_sel.add_last(i)
+		_if _not i[1].is_valid? _orif
+		    i[1].source_collection.name _isnt :mss_ptdef
+		_then
+			only_ptdef_sel? << _false
+		_endif
+	_endloop
+	_self.action(:delete_contents_relationship).enabled? << w? _andif all_sel.size > 0 _andif
+								only_ptdef_sel?
+	_self.action(:contents_properties).enabled? << w? _andif all_sel.size = 1 _andif
+						       only_ptdef_sel?
+	
+	_self.manage_copy_paste_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.manage_actions_for_ptdef_list_selection()
+	## 
+	## 
+
+	w? << .dbv.writable?
+	all_sel << _self.selected_ptdefs
+	_self.action(:add_to_contents).enabled? << w? _andif all_sel.size > 0
+	_self.action(:edit_pointing_rule).enabled? << all_sel.size = 1
+	_self.action(:clone_pointing_rule).enabled? << w? _andif all_sel.size = 1
+	_self.action(:import_pointing_rules).enabled? << w?
+	_self.action(:export_selected_ptrules).enabled? << all_sel.size > 0
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.manage_copy_paste_actions()
+	## 
+	## 
+
+	folder_sel? << _self.selected_folder _isnt _unset
+	w? << .dbv.writable?
+
+	# Cut/copy depend on which list has been selected last - either
+	# a single selection in :folder_list, or one or more selections
+	# in :contents_list.
+	_if .last_user_selected_list _is :folder
+	_then
+		sel? << _self.selected_folder _isnt _unset
+	_elif .last_user_selected_list _is :contents
+	_then
+		sel? << _self.selected_contents.size > 0
+	_else
+		sel? << _false
+	_endif 
+	_self.action(:cut).enabled? << w? _andif sel?
+	_self.action(:copy).enabled? << w? _andif sel?
+
+	# Paste is enabled if something has been cut/copied, and if a
+	# folder has been selected to paste to.
+	_self.action(:paste).enabled? << w? _andif folder_sel? _andif .cut_copy_data _isnt _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.new_root_folder()
+	## 
+	## Create a dialog to prompt for the creation of a new root folder.
+	##
+
+	_if (d << _self.get_dialog(:folder)) _is _unset
+	_then
+		d << mss_pfcp_folder_dialog.new_dialog(_self, _self)
+		d.activate()
+		_self.cache_dialog(:folder, d)
+	_else
+		d.reactivate()
+	_endif
+	d.callback_data << property_list.new_with(:mode, :new_root_folder)
+	d.reset()
+	
+	_return d
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.new_sub_folder()
+	## 
+	## Create a dialog to prompt for the creation of a new sub folder.
+	##
+
+	_if (sel_rwo << _self.selected_folder) _is _unset
+	_then
+		_self.user_error(:select_parent_folder)
+	_endif 
+	
+	_if (d << _self.get_dialog(:folder)) _is _unset
+	_then
+		d << mss_pfcp_folder_dialog.new_dialog(_self, _self)
+		d.activate()
+		_self.cache_dialog(:folder, d)
+	_else
+		d.reactivate()
+	_endif
+	d.callback_data << property_list.new_with(:mode, :new_sub_folder,
+						  :parent, sel_rwo)
+	d.reset()
+	
+	_return d
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.folder_properties()
+	## 
+	## Create a dialog to prompt for the properties of an existing folder.
+	##
+
+	_if (sel_rwo << _self.selected_folder) _is _unset
+	_then
+		_self.user_error(:select_folder)
+	_endif 
+	
+	_if (d << _self.get_dialog(:folder)) _is _unset
+	_then
+		d << mss_pfcp_folder_dialog.new_dialog(_self, _self)
+		d.activate()
+		_self.cache_dialog(:folder, d)
+	_else
+		d.reactivate()
+	_endif
+	d.callback_data << property_list.new_with(:mode, :folder_properties,
+						  :record, sel_rwo)
+	d.reset()
+	
+	_return d
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.contents_properties()
+	## 
+	## Create a dialog to prompt for the properties of an existing
+	## ptdef within its folder.
+	##
+
+	_if (sel_contents << _self.selected_contents).size ~= 1 _orif
+	    sel_contents[1][1].source_collection.name _isnt :mss_ptdef _orif
+	    _not sel_contents[1][1].is_valid? _orif
+	    _not sel_contents[1][2].is_valid?
+	_then
+		_self.user_error(:select_ptdef)
+	_endif 
+	
+	_if (d << _self.get_dialog(:folder)) _is _unset
+	_then
+		d << mss_pfcp_folder_dialog.new_dialog(_self, _self)
+		d.activate()
+		_self.cache_dialog(:folder, d)
+	_else
+		d.reactivate()
+	_endif
+	d.callback_data << property_list.new_with(:mode, :contents_properties,
+						  :record, sel_contents[1][1],
+						  :parent_folder, sel_contents[1][2])
+	d.reset()
+	
+	_return d
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.folder_dialog_ok(data)
+	## 
+	## OK callback method from folder dialog.
+	##
+
+	tbl << .dbv.collections[:mss_ptdef_folder]
+	d << data[:callback_data]
+
+	ok? << .dbv.start_lwt()
+	_protect 
+		_if d[:mode] _is :new_root_folder
+		_then
+			ndr << tbl.new_detached_record()
+			ndr.name << data[:folder_name]
+			ndr.parent_id << _unset
+			ndr.seq << 0
+			ndr.source_collection.insert(ndr)
+			u_msg << _self.message(:undo_create_new_root_folder, ndr.name)
+
+		_elif d[:mode] _is :new_sub_folder
+		_then
+			ndr << tbl.new_detached_record()
+			ndr.name << data[:folder_name]
+			ndr.parent_id << d[:parent].id
+			ndr.seq << data[:sequence].default(0)
+			rec << ndr.source_collection.insert(ndr)
+			u_msg << _self.message(:undo_create_new_sub_folder, ndr.name)
+
+		_elif d[:mode] _is :folder_properties
+		_then
+			dr << d[:record].detached()
+			dr.name << data[:folder_name]
+			_if dr.parent_id _isnt _unset 
+			_then
+				dr.seq << data[:sequence].default(0)
+			_endif 
+			rec << dr.source_collection.update(dr)
+			u_msg << _self.message(:undo_folder_properties, dr.name)
+
+		_elif d[:mode] _is :contents_properties
+		_then
+			rel << d[:record].parent_folder_relationship(d[:parent_folder])
+			_if rel _isnt _unset
+			_then
+				dr << rel.detached()
+				dr.seq << data[:sequence].default(0)
+				rec << dr.source_collection.update(dr)
+			_endif 
+			u_msg << _self.message(:undo_contents_properties, d[:record].name)
+		_endif
+
+		ok? << _true
+	_protection
+		.dbv.end_lwt(ok?, _true, u_msg, property_list.new_with(:function, u_msg))
+	_endprotect
+
+	_if ok?
+	_then
+		_self.set_folder_list()
+		_self.changed(:folder_list, :refresh)
+		_self.set_contents_list()
+		_self.changed(:contents_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.delete_folder()
+	## 
+	## Delete the selected folder.
+	##
+
+	_if (sel_rwo << _self.selected_folder) _is _unset
+	_then
+		_self.user_error(:select_folder)
+	_endif 
+
+	_if _self.framework.show_query({_self.message(:ok),
+					_self.message(:cancel)},
+				       {_true, _false}, _true,
+				       _self.message(:confirm_delete, sel_rwo.name)) _is _false
+	_then
+		_return
+	_endif 
+
+	ok? << .dbv.start_lwt()
+	_protect
+		u_msg << _self.message(:undo_delete_folder, sel_rwo.name)
+		sel_rwo.delete()
+		ok? << _true
+	_protection
+		.dbv.end_lwt(ok?, _true, u_msg, property_list.new_with(:function, u_msg))
+	_endprotect
+
+	_if ok?
+	_then
+		.cut_copy_data << _unset 
+		_self.framework.status_info << ""
+		_self.set_folder_list()
+		_self.changed(:folder_list, :refresh)
+		_self.set_contents_list()
+		_self.changed(:contents_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.data_cut()
+	## 
+	## 
+
+	_if .last_user_selected_list _is :folder
+	_then 
+		_if (sel_rwo << _self.selected_folder) _is _unset
+		_then
+			_self.user_error(:select_data_for_cut)
+		_endif
+		sel_rwos << {sel_rwo}
+	_elif .last_user_selected_list _is :contents
+	_then
+		_if (sel_rwos << _self.selected_contents).size = 0
+		_then
+			_self.user_error(:select_data_for_cut)
+		_endif
+	_else
+		_self.user_error(:select_data_for_cut)
+	_endif
+	
+	.cut_copy_data <<
+		property_list.new_with(:mode, :cut,
+				       :data, sel_rwos)
+	_if sel_rwos.size = 1
+	_then 
+		thing << sel_rwos.an_element()
+		_if _not thing.is_a_datastore_object?
+		_then
+			thing << thing[1]
+		_endif 
+		_self.framework.status_info <<
+			_self.message(:cut_pending, thing.name)
+	_else
+		_self.framework.status_info <<
+			_self.message(:cut_pending_multiple, sel_rwos.size)
+	_endif 
+	_self.manage_copy_paste_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.data_copy()
+	## 
+	## 
+
+	_if .last_user_selected_list _is :folder
+	_then 
+		_if (sel_rwo << _self.selected_folder) _is _unset
+		_then
+			_self.user_error(:select_data_for_copy)
+		_endif
+		sel_rwos << {sel_rwo}
+	_elif .last_user_selected_list _is :contents
+	_then
+		_if (sel_rwos << _self.selected_contents).size = 0
+		_then
+			_self.user_error(:select_data_for_copy)
+		_endif
+	_else
+		_self.user_error(:select_data_for_copy)
+	_endif
+	
+	.cut_copy_data <<
+		property_list.new_with(:mode, :copy,
+				       :data, sel_rwos)
+	_if sel_rwos.size = 1
+	_then
+		thing << sel_rwos.an_element()
+		_if _not thing.is_a_datastore_object?
+		_then
+			thing << thing[1]
+		_endif 
+		_self.framework.status_info <<
+			_self.message(:copy_pending, thing.name)
+	_else
+		_self.framework.status_info <<
+			_self.message(:copy_pending_multiple, sel_rwos.size)
+	_endif 
+	_self.manage_copy_paste_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.data_paste()
+	## 
+	## 
+
+	_if (ccd << .cut_copy_data) _is _unset _then _return _endif 
+	_if (sel_rwo << _self.selected_folder) _is _unset
+	_then
+		_self.user_error(:select_parent_folder)
+	_endif
+	
+	ok? << .dbv.start_lwt()
+	_protect
+		_if ccd[:mode] _is :cut
+		_then
+			_for child_data _over ccd[:data].fast_elements()
+			_loop
+				_if child_data.is_a_datastore_object?
+				_then
+					# This applies to mss_ptdef_folders, which need no additional
+					# information to perform this operation.
+					child_data.set_parent_folder(sel_rwo)
+				_else
+					# This applies to mss_ptdefs, which also need to know the
+					# old parent folder.
+					child_data[1].set_parent_folder(sel_rwo, child_data[2])
+				_endif 
+			_endloop 
+			u_msg << _self.message(:undo_cut_and_paste)
+
+		_elif ccd[:mode] _is :copy
+		_then
+			_for child_data _over ccd[:data].fast_elements()
+			_loop
+				_if child_data.is_a_datastore_object?
+				_then
+					# This applies to mss_ptdef_folders, which need no additional
+					# information to perform this operation.
+					child_data.clone_to_parent_folder(sel_rwo)
+				_else
+					# This applies to mss_ptdefs, which also need to know the
+					# old parent folder.
+					child_data[1].clone_to_parent_folder(sel_rwo, child_data[2])
+				_endif 
+			_endloop 
+			u_msg << _self.message(:undo_copy_and_paste)
+		_endif 
+
+		ok? << _true
+	_protection
+		.dbv.end_lwt(ok?, _true, u_msg, property_list.new_with(:function, u_msg))
+	_endprotect
+
+	_if ok?
+	_then
+		.cut_copy_data << _unset 
+		_self.framework.status_info << ""
+		_self.set_folder_list()
+		_self.changed(:folder_list, :refresh)
+		_self.set_contents_list()
+		_self.changed(:contents_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.refresh()
+	## 
+	## Update all displayed lists.
+	##
+
+	_self.set_folder_list()
+	_self.changed(:folder_list, :refresh)
+	_self.set_contents_list()
+	_self.changed(:contents_list, :refresh)
+	_self.refresh_ptdef_list()
+
+	_self.manage_actions_for_folder_list_selection()
+	_self.manage_actions_for_contents_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.apply_ptdef_filter()
+	## 
+	## Apply the partial filter in the ptdef_filter input field,
+	## and populate ptdef_list.
+	##
+
+	match_str << .items[:ptdef_filter].value.default("")
+	_if match_str.size = 0 _orif
+	    match_str.last ~= %*
+	_then
+		match_str +<< %*
+	_endif
+	sc << sorted_collection.new(10, _proc(a, b)
+						_return a[1] _cf b[1]
+				    _endproc)
+	_for i _over .dbv.collections[:mss_ptdef].
+		select(predicate.wild(:name, match_str)).fast_elements()
+	_loop
+		sc.add({i.name.as_charvec(), i})
+	_endloop
+
+	.ptdef_list.empty()
+	sstr << {:image, :internal_table, :value, :description}
+	_for i _over sc.fast_elements()
+	_loop
+		rec << i[2]
+		pl << property_list.new_with(
+			      :ptdef, rec,
+			      :description, rec.name.as_charvec())
+		new_tree << display_tree.new(rec.id, pl)
+		new_tree.styled_string << sstr
+		.ptdef_list.add_last(new_tree)
+	_endloop
+
+	_self.changed(:ptdef_list, :renew)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.refresh_ptdef_list()
+	## 
+	## Examine ptdef_list, and if any record is no longer valid,
+	## remove it and refresh the list.
+	##
+
+	changed? << _false
+	_for i _over .ptdef_list.size.downto(1)
+	_loop
+		pl << .ptdef_list[i].value
+		_if (rec << pl[:ptdef]) _is _unset _orif
+		    _not rec.is_valid?
+		_then
+			.ptdef_list.remove_nth(i)
+			changed? << _true
+			_continue 
+		_endif
+		_if pl[:description] ~= rec.name
+		_then
+			pl[:description] << rec.name.as_charvec()
+			changed? << _true 
+		_endif
+	_endloop
+	_if changed?
+	_then
+		_self.changed(:ptdef_list, :refresh)
+	_else
+		_self.changed(:ptdef_list)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.delete_contents_relationship()
+	## 
+	## Remove selected ptdefs from the current folder.
+	##
+
+	to_do << rope.new()
+	_for i _over _self.selected_contents.fast_elements()
+	_loop
+		_if i[1].source_collection.name _isnt :mss_ptdef _orif
+		    _not i[1].is_valid? _orif
+		    _not i[2].is_valid?
+		_then
+			_continue
+		_endif
+		to_do.add_last(i)
+	_endloop
+
+	_if to_do.size = 0
+	_then
+		_self.user_error(:select_ptdefs_to_remove)
+	_endif 
+	
+	ok? << .dbv.start_lwt()
+	_protect
+		_for i _over to_do.fast_elements()
+		_loop
+			_if (rel << i[1].parent_folder_relationship(i[2])) _isnt _unset
+			_then
+				rel.delete()
+			_endif
+		_endloop
+		u_msg << _self.message(:undo_delete_contents_relationship)
+		ok? << _true
+	_protection
+		.dbv.end_lwt(ok?, _true, u_msg, property_list.new_with(:function, u_msg))
+	_endprotect
+
+	_if ok?
+	_then
+		.cut_copy_data << _unset 
+		_self.framework.status_info << ""
+		_self.set_contents_list()
+		_self.changed(:contents_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.add_to_contents()
+	## 
+	## Add selected ptdefs from the current folder.
+	##
+
+	to_do << rope.new()
+	_for i _over _self.selected_ptdefs.fast_elements()
+	_loop
+		_if _not i.is_valid?
+		_then
+			_continue
+		_endif
+		to_do.add_last(i)
+	_endloop
+
+	_if to_do.size = 0
+	_then
+		_self.user_error(:select_ptdefs_to_add)
+	_endif 
+	_if (parent << _self.selected_folder) _is _unset
+	_then
+		_self.user_error(:select_parent_folder)
+	_endif
+	
+	ok? << .dbv.start_lwt()
+	_protect
+		_for i _over to_do.fast_elements()
+		_loop
+			i.set_parent_folder(parent)
+		_endloop
+		u_msg << _self.message(:undo_add_to_contents)
+		ok? << _true
+	_protection
+		.dbv.end_lwt(ok?, _true, u_msg, property_list.new_with(:function, u_msg))
+	_endprotect
+
+	_if ok?
+	_then
+		_self.set_contents_list()
+		_self.changed(:contents_list, :refresh)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.edit_pointing_rule()
+	## 
+	## Edit the selected pointing rule.
+	##
+
+	rec << _self.selected_ptdefs.an_element()
+	_if rec _is _unset
+	_then
+		_self.user_error(:select_ptdef)
+	_endif 
+	_self.framework.activate_editor_for_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.clone_pointing_rule()
+	## 
+	## Create a clone of the selected ptdef.
+	##
+
+	rec << _self.selected_ptdefs.an_element()
+	_if rec _is _unset
+	_then
+		_self.user_error(:select_ptdef)
+	_endif
+
+	ok? << .dbv.start_lwt()
+	_protect
+		new_rec << rec.clone_with_substructure()
+		u_msg << _self.message(:undo_clone_pointing_rule)
+		ok? << _true
+	_protection
+		.dbv.end_lwt(ok?, _true, u_msg, property_list.new_with(:function, u_msg))
+	_endprotect
+
+	# Refresh display appropriately.
+	sstr << {:image, :internal_table, :value, :description}
+	pl << property_list.new_with(
+		      :ptdef, new_rec,
+		      :description, new_rec.name.as_charvec())
+	new_tree << display_tree.new(rec.id, pl)
+	new_tree.styled_string << sstr
+
+	# Find the rec in the list, and add the cloned record right
+	# after it.
+	rec_id << rec.id
+	found? << _false 
+	_for i, j _over .ptdef_list.fast_keys_and_elements()
+	_loop
+		_if j.key = rec_id
+		_then
+			found? << _true
+			.ptdef_list.add_nth(new_tree, i + 1)
+			_leave
+		_endif
+	_endloop
+	_if _not found?
+	_then 
+		.ptdef_list.add_last(new_tree)
+	_endif
+	
+	_self.changed(:ptdef_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.import_pointing_rules(_optional fname)
+	## 
+	## Import pointing rules from the file named FNAME - if not
+	## provided, it will be prompted.
+	##
+
+	_if .dbv.updated?
+	_then
+		condition.raise(:user_error, :string, _self.message(:dbv_updated))
+	_endif
+	
+	_if fname _is _unset
+	_then
+		fd << file_dialog.new(_self, {:|perform_safely()|, :|do_import_pointing_rules()|}, _unset,
+				      :directory, "",
+				      :operation, :open,
+				      :filter, {_self.message(:xml_filter), "*.xml"},
+				      :title, _self.message(:import_dialog_title))
+		fd.activate()
+	_else
+		_self.do_import_pointing_rules(fname)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.do_import_pointing_rules(fname)
+	## 
+	## Import pointing rules from the file named FNAME.
+	##
+
+	_if _not system.file_readable?(fname)
+	_then
+		condition.raise(:user_error, :string, _self.message(:file_not_readable, fname))
+	_endif
+
+	ok? << _false 
+	_protect
+		f << external_text_input_stream.new(fname)
+		config_rope << serial_xml_thing.read_thing_from(f)
+
+		# First pass: create all data except for child_ptdefs, since
+		# all child references may not exist until this pass is done.
+		_for idx, config_data _over config_rope.fast_keys_and_elements()
+		_loop
+			# Currently, can only read version 1.  Version "0" didn't have
+			# a header at all, so cater to that situation.
+			_if idx = 1 _andif
+			    config_data.is_kind_of?(property_list) _andif 
+			    (version_info << config_data[:version]) _isnt _unset
+			_then
+				_if version_info ~= 1
+				_then
+					_self.user_error(:import_cannot_read_version, version_info)
+				_endif
+				_continue 
+			_endif
+			
+			mss_ptdef.create_from_serial(config_data, .dbv, _true, _false,
+						     _self.action(:import_preserve_folders?).value,
+						     _self.action(:import_strict_folders?).value)
+		_endloop
+
+		# Second pass: create child references.
+		_for idx, config_data _over config_rope.fast_keys_and_elements()
+		_loop
+			# Skip the header, if it exists.
+			_if idx = 1 _andif
+			    config_data.is_kind_of?(property_list) _andif 
+			    (version_info << config_data[:version]) _isnt _unset
+			_then
+				_continue
+			_endif
+			
+			mss_ptdef.create_child_ptdefs_from_serial(config_data, .dbv)
+		_endloop
+
+		ok? << _true 
+	_protection
+		_if f _isnt _unset _then f.close() _endif
+		_if _not ok?
+		_then
+			.dbv.rollback()
+		_endif
+		_self.refresh()
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.toggle_import_preserve_folders?(new_val)
+	## 
+	## If this is set false, then the import_strict_folders? value
+	## must also be false.
+	##
+
+	a << _self.action(:import_strict_folders?)
+	_if new_val _is _false
+	_then
+		a.value << new_val
+	_endif
+	a.enabled? << new_val
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.toggle_import_strict_folders?(new_val)
+	##
+	## No additional processing required when this changes.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.export_selected_folder(_optional fname)
+	## 
+	## Export all pointing rules in selected folder to the file
+	## named FNAME - if not provided, it will be prompted.
+	##
+	
+	_if fname _is _unset
+	_then
+		fd << file_dialog.new(_self, {:|perform_safely()|, :|do_export_selected_folder()|}, _unset,
+				      :directory, "",
+				      :operation, :save,
+				      :filter, {_self.message(:xml_filter), "*.xml"},
+				      :title, _self.message(:export_folder_dialog_title))
+		fd.activate()
+	_else
+		_self.do_export_selected_folder(fname)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.do_export_selected_folder(fname)
+	## 
+	## Export all pointing rules in selected folder to the file
+	## named FNAME.
+	##
+	
+	suf << _self.message(:xml_filetype)
+	_if fname.size <= suf.size _orif
+	    fname.lowercase.slice_to_end(fname.size - suf.size + 1) ~= suf.lowercase
+	_then
+		fname << write_string(fname, suf)
+	_endif
+
+	_try 
+		f << external_text_output_stream.new(fname)
+	_when error 
+		_if f _isnt _unset _then f.close() _endif
+		condition.raise(:user_error, :string, _self.message(:file_not_writable, fname))
+	_endtry
+
+	_protect
+		config_rope << rope.new()
+
+		# First line is version information.
+		config_rope.add_last(property_list.new_with(:version, 1))
+		
+		to_do << sorted_collection.new(10, _proc(a, b)
+							   _return a.internal_name _cf b.internal_name
+					       _endproc)
+		to_do.add_all(_self.ptdefs_in_selected_folder())
+		_for i _over to_do.fast_elements()
+		_loop
+			pl << i.prepare_for_serial(_false, _false)
+			config_rope.add_last(pl)
+		_endloop 
+		serial_xml_thing.write_thing_to(config_rope, f)
+	_protection
+		_if f _isnt _unset _then f.close() _endif
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.ptdefs_in_selected_folder()
+	## 
+	## Return a collection of all ptdef records in the selected folder.
+	##
+
+	r << rope.new()
+	_if (sel_folder << _self.selected_folder) _is _unset
+	_then
+		_return r
+	_endif
+
+	# First, get all sub-folders.
+	q << queue.new()
+	q.add(sel_folder)
+	done_folders << equality_set.new_with(sel_folder)
+	f_rope << rope.new_with(sel_folder)
+	_loop
+		_if q.size = 0 _then _leave _endif
+		next << q.next()
+		_for child _over next.child_folders.fast_elements()
+		_loop
+			_if done_folders.includes?(child)
+			_then
+				_continue
+			_endif
+			done_folders.add(child)
+			f_rope.add_last(child)
+			q.add(child)
+		_endloop
+	_endloop
+
+	# Next, process all ptdefs for all folders.
+	done_ptdefs << equality_set.new()
+	_for i _over f_rope.fast_elements()
+	_loop
+		_for child _over i.child_ptdefs.fast_elements()
+		_loop
+			_if done_ptdefs.includes?(child)
+			_then
+				_continue
+			_endif
+			done_ptdefs.add(child)
+			r.add_last(child)
+
+			_for sub_child _over child.all_child_ptdefs().fast_elements()
+			_loop
+				_if done_ptdefs.includes?(sub_child)
+				_then
+					_continue
+				_endif
+				done_ptdefs.add(sub_child)
+				r.add_last(sub_child)
+			_endloop 
+		_endloop
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.export_selected_ptrules(_optional fname)
+	## 
+	## Export selected pointing rules to the file named FNAME - if not
+	## provided, it will be prompted.
+	##
+	
+	_if fname _is _unset
+	_then
+		fd << file_dialog.new(_self, {:|perform_safely()|, :|do_export_selected_ptrules()|}, _unset,
+				      :directory, "",
+				      :operation, :save,
+				      :filter, {_self.message(:xml_filter), "*.xml"},
+				      :title, _self.message(:export_ptrules_dialog_title))
+		fd.activate()
+	_else
+		_self.do_export_selected_ptrules(fname)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_folder_config_plugin.do_export_selected_ptrules(fname)
+	## 
+	## Export selected pointing rules to the file named FNAME.
+	##
+	
+	suf << _self.message(:xml_filetype)
+	_if fname.size <= suf.size _orif
+	    fname.lowercase.slice_to_end(fname.size - suf.size + 1) ~= suf.lowercase
+	_then
+		fname << write_string(fname, suf)
+	_endif
+
+	_try 
+		f << external_text_output_stream.new(fname)
+	_when error 
+		_if f _isnt _unset _then f.close() _endif
+		condition.raise(:user_error, :string, _self.message(:file_not_writable, fname))
+	_endtry
+
+	_protect
+		config_rope << rope.new()
+
+		# First line is version information.
+		config_rope.add_last(property_list.new_with(:version, 1))
+				
+		raw_ptdefs << equality_set.new()
+		_for i _over _self.selected_ptdefs.fast_elements()
+		_loop
+			raw_ptdefs.add(i)
+			raw_ptdefs.add_all(i.all_child_ptdefs())
+		_endloop
+		
+		to_do << sorted_collection.new(10, _proc(a, b)
+							   _return a.internal_name _cf b.internal_name
+					       _endproc)
+		to_do.add_all(raw_ptdefs)
+		_for i _over to_do.fast_elements()
+		_loop
+			pl << i.prepare_for_serial(_false, _false)
+			config_rope.add_last(pl)
+		_endloop 
+		serial_xml_thing.write_thing_to(config_rope, f)
+	_protection
+		_if f _isnt _unset _then f.close() _endif
+	_endprotect
+
+_endmethod
+$

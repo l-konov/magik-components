@@ -1,0 +1,24 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-06-07 22:54:06 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 04-13-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+smallworld_product.register_application(:mclib_thread_manager,
+					"mclib:thread_manager_application",
+					:external_name,"Thread manager",
+					:resource_module_name,:mclib_thread_manager,
+					:icon_name,:thread_manager,
+					:description,"Start the thread manager")
+$

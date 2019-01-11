@@ -1,0 +1,93 @@
+<gui>
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="mss_bulk_update_plugin.clear_proposed_changes"/>
+      <action name="mss_bulk_update_plugin.perform_update"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.perform_delete"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.interrupt"/>
+      <separator/>
+      <action name="close"/>
+    </submenu>
+    <submenu name="edit">
+      <action name="mss_bulk_update_plugin.add_by_map_selection"/>
+      <action name="mss_bulk_update_plugin.add_by_trail"/>
+      <action name="mss_bulk_update_plugin.add_by_scrapbook"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.remove_by_map_selection"/>
+      <action name="mss_bulk_update_plugin.remove_object"/>
+      <action name="mss_bulk_update_plugin.remove_selected_tables"/>
+      <action name="mss_bulk_update_plugin.remove_all"/>
+      <action name="mss_bulk_update_plugin.remove_by_attribute"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.edit_object"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.copy_to_scrapbook"/>
+    </submenu>
+    <submenu name="view">
+      <action name="mss_bulk_update_plugin.goto_object"/>
+      <action name="mss_bulk_update_plugin.goto_selected_tables"/>
+      <action name="mss_bulk_update_plugin.goto_all"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.highlight_object"/>
+      <action name="mss_bulk_update_plugin.highlight_selected_tables"/>
+      <action name="mss_bulk_update_plugin.highlight_all"/>
+      <separator/>
+      <action name="mss_bulk_update_plugin.display_first"/>
+      <action name="mss_bulk_update_plugin.display_prev"/>
+      <action name="mss_bulk_update_plugin.display_next"/>
+      <action name="mss_bulk_update_plugin.display_last"/>
+    </submenu>
+    <submenu name="options">
+      <action name="mss_bulk_update_plugin.suppress_warnings?"/>
+      <action name="mss_bulk_update_plugin.force_commit?"/>
+      <action name="mss_bulk_update_plugin.append_text_joins?"/>
+    </submenu>
+  </menu>
+
+  <toolbar name="system">
+    <action name="mss_bulk_update_plugin.clear_proposed_changes"/>
+    <action name="mss_bulk_update_plugin.perform_update"/>
+  </toolbar>
+  <toolbar name="interrupt">
+    <action name="mss_bulk_update_plugin.interrupt"/>
+  </toolbar>
+  <toolbar name="edit">
+    <action name="mss_bulk_update_plugin.add_by_map_selection"/>
+    <action name="mss_bulk_update_plugin.add_by_trail"/>
+    <action name="mss_bulk_update_plugin.add_by_scrapbook"/>
+    <action name="mss_bulk_update_plugin.remove_all"/>
+  </toolbar>
+  <toolbar name="prev_next">
+    <action name="mss_bulk_update_plugin.display_first"/>
+    <action name="mss_bulk_update_plugin.display_prev"/>
+    <action name="mss_bulk_update_plugin.display_next"/>
+    <action name="mss_bulk_update_plugin.display_last"/>
+  </toolbar>
+  <toolbar name="ghe">
+    <action name="mss_bulk_update_plugin.goto_object"/>
+    <action name="mss_bulk_update_plugin.highlight_object"/>
+    <action name="mss_bulk_update_plugin.edit_object"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="system"/>
+    <toolbar name="interrupt"/>
+    <toolbar name="edit"/>
+    <toolbar name="prev_next"/>
+    <toolbar name="ghe"/>
+  </dock>
+ 
+  <work_area>
+    <paned_window side_by_side="no" dynamic="yes">
+      <plugin plugin_name="mss_bulk_update_plugin" stretch="30"/>
+      <plugin plugin_name="mss_bu_editor_field_lister" stretch="70"/>
+    </paned_window>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

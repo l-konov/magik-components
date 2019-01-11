@@ -1,0 +1,32 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method road_works.do_cam_constructed_state_change()
+	## 
+	## Perform updates to self when a design is changed to the
+	## Constructed state.
+	##
+
+	new_st << _unset
+	_if (st << _self.status) = "Proposed" _orif
+	    st = "Current"
+	_then
+		new_st << "Completed"
+	_endif
+
+	_if new_st _isnt _unset
+	_then
+		dr << _self.detached()
+		dr.status << new_st
+		dr.source_collection.update(dr)
+	_endif
+	
+_endmethod
+$

@@ -1,0 +1,121 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_export_cus_task_handler
+##
+## Task handler for exporting CUs for a design to an output file.
+##
+
+def_slotted_exemplar(:mss_export_cus_task_handler,
+{},
+{:mss_scheduled_task_handler})
+$
+
+mss_scheduler_engine.define_task_handler(:export_cus, mss_export_cus_task_handler)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_export_cus_task_handler.parameters_for_task_type(task_type)
+	## 
+	##
+
+	pl << property_list.new()
+	_if task_type _is :export_cus
+	_then
+		pl[:design_id] << {:integer}
+		pl[:output_filename] << {:filename}
+		pl[:include_parent_designs?] << {:boolean}
+		pl[:combine_similar_cus?] << {:boolean}
+	_endif 
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_export_cus_task_handler.int!run()
+	## 
+	## Perform the work required to complete the export.
+	##
+
+	mss_workspace_manager_engine.view.rollforward()
+	_protect
+		# Determine the job or design to be transitioned.
+		_if .type = "export_cus"
+		_then
+			_if (design_id << .parameters[:design_id]) _is _unset _orif
+			    (rec << mss_workspace_manager_engine.design_table.at(design_id)) _is _unset
+			_then
+				.failure_code << :missing_design
+				.error_output.write(_self.message(:design_id_not_found, design_id), newline_char)
+				_return _false 
+			_endif
+			
+			# Perform CU export processing.
+			res << _self.export_cus(rec)
+		_endif
+		
+	_protection
+		# Upon completion, ensure there is no active design.
+		mss_workspace_manager_engine.open_design(_unset)
+	_endprotect
+	
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_export_cus_task_handler.export_cus(rec)
+	## 
+	## 
+
+	_handling mss_information _with procedure
+	_handling mss_question _with procedure
+	
+	# Open the design to be processed.
+	mss_workspace_manager_engine.open_design(rec)
+
+	# Prepare a CU summary engine to do the work.
+	engine << mss_cu_summary_engine.new()
+	engine.cu_job_type << mss_cu_engine.active_job_type
+	_if .parameters[:include_parent_designs?] _is _false
+	_then
+		engine.set_designs({rec})
+	_else
+		engine.set_designs(rec.ordered_design_path)
+	_endif
+	engine.combine_similar_cus? << .parameters[:combine_similar_cus?].default(_true)
+	engine.set_results()
+
+	# Output to a file, or simply dump to terminal if no file specified.
+	close? << _false
+	f << _unset 
+	_protect
+		_if (fname << .parameters[:output_filename]) _isnt _unset _andif
+		    fname ~= ""
+		_then
+			close? << _true
+			f << external_text_output_stream.new(fname)
+		_else
+			f << !terminal!
+		_endif
+
+		engine.export_raw_results(f)
+	_protection 
+		_if close? _andif f _isnt _unset _then f.close() _endif
+	_endprotect
+	
+	_return true
+	
+_endmethod
+$

@@ -1,0 +1,81 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright (C) 2009-2011  regioDATA GmbH, D-Freiburg im Breisgau
+# Author: Reinhard Hahn
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+_pragma(classify_level=basic, topic={mss_ptrule,nrm_compatibility})
+_method mss_ptdef.ordered_attributes(_optional an_ace, tag_name)
+	## 
+	## Return self's attribute records, ordered either by the
+	## actual tables ordering for AN_ACE and TAG_NAME, or simply by
+	## default visibility in the CASE tool if those arguments are
+	## not provided.
+	##
+
+	_if (tbl << _self.actual_collection) _is _unset
+	_then
+		# Just use self's attributes
+		_return _self.attributes
+	_endif
+
+# COMMENT concerning this change
+# In nrm editors are often organised in main and subpages,
+# which are controlled by differend visibility tags :main_page,
+# :sub_page_1, :sub_page_2, etc.
+# For that reason the fallback order of the fields should not
+# be given by the :default visibility but by the order of these
+# page's visibility tags.
+# OLD:
+#	_if an_ace _isnt _unset
+#	_then
+#		vis_vec << an_ace.table_visible_field_names_with_defaults(tbl.source_view.name, tbl.name,
+#									  tag_name.default(:default))
+# END
+# NEW:
+	_if tag_name _is _unset
+	_then
+		vis_vec << _self.rd!pages_attributes(tbl,an_ace)
+	_elif an_ace _isnt _unset
+	_then
+		vis_vec << an_ace.table_visible_field_names_with_defaults(tbl.source_view.name, tbl.name, tag_name)
+# END
+	_else
+		vis_vec << tbl.visible_field_names
+	_endif
+	vis_lkp << hash_table.new()
+	_for i, j _over vis_vec.fast_keys_and_elements()
+	_loop
+		vis_lkp[j] << i
+	_endloop
+
+	sc << sorted_collection.new(10, _proc(a, b) _return a[1] _cf b[1] _endproc)
+	_for i _over _self.attributes.fast_elements()
+	_loop
+		attr_name << i.name.as_symbol()
+		order_val << vis_lkp[attr_name].default(bignum)
+		sc.add({order_val, i})
+	_endloop
+
+	r << rope.new()
+	_for i _over sc.fast_elements()
+	_loop
+		r.add_last(i[2])
+	_endloop
+
+	_return r
+	
+_endmethod
+$

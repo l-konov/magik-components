@@ -1,0 +1,8 @@
+mss_ptdef_ds_record.magik
+mss_ptdef.magik
+mss_ptdef_action.magik
+mss_ptdef_attribute.magik
+mss_ptdef_cu_reference.magik
+mss_ptdef_folder.magik
+mss_ptdef_folder_relationship.magik
+mss_ptdef_property.magik

@@ -1,0 +1,9 @@
+mss_cu_data_model	1
+
+description
+	MSS compatible units data model
+end
+
+requires
+	mss_record_tracking
+end

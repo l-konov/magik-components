@@ -1,0 +1,1 @@
+insync_admin_plugin

@@ -1,0 +1,9 @@
+mss_geocode_yahoo	1
+
+description
+	Geocoder using Yahoo REST Geocoding API V1
+end
+
+requires
+	mss_http_client
+end

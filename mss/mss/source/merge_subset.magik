@@ -1,0 +1,151 @@
+$
+_global list_alternatives <<
+_proc(a_view, _optional fname)
+	##
+	## Create a list of all alternatives to FNAME
+	##
+	
+	_if fname _is _unset
+	_then
+		fname << write_string("c:\mss\source\all_alts_",
+				      a_view.original_view_name.write_string.lowercase,
+				      ".txt")
+	_endif
+
+	f << external_text_output_stream.new(fname)
+	_protect 
+		_for i _over a_view.actual_alternatives()
+		_loop
+			_if i.alternative_level = 0 _then _continue _endif
+			f.write(i.alternative_path_name(), newline_char)
+		_endloop
+	_protection
+		f.close()
+	_endprotect
+_endproc
+$
+
+_global merge_subset <<
+_proc(a_view, _optional fname, start, end, excl_set)
+	##
+	## Merge from lines START to END in file FNAME.
+	##
+
+	_if a_view.updated?
+	_then
+		write("View is updated - cannot merge")
+		_return
+	_endif
+	_if a_view.alternative_level = 0
+	_then
+		orig_alt << _unset 
+	_else 
+		orig_alt << a_view.alternative_path_name()
+	_endif
+	
+	_local err_text
+	
+	errs << rope.new()
+	
+	_if fname _is _unset
+	_then
+		fname << write_string("c:\mss\source\all_alts_",
+				      a_view.original_view_name.write_string.lowercase,
+				      ".txt")
+	_endif
+
+	start << start.default(1)
+	end << end.default(99999)
+	_if excl_set _is _unset
+	_then 
+		excl_set << equality_set.new()
+	_endif 
+	
+	f << external_text_input_stream.new(fname)
+	c << 0
+	_protect 
+		_loop
+			_if (l << f.get_line()) _is _unset _then _leave _endif
+			c +<< 1
+			_if c < start _then _continue _endif
+			_if c > end _then _leave _endif
+
+			write(date_time.now(), "  MERGING ", c, %,, l)
+			err_text << ""
+			ok? << _false 
+			_catch :any_error
+			       _handling error _with
+			       _proc(cond)
+				       _import err_text
+				       err_text << write_string("  ERROR: ", cond.report_contents_string)
+				       write(err_text)
+				       _throw :any_error
+			       _endproc
+
+			       _if excl_set.includes?(l.lowercase)
+			       _then
+				       err_text << write_string("  SKIPPING this alternative intentionally")
+				       write(err_text)
+				       _throw :any_error
+			       _endif
+			       
+			       a_view.go_to_alternative(l)
+			       _if a_view.has_checkpoint?("{pre_merge}")
+			       _then
+				       err_text << write_string("  ERROR: pre_merge checkpoint already exists")
+				       write(err_text)
+				       _throw :any_error
+			       _endif
+			       
+			       a_view.switch(:write)
+			       (ch?, roots, det) << a_view.merge(_false, _false)
+			       _if ch? _isnt _maybe _andif roots _is _unset
+			       _then
+				       # OK
+				       ok? << _true 
+			       _else
+				       err_text << write_string("  ERROR: conflicts")
+				       write(err_text)
+				       _if det _isnt _unset
+				       _then
+					       det.undo_merge()
+					       det.terminate()
+				       _endif 
+			       _endif
+			_endcatch
+			_if ok?
+			_then
+				# This can happen in force_conflict mode... forcing the
+				# conflicts leaves the alternative updated.
+				a_view.commit()
+			_else 
+				a_view.rollback()
+				errs.add_last({c, l, err_text})
+			_endif 
+			a_view.switch(:readonly)
+			write("")
+			
+		_endloop
+	_protection
+		f.close()
+	_endprotect
+
+	write(newline_char, "Total errors/warnings: ", errs.size)
+	_for i _over errs.fast_elements()
+	_loop
+		write("")
+		write(i[1], ",", i[2])
+		write(i[3])
+	_endloop
+
+	_if orig_alt _is _unset
+	_then
+		a_view.goto_top_alternative()
+	_else 
+		a_view.go_to_alternative(orig_alt)
+	_endif 
+	a_view.switch(:readonly)
+	
+	_return errs
+_endproc
+$

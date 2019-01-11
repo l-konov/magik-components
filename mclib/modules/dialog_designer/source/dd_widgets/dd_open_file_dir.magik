@@ -1,0 +1,120 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_open_file_dir - object to represent a file/directory
+## selection widget.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_open_file_dir,{},:image_button_item)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_open_file_dir.define_shared_constant(:dd_properties,
+					property_list.new_with(
+						:operation,{:open,:save,:save_as,:select_directory},
+						:filter,:string),
+					:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_open_file_dir.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_open_file_dir.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_open_file_dir.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	img << smallworld_product.get_raster_image(:open_file_dir,:dialog_designer)
+	new_rec << _self.new(rc,"image_button",_unset,:|open_file_dir()|,
+			     :row,row,:col,col,
+			     :col_alignment,:left,:row_alignment,:top,
+			     :has_border?,_true,
+			     :image,img)
+	new_rec.set_property(:image_file_name,:open_file_dir)
+	new_rec.set_property(:image_module_name,:dialog_designer)
+	new_rec.set_property(:filter,"*.*")
+	new_rec.set_property(:operation,:open)
+	>> new_rec
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_open_file_dir.gui_code(txt)
+	## 
+	## Generate gui_code for SELF, an action control placement.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,"_self.action(:",_self.dialog_element_id,
+		  ").place_control_on(")
+	
+	txt.write(parent_id,",:dialog,")
+
+	_if _self.responds_to?(:has_border?) _andif
+	    _self.has_border? _is _false 
+	_then
+		txt.write(%newline,%tab*2,":has_border?, _false,")
+	_endif
+
+	txt.write(%newline,%tab*2,":control_type, { :image_button_item")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		_if n = "has_border?"
+		_then
+			_continue 
+		_endif
+
+		_if parent_id.index_of_seq("paned_window") _isnt _unset _andif
+		    (n.index_of_seq("_alignment") _isnt _unset _orif n = "row" _orif n="col")
+		_then
+			_continue
+		_endif
+		
+		( gui_name,gui_value)  << _self.gui_name_and_value(n,v)
+		
+		_if gui_name _is _unset 
+		_then
+			_continue
+		_endif
+
+		txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)
+	_endloop
+
+	txt.write(" } )",%newline)
+
+	_if _self.enabled? _is _false
+	_then
+		txt.write(%newline,%tab,"_self.action(:",_self.dialog_element_id,").enabled? << _false",%newline)
+	_endif 
+
+_endmethod
+$

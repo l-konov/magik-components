@@ -1,0 +1,377 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_STYLE_CHOICE_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_style_choice_item,{},:text_choice_item)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_style_choice_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :style_type,{:area_fg_colour,
+						       :area_bg_colour,
+						       :line_fg_colour,
+						       :line_bg_colour,
+						       :text_colour,
+						       :line_width,
+						       :dash_pattern,
+#						       :line_join_style,
+#						       :line_end_style,
+						       :fill_percentage,
+						       :hatch_pattern,
+						       :point_style}
+						),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.dd_properties()
+	## 
+	##  Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_style_choice_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	_for k _over {:strings,:values,:representation_message,:is_combo_box}.elements()
+	_loop
+		props.remove_key(k)
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+	
+	>> 40 + _self.label_width
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.default_min_height
+	## 
+ 	## Return the minimum default rendering height.
+	
+	vts << vtext_style.new(_self.font)
+	>> vts.box_coordinates("Ab").bounds.height.rounded - 2
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	sc << _self.new(rc,_unset,
+			:row,row,:col,col,
+			:col_alignment,:fill,
+			:row_alignment,:top)
+	
+	sc.style_type << :area_fg_colour
+
+	>> sc
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	>> _self.new(parent,props[:label],_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	!dialog_element_footprints![pbb.deep_copy()] << _self
+	
+	# Adjust when there's label 
+	lab_w << _self.label_width
+	pbb.xmin +<< lab_w
+	w -<< lab_w
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	# Draw an example style type in the choice item
+	_self.draw_style_example(canv,pbb)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+	canv.draw(pbb.boundary,ls)
+
+	ri << smallworld_product.get_raster_image(:choice_item_down,:dialog_designer)
+	canv.render_raster(ri,pbb.xmax-15,pbb.ymin+1,_false)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	canv.draw_text(ts,pbb.xmin+2-lab_w,pbb.ymax-2,_self.label)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.draw_style_example(canv,pbb)
+	## 
+	## Render a sample of the draw style type currently selected
+	## onto CANV.
+
+	w << pbb.width - 15
+	st << _self.style_type.default(:area_fg_colour)
+
+	_if st _is :area_fg_colour
+	_then
+		a_style << fill_style.new(colour.called(:red))
+	_elif st _is :area_bg_colour
+	_then
+		a_style << fill_style.new(colour.called(:blue))
+	_elif st _is :fill_percentage
+	_then
+		a_style << fill_style.new_wash(colour.called(:black),50)
+	_elif st _is :hatch_pattern
+	_then
+		a_style << crosshatch_style.new_with_properties(:foreground_colour,colour.called(:black),:layers,{property_list.new()})
+	_elif st _is :line_fg_colour
+	_then
+		a_style << line_style.new(colour.called(:red),3)
+	_elif st _is :line_bg_colour
+	_then
+		a_style << line_style.new(colour.called(:blue),3)
+	_elif st _is :line_width
+	_then
+		a_style << line_style.new(colour.called(:black),5)
+	_elif st _is :dash_pattern
+	_then
+		a_style << line_style.new_with_properties(
+				   :foreground_colour,colour.called(:black),
+				   :width,2,
+				   :dash_pattern,dash_pattern.short_dash)
+	_elif st _is :text_colour
+	_then
+		f << font.new_with_properties(:type,:logical,
+				      :name,"fixed",
+				      :point_size,12)
+		a_style << vtext_style.new(f,_unset,_unset,colour.called(:red))
+	_elif st _is :point_style
+	_then
+		a_style << _self.get_style_for(:point_3)
+	_endif
+
+	ras << a_style.as_raster_image(:width,pbb.width-4-15,:height,pbb.height-4)
+	canv.render_raster(ras,pbb.xmin+3,pbb.ymin+3,_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.get_style_for(dp_field)
+	## 
+	## Get the style for the drafting_point field DP_FIELD.
+	
+	v << gis_program_manager.databases.an_element()
+	fd << v.collections[:drafting_points].all_fields[dp_field]
+
+	style_view << gis_program_manager.style_view
+	style_table << style_view.collections[:sw_gis!rwo_style]
+	rwo_type  << fd.rwo_type
+	app_type  << fd.app_type
+	geom_code << fd.geom_code
+	
+	st_all <<  style_table.all_at(:default, :drafting_points, dp_field, :normal, "auto", 0)
+	st << st_all.an_element()
+	>> st
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.gui_messages(txt)
+	## 
+	## Write SELF's messages to the text stream TXT.
+
+	txt.write(%:,_self.get_property(:dialog_element_id),%tab,_self.value,%newline)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.action_code(txt)
+	## 
+	## Write interpretable code for SELF on the stream TXT.
+
+	_local name << _self.get_property(:dialog_element_id)
+
+	# Use the change selector value, if provided.
+	_local change_selector << _if _self.change_selector.default("").empty?
+				  _then 
+					  >> "set_style_value()"
+				  _else
+					  >> _self.change_selector
+				  _endif 
+	
+	_if change_selector.index_of_seq("()") _isnt _unset
+	_then
+		change_selector << change_selector.slice(1,change_selector.size-2)
+	_endif
+
+	ss << _self.style_type.write_string
+
+	tt << dialog_designer.message(:dd_ + _self.style_type + :_tt)
+	_if ss.index_of_seq("colour") _isnt _unset 
+	_then
+		txt.write(%newline,%tab,dialog_designer.message(:dd_colour_choice,name,change_selector,_self.style_type,tt))
+	_elif ss.index_of_seq("line_width") _isnt _unset 
+	_then
+		txt.write(%newline,%tab,dialog_designer.message(:dd_line_width_choice,name,:line_width,tt))
+	_elif ss.index_of_seq("point_style") _isnt _unset 
+	_then
+		txt.write(%newline,%tab,dialog_designer.message(:dd_point_style_choice,name,:line_width,tt))
+	_else
+		txt.write(%newline,%tab,dialog_designer.message(:dd_style_choice,name,_self.style_type,tt))
+	_endif
+
+	>> name.as_symbol()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.control_type()
+	## 
+	## Return the control type based on the current style_type.
+
+	ss << _self.style_type.write_string
+	
+	>> _if ss.index_of_seq("colour") _isnt _unset 
+	   _then
+		   >> :colour_choice_item
+	   _elif ss.index_of_seq("line_width") _isnt _unset 
+	   _then
+		   >> :line_width_choice_item
+	   _elif ss.index_of_seq("point_style") _isnt _unset 
+	   _then
+		   >> :image_choice_item
+	   _else
+		   >> _self.style_type +:_choice_item
+	   _endif
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.style_class
+	## 
+	## Return the class of the gui element depending on SELF's style_type.
+
+	sts << _self.style_type.write_string
+	
+	_if sts.index_of_seq("colour") _isnt _unset 
+	_then
+		sc << :colour_choice_item
+	_elif sts.index_of_seq("point") _isnt _unset 
+	_then
+		sc << :image_choice_item
+	_else
+		sc << _self.style_type + :_choice_item	
+	_endif
+
+	>> sc
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF, an action control placement.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,"_self.action(:",_self.dialog_element_id,
+		  ").place_control_on(")
+	
+	txt.write(parent_id,",:dialog,")
+
+	txt.write(%newline,%tab*2,":control_type, { :",_self.style_class)
+	txt.write(%,,%newline,%tab*3,":width, 50")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		#debug show (n,v)
+		_if parent_id.index_of_seq("paned_window") _isnt _unset _andif
+		    (n.index_of_seq("_alignment") _isnt _unset _orif n = "row" _orif n="col")
+		_then
+			_continue
+		_endif
+		
+		( gui_name,gui_value)  << _self.gui_name_and_value(n,v)
+		_if gui_name _is _unset _orif n="enabled?"
+		_then
+			_continue 
+		_endif
+
+		txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)
+	_endloop
+
+	txt.write(" } )",%newline)
+
+	_if _self.style_type _is :point_style
+	_then
+		txt.write(%tab,"_self.action(:",_self.dialog_element_id,").items << _self.drafting_point_style_items()",%newline)
+	_endif
+
+	_if _self.enabled? _is _false
+	_then
+		txt.write(%newline,%tab,"_self.action(:",_self.dialog_element_id,").enabled? << _false",%newline)
+	_endif 
+
+		
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_style_choice_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_style_choice_item.set_logical_properties(_optional all?)
+	##
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_if all?.default(_false)
+	_then
+		_self.change_selector << _self.dialog_element_id + "_changed()"
+	_endif
+
+_endmethod
+$

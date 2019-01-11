@@ -1,0 +1,1307 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_engine
+##
+## Engine for coordinating compatible unit/cost estimating
+## functions.  Note that there is only one instance of this
+## object. 
+##
+
+def_slotted_exemplar(:mss_cu_engine,
+{},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_engine.define_shared_constant(
+	:view_name,
+	## The name of the database view that holds CU configuration information.
+	:mss_config,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_engine.define_shared_constant(
+	:spatial_object_controller_name,
+	## The name of the SOC that holds CU configuration information.
+	:mss_config,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_engine.define_shared_constant(
+	:default_install_operation,
+	## The name of the operation value which represents things
+	## being installed (defaults to "Install").  This has somewhat
+	## special significance, because a large majority of CUs being
+	## placed will usually be install-type CUs.
+	"Install",
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_engine.define_shared_constant(
+	:macro_unit_usage_value,
+	## The name of the enumerator value for the usage attribute of
+	## the mss_cu_definition table that represents a Macro Unit.
+	"Macro Unit",
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_engine.define_shared_constant(
+	:work_point_view_name,
+	## The name of the database view that holds CU work point information.
+	:gis,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_engine.message(message_id, _gather args)
+	## 
+	## 
+
+	mh_name << _self.class_name
+	_return message_handler.new(mh_name).human_string(message_id, _unset, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_engine.user_error(_gather args)
+	## 
+	## Raise a user error condition with a message constructed from ARGS.
+	##
+
+	condition.raise(:user_error, :string, _self.message(_scatter args))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_engine.active_design
+	## 
+	## Obtain this from the mss_workspace_manager_engine.
+	##
+
+	_return mss_workspace_manager_engine.active_design
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_engine.active_job_type
+	##
+	## Return the results of self.active_job_type(), using the
+	## currently active design and the :cu_cost mode of operation.
+	##
+
+	_return _self.active_job_type(_unset, :cu_cost)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_engine.active_job_type(_optional cur_design, mode)
+	## 
+	## Locate the mss_cu_job_type record that corresponds to
+	## CUR_DESIGN (defaults to mss_workspace_manager_engine.active_design).
+	## MODE may be :cu_cost (the default) for determining a job
+	## type for costing purposes; or :cu_query for determining a
+	## job type for CU query purposes.
+	##
+
+	_if cur_design _isnt _unset
+	_then
+		wjt << cur_design.job_type(_true)
+	_else
+		wjt << mss_workspace_manager_engine.active_job_type
+	_endif
+	
+	_if wjt _is _unset
+	_then
+		_return _unset
+	_endif
+	_return _self.cu_job_type_for_workspace_job_type(wjt)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_engine.active_design_dataset_names
+	## 
+	## Obtain this from the mss_workspace_manager_engine.
+	##
+
+	_return mss_workspace_manager_engine.active_design_dataset_names
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_engine.view
+	## 
+	## The database view that holds CU configuration information.
+	##
+
+	_return gis_program_manager.cached_dataset(_self.view_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_engine.work_point_view
+	## 
+	## The database view that holds CU work point information.
+	##
+
+	_return gis_program_manager.cached_dataset(_self.work_point_view_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_engine.work_point_table
+	## 
+	## The database table that holds CU work point information.
+	##
+
+	_if (wpv << _self.work_point_view) _isnt _unset
+	_then
+		_return wpv.collections[:mss_cu_work_point]
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_engine.parse_operation_and_cu_predicates(cu_attrs)
+	## 
+	## Parse the operation predicate and CU attribute predicate
+	## based on the contents of the CU_ATTRS property list (see 
+	## cus_for_attributes() for details on this structure).
+	##
+	
+	_if (op_val << cu_attrs[:operation]) _isnt _unset
+	_then 
+		op_pred << predicate.eq(:operation, op_val)
+	_else
+		op_pred << _unset
+	_endif
+	cu_pred << _unset
+	_for i _over {:cu_code, :description}.fast_elements()
+	_loop
+		_if (v << cu_attrs[i]) _isnt _unset
+		_then
+			_if v.index_of(%*) _isnt _unset _orif
+			    v.index_of(%?) _isnt _unset
+			_then
+				sub_pred << predicate.wild(i, v, :canon)
+			_else
+				sub_pred << predicate.eq(i, v, :canon)
+			_endif
+			_if cu_pred _is _unset
+			_then
+				cu_pred << sub_pred
+			_else
+				cu_pred _and<< sub_pred
+			_endif
+		_endif
+	_endloop
+
+	_return op_pred, cu_pred
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.cu_definition_for_code(cu_code, _optional effective_date)
+	## 
+	## Return the mss_cu_definition record for the given CU_CODE.
+	## If EFFECTIVE_DATE is given, then only a CU that was
+	## effective on that date will be considered.  Otherwise, any
+	## CU will be considered (with preference to one that is 
+	## effective on the current date).
+	##
+
+	cu_attrs << property_list.new_with(:cu_code, cu_code)
+	_if effective_date _isnt _unset
+	_then
+		cu_attrs[:effective_date] << effective_date
+	_else
+		cu_attrs[:effective_date] << date.now()
+	_endif
+	
+	recs << _self.cus_for_attributes(cu_attrs)
+	_if (retval << recs.an_element()) _isnt _unset
+	_then
+		_return retval
+	_endif
+
+	_if effective_date _is _unset
+	_then 
+		# If the previous query fails, rerun it and consider
+		# non-current CUs as well.
+		cu_attrs.remove_key(:effective_date)
+		recs << _self.cus_for_attributes(cu_attrs)
+		_return recs.an_element()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.cus_for_attributes(cu_attrs)
+	## 
+	## Return a collection of mss_cu_definition records which match
+	## the attributes in CU_ATTRS, which is a property list with
+	## the following keys and values:
+	## - :operation (optional): The CU operation (i.e. Install, Remove).
+	## - :cu_code (optional): A substring match for the cu_code.
+	## - :description (optional): A substring match for the description.
+	## - :effective_date (optional): If specified, only CU records that
+	##   are effective on this date are considered.
+	## - :job_type (optional): If specified, only CU records that are
+	##   related to this mss_cu_job_type record are considered.
+	## - :max (optional): A maximum number to return.
+	##
+
+	cu_tbl << _self.view.collections[:mss_cu_definition]
+	(op_pred, cu_pred) << _self.parse_operation_and_cu_predicates(cu_attrs)
+	_if cu_pred _is _unset
+	_then
+		cu_pred << predicate
+	_endif
+
+	cu_code << cu_attrs[:cu_code]
+	eff_date << cu_attrs[:effective_date]
+	job_type << cu_attrs[:job_type]
+	max << cu_attrs[:max]
+	use_job_type_check? << (job_type _isnt _unset)
+	use_cu_pred_check? << _false
+	
+	_if job_type _isnt _unset _andif
+	    (cu_code _is _unset _orif
+	     cu_code = "" _orif
+	     cu_code[1] = %* _orif
+	     cu_code[1] = %?)
+	_then
+		# Cannot use index on cu_code, but a job type is entered - so,
+		# use that as the basis for querying.
+		raw_scan_recs << job_type.mss_cu_definitions
+		use_job_type_check? << _false
+		use_cu_pred_check? << _true 
+	_else
+		# The index on cu_code can be used, so let that happen.
+		raw_scan_recs << cu_tbl.select(cu_pred)
+	_endif
+
+	r << rope.new()
+	_for cu_rec _over raw_scan_recs.fast_elements()
+	_loop
+		_if use_cu_pred_check? _andif
+		    _not cu_pred.test?(cu_rec)
+		_then
+			_continue
+		_endif 
+		_if op_pred _isnt _unset _andif 
+		    cu_rec.mss_cu_operation_definitions.select(op_pred).an_element() _is _unset
+		_then
+			_continue
+		_endif
+		_if eff_date _isnt _unset _andif
+		    _not cu_rec.effective_for_date?(eff_date)
+		_then
+			_continue
+		_endif
+		_if use_job_type_check? _andif
+		    _not cu_rec.mss_cu_job_types.includes?(job_type)
+		_then
+			_continue
+		_endif
+		
+		r.add_last(cu_rec)
+		_if max _isnt _unset _andif
+		    r.size = max
+		_then
+			_leave
+		_endif
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.cus_for_group(group_rec, cu_attrs)
+	## 
+	## Return a collection of mss_cu_definition records which match
+	## the attributes in CU_ATTRS (see cus_for_attributes() for
+	## details on this structure).  Results are limited to CUs that
+	## exist in the mss_cu_group_definition record GROUP_REC.
+	##
+
+	(op_pred, cu_pred) << _self.parse_operation_and_cu_predicates(cu_attrs)
+	_if cu_pred _is _unset
+	_then
+		cu_pred << predicate
+	_endif
+	eff_date << cu_attrs[:effective_date]
+	job_type << cu_attrs[:job_type]
+	max << cu_attrs[:max]
+	
+	r << rope.new()
+	_for cu_rec _over group_rec.mss_cu_definitions.select(cu_pred).fast_elements()
+	_loop
+		_if op_pred _isnt _unset _andif 
+		    cu_rec.mss_cu_operation_definitions.select(op_pred).an_element() _is _unset
+		_then
+			_continue
+		_endif
+		_if eff_date _isnt _unset _andif
+		    _not cu_rec.effective_for_date?(eff_date)
+		_then
+			_continue
+		_endif
+		_if job_type _isnt _unset _andif
+		    _not cu_rec.mss_cu_job_types.includes?(job_type)
+		_then
+			_continue
+		_endif
+
+		r.add_last(cu_rec)
+		_if max _isnt _unset _andif
+		    r.size = max
+		_then
+			_leave
+		_endif
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+mss_cu_engine.define_shared_variable(
+	:facility_require_all_attributes?,
+	## This setting is used by the mss_cu_engine.cus_for_facility()
+	## method.  If it is false, then for a CU to be returned by that
+	## query, it is considered to PASS any attribute test for which
+	## it does not have a mss_cu_facility_attribute record defined.
+	## If it is true, then it is considered to FAIL any attribute
+	## test in that case.
+	##
+	## For example, suppose a query for poles is done, where
+	## ATTR_FILTERS includes material="Wood".  Also, suppose that
+	## the CU named PGENERIC does not have any attribute
+	## information associated with it for the material attribute.
+	## If this is set to false, then PGENERIC would be included in
+	## the results of a material="Wood" query.  If it is set to
+	## true, then PGENERIC would not be returned.
+	##
+	## Default setting is true.
+	##
+	_true,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.cus_for_facility(rec_ex, cu_attrs, attr_filters, _optional req_all_attrs?)
+	## 
+	## Return two values: a collection of mss_cu_definition records
+	## and a collection of mss_cu_facility_relationship records
+	## which meet the following criteria:
+	## - Matches all attributes as defined in CU_ATTRS (see
+	##   cus_for_attributes() for details on this structure).
+	##   Note that for this query, the :operation key of that
+	##   property list must be specified.
+	## - Have a mss_cu_facility_relationship record that refers to the
+	##   table indicated by REC_EX.
+	## - For the mss_cu_facility_relationship record, has related
+	##   mss_cu_facility_attribute records that do not conflict
+	##   with the attributes specified in ATTR_FILTERS property list.
+	##   Cases where no mss_cu_facility_attribute record exists for
+	##   a given attribute may or may not be returned, according to the
+	##   mss_cu_engine.facility_require_all_attributes? setting (refer
+	##   to the comments of that shared variable for further details).
+	##   If REQ_ALL_ATTRS? is set to true or false, then this will override
+	##   the mss_cu_engine.facility_require_all_attributes? setting.
+	##
+	## N.B.: for each attribute provided in the ATTR_FILTERS
+	## property list, the value given must be of the proper
+	## datatype for that field.  This is relevant for float and
+	## stored unit types of fields, where a string-based comparison
+	## is not possible.
+	##
+
+	r1 << rope.new()
+	r2 << rope.new()
+	cu_tbl << _self.view.collections[:mss_cu_facility_relationship]
+	rec_tbl << rec_ex.source_collection
+	eff_date << cu_attrs[:effective_date]
+	job_type << cu_attrs[:job_type]
+	max << cu_attrs[:max]
+	
+	# Convert REC_EX to a mss_cu_facility_definition record.
+	_if (fac_def << mss_cu_facility_definition.get_for_target_table(rec_tbl)) _is _unset
+	_then
+		_return r1, r2
+	_endif
+
+	# If this is a query that is not for the default install
+	# operation, and if the configuration is such that the default
+	# install operation should always be used for attribute
+	# queries, then this gets a bit more complex.  Start sorting
+	# out that situation right now.
+	dio << _self.default_install_operation
+	use_dio? << _false
+	real_op << cu_attrs[:operation].default(dio)
+	_if real_op ~= dio _andif
+	    rec_ex.mss_cu_default_install_facility_relationships?
+	_then
+		use_dio? << _true
+	_endif 
+	
+	# Use a temporary construct to parse out only the portions of
+	# the predicate that apply to the mss_cu_facility_relationship table.
+	# Note that the :operation key must be specified by caller.
+	temp_pl << property_list.new_with(:operation, real_op,
+					  :cu_code, cu_attrs[:cu_code])
+	(op_pred, cu_pred) << _self.parse_operation_and_cu_predicates(temp_pl)
+	cu_fac_pred << op_pred _and predicate.eq(:table_code, fac_def.id)
+	_if cu_pred _isnt _unset
+	_then
+		cu_fac_pred _and<< cu_pred
+	_endif 
+
+	cu_fac_pred2 << _unset 
+	_if use_dio?
+	_then
+		cu_fac_pred2 << predicate.eq(:operation, dio) _and predicate.eq(:table_code, fac_def.id)
+		_if cu_pred _isnt _unset
+		_then
+			cu_fac_pred2 _and<< cu_pred
+		_endif
+		fac_recs_to_check << _self.default_and_override_fac_recs_for(cu_fac_pred2, cu_fac_pred, real_op)
+	_else
+		fac_recs_to_check << cu_tbl.select(cu_fac_pred)
+	_endif
+	
+	# Use a temporary construct to parse out the remainder of
+	# attributes which then apply to the mss_cu_definition table.
+	temp_pl << property_list.new_with(:description, cu_attrs[:description])
+	(junk, cu_desc_pred) << _self.parse_operation_and_cu_predicates(temp_pl)
+	
+	# Preprocess the attribute information provided to enable
+	# attribute comparisions.  If the comparison can be done on a
+	# string compare alone, it is fast - otherwise (for things such
+	# as floats and stored units), values must be evaluated fully.
+	_if (all_req? << req_all_attrs?) _is _unset
+	_then 
+		all_req? << _self.facility_require_all_attributes?
+	_endif
+	
+	attr_comp_data << equality_property_list.new()
+	_for af_key, af_value _over attr_filters.fast_keys_and_elements()
+	_loop
+		_if (rec_fd << rec_tbl.all_fields[af_key.as_symbol()]) _is _unset
+		_then
+			_continue
+		_endif
+		_if _not rec_fd.is_physical? _andif
+		    _not rec_fd.is_derived?
+		_then
+			_continue
+		_endif
+
+		comp_value << af_value.default("")
+		_if comp_value = ""
+		_then
+			fd_desc << :string
+		_elif rec_fd.stored_unit _isnt _unset
+		_then
+			fd_desc << :stored_unit
+		_elif rec_fd.type.element_class.species _is 1.0.species
+		_then
+			fd_desc << :float
+		_else
+			fd_desc << :string
+			comp_value << comp_value.write_string
+		_endif
+		attr_comp_data[rec_fd.name.as_charvec()] << {fd_desc, rec_fd, comp_value}
+	_endloop
+
+	# The following is simply an optimized shortcut in the case
+	# where there are no attributes to be checked.
+	_if (attrs_to_test_count << attr_comp_data.size) = 0
+	_then 
+		_for cu_fac_rec _over fac_recs_to_check.fast_elements()
+		_loop
+			_if (parent_rec << cu_fac_rec.mss_cu_definition) _is _unset _then _continue _endif
+			_if cu_desc_pred _isnt _unset _andif
+			    cu_desc_pred.test?(parent_rec) _is _false
+			_then
+				_continue
+			_endif 
+			_if eff_date _isnt _unset _andif
+			    _not parent_rec.effective_for_date?(eff_date)
+			_then
+				_continue
+			_endif
+			_if job_type _isnt _unset _andif
+			    _not parent_rec.mss_cu_job_types.includes?(job_type)
+			_then
+				_continue
+			_endif
+			
+			r1.add_last(parent_rec)
+			r2.add_last(cu_fac_rec)
+
+			_if max _isnt _unset _andif
+			    r1.size = max
+			_then
+				_leave
+			_endif
+		_endloop
+
+		_return r1, r2
+	_endif
+
+	defer_checks << rope.new()
+	_for cu_fac_rec _over fac_recs_to_check.fast_elements()
+	_loop
+		_if (parent_rec << cu_fac_rec.mss_cu_definition) _is _unset _then _continue _endif 
+		_if cu_desc_pred _isnt _unset _andif
+		    cu_desc_pred.test?(parent_rec) _is _false
+		_then
+			_continue
+		_endif 
+		_if eff_date _isnt _unset _andif
+		    _not parent_rec.effective_for_date?(eff_date)
+		_then
+			_continue
+		_endif
+		_if job_type _isnt _unset _andif
+		    _not parent_rec.mss_cu_job_types.includes?(job_type)
+		_then
+			_continue
+		_endif
+		
+		# Check each defined attribute to be sure it does not conflict.
+		defer_checks.empty()
+		attr_pass? << _true
+		attrs_tested << 0
+		_for cu_fac_attr _over cu_fac_rec.mss_cu_facility_attributes.fast_elements()
+		_loop
+			attr_name << cu_fac_attr.attribute_name.as_charvec()
+			_if (attr_def << attr_comp_data[attr_name]) _is _unset
+			_then
+				# This attribute value is not being checked.
+				_continue
+			_endif
+			attrs_tested +<< 1
+			attr_value << cu_fac_attr.attribute_value.as_charvec()
+			compare_value << attr_def[3]
+
+			# First thing: check for an empty string (which is the
+			# convention for unset for any field type).
+			_if attr_value = ""
+			_then
+				_if compare_value = ""
+				_then
+					_continue
+				_else
+					attr_pass? << _false
+					_leave
+				_endif
+			_endif
+
+			# Next thing: check for non-string type comparisons, which get
+			# deferred until after the string-type comparisons are done.
+			_if attr_def[1] _isnt :string
+			_then
+				defer_checks.add_last({attr_def[1], attr_def[2], cu_fac_attr, compare_value, attr_value})
+				_continue
+			_endif
+			
+			# At this point, do a string based comparision.
+			_if attr_value ~= compare_value
+			_then
+				attr_pass? << _false
+				_leave
+			_endif
+		_endloop 
+
+		_if _not attr_pass?
+		_then
+			# An attribute check has failed - skip it.
+			_continue
+		_endif
+
+		# If all attribures are required but not all are present, this
+		# is a failure.
+		_if all_req? _andif
+		    attrs_tested < attrs_to_test_count
+		_then
+			_continue
+		_endif
+		
+		# Try the deferred checks now, to deal with things that cannot
+		# be compared as strings.
+		_for defer_data _over defer_checks.fast_elements()
+		_loop
+			fd << defer_data[2]
+			cfa << defer_data[3]
+			compare_value << defer_data[4]
+			attr_value << defer_data[5]
+			_if defer_data[1] _is :float
+			_then
+				_if _self.compare_attribute_float?(rec_ex, fd, cfa,
+								   compare_value, attr_value) _is _false
+				_then
+					attr_pass? << _false
+					_leave
+				_endif
+			_elif defer_data[1] _is :stored_unit
+			_then
+				_if _self.compare_attribute_stored_unit?(rec_ex, fd, cfa,
+									 compare_value, attr_value) _is _false
+				_then
+					attr_pass? << _false
+					_leave
+				_endif
+			_endif 
+		_endloop 
+
+		_if _not attr_pass?
+		_then
+			# An attribute check has failed - skip it.
+			_continue
+		_endif
+	
+		r1.add_last(parent_rec)
+		r2.add_last(cu_fac_rec)
+
+		_if max _isnt _unset _andif
+		    r1.size = max
+		_then
+			_leave
+		_endif
+	_endloop
+
+	_return r1, r2
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_engine.default_and_override_fac_recs_for(def_pred, override_pred, op_code)
+	## 
+	## Return a rope of mss_cu_facility_relationship records that
+	## gets built as follows:
+	## - For all records that match DEF_PRED - which is a predicate
+	##   for the default_install_operation - return the element,
+	##   as long as the operation given by OP_CODE is valid.
+	## - For all records that match OVERRIDE_PRED - which is a
+	##   predicate for the given OP_CODE - return the element,
+	##   as long as it has not already been returned by the
+	##   DEF_PRED check given above.
+	##
+	
+	cu_tbl << _self.view.collections[:mss_cu_facility_relationship]
+	r << rope.new()
+	done_set << equality_set.new()
+
+	# First pass: get all using the default install operation.
+	_for cu_fac_rec _over cu_tbl.select(def_pred).fast_elements()
+	_loop
+		# Ensure that OP_CODE is a valid type of operation for this CU
+		# definition. 
+		_if (parent_rec << cu_fac_rec.mss_cu_definition) _is _unset _then _continue _endif
+		_if parent_rec.operation_definition_for(op_code) _is _unset
+		_then
+			_continue
+		_endif
+		r.add_last(cu_fac_rec)
+		done_set.add(parent_rec)
+	_endloop
+
+	# Second pass: get all that match the overriding operation,
+	# which haven't already been found.
+	_for cu_fac_rec _over cu_tbl.select(override_pred).fast_elements()
+	_loop
+		# Ensure that OP_CODE is a valid type of operation for this CU
+		# definition. 
+		_if (parent_rec << cu_fac_rec.mss_cu_definition) _is _unset _then _continue _endif
+		_if done_set.includes?(parent_rec)
+		_then
+			_continue
+		_endif
+		
+		r.add_last(cu_fac_rec)
+		done_set.add(parent_rec)
+	_endloop
+	
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.compare_attribute_float?(rec_ex, fd, cfa, compare_value, string_value)
+	## 
+	## Perform a comparision based on floating point values.
+	## REC_EX and FD define the record exemplar and field
+	## descriptor being analyzed.  COMPARE_VALUE is one value to be
+	## compared, which will already be of the proper data type.
+	## STRING_VALUE is the other value to be compared, which will
+	## still be in a string format (and so must be converted to the
+	## proper data type).
+	##
+	## CFA is the mss_cu_facility_attribute record that initiated
+	## this comparison.
+	##
+
+	_local me << _self 
+	compare_ok? << _false 
+	_catch :any_error
+	       _handling error _with
+	       _proc(cond)
+		       _import me, cfa
+		       write(me.message(:float_conversion_error, cfa, cond.report_contents_string))
+		       _throw :any_error
+	       _endproc
+	       
+	       attr_value << rec_ex.value_from_string(fd, string_value)
+
+	       ep << attr_value / 1000000.0
+	       compare_ok? << (attr_value - compare_value).abs <= ep
+	       
+	_endcatch
+
+	_return compare_ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.compare_attribute_stored_unit?(rec_ex, fd, cfa, compare_value, string_value)
+	## 
+	## Perform a comparision based on stored unit values.
+	## REC_EX and FD define the record exemplar and field
+	## descriptor being analyzed.  COMPARE_VALUE is one value to be
+	## compared, which will already be of the proper data type.
+	## STRING_VALUE is the other value to be compared, which will
+	## still be in a string format (and so must be converted to the
+	## proper data type).
+	##
+	## CFA is the mss_cu_facility_attribute record that initiated
+	## this comparison.
+	##
+
+	_local me << _self 
+	compare_ok? << _false 
+	_catch :any_error
+	       _handling error _with
+	       _proc(cond)
+		       _import me, cfa
+		       write(me.message(:stored_unit_conversion_error, cfa, cond.report_contents_string))
+		       _throw :any_error
+	       _endproc
+	       
+	       attr_value << rec_ex.value_from_string(fd, string_value)
+
+	       # Consider the following simple comparision:
+	       #  - compare_ok? << compare_value = attr_value       
+	       # Note that it relies on the .eq() operator working exactly
+	       # right for unit_value, which is probably not a correct
+	       # assumption (due to the potential for rounding errors).  So,
+	       # explicitly do our own comparision here, using a 1 in 1
+	       # million allowable error.
+	       ep << attr_value.value / 1000000.0
+	       _if compare_value.unit.dimensionality _isnt attr_value.unit.dimensionality
+	       _then
+		       compare_ok? << _false
+	       _else
+		       compare_ok? << (attr_value.value - compare_value.value_in(attr_value.unit)).abs <= ep
+	       _endif
+	       
+	_endcatch
+
+	_return compare_ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_engine.cu_job_type_for_workspace_job_type(wjt)
+	## 
+	## Return a mss_cu_job_type record that corresponds to the
+	## mss_job_type record WJT (from the mss_workspace data model).
+	## Default processing is to find a matching value based on
+	## name.
+	##
+
+	tbl << _self.view.collections[:mss_cu_job_type]
+	_return tbl.select(predicate.eq(:name, wjt.name)).an_element()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.maintain_cus_for_record(rec, cu_list, _optional cur_design)
+	## 
+	## Maintain the mss_cu_reference records associated with REC,
+	## by inserting/updating/deleting as required to match the
+	## contents of CU_LIST (a collection of mss_cu_holder records).
+	##
+	## If CUR_DESIGN (a mss_design record) is set, then any new or
+	## updated CUs will be associated with that design.
+	## Otherwise, new or updated CUs will not be associated with
+	## any design.
+	##
+
+	rec.fire_pre_maintain_cus_actions(cu_list)
+	
+	_if cur_design _is _unset
+	_then
+		cur_design_id << _unset
+	_else
+		cur_design_id << cur_design.id
+	_endif
+
+	# If there are any Macro Units in CU list, expand them out here.
+	exp_cu_list << rope.new()
+	_for i _over cu_list.fast_elements()
+	_loop
+		exp_cu_list.add_all_last(i.expand_for_macro_units())
+	_endloop 
+	
+	# Figure out the existing set of CU references.
+	exist_refs << equality_set.new_from(mss_cu_reference.tracking_records_for(rec))
+	
+	# Work through EXP_CU_LIST to classify inserts vs. updates.
+	new_cus << rope.new()
+	update_cus << rope.new()
+	_for i _over exp_cu_list.fast_elements()
+	_loop
+		_if (ref << i.cu_reference) _isnt _unset
+		_then
+			# If this does not exist in EXIST_REFs, something is broken.
+			_if _not exist_refs.remove(ref)
+			_then 
+				_self.user_error(:unexpected_error_maintaining_cus, ref)
+			_endif
+			update_cus.add_last(i)
+		_else
+			new_cus.add_last(i)
+		_endif
+	_endloop
+
+	# Insert all new ones.
+	_for i _over new_cus.fast_elements()
+	_loop
+		new_pl << property_list.new_with(:cu_code, i.cu_code,
+						 :operation, i.operation,
+						 :work_point_number, i.work_point_number,
+						 :quantity, i.quantity.default(1),
+						 :unit_multiplier, i.unit_multiplier)
+		new_ref << mss_cu_reference.new(rec, cur_design, new_pl)
+	_endloop
+
+	# Update all existing ones.
+	_for i _over update_cus.fast_elements()
+	_loop
+		ref << i.cu_reference
+		update_pl << property_list.new_with(:cu_code, i.cu_code,
+						    :operation, i.operation,
+						    :work_point_number, i.work_point_number,
+						    :quantity, i.quantity.default(1),
+						    :unit_multiplier, i.unit_multiplier)
+		any_updates? << _false 
+		dr << ref.detached()
+		_for attr_name, new_val _over update_pl.fast_keys_and_elements()
+		_loop
+			_if dr.perform(attr_name).default("") ~= new_val.default("")
+			_then
+				dr.perform(attr_name.with_chevron, new_val)
+				any_updates? << _true
+			_endif
+		_endloop
+		_if _not any_updates?
+		_then
+			_continue
+		_endif
+
+		# If working in a design, then claim ownership of this CU record.
+		_if cur_design_id _isnt _unset
+		_then
+			dr.mss_design_id << cur_design_id
+		_endif
+
+		dr.source_collection.update(dr)
+	_endloop 
+
+	# Delete all unreferenced ones.
+	_for i _over exist_refs.elements()
+	_loop
+		i.delete()
+	_endloop
+	
+	rec.fire_post_maintain_cus_actions(cu_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.next_available_work_point_number(prefix, start_number)
+	## 
+	## Return the next available number value for a proposed new
+	## mss_cu_work_point with the given PREFIX and START_NUMBER
+	## (note that the START_NUMBER must be given as an integer).
+	## This will try START_NUMBER, and if a record already exists
+	## with that value, it will successively increment that value
+	## until no duplicate exists.
+	##
+
+	start_number << start_number.default(1)
+	_if (tbl << _self.work_point_table) _is _unset
+	_then
+		_return start_number
+	_endif 
+	prefix << prefix.default("")
+	_if (ad << _self.active_design) _is _unset
+	_then
+		# No duplicate validation if there is no active design.
+		_return start_number
+	_endif
+	
+	dr << tbl.new_detached_record()
+	dr.mss_design_id << ad.id
+	dr.prefix << prefix
+	check_ids << dr.mss_design_ids_for_uniqueness_check()
+	
+	# Optimistically assume that the caller provided a good guess.
+	# In this case, we'll try iterating for a few guesses.
+	good_guess_factor << 10
+	best_val << _unset 
+	_for i _over start_number.upto(start_number + good_guess_factor)
+	_loop
+		dr.number << i.write_string
+		wpn << dr.work_point_number << dr.derived_work_point_number()
+		any_match? << _false 
+		_for j _over check_ids.fast_elements()
+		_loop
+			pred << predicate.eq(:mss_design_id, j) _and
+				predicate.eq(:work_point_number, wpn)
+			_if tbl.select(pred).an_element() _isnt _unset
+			_then
+				any_match? << _true
+				_leave
+			_endif
+		_endloop
+		_if _not any_match?
+		_then
+			best_val << i
+			_leave
+		_endif
+	_endloop
+
+	_if best_val _isnt _unset
+	_then
+		_return best_val
+	_endif 
+
+	# OK, the optimistic approach isn't working.  To avoid the case
+	# where there are 1000 sequential work points (resulting in a
+	# lot of queries), just get a whole batch of all work point
+	# values and compare to this set.
+	all_wpns << equality_set.new()
+	_for i _over check_ids.fast_elements()
+	_loop
+		pred << predicate.eq(:mss_design_id, i) _and
+			predicate.eq(:prefix, prefix)
+		_for j _over tbl.select(pred).fast_elements()
+		_loop
+			all_wpns.add(j.work_point_number)
+		_endloop 
+	_endloop
+
+	best_val << start_number + good_guess_factor + 1
+	_loop
+		dr.number << best_val.write_string
+		wpn << dr.work_point_number << dr.derived_work_point_number()
+		_if _not all_wpns.includes?(wpn)
+		_then
+			_return best_val
+		_endif
+		best_val +<< 1
+	_endloop 
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_engine.mss_wp_auto_anno_offset(wp)
+	## 
+	## The distance to auto-offset annotation created by the
+	## mss_wp_multi_create() method.  This can either be unset
+	## (indicating no auto-generated anno), or a length_value.
+	##
+
+	# Note that this can also be redefined to consider
+	# !current_world!, and/or the work point WP being annotated.
+	
+	_return length_value.new(5.0, :m)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_engine.mss_wp_multi_create(mode, p_chain, prefix, number)
+	## 
+	## Create multiple work points and spans with a single operation.
+	## P_CHAIN is a pseudo_chain geometry to define the sectors and
+	## world, PREFIX is the work point prefix value, and NUMBER is
+	## the work point number value.
+	##
+	## MODE may be:
+	##  - :multi_point_no_span : create one point geometry at each
+	##    vertex; create no spans.
+	##  - :multi_point_multi_span : create one point geometry at each
+	##    vertex; create one span between each vertex.
+	##  - :multi_point_single_span : create one point geometry at each
+	##    vertex; create one span from the first to last vertex.
+	##  - :no_point_multi_span : create no point geometries; create
+	##    one span between each vertex. 
+	##
+
+	_dynamic !current_world!
+
+	_if (wpv << _self.work_point_view) _is _unset _orif
+	    (tbl << _self.work_point_table) _is _unset
+	_then
+		_return
+	_endif 
+	
+	sr << p_chain.sectors
+	w << p_chain.world
+	!current_world! << w.world_for_dataset(wpv)
+	_if !current_world! _is _unset
+	_then
+		_self.user_error(:no_matching_world_for_wp, wpv.external_name)
+	_endif
+
+	_for i _over sr.fast_elements()
+	_loop
+		_if _not i.is_class_of?(sector) _andif
+		    _not i.is_class_of?(sector_z)
+		_then
+			_self.user_error(:straight_sector_required)
+		_endif
+	_endloop
+
+	sec << sr.as_straight_sector(0, 0, 0)
+	all_wps << rope.new()
+	_for idx, coord _over sec.fast_keys_and_elements()
+	_loop
+		a1 << _unset 
+		a2 << _unset 
+		_if idx > 1
+		_then
+			a1 << sec[idx - 1].angle_to(sec[idx]).default(0.0)
+		_endif
+		_if idx < sec.size
+		_then
+			a2 << sec[idx].angle_to(sec[idx + 1]).default(0.0)
+		_endif
+		_if a1 _is _unset
+		_then
+			_if a2 _is _unset
+			_then
+				a_avg << 0.0
+			_else
+				a_avg << a2
+			_endif
+		_else
+			_if a2 _is _unset
+			_then
+				a_avg << a1
+			_else
+				a_avg << (a1 + a2) / 2.0
+			_endif
+		_endif
+		
+		_if {:multi_point_no_span, :multi_point_multi_span, :multi_point_single_span}.includes?(mode)
+		_then
+			# Create a work point here.
+			_if (wp << _self.mss_wp_multi_create_work_point(coord, w, prefix, number)) _isnt _unset
+			_then
+				all_wps.add_last(wp)
+				number +<< 1
+
+				_if (a_off << _self.mss_wp_auto_anno_offset(wp)) _isnt _unset
+				_then
+					a_off << a_off.value_in(w.unit_name)
+					a_ang << (a_avg - 1.0.pi / 4.0).normalise(0, 1.0.pi) - 1.0.pi / 4.0
+					c_off << coordinate.new_with_polar(a_off, a_ang)
+					wp.make_geometry(:annotation, coord + c_off, wp.annotation_text)
+				_endif 
+			_endif 
+		_endif
+	
+		_if {:multi_point_multi_span, :no_point_multi_span}.includes?(mode) _andif
+		    idx < sec.size
+		_then
+			# Create a work point with chain geometry here.
+			coord2 << sec[idx + 1]
+			wp_sr << sector_rope.new_with(sector.new_with(coord, coord2))
+			_if wp_sr.line_length > 0.0 _andif
+			    (wp << _self.mss_wp_multi_create_work_chain(wp_sr, w, prefix, number)) _isnt _unset
+			_then
+				all_wps.add_last(wp)
+				number +<< 1
+
+				_if (a_off << _self.mss_wp_auto_anno_offset(wp)) _isnt _unset
+				_then
+					a_off << a_off.value_in(w.unit_name)
+					a_ang << (a2 - 1.0.pi / 4.0).normalise(0, 1.0.pi) - 1.0.pi / 4.0
+					c_off << coordinate.new_with_polar(a_off, a_ang)
+					wp.make_geometry(:annotation, (coord + coord2) / 2.0 + c_off, wp.annotation_text)
+				_endif 
+			_endif 
+		_endif
+	_endloop
+
+	_if {:multi_point_single_span}.includes?(mode)
+	_then
+		# Create a work point with chain geometry here.
+		wp_sr << sector_rope.new_with(sec)
+		_if (wp_sr_ll << wp_sr.line_length) > 0.0 _andif
+		    (wp << _self.mss_wp_multi_create_work_chain(wp_sr, w, prefix, number)) _isnt _unset
+		_then
+			all_wps.add_last(wp)
+			number +<< 1
+			
+			_if (a_off << _self.mss_wp_auto_anno_offset(wp)) _isnt _unset
+			_then
+				a_off << a_off.value_in(w.unit_name)
+				mid << wp_sr.location_for_length(wp_sr_ll / 2.0).coord
+				a_ang << (wp_sr.angle_near(mid) - 1.0.pi / 4.0).normalise(0, 1.0.pi) - 1.0.pi / 4.0
+				c_off << coordinate.new_with_polar(a_off, a_ang)
+				wp.make_geometry(:annotation, mid + c_off, wp.annotation_text)
+			_endif 
+		_endif 
+	_endif 
+	
+	_return all_wps
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_engine.mss_wp_multi_create_work_point(coord, w, prefix, number)
+	## 
+	## Create a work point with a point geometry at COORD in world
+	## W, using PREFIX and NUMBER for the prefix and number attributes.
+	##
+
+	_dynamic !current_world!
+
+	_if (wpv << _self.work_point_view) _is _unset _orif
+	    (tbl << _self.work_point_table) _is _unset
+	_then
+		_return
+	_endif
+	_if !current_world! _is _unset
+	_then
+		!current_world! << w.world_for_dataset(wpv)
+	_endif 
+
+	_if (ad << _self.active_design) _is _unset
+	_then
+		ad_id << 0
+		validate_design_ids << _unset 
+	_else
+		ad_id << ad.id
+		validate_design_ids << mss_cu_work_point.mss_design_ids_for_uniqueness_check(ad)
+	_endif
+		
+	# If there is already one at this point, skip it.
+	pa << pseudo_area.new(bounding_box.new_centred(coord.x, coord.y, 5.0))
+	pa.world << !current_world!
+	_for test_point _over tbl.select(predicate.interacts(:location, pa)).fast_elements()
+	_loop
+		_if (test_geom << test_point.location) _isnt _unset _andif
+		    test_geom.distance_to(coord) < 5.0
+		_then
+			_if validate_design_ids _is _unset _orif
+			    validate_design_ids.includes?(test_point.mss_design_id)
+			_then
+				_return
+			_endif 
+		_endif
+	_endloop
+	
+	dr << tbl.new_detached_record()
+	next_num << _self.next_available_work_point_number(prefix, number)
+	dr.mss_design_id << ad_id
+	dr.prefix << prefix
+	dr.number << next_num.write_string
+	rec << dr.source_collection.insert(dr)
+	rec.make_geometry(:location, coord)
+
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_engine.mss_wp_multi_create_work_chain(sr, w, prefix, number)
+	## 
+	## Create a work point with a chain geometry of sector rope SR in world
+	## W, using PREFIX and NUMBER for the prefix and number attributes.
+	##
+
+	_dynamic !current_world!
+
+	_if (wpv << _self.work_point_view) _is _unset _orif
+	    (tbl << _self.work_point_table) _is _unset
+	_then
+		_return
+	_endif 
+	_if !current_world! _is _unset
+	_then
+		!current_world! << w.world_for_dataset(wpv)
+	_endif 
+
+	_if (ad << _self.active_design) _is _unset
+	_then
+		ad_id << 0
+	_else
+		ad_id << ad.id
+	_endif
+	
+	dr << tbl.new_detached_record()
+	next_num << _self.next_available_work_point_number(prefix, number)
+	dr.mss_design_id << ad_id
+	dr.prefix << prefix
+	dr.number << next_num.write_string
+	rec << dr.source_collection.insert(dr)
+	rec.make_geometry(:route, sr)
+
+	_return rec
+	
+_endmethod
+$

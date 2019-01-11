@@ -1,0 +1,40 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-06-17 00:37:00 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 06-17-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method line_style.kml_style()
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	(r,g,b) << _self.colour.rgb()
+	r << (r*255).as_hex_string(2)
+	g << (g*255).as_hex_string(2)
+	b << (b*255).as_hex_string(2)
+	col << write_string("ff",r,g,b)
+	xml << simple_xml_thing.new("Style",
+				    rope.new_with(simple_xml_thing.new("LineStyle",
+							  rope.new_with(
+								  simple_xml_thing.new("color",{col})
+							  )
+						      )
+				    )
+				)
+	>> xml
+_endmethod
+$

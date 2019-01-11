@@ -1,0 +1,85 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_wsdl_service
+##
+## Service class to serve WSDL files for a module.
+##
+
+def_slotted_exemplar(:mss_http_wsdl_service,
+{},
+{:mss_http_service})
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_wsdl_service.process_service_request(req)
+	## 
+	## Respond to the request by reporting back the requested WSDL
+	## file, with %HOSTNAME% substituted with the actual host name.
+	##
+
+	.request << req
+	_self.process_wsdl_file_service_request()
+	_self.server.send_request_response(req)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_wsdl_service.process_wsdl_file_service_request()
+	## 
+	## Serve the requested WSDL file if found.
+	##
+
+	req << .request
+	resp << req.response
+	
+	_try
+		(my_module << sw_module_manager.module(.init_properties[:wsdl_file_module_name].default("")))
+	_when sw_module_no_such_module
+	      resp.default_not_found_response()
+	      _return
+	_endtry 
+
+	_if (leaf_name << .init_properties[:leaf_name]) _is _unset _orif
+	    (full_fname << my_module.safe_full_directory) _is _unset
+	_then
+		resp.default_not_found_response()
+		_return
+	_endif
+	
+	full_fname << system.pathname_down(full_fname, "resources", "base", "wsdl", leaf_name)
+	_if _not system.file_exists?(full_fname)
+	_then
+		resp.default_not_found_response()
+		_return
+	_endif
+
+	# Transfer the file, substituting the HOSTNAME as appropriate.
+	real_host << _self.server.hostname_for_request(req)
+	f << _unset
+	s << internal_text_output_stream.new()
+	_protect
+		f << external_text_input_stream.new(full_fname)
+		_loop
+			_if (l << f.get_line()) _is _unset _then _leave _endif
+			l << l.substitute_string("%HOSTNAME%", real_host)
+			s.write(l, newline_char)
+		_endloop 
+	_protection
+		_if f _isnt _unset _then f.close() _endif
+	_endprotect
+	
+	resp.response_object << s.string
+	resp.set_status_code(200)
+
+_endmethod
+$

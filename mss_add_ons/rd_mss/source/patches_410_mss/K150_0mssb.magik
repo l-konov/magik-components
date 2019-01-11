@@ -1,0 +1,65 @@
+#% text_encoding = iso8859_1
+#Patch-Number:	150 (aus 410-Fehlerliste)
+#Fixes-Bug-Numbers:	
+#Author:	Reinhard Hahn 
+#Copyright:	regioDATA GmbH
+#Date:		21.04.2011
+#Product:	MSS
+#TOPIC		Join-fields
+#
+#INTEGRATED TO SOURCES?: Nein
+#
+#Release Notes:
+# If you load K150_0mssa.magik and you are dealing with
+# mandatory join fields, you should expand the mandatory check
+# to these fields as well. This is done here
+#
+# NB: Technically spoken there is no dependence to
+# K150_0mssa.magik, but it makes no sense to load this patch
+# without the other.
+
+sw!patch_software("mss_ptrule_manager",1)
+$
+
+_package user
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_validate_mandatory_attributes(a_ptrule)
+	## 
+	## Ensure that all mandatory fields that do not have a
+	## generated value are not unset.
+	##
+
+# OLD:
+#	_for fd _over _self.physical_fields.fast_elements()
+#	_loop
+#		_if _not fd.mandatory? _orif
+#		    fd.generator _isnt _unset
+# END
+# NEW:
+	_for fd _over _self.all_fields.fast_elements()
+	_loop
+		 _if _not (fd.is_join? _orif fd.is_physical?) _orif 
+		     _not fd.mandatory? _orif
+		     fd.generator _isnt _unset
+# END
+		_then
+			_continue
+		_endif 
+		_if (val << _self.perform(fd.name)) _is _unset _orif
+		    val = ""
+		_then
+			condition.raise(:dd_mandatory_field,
+					:field_name, write_string(_self.source_collection.external_name, " ",
+								  fd.external_name),
+					:fd, fd)
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+
+sw!declare_custom_patch(150,"0mssb","Attribute Prompter should handle join fields as well")
+$

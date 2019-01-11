@@ -1,0 +1,39 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_group_definition
+##
+## Definition record for grouping compatible units.
+##
+
+def_slotted_exemplar(:mss_cu_group_definition,
+{},
+{:mss_cu_ds_record})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_group_definition.general_validator()
+	## 
+	## Ensure that the name is unique.
+	##
+
+	pred << predicate.eq(:name, _self.name)
+	_for i _over _self.source_collection.select(pred).fast_elements()
+	_loop
+		_if i.id ~= _self.id
+		_then
+			_self.user_error(:duplicate_cu_group_definition, _self.name)
+		_endif
+	_endloop
+	_return _super.general_validator()
+	
+_endmethod
+$

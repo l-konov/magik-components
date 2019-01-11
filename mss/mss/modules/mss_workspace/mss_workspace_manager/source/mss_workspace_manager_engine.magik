@@ -1,0 +1,2258 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_workspace_manager_engine
+##
+## Engine for coordinating workspace management functions.
+## Note that there is only one instance of this object: its
+## function is primarily to deal with datastore management of
+## all defined datastores, and there is only one instance of
+## each database view that it manages.
+##
+
+def_slotted_exemplar(:mss_workspace_manager_engine,
+{
+	{:incarnation, _unset},
+	{:view, _unset},
+	{:active_design, _unset},
+	{:active_design_alternative_data, _unset},
+	{:active_design_mode, _unset, :readable},
+	{:active_design_dataset_names, _unset, :readable},
+	{:overlay_design_data, _unset},
+	{:conflict_viewer, _unset}
+},
+{})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:view_name,
+	## The name of the database view that holds workspace information.
+	:mss_workspace,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:alternative_name_prefix,
+	## The prefix used to construct a design alternative name -
+	## this is concatenated with the ID value of the design.  Note
+	## that once this is defined and alternatives have been
+	## created, it cannot be changed.
+	"WS_",
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:root_alternative_name_for_view_name,
+	## Lookup table to map from a gis_ds_view name to the top
+	## alternative name for that view.  All top-level designs will
+	## be created beneath this top alternative name.
+	##
+	## This must be redefined: the following implementation is an
+	## example only.
+	property_list.new_with(:gis, "|MSS_ROOT"),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:non_postable_dataset_names,
+	## A vector of dataset names that should not be posted.  This
+	## may be redefined to include a working partition that
+	## contains such things as temporary construction notes.
+	{},
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:non_aggregatable_dataset_names,
+	## A vector of dataset names that should not be aggregated.  This
+	## may be redefined to include a working partition that
+	## contains such things as temporary construction notes.
+	{},
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:use_scheduler_for_post?,
+	## Set this to true if the mss_scheduler module should be used
+	## to perform post operations on designs.
+	_false,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_workspace_manager_engine.root_alternative_name_for_view_name_and_design(view_name, design)
+	## 
+	## Return the root alternative name to use for the database
+	## view identified by VIEW_NAME, and the mss_design record
+	## DESIGN.
+	##
+	## The default implementation simply uses the information in
+	## the root_alternative_name_for_view_name shared constant,
+	## which results in all top-level designs being created right
+	## below that alternative.  If this behavior is changed, it
+	## must be guaranteed to always return the same result over the
+	## life of the DESIGN record, because the database alternatives
+	## cannot be moved/reparented to a different root alternative
+	## once they have been created.
+	##
+
+	_return _self.root_alternative_name_for_view_name[view_name]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.init(_optional force?)
+	## 
+	## Initialize slots on self.
+	##
+
+	_if force? _isnt _true _andif
+	    .incarnation _is system.incarnation
+	_then
+		_return
+	_endif
+
+	.incarnation << system.incarnation
+	.view << gis_program_manager.cached_dataset(_self.view_name)
+	.active_design << _unset
+	.active_design_alternative_data << equality_property_list.new()
+	.active_design_mode << :readonly
+	.active_design_dataset_names << {}
+	.overlay_design_data << hash_table.new()
+		
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.message(message_id, _gather args)
+	## 
+	## 
+
+	mh_name << _self.class_name
+	_return message_handler.new(mh_name).human_string(message_id, _unset, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.user_error(_gather args)
+	## 
+	## Raise a user error condition with a message constructed from ARGS.
+	##
+
+	condition.raise(:user_error, :string, _self.message(_scatter args))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.view
+	## 
+	## 
+
+	_self.init()
+	_return .view
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.active_design
+	## 
+	## Return the mss_design record that is currently active.
+	##
+
+	_if .active_design _isnt _unset _andif
+	    _not .active_design.is_valid?
+	_then
+		.active_design << _unset
+	_endif
+	_return .active_design
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.active_job
+	## 
+	## Return the mss_job record that owns the active design.
+	##
+
+	_if (ad << _self.active_design) _isnt _unset
+	_then
+		_return ad.mss_job
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.active_job_type
+	## 
+	## Return the mss_job_type record that is associated with the
+	## active job.
+	##
+
+	_if (aj << _self.active_job) _isnt _unset
+	_then
+		_return aj.job_type(_true)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.job_table
+	## 
+	## 
+
+	_self.init()
+	_return .view.collections[:mss_job]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.design_table
+	## 
+	## 
+
+	_self.init()
+	_return .view.collections[:mss_design]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_manager_engine.overlay_design_data
+	## 
+	## 
+
+	_self.init()
+	_return .overlay_design_data
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.new_job(job_pl)
+	## 
+	## Create and return a new mss_job record, using attributes in
+	## the property list JOB_PL.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	tbl << _self.job_table
+
+	# The following will work out the appropriate status value to
+	# use, based on the workflow.
+	ndr << tbl.new_detached_record()
+	_if (jt << job_pl[:type]) _is _unset _orif
+	    jt = ""
+	_then
+		condition.raise(:user_error, :string, _self.message(:blank_job_type))
+	_endif
+	ndr.type << jt
+	wf << ndr.workflow()
+	cand_states << wf.get_subsequent_state_names(ndr, _unset)
+	job_pl[:status] << cand_states.an_element()
+
+	trans << record_transaction.new_insert(tbl, job_pl)
+	rec << trans.run()
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.new_design(parent_job, design_pl)
+	## 
+	## Create and return a new mss_design record, using attributes in
+	## the property list DESIGN_PL.  The design will be related to
+	## the job identified by PARENT_JOB.
+	##
+	## This also creates the database alternatives associated with
+	## the design.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	ok? << _false 
+	_protect
+		rec << _self.int!new_design(parent_job, design_pl)
+		_self.create_design_alternatives(rec)
+		ok? << _true 
+	_protection
+		_if _not ok? _andif
+		    rec _isnt _unset _andif
+		    rec.is_valid?
+		_then
+			_protect
+				_self.delete_design_alternatives(rec)
+			_protection 
+				trans << record_transaction.new_delete(rec)
+				trans.run()
+			_endprotect 
+		_endif
+	_endprotect
+
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.new_job_and_design(job_pl, design_pl)
+	##
+	## Create and return a new mss_job and mss_design record, using
+	## attributes in the property lists JOB_PL and DESIGN_PL.
+	##
+	## This also creates the database alternatives associated with
+	## the design.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	ok? << _false 
+	_protect
+		# The following is a bit tricky, because the transactions
+		# cannot simply be chained together using a dataset transaction
+		# - but, they should all run as one.  So, wrap the whole thing
+		# in a custom_record_transaction.
+		trans << mss_workspace_transaction.new(_self.view, _self, :|int!new_job_and_design()|,
+						       {job_pl, design_pl})
+		results << trans.run()
+		job_rec << results[1]
+		design_rec << results[2]
+		_self.create_design_alternatives(design_rec)
+		ok? << _true 
+	_protection
+		_if _not ok?
+		_then
+			_protect
+				_if design_rec _isnt _unset _andif design_rec.is_valid?
+				_then 
+					_self.delete_design_alternatives(design_rec)
+				_endif 
+			_protection 
+				trans_rope << rope.new()
+				_if design_rec _isnt _unset _andif design_rec.is_valid?
+				_then
+					trans << record_transaction.new_delete(design_rec)
+					trans_rope.add_last(trans)
+				_endif 
+				_if job_rec _isnt _unset _andif job_rec.is_valid?
+				_then
+					trans << record_transaction.new_delete(job_rec)
+					trans_rope.add_last(trans)
+				_endif
+				_if trans_rope.size > 0
+				_then
+					ds_trans << dataset_transaction.new(trans_rope)
+					ds_trans.run()
+				_endif
+			_endprotect 
+		_endif
+	_endprotect
+
+	_return job_rec, design_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.new_sub_design(parent_design, design_pl)
+	## 
+	## Create and return a new mss_design record, using attributes in
+	## the property list DESIGN_PL.  The design will be related to
+	## the design identified by PARENT_DESIGN
+	##
+	## This also creates the database alternatives associated with
+	## the design.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	parent_job << parent_design.mss_job
+	design_pl[:mss_design_id] << parent_design.id
+	ok? << _false 
+	_protect
+		rec << _self.int!new_design(parent_job, design_pl)
+		_self.create_design_alternatives(rec)
+		ok? << _true 
+	_protection
+		_if _not ok? _andif
+		    rec _isnt _unset _andif
+		    rec.is_valid?
+		_then
+			_protect
+				_self.delete_design_alternatives(rec)
+			_protection 
+				trans << record_transaction.new_delete(rec)
+				trans.run()
+			_endprotect 
+		_endif
+	_endprotect
+
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.int!new_design(parent_job, design_pl)
+	## 
+	## Create and return a new mss_design record, using attributes in
+	## the property list DESIGN_PL.  The design will be related to
+	## the job identified by PARENT_JOB.
+	##
+	## Note that this does not create the database alternatives
+	## associated with the design.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	tbl << _self.design_table
+	design_pl[:mss_job_id] << parent_job.id
+	wf << parent_job.workflow()
+	cand_states << wf.get_subsequent_state_names(tbl.record_exemplar, _unset)
+	design_pl[:status] << cand_states.an_element()
+
+	trans << record_transaction.new_insert(tbl, design_pl)
+	rec << trans.run()
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.int!new_job_and_design(job_pl, design_pl)
+	## 
+	## Create and return a new mss_job and mss_design record, using
+	## attributes in the property lists JOB_PL and DESIGN_PL.
+	##
+	## Note that this does not create the database alternatives
+	## associated with the design.
+	## 
+
+	_dynamic !mss_workspace_initiator! << _self
+
+	new_job << _self.new_job(job_pl)
+	new_design << _self.int!new_design(new_job, design_pl)
+	_return {new_job, new_design}
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.delete_design(rec)
+	##
+	## Delete the design record REC, along with all design alternatives.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+
+	rec.validate_delete()
+	ok? << _false 
+	_protect
+		_self.delete_design_alternatives(rec)
+		trans << record_transaction.new_delete(rec)
+		trans.run()
+		ok? << _true 
+	_protection
+		# If a failure happens, we may have a design that exists
+		# without design alternatives.  This is better than having
+		# design alternatives that exist without a design.  Either way,
+		# there's no useful recovery to try to do at this point.
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.delete_job(rec)
+	##
+	## Delete the job record REC, along with all designs and all
+	## design alternatives. 
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	rec.validate_delete()
+	ok? << _false 
+	_protect
+		# Delete the design records in reverse order, to ensure that
+		# sub-designs are deleted before their parents.
+		design_recs << rec.ordered_sub_designs().reversed()
+
+		# Delete design alternatives first.
+		trans_rope << rope.new()
+		_for i _over design_recs.fast_elements()
+		_loop 
+			_self.delete_design_alternatives(i)
+			trans_rope.add_last(record_transaction.new_delete(i))
+		_endloop
+
+		# Delete the job next.
+		trans_rope.add_last(record_transaction.new_delete(rec))
+
+		# Finally, run the delete transaction.
+		ds_trans << dataset_transaction.new(trans_rope)
+		ds_trans.run()
+		ok? << _true 
+	_protection
+		# If a failure happens, we may have a design that exists
+		# without design alternatives.  This is better than having
+		# design alternatives that exist without a design.  Either way,
+		# there's no useful recovery to try to do at this point.
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.create_design_alternatives(design_rec)
+	## 
+	## Create the database alternatives associated with the design
+	## DESIGN_REC.  
+	##
+
+	jt << design_rec.job_type()
+	new_alt_view_names << rope.new()
+	anp << _self.alternative_name_prefix
+
+	ok? << _false 
+	_protect
+		repl_view << _unset 
+		_for ds_name _over jt.dataset_names.fast_elements()
+		_loop
+			repl_view << gis_program_manager.cached_dataset(ds_name).replicate_without_collections()
+			repl_view.go_to_alternative(_self.root_alternative_name_for_view_name_and_design(ds_name, design_rec))
+			path << design_rec.ordered_design_path
+
+			# Step down to one level above PATH: if need be, create
+			# alternatives along the way (although they ought to exist already).
+			_for i _over 1.upto(path.size - 1)
+			_loop
+				new_alt_name << write_string(anp, path[i].id)
+				_if _not repl_view.has_alternative?(new_alt_name)
+				_then
+					repl_view.spawn(new_alt_name)
+				_endif
+				repl_view.down(new_alt_name)
+			_endloop
+
+			# Now, create the leaf alternative.  If it already exists, no
+			# action is needed - if it is indeed created, then log that it
+			# was done, to undo later if something goes wrong.
+			new_alt_name << write_string(anp, design_rec.id)
+			_if _not repl_view.has_alternative?(new_alt_name)
+			_then
+				repl_view.spawn(new_alt_name)
+				new_alt_view_names.add_last(ds_name)
+			_endif
+
+			repl_view.discard()
+			repl_view << _unset
+		_endloop
+		ok? << _true
+	_protection
+		_if _not ok?
+		_then
+			_if repl_view _isnt _unset _then repl_view.discard() _endif
+			_if new_alt_view_names.size > 0
+			_then
+				_self.delete_design_alternatives(design_rec, new_alt_view_names)
+			_endif
+		_endif
+	_endprotect 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.delete_design_alternatives(design_rec, _optional view_names)
+	##
+	## Delete the alternatives associated with design DESIGN_REC.
+	## If VIEW_NAMES is entered, only the alternatives in these
+	## database views will be deleted.
+	##
+
+	jt << design_rec.job_type()
+	anp << _self.alternative_name_prefix
+	
+	ok? << _false 
+	_protect
+		repl_view << _unset 
+		_for ds_name _over jt.dataset_names.fast_elements()
+		_loop
+			_if view_names _isnt _unset _andif
+			    _not view_names.includes?(ds_name)
+			_then
+				_continue
+			_endif
+			
+			repl_view << gis_program_manager.cached_dataset(ds_name).replicate_without_collections()
+			repl_view.go_to_alternative(_self.root_alternative_name_for_view_name_and_design(ds_name, design_rec))
+			path << design_rec.ordered_design_path
+
+			# Step down to one level above PATH: if anything is missing
+			# along the way, this is unexpected, but there is nothing to do
+			# in this case.
+			_for i _over 1.upto(path.size - 1)
+			_loop
+				new_alt_name << write_string(anp, path[i].id)
+				_if _not repl_view.has_alternative?(new_alt_name)
+				_then
+					repl_view.discard()
+					repl_view << _unset
+					_leave 
+				_endif
+				repl_view.down(new_alt_name)
+			_endloop
+			_if repl_view _is _unset
+			_then
+				# Above loop bailed out - nothing to delete.
+				_continue
+			_endif
+			
+			# Now, delete the leaf alternative.  If any user-created
+			# alternatives exist, they must be deleted here also.
+			new_alt_name << write_string(anp, design_rec.id)
+			_if repl_view.has_alternative?(new_alt_name)
+			_then
+				repl_view.remove_alternative(new_alt_name, _true)
+			_endif 
+			repl_view.discard()
+			repl_view << _unset
+		_endloop
+		ok? << _true
+	_protection
+		_if _not ok?
+		_then
+			_if repl_view _isnt _unset _then repl_view.discard() _endif
+		_endif
+	_endprotect 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.goto_design_alternatives(design_rec, mode, _optional view_pl)
+	##
+	## Goto the database alternatives associated with the design
+	## DESIGN_REC, using MODE (:write or :readonly).
+	##
+	## If VIEW_PL is specified, it must be a property list of all
+	## views associated with the design.  This allows the caller to
+	## use a set of replicated views.
+	##
+
+	# It is actually a relatively lightweight thing to call
+	# create_design_alternatives() if they already exist.  Do it,
+	# since it simplifies the following processing.
+	_if design_rec _isnt _unset
+	_then 
+		_self.create_design_alternatives(design_rec)
+		jt << design_rec.job_type()
+		my_ds_names << jt.dataset_names
+	_else
+		my_ds_names << {}
+	_endif
+	
+	# Store the current pathname and mode for all database
+	# alternatives that self can potentially manage.  Also store
+	# the target pathname and mode
+	orig_alts << equality_property_list.new()
+	new_alts << equality_property_list.new()
+	addl_pl << property_list.new()
+	
+	_for ds_name, root_alt_name _over _self.root_alternative_name_for_view_name.fast_keys_and_elements()
+	_loop
+		_if view_pl _isnt _unset
+		_then
+			_if (dbv << view_pl[ds_name]) _is _unset
+			_then
+				_continue
+			_endif 
+		_else 
+			dbv << gis_program_manager.cached_dataset(ds_name)
+		_endif 
+		orig_alts[dbv] << {dbv.alternative_path_name(), dbv.mode}
+		_if my_ds_names.includes?(ds_name)
+		_then
+			odp << design_rec.ordered_design_path
+			target_alt << _self.full_alternative_name_for_view_name_and_design(ds_name, design_rec)
+			target_mode << mode
+			in_design? << _true 
+		_else
+			odp << {}
+			target_alt << root_alt_name
+			target_mode << :readonly
+			in_design? << _false 
+		_endif
+		new_alts[dbv] << {target_alt, target_mode, in_design?, odp}
+	_endloop
+
+	ok? << _false 
+	_protect
+		_for i, j _over new_alts.fast_keys_and_elements()
+		_loop
+			i.go_to_alternative(j[1])
+			_try 
+				i.switch(j[2])
+			_when auth!alternative_access_denied
+			_endtry
+			_if j[2] _is :write _andif
+			    i.mode _isnt :write
+			_then
+				_if (cw << i.current_writer) _isnt _unset
+				_then
+					addl_pl[:current_writer] << cw
+				_endif
+			_endif 
+			j[2] << i.mode
+		_endloop
+		ok? << _true 
+	_protection
+		_if _not ok?
+		_then
+			# Revert all alternatives to previous settings.
+			_for i, j _over orig_alts.fast_keys_and_elements()
+			_loop
+				i.go_to_alternative(j[1])
+				i.switch(j[2])
+			_endloop
+		_endif 
+	_endprotect 
+
+	_return new_alts, addl_pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.full_alternative_name_for_view_name_and_design(ds_name, design_rec)
+	## 
+	## Return the full alternative name used to navigate to the
+	## design alternative for DESIGN_REC in the database named
+	## DS_NAME.
+	##
+
+	anp << _self.alternative_name_prefix
+	modified_root_alt_name << _self.root_alternative_name_for_view_name_and_design(ds_name, design_rec)
+	s << internal_text_output_stream.new()
+	s.write(modified_root_alt_name)
+	
+	# Bit of a special case: if this is actually the true top
+	# alternative, don't need a separator for the first design.
+	_if modified_root_alt_name = "|"
+	_then
+		sep << ""
+	_else
+		sep << "|"
+	_endif
+	
+	# Step down each child design in order, to build the path name.
+	_for next_rec _over design_rec.ordered_design_path.fast_elements()
+	_loop
+		s.write(sep, anp, next_rec.id)
+		sep << "|"
+	_endloop
+
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.ensure_design_alternatives_not_updated()
+	## 
+	## Raise a user_error condition if any design alternatives are updated.
+	##
+
+	_self.init()
+	ad << _self.active_design
+	_for a_view _over .active_design_alternative_data.fast_keys()
+	_loop
+		_if a_view.updated?
+		_then
+			_if ad _isnt _unset
+			_then
+				msg << _self.message(:active_design_updated, ad.short_description)
+			_else
+				msg << _self.message(:database_updated, a_view.external_name)
+			_endif
+			condition.raise(:user_error, :string, msg)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.open_design(a_design, _optional desired_mode)
+	##
+	## Make A_DESIGN the active design.  If DESIRED_MODE is
+	## :readonly, it will be opened in readonly mode - otherwise
+	## write mode will be attempted, and if the access is only
+	## readonly, an mss_information condition will be raised to
+	## indicate why.  If DESIRED_MODE is :force_write, this will
+	## override auth and state configuration settings which would
+	## otherwise result in readonly access.
+	##
+
+	_self.init()
+	_if desired_mode _is :readonly
+	_then
+		actual_mode << :readonly
+	_else
+		actual_mode << :write
+	_endif 
+	_self.ensure_design_alternatives_not_updated()
+	
+	# If there is no design, then treat this as close_design()
+	_if a_design _is _unset
+	_then
+		_return _self.close_design()
+	_endif
+
+	_if _not a_design.is_valid?
+	_then
+		condition.raise(:user_error, :string, _self.message(:invalid_design))
+	_endif
+
+	_if desired_mode _isnt :force_write
+	_then
+		# Check state and auth conditions if not forcing writable access.
+		state << a_design.state()
+		_if state.get_property(:readonly?) _is _true
+		_then
+			actual_mode << :readonly
+		_endif
+
+		# Check authorisation to see if access is permitted.
+		_if a_design.owned_by_current_user?()
+		_then
+			auth_key_1 << :design_open_write_own
+			auth_key_2 << :design_open_readonly_own
+		_else 
+			auth_key_1 << :design_open_write_other
+			auth_key_2 << :design_open_readonly_other
+		_endif
+		
+		_if mss_wm_auth_engine.check_access(auth_key_1, a_design) _is _true 
+		_then
+			# Great, no further auth checking needed.
+		_else 
+			_if mss_wm_auth_engine.check_access(auth_key_2, a_design) _isnt _true 
+			_then
+				# No read or write access allowed.
+				_self.user_error(:no_read_access, a_design.short_description)
+			_endif
+			actual_mode << :readonly
+		_endif 
+	_endif
+	
+	(pl, addl_pl) << _self.goto_design_alternatives(a_design, actual_mode)
+	.active_design << a_design
+	_self.set_active_design_alternative_data(pl)
+	_self.changed(:active_design, _self.active_design)
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.check_writable_status(_optional desired_mode)
+	## 
+	## Check to see if the active design is writable - if not,
+	## raise an mss_information condition to indicate why not.
+	## If DESIRED_MODE is :force_write, this will override auth and
+	## state configuration settings which would otherwise result in
+	## readonly access. 
+	## 
+
+	_if (a_design << _self.active_design) _is _unset _then _return _endif 
+
+	readonly_reason << _unset
+	_if desired_mode _isnt :force_write
+	_then
+		# Check state and auth conditions if not forcing writable access.
+		state << a_design.state()
+		_if state.get_property(:readonly?) _is _true
+		_then
+			readonly_reason << _self.message(:readonly_state, state.name)
+			condition.raise(:mss_information, :string, readonly_reason)
+			_return 
+		_endif
+
+		# Check authorisation to see if access is permitted.
+		_if a_design.owned_by_current_user?()
+		_then
+			auth_key_1 << :design_open_write_own
+			auth_key_2 << :design_open_readonly_own
+		_else 
+			auth_key_1 << :design_open_write_other
+			auth_key_2 << :design_open_readonly_other
+		_endif
+		
+		_if mss_wm_auth_engine.check_access(auth_key_1, a_design) _isnt _true 
+		_then
+			readonly_reason << _self.message(:readonly_auth)
+			condition.raise(:mss_information, :string, readonly_reason)
+			_return 
+		_endif
+	_endif 
+
+	# Check for current_writer being someone else.
+	_if .active_design_mode _is :readonly
+	_then
+		# This is not a perfect indicator (since there could be
+		# multiple alternatives, and possibly only a subset will be
+		# affected).  However, if a current writer was found for an
+		# alternative when we're trying to get write mode, report it.
+		_for dbv _over .active_design_alternative_data.fast_keys_and_elements()
+		_loop
+			_if (cw << dbv.current_writer) _isnt _unset
+			_then
+				readonly_reason << _self.message(:readonly_current_writer, cw)
+				condition.raise(:mss_information, :string, readonly_reason)
+				_return 
+			_endif
+			
+			# Check if writable access could be obtained.
+			write_ok? << _false
+			_try
+				dbv.check_alternative_access(:switch_mode, :write)
+				write_ok? << _true
+			_when error 
+			_endtry
+			_if _not write_ok?
+			_then
+				readonly_reason << _self.message(:readonly_auth)
+				condition.raise(:mss_information, :string, readonly_reason)
+				_return 
+			_endif
+		_endloop
+	_endif
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.close_design()
+	## 
+	## Close the currently active design.
+	##
+
+	_self.init()
+	_self.ensure_design_alternatives_not_updated()
+	pl << _self.goto_design_alternatives(_unset, :readonly)
+	.active_design << _unset
+	_self.set_active_design_alternative_data(pl)
+	_self.changed(:active_design, _self.active_design)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.set_active_design_alternative_data(pl)
+	## 
+	## Parse out useful public information from
+	## .active_design_alternative_data
+	##
+
+	.active_design_alternative_data << pl
+	.active_design_mode << :readonly
+	.active_design_dataset_names << rope.new()
+	_for i, j _over .active_design_alternative_data.fast_keys_and_elements()
+	_loop
+		_if j[2] _is :write
+		_then
+			# If any design database alternative is writable, consider the
+			# design to be writable.
+			.active_design_mode << :write
+		_endif
+		_if j[3] _is _true
+		_then
+			.active_design_dataset_names.add_last(i.name)
+		_endif
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.mss_workspace_tracking_trigger(type, rec, old_rec)
+	## 
+	## Perform record-level tracking to record inserts, updates,
+	## and deletes done in the active design.
+	##
+
+	_dynamic !mss_tracking_enabled?!
+	
+	# There are all sorts of things that prevent tracking:
+	_if !mss_tracking_enabled?! _is _false _orif
+	    (ad << _self.active_design) _is _unset _orif
+	    ad.track_records_in_design?() _is _false _orif 
+	    rec.mss_track_record?() _is _false _orif
+	    _not .active_design_dataset_names.includes?((dbv << rec.source_view).name)
+	_then
+		_return
+	_endif
+
+	# Get all existing tracking records, as this is needed to
+	# determine how to deal with inserts/updates/deletes.
+	ex_tracks << rope.new_from(mss_workspace_tracking_record.tracking_records_for(rec, ad))
+
+	_if type _is :insert
+	_then
+		# It seems impossible to have any existing records, but delete
+		# them just in case.
+		_for i _over ex_tracks.fast_elements()
+		_loop
+			i.delete()
+		_endloop
+
+		# Create an insert tracking record.
+		retval << mss_workspace_tracking_record.new(rec, ad, 1)
+
+	_elif type _is :update
+	_then
+		# Existing records may contain a single insert, update, or delete.
+		# (Note: a delete can exist before an update, because
+		# rwo_record.delete() calls delete triggers on the table itself
+		# before deleting geometry).
+		# Again, protect against invalid data here - if there
+		# are more than 1 record, delete them and recreate them (but
+		# preserve an insert or delete if there is one).
+		_if ex_tracks.size > 1
+		_then
+			first_insert_or_delete << _unset
+			_for i _over ex_tracks.fast_elements()
+			_loop
+				_if i.operation = 1 _andif
+				    first_insert_or_delete _is _unset 
+				_then
+					first_insert_or_delete << i
+				_else
+					i.delete()
+				_endif
+			_endloop
+
+			# Re-get existing records.
+			ex_tracks << rope.new_from(mss_workspace_tracking_record.tracking_records_for(rec, ad))
+		_endif
+
+		# If there are no tracking records, create one.
+		_if ex_tracks.size = 0
+		_then
+			retval << mss_workspace_tracking_record.new(rec, ad, 2)
+		_endif
+
+	_elif type _is :delete
+	_then
+		# Existing records may contain a single insert or a single
+		# update.  Delete all existing ones - but note if there is an
+		# insert.  If the record got inserted and deleted in the same
+		# design, do not create a delete tracking record for it.  I may
+		# want to re-think this, because the record could have been
+		# posted between the time that it was inserted and deleted in
+		# the same design.  However, trying to keep track of that case
+		# requires a bunch more infrastructure.
+		insert_found? << _false
+		_for i _over ex_tracks.fast_elements()
+		_loop
+			_if i.operation = 1
+			_then
+				insert_found? << _true
+			_endif
+			i.delete()
+		_endloop
+
+		_if _not insert_found?
+		_then
+			retval << mss_workspace_tracking_record.new(rec, ad, 3)
+		_endif
+	_endif 
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.perform_state_transition(rec, from_state_name, to_state_name, _optional parms)
+	## 
+	## Perform the state transition to move job or design REC from
+	## the state named FROM_STATE_NAME to the state named
+	## TO_STATE_NAME. 
+	## 
+
+	_dynamic !mss_workspace_initiator! << _self
+
+	_if parms _is _unset _then parms << property_list.new() _endif
+	wf << rec.workflow()
+	_if (trans << wf.get_state_transition(rec.source_collection.name,
+					      from_state_name, to_state_name)) _is _unset
+	_then
+		condition.raise(:user_error, :string,
+				_self.message(:no_state_transition_for_record,
+					      rec.short_description, from_state_name, to_state_name))
+	_endif
+
+	# Check authorization here.
+	_if rec.owned_by_current_user?()
+	_then
+		auth_key << :state_transition_own
+	_else
+		auth_key << :state_transition_other
+	_endif
+	_if mss_wm_auth_engine.check_access(auth_key, trans) _isnt _true
+	_then
+		condition.raise(:user_error, :string,
+				_self.message(:auth_state_transition_error,
+					      rec.short_description, from_state_name, to_state_name))
+	_endif 
+	
+	trans.perform_state_transition(rec, parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.merge_design(_optional parms)
+	## 
+	## Merge all datasets associated with the active design,
+	## starting from the root alternative for each dataset.
+	##
+	## PARMS is a property list that may include the following:
+	## - :gui_handler - the sw_component that can serve as the
+	##    reference GUI element for performing conflict resolution.
+	## - :conflict_mode - may be :force_parent, :force_child,
+	##    or :operator_intervention.
+	##
+	## Note that other PARMS will be set internally by this method
+	## (and subsequent methods that it calls).
+	##
+
+	_if parms _is _unset _then parms << property_list.new() _endif
+
+	_self.ensure_design_alternatives_not_updated()
+	_if (ad << _self.active_design) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_design))
+	_endif 
+	parms[:active_design] << ad
+	conf_mode << parms[:conflict_mode] << parms[:conflict_mode].default(:operator_intervention)
+	parms[:complete_ok_message] << parms[:complete_ok_message].default(_self.message(:merge_complete_ok_message))
+	parms[:complete_cancel_message] << parms[:complete_cancel_message].default(_self.message(:merge_complete_cancel_message))
+	
+	# Build an ordered list of alternatives that will be merged.
+	r << rope.new()
+	ad_pl << .active_design_alternative_data.copy()
+	_for i, j _over ad_pl.fast_keys_and_elements()
+	_loop
+		ds_name << i.name
+		_if j[3] _isnt _true
+		_then
+			# This is not part of the design.
+			_continue
+		_endif
+		odp << j[4]
+		mode << j[2]
+		_for k _over odp.fast_elements()
+		_loop
+			target_alt << _self.full_alternative_name_for_view_name_and_design(ds_name, k)
+			r.add_last({:merge, ds_name, target_alt, mode, k, conf_mode})
+		_endloop
+	_endloop
+
+	_return _self.perform_vmds_operation_list(r, parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.post_design(_optional parms)
+	## 
+	## Post all datasets associated with the active design,
+	## starting from the root alternative for each dataset.
+	##
+	## PARMS is a property list that may include the following:
+	## - :gui_handler - the sw_component that can serve as the
+	##    reference GUI element for performing conflict resolution.
+	## - :conflict_mode - may be :force_parent, :force_child,
+	##    or :operator_intervention.
+	##
+	## Note that other PARMS will be set internally by this method
+	## (and subsequent methods that it calls).
+	##
+
+	_if parms _is _unset _then parms << property_list.new() _endif
+
+	_self.ensure_design_alternatives_not_updated()
+	_if (ad << _self.active_design) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_active_design))
+	_endif 
+	parms[:active_design] << ad
+	conf_mode << parms[:conflict_mode] << parms[:conflict_mode].default(:operator_intervention)
+	parms[:complete_ok_message] << parms[:complete_ok_message].default(_self.message(:post_complete_ok_message))
+	parms[:complete_cancel_message] << parms[:complete_cancel_message].default(_self.message(:post_complete_cancel_message))
+
+	# Build an ordered list of alternatives that will be posted.
+	r << rope.new()
+	ad_pl << .active_design_alternative_data.copy()
+	_for i, j _over ad_pl.fast_keys_and_elements()
+	_loop
+		_if _self.non_postable_dataset_names.includes?(ds_name << i.name)
+		_then
+			# This is part of the design, but the configurer has requested
+			# that it should not be posted.
+			_continue
+		_endif 
+		_if j[3] _isnt _true
+		_then
+			# This is not part of the design.
+			_continue
+		_endif
+		odp << j[4].reversed()
+		mode << j[2]
+		_for k _over odp.fast_elements()
+		_loop
+			target_alt << _self.full_alternative_name_for_view_name_and_design(ds_name, k)
+			r.add_last({:post, ds_name, target_alt, mode, k, conf_mode})
+		_endloop
+	_endloop
+
+	_return _self.perform_vmds_operation_list(r, parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.save_vmds_state()
+	## 
+	## Return a property list of information describing the state
+	## of all VMDS alternatives managed by self.  This is done in
+	## preparation for performing heavyweight VMDS operations
+	## (merge and/or post).  So, if any alternative is updated, it
+	## will be explicitly committed - any prompting/verification
+	## must be done by the caller before starting this.
+	##
+
+	vmds_state << equality_property_list.new()
+	_for a_view _over .active_design_alternative_data.fast_keys()
+	_loop
+		_if a_view.updated?
+		_then
+			a_view.commit()
+		_endif 
+		vmds_state[a_view] << {a_view.alternative_path_name(), a_view.mode, a_view.params[:conflict_mode]}
+	_endloop
+	_return vmds_state
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.restore_vmds_state(vmds_state, ok?)
+	## 
+	## Restore the views in VMDS_STATE (a structure created by the
+	## save_vmds_state() method).  If OK? is true, then any changes
+	## will be committed - otherwise they will be rolled back.
+	##
+
+	_for a_view, view_info _over vmds_state.fast_keys_and_elements()
+	_loop
+		_if a_view.updated?
+		_then
+			_if ok? _is _true
+			_then
+				a_view.commit()
+			_else
+				a_view.rollback()
+			_endif
+		_endif
+		a_view.go_to_alternative(view_info[1])
+		a_view.switch(view_info[2])
+		a_view.params[:conflict_mode] << view_info[3]
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.perform_vmds_operation_list(op_list, parms)
+	## 
+	## 
+
+	# If a conflict viewer is already active, don't permit VMDS
+	# operations to be carried out.
+	_if .conflict_viewer _isnt _unset _andif
+	    .conflict_viewer.top_frame _isnt _unset _andif
+	    .conflict_viewer.top_frame.active?
+	_then
+		condition.raise(:user_error, :string, _self.message(:conflict_dialog_active))
+	_endif 
+	
+	_self.ensure_design_alternatives_not_updated()
+	gui_handler << parms[:gui_handler]
+	
+	# Start by saving current VMDS state: alternative path,
+	# read/write, and conflict mode.  But, don't save if it already
+	# has been saved (i.e. this is a continuation of a previous
+	# operation initiated by the conflict dialog).
+	_if (vmds_state << parms[:vmds_state]) _is _unset
+	_then 
+		vmds_state << parms[:vmds_state] << _self.save_vmds_state()
+	_endif 
+	ok? << _false
+	retval?? << _false 
+	_protect
+		_self.int!perform_vmds_operation_list(op_list, parms)
+		ok? << _true 
+	_protection
+		# Unless parms indicates that the process is paused to
+		# handle conflicts, restore the saved VMDS state.
+		_if parms[:conflict_resolution_in_progress?] _isnt _true
+		_then
+			in_conf? << _false
+			retval?? << ok?
+			_self.restore_vmds_state(vmds_state, ok?)
+		_else
+			in_conf? << _true
+			retval?? << _maybe 
+		_endif
+		
+		_if gui_handler _isnt _unset _andif
+		    gui_handler.responds_to?(:|set_application_status_info_text()|)
+		_then
+			_if in_conf?
+			_then
+				msg << _self.message(:resolving_conflicts)
+			_elif ok?
+			_then
+				msg << parms[:complete_ok_message].default("")
+			_else
+				msg << parms[:complete_cancel_message].default("")
+			_endif 
+			gui_handler.set_application_status_info_text(msg)
+		_endif 
+	_endprotect 
+
+	_return retval??
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.int!perform_vmds_operation_list(op_list, parms)
+	## 
+	## 
+	
+	_global mss_wm_conflict_dialog
+	_local merged_ok?
+	_local posted_ok?
+	_local post_max_loops << 10
+	
+	gui_handler << parms[:gui_handler]
+	ad << parms[:active_design]
+
+	_for i, j _over op_list.fast_keys_and_elements()
+	_loop @outer
+		op << j[1]
+		ds_name << j[2]
+		alt_name << j[3]
+		restore_mode << j[4]
+		affected_design << j[5]
+		conf_mode << j[6]
+			
+		dbv << gis_program_manager.cached_dataset(ds_name)
+		restore_conf_mode << dbv.params[:conflict_mode]
+
+		dbv.go_to_alternative(alt_name)
+		dbv.switch(:write)
+		parms[:dbv] << dbv
+		_if op _is :merge _orif
+		    op _is :post
+		_then
+			status_str << ""
+			_if op _is :merge
+			_then 
+				status_str << _self.message(:merge_status, ds_name, ad.short_description)
+			_elif op _is :post
+			_then
+				status_str << _self.message(:post_status, ds_name, ad.short_description)
+			_endif 
+			_if gui_handler _isnt _unset _andif
+			    gui_handler.responds_to?(:|set_application_status_info_text()|)
+			_then
+				gui_handler.set_application_status_info_text(status_str)
+			_endif 
+
+			_if conf_mode _isnt _unset
+			_then 
+				dbv.params[:conflict_mode] << conf_mode
+			_endif 
+			(changed?, roots, detector) << dbv.merge(_false, _false)
+			_if changed? _is _maybe _orif
+			    roots _isnt _unset
+			_then
+				# There are conflicts: if there is a GUI handler, use that for
+				# resolving.
+				_if gui_handler _isnt _unset _andif
+				    mss_wm_conflict_dialog _isnt _unset 
+				_then
+					# Only let the user sort out conflicts in the leaf
+					# design.  If there are conflicts in a parent design, instruct
+					# the user to handle those by opening the parent design.
+					_if affected_design.id ~= ad.id
+					_then
+						condition.raise(:user_error, :string,
+								_self.message(:conflicts_in_parent_design, affected_design.short_description))
+					_endif
+					
+					continue_op_list << op_list.slice_to_end(i)
+					parms[:continue_op_list] << continue_op_list
+					_self.activate_conflict_viewer(changed?, roots, detector, parms)
+					_leave @outer
+				_else
+					_if detector _isnt _unset
+					_then
+						detector.undo_merge()
+						detector.terminate()
+					_endif
+					parms[:conflicts_not_handled] << _true 
+					condition.raise(:user_error, :string,
+							_self.message(:conflicts_not_handled, ad.short_description))
+				_endif 
+			_endif 
+		_endif
+
+		_if op _is :post
+		_then
+			merged_ok? << _true 
+			posted_ok? << _false
+			_for loop_count _over 1.upto(post_max_loops)
+			_loop @post_retry
+				_catch :re_post
+				       _handling ds_alternative_parent_has_changed _with 
+				       _proc(cond)
+					       # There is a small window of opportunity for the parent
+					       # alternative to be changed between the previous merge and the
+					       # post.  If this happens, need to re-merge.  However, if the
+					       # maximum number of iterations has been exceeded, give up.
+					       _import loop_count, post_max_loops
+					       _if loop_count = post_max_loops
+					       _then
+						       cond.continue_handling()
+					       _endif
+					       
+					       _import merged_ok?
+					       merged_ok? << _false
+					       _throw :re_post
+				       _endproc
+
+				       _handling ds_alternative_already_open_for_write _with 
+					_proc(cond)
+						# Someone else is writing to the parent alternative.  Sleep for
+						# a second, and try again.
+						_import loop_count, post_max_loops
+					       _if loop_count = post_max_loops
+					       _then
+						       cond.continue_handling()
+					       _endif
+
+					       _thisthread.sleep(1000)
+					       _throw :re_post
+					_endproc
+
+					_if _not merged_ok?
+					_then
+						_if conf_mode _isnt _unset
+						_then 
+							dbv.params[:conflict_mode] << conf_mode
+						_endif 
+						(changed?, roots, detector) << dbv.merge(_false, _false)
+						_if changed? _is _maybe _orif
+						    roots _isnt _unset
+						_then
+							# There are conflicts: if there is a GUI handler, use that for
+							# resolving.
+							_if gui_handler _isnt _unset _andif
+							    mss_wm_conflict_dialog _isnt _unset 
+							_then
+								# Only let the user sort out conflicts in the leaf
+								# design.  If there are conflicts in a parent design, instruct
+								# the user to handle those by opening the parent design.
+								_if affected_design.id ~= ad.id
+								_then
+									condition.raise(:user_error, :string,
+											_self.message(:conflicts_in_parent_design, affected_design.short_description))
+								_endif
+								
+								continue_op_list << op_list.slice_to_end(i)
+								parms[:continue_op_list] << continue_op_list
+								_self.activate_conflict_viewer(changed?, roots, detector, parms)
+								_leave @outer
+							_else
+								_if detector _isnt _unset
+								_then
+									detector.undo_merge()
+									detector.terminate()
+								_endif
+								parms[:conflicts_not_handled] << _true 
+								condition.raise(:user_error, :string,
+										_self.message(:conflicts_not_handled, ad.short_description))
+							_endif 
+						_endif
+						merged_ok? << _true 
+					_endif
+
+					dbv.post()
+					posted_ok? << _true
+					_leave @post_retry
+				_endcatch
+			_endloop
+
+			_if _not posted_ok?
+			_then
+				# This seems impossible, but it is too important to let it pass by.
+				_self.user_error(:unknown_error_during_post)
+			_endif 
+		_endif
+		
+		# Note that these statements are not guaranteed to be called,
+		# due to various conditions above.  The calling method ensures
+		# that the VMDS state is fully restored.
+		dbv.switch(restore_mode)
+		dbv.params[:conflict_mode] << restore_conf_mode
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.activate_conflict_viewer(changed?, roots, detector, parms)
+	## 
+	## 
+
+	gui_handler << parms[:gui_handler]
+	dbv << parms[:dbv]
+	
+	top_frame << gui_handler.top_frame
+	dialog_position << {top_frame.width _div 2 - 170,
+			    top_frame.height _div 2 - 40}
+
+	add_msg << _unset 
+	_if parms[:during_post?] _is _true
+	_then
+		add_msg << _self.message(:conflict_during_post)
+	_endif
+	
+	_if changed? _isnt _maybe _andif roots _is _unset
+	_then
+		_return
+		
+	_elif changed? _is _maybe
+	_then
+		msg << _self.message(:conflicts_outstanding)
+		_if add_msg _isnt _unset
+		_then
+			msg << write_string(msg, newline_char, newline_char, add_msg)
+		_endif 
+		gui_handler.show_message(msg)
+		detector << dbv.new_conflict_detector()
+		roots << detector.refind_roots()
+	_else
+		msg << _self.message(:conflicts_found)
+		_if add_msg _isnt _unset
+		_then
+			msg << write_string(msg, newline_char, newline_char, add_msg)
+		_endif 
+		gui_handler.show_message(msg)
+	_endif 
+
+	app << gui_handler.application
+	.conflict_viewer << viewer << mss_wm_conflict_dialog.new(:conflict_viewer_dialog, app,
+								 :detector, detector, :roots, roots)
+	parms[:conflict_resolution_in_progress?] << _true 
+	viewer.set_parameters(parms)
+
+	viewer.activate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.notify_conflict_dialog_failure(parms)
+	## 
+	## Conflicts have not been resolved - notify user that the
+	## merge process is not completed.
+	##
+
+	ad << parms[:active_design]
+	gui_handler << parms[:gui_handler]
+
+	# Restore database alternatives to original settings.
+	_if (vmds_state << parms[:vmds_state]) _isnt _unset
+	_then
+		_self.restore_vmds_state(vmds_state, _false)
+	_endif 
+	
+	_if gui_handler _isnt _unset
+	_then
+		_if gui_handler.responds_to?(:|set_application_status_info_text()|)
+		_then
+			msg << parms[:complete_cancel_message].default("")
+			gui_handler.set_application_status_info_text(msg)
+		_endif 
+		gui_handler.show_message(_self.message(:conflict_dialog_failure, ad.short_description))
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.overlay_design(rec, _optional seq_no)
+	## 
+	## Create an overlay for the design record REC.  SEQ_NO is the
+	## sequence number to use for referencing this overlay design
+	## (defaults to 1).  If REC is unset, then the overlay
+	## information for this sequence number is removed.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	_self.init()
+	seq_no << seq_no.default(1)
+
+	# Note that this needs to be done for each SOC that refers to
+	# one of the datasets of the design record REC.
+	views_to_discard << equality_set.new()
+	odd << .overlay_design_data
+	_if rec _isnt _unset
+	_then 
+		odd[seq_no] << property_list.new_with(:design, rec,
+						      :datasets, (ds_pl << property_list.new()))
+	_else
+		odd.remove_key(seq_no)
+		ret_pl << _unset 
+	_endif
+	
+	_protect 
+		_for soc _over gis_program_manager.spatial_object_controllers()
+		_loop
+			interim_ds_pl << _self.overlay_design_for_soc(soc, rec, seq_no, views_to_discard)
+			_if ds_pl _isnt _unset
+			_then 
+				_for i, j _over interim_ds_pl.fast_keys_and_elements()
+				_loop
+					ds_pl[i] << j
+				_endloop
+			_endif 
+		_endloop
+	_protection
+		# Note: I may need to improve this later, as it seems possible
+		# that a view could be marked as needing discarding when in
+		# fact it is referenced somewhere.
+		_for i _over views_to_discard.fast_elements()
+		_loop
+			gis_program_manager.uncache_dataset(i.name)
+			i.discard()
+		_endloop
+		_self.changed(:overlay_design_data, odd)
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_private _method mss_workspace_manager_engine.overlay_design_for_soc(soc, rec, seq_no, views_to_discard)
+	## 
+	## Do not use directly - see overlay_design() instead.
+	##
+
+	# Get all existing overlay managers - reuse if possible.
+	cur_mgrs << equality_property_list.new()
+	_for view_name _over _self.root_alternative_name_for_view_name.fast_keys_and_elements()
+	_loop
+		_if (main_mgr << soc.dataset_manager(view_name)) _is _unset
+		_then
+			_continue
+		_endif
+		sub_name << mss_wm_overlay_swdp_manager.name_for_manager_and_seq_no(main_mgr, seq_no)
+		_if (sub_mgr << soc.dataset_manager(sub_name)) _isnt _unset
+		_then
+			# Mark it as needing to be discarded later, unless something
+			# else overrides that.
+			cur_mgrs[sub_mgr] << _false
+		_endif
+	_endloop
+
+	_if rec _isnt _unset
+	_then
+		my_ds_names << rec.job_type().dataset_names
+	_else
+		my_ds_names << {}
+	_endif
+
+	_for view_name _over my_ds_names.fast_elements()
+	_loop
+		_if (main_mgr << soc.dataset_manager(view_name)) _is _unset
+		_then
+			_continue
+		_endif
+		sub_name << mss_wm_overlay_swdp_manager.name_for_manager_and_seq_no(main_mgr, seq_no)
+		_if (sub_mgr << soc.dataset_manager(sub_name)) _isnt _unset
+		_then
+			# This no longer needs to be discarded.
+			cur_mgrs[sub_mgr] << _true
+		_else
+			# Create a new one.
+			ok? << _false
+			create_new? << _false 
+			_protect
+				# Check if this dataset has been created yet.
+				_if (v2 << gis_program_manager.cached_dataset(sub_name)) _is _unset _orif
+				    v2.collections.size = 0
+				_then
+					create_new? << _true 
+					v2 << main_mgr.actual_dataset.replicate()
+				_endif 
+				sub_mgr << mss_wm_overlay_swdp_manager.new_from(main_mgr, seq_no, v2)
+				soc.add_dataset_manager(sub_mgr)
+				ok? << _true
+			_protection
+				_if _not ok? _andif
+				    create_new? _andif
+				    v2 _isnt _unset
+				_then
+					v2.discard()
+				_endif
+			_endprotect
+			cur_mgrs[sub_mgr] << _true
+		_endif
+	_endloop
+
+	view_pl << property_list.new()
+	_for a_mgr, keep? _over cur_mgrs.copy().fast_keys_and_elements()
+	_loop
+		_if _not keep?
+		_then
+			soc.remove_dataset_manager(a_mgr.name)
+			views_to_discard.add(a_mgr.actual_dataset)
+			cur_mgrs.remove_key(a_mgr)
+		_else
+			view_pl[a_mgr.parent_swdp_manager.actual_dataset.name] << a_mgr.actual_dataset
+		_endif
+	_endloop
+
+	# Go to the chosen design alternatives.
+	_if rec _isnt _unset
+	_then
+		_self.goto_design_alternatives(rec, :readonly, view_pl)
+
+		# Now that we're in the right alternatives, we can ask each
+		# dataset manager to set cached replica view information.
+		_for a_mgr _over cur_mgrs.fast_keys_and_elements()
+		_loop
+			a_mgr.set_geometry_data_for_replica_view()
+		_endloop
+	_endif 
+	_return view_pl
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_manager_engine.aggregate_design(to_design, from_design)
+	## 
+	## Aggregate the contents of all design alternatives associated
+	## with FROM_DESIGN into TO_DESIGN.  (Note that if TO_DESIGN is
+	## not the active design, it is explicitly activated here).
+	##
+
+	_if to_design ~= _self.active_design
+	_then
+		_self.open_design(to_design)
+	_endif
+	_self.ensure_design_alternatives_not_updated()
+
+	# Check to be sure that a valid set of rules has been defined
+	# for aggregating these designs.
+	(agg_from_ok?, aggregate_data) << to_design.validate_aggregate_from(from_design)
+	_if aggregate_data _is _unset
+	_then
+		aggregate_data << property_list.new(:conflict_mode, :force_parent)
+	_endif
+	conflict_mode << aggregate_data[:conflict_mode].default(:force_parent)
+
+	to_ds_names << to_design.job_type().dataset_names
+	from_ds_names << from_design.job_type().dataset_names
+	nadn << _self.non_aggregatable_dataset_names
+	ds_names_to_do << rope.new()
+	_for i _over to_ds_names.fast_elements()
+	_loop
+		_if nadn.includes?(i) _then _continue _endif
+		_if _not from_ds_names.includes?(i) _then _continue _endif
+		ds_names_to_do.add_last(i)
+	_endloop
+
+	_if ds_names_to_do.size = 0
+	_then
+		# If there are no datasets in common between these designs,
+		# then there is nothing to do.
+		_return
+	_endif
+
+	ok? << _false
+	main_ds_pl << property_list.new()
+	repl_ds_pl << property_list.new()
+	base_ds_pl << property_list.new()
+	persistent_data << property_list.new_with(
+				   :views_to_discard, property_list.new())
+	vmds_state << _self.save_vmds_state()
+	_protect
+		# Prepare property lists for main datasets being copied to, and
+		# replica datasets being copied from.
+		_for i _over ds_names_to_do.fast_elements()
+		_loop
+			dbv << main_ds_pl[i] << gis_program_manager.cached_dataset(i)
+			dbv.switch(:write)
+			repl_ds_pl[i] << dbv.replicate()
+		_endloop
+
+		# Move replicas to the proper alternatives.
+		_self.goto_design_alternatives(from_design, :readonly, repl_ds_pl)
+
+		# Figure base replicas.
+		_for i _over ds_names_to_do.fast_elements()
+		_loop
+			# Note: currently, this is just using the true base version.
+			# It assumes that parent designs explicitly get aggregated
+			# before sub-designs.  It may be possible to do the whole shot
+			# in one go by using the base of the top-level design for any
+			# sub-design, but that isn't being attempted here.
+			base_ds_pl[i] << repl_ds_pl[i].replicate(:base)
+		_endloop
+		
+		# Do any pre-processing required.
+		_self.pre_process_aggregate_design(to_design, from_design, ds_names_to_do,
+						   main_ds_pl, repl_ds_pl, base_ds_pl,
+						   aggregate_data, persistent_data)
+
+		_for i _over ds_names_to_do.fast_elements()
+		_loop
+			v1 << main_ds_pl[i]
+			v2 << repl_ds_pl[i]
+			v3 << base_ds_pl[i]
+			_self.int!aggregate_single_alternative(v1, v2, v3, conflict_mode)
+		_endloop
+		
+		# Do any post-processing required.
+		_self.post_process_aggregate_design(to_design, from_design, ds_names_to_do,
+						    main_ds_pl, repl_ds_pl, base_ds_pl,
+						    aggregate_data, persistent_data)
+		
+		ok? << _true
+	_protection
+		_protect
+			# Extra cautious here: even if a problem happens restoring the
+			# VMDS state, still need to force all replicas to be discarded.
+			_self.restore_vmds_state(vmds_state, ok?)
+		_protection
+			_for i _over repl_ds_pl.fast_elements()
+			_loop
+				i.discard()
+			_endloop
+			_for i _over base_ds_pl.fast_elements()
+			_loop
+				i.discard()
+			_endloop
+			_for i _over persistent_data[:views_to_discard].fast_elements()
+			_loop
+				i.discard()
+			_endloop 
+		_endprotect 
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.pre_process_aggregate_design(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl, aggregate_data,
+		persistent_data)
+	## 
+	## Perform any pre-processing required before aggregating
+	## FROM_DESIGN into TO_DESIGN.  DS_NAMES_TO_DO is a rope of
+	## dataset names to be processed.  MAIN_DS_PL and REPL_DS_PL
+	## are property lists of the main datastores (being aggregated
+	## to), and the replica datastores (being aggregated from).
+	## BASE_DS_PL is a property list of the base view for aggregation.
+	##
+	## AGGREGATE_DATA is a property list describing how the
+	## aggregation should take place, and may contain the following
+	## keys and values:
+	## - :conflict_mode : one of :force_parent, :force_child, :force_base,
+	##      :force_parent_with_manifold_interaction, or
+	##      :operator_intervention.  Note that :operator_intervention
+	##      does NOT currently have any GUI code built for it which
+	##      will truly perform operator intervention, so if you want
+	##      to use that, you'll have to write it yourself.
+	## - :create_tracking_records? : if true, this will create new
+	##      mss_workspace_tracking_records for data being copied
+	##      into the TO_DESIGN.
+	## - :reassign_cus? : if true, then CUs copied that referred to
+	##      FROM_DESIGN will be reassigned to TO_DESIGN.
+	## - :update_work_points? : if true, then work points copied
+	##      that referred to FROM_DESIGN will be updated such that
+	##      the work point names have a distinct new value.
+	##
+	## PERSISTENT_DATA is a property list, which is initially
+	## empty, but which can be populated with information of
+	## interest in post_process_aggregate_design().
+	##
+
+	_if aggregate_data[:create_tracking_records?] _is _true
+	_then
+		_self.pre_process_ad_for_create_tracking_records(
+			to_design, from_design, ds_names_to_do,
+			main_ds_pl, repl_ds_pl, base_ds_pl,
+			aggregate_data, persistent_data)
+	_endif
+
+	_if aggregate_data[:update_work_points?] _is _true
+	_then
+		_self.pre_process_ad_for_update_work_points(
+			to_design, from_design, ds_names_to_do,
+			main_ds_pl, repl_ds_pl, base_ds_pl,
+			aggregate_data, persistent_data)
+	_endif
+	
+	_if aggregate_data[:reassign_cus?] _is _true
+	_then
+		_self.pre_process_ad_for_reassign_cus(
+			to_design, from_design, ds_names_to_do,
+			main_ds_pl, repl_ds_pl, base_ds_pl,
+			aggregate_data, persistent_data)
+	_endif
+
+	_self.custom_pre_process_aggregate_design(to_design, from_design, ds_names_to_do,
+						  main_ds_pl, repl_ds_pl, base_ds_pl,
+						  aggregate_data, persistent_data)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.pre_process_ad_for_create_tracking_records(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Pre-process aggregate design operation to
+	## create mss_workspace_tracking_records.
+	##
+
+	# Create replica snapshots of each view to be processed: these
+	# will be compared with the aggregation results in the
+	# post-process method.
+	vtd << persistent_data[:views_to_discard]
+	_for nm _over ds_names_to_do.fast_elements()
+	_loop
+		o_nm << :original_ + nm
+		_if (ov << vtd[o_nm]) _is _unset
+		_then
+			ov << vtd[o_nm] << main_ds_pl[nm].replicate()
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.pre_process_ad_for_update_work_points(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Pre-process aggregate design operation to
+	## update work point names for copied data.
+	##
+	## Note: this is currently only a stub method, and if it is
+	## ever fully written, it will be done as part of an extension
+	## to the mss_cu set of modules.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.pre_process_ad_for_reassign_cus(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Pre-process aggregate design operation to
+	## reassign CUs from FROM_DESIGN to TO_DESIGN.
+	##
+	## Note: this is currently only a stub method, and if it is
+	## ever fully written, it will be done as part of an extension
+	## to the mss_cu set of modules.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_workspace_manager_engine.custom_pre_process_aggregate_design(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Custom hook for pre-processing an aggregate design operation.
+	## See pre_process_aggregate_design() for argument details.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.post_process_aggregate_design(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl, aggregate_data,
+		persistent_data)
+	## 
+	## Perform any post-processing required before aggregating
+	## FROM_DESIGN into TO_DESIGN.  All arguments are the same as
+	## for the pre_process_aggregate_design() method.
+	##
+
+	_if aggregate_data[:create_tracking_records?] _is _true
+	_then
+		_self.post_process_ad_for_create_tracking_records(
+			to_design, from_design, ds_names_to_do,
+			main_ds_pl, repl_ds_pl, base_ds_pl,
+			aggregate_data, persistent_data)
+	_endif
+
+	_if aggregate_data[:update_work_points?] _is _true
+	_then
+		_self.post_process_ad_for_update_work_points(
+			to_design, from_design, ds_names_to_do,
+			main_ds_pl, repl_ds_pl, base_ds_pl,
+			aggregate_data, persistent_data)
+	_endif
+	
+	_if aggregate_data[:reassign_cus?] _is _true
+	_then
+		_self.post_process_ad_for_reassign_cus(
+			to_design, from_design, ds_names_to_do,
+			main_ds_pl, repl_ds_pl, base_ds_pl,
+			aggregate_data, persistent_data)
+	_endif
+
+	_self.custom_post_process_aggregate_design(to_design, from_design, ds_names_to_do,
+						   main_ds_pl, repl_ds_pl, base_ds_pl,
+						   aggregate_data, persistent_data)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.post_process_ad_for_create_tracking_records(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Post-process aggregate design operation to
+	## create mss_workspace_tracking_records.  Note that this does
+	## leave the original tracking records intact (those that were
+	## created in FROM_DESIGN).
+	##
+
+	# Create replica snapshots of each view to be processed: these
+	# will be compared with the aggregation results in the
+	# post-process method.
+	vtd << persistent_data[:views_to_discard]
+	_for nm _over ds_names_to_do.fast_elements()
+	_loop
+		o_nm << :original_ + nm
+		_if (ov << vtd[o_nm]) _is _unset
+		_then
+			_continue 
+		_endif
+		_if (mv << main_ds_pl[nm]).collections[:mss_workspace_tracking_record] _is _unset
+		_then
+			# No tracking record table, therefore no tracking can be
+			# performed in this view.
+			_continue
+		_endif 
+		
+		# Perform difference stream processing to locate all things
+		# that could be tracked.
+		_for tbl_info _over mv.table_changes_to(ov).fast_elements()
+		_loop
+			# Only deal with ds_collections - skip any view or extdb
+			# stuff. 
+			tbl_name << tbl_info.tablename
+			_if (my_tbl << mv.collections[tbl_name]) _is _unset _orif
+			    _not my_tbl.is_class_of?(ds_collection)
+			_then
+				_continue
+			_endif
+			_if (base_tbl << ov.collections[tbl_name]) _is _unset
+			_then
+				_continue
+			_endif
+			
+			# Also skip any internal tables.
+			_if (desc << my_tbl.descriptor) _is _unset _orif
+			    desc.internal_table?
+			_then
+				_continue
+			_endif 
+
+			diffs << ds_difference_stream.new_on(my_tbl, base_tbl)
+			_loop
+				(my_change, my_rec, base_rec) << diffs.get()
+				_if my_change _is _unset
+				_then
+					_leave
+				_endif
+
+				# Only deal with inserts and updates here.  Deletes could be
+				# considered too, but seem unlikely to matter at this point,
+				# and would likely require some extra development (could be
+				# tricky dealing with detached records when using standard
+				# trigger behavior).
+				_if my_change _is :insert _orif
+				    my_change _is :update
+				_then
+					# OK.
+				_else
+					_continue
+				_endif
+
+				_if _not my_rec.mss_track_record?()
+				_then
+					_continue
+				_endif
+
+				_if my_change _is :insert
+				_then
+					my_rec.mss_workspace_tracking_trigger(:insert, _unset)
+				_elif my_change _is :update
+				_then
+					my_rec.mss_workspace_tracking_trigger(:update, base_rec)
+				_endif
+			_endloop 
+		_endloop
+
+		mv.commit()
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.post_process_ad_for_update_work_points(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Post-process aggregate design operation to
+	## update work point names for copied data.
+	##
+	## Note: this is currently only a stub method, and if it is
+	## ever fully written, it will be done as part of an extension
+	## to the mss_cu set of modules.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_manager_engine.post_process_ad_for_reassign_cus(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Post-process aggregate design operation to
+	## reassign CUs from FROM_DESIGN to TO_DESIGN.
+	##
+	## Note: this is currently only a stub method, and if it is
+	## ever fully written, it will be done as part of an extension
+	## to the mss_cu set of modules.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_workspace_manager_engine.custom_post_process_aggregate_design(
+		to_design, from_design, ds_names_to_do,
+		main_ds_pl, repl_ds_pl, base_ds_pl,
+		aggregate_data, persistent_data)
+	## 
+	## Custom hook for post-processing an aggregate design operation.
+	## See post_process_aggregate_design() for argument details.
+	##
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_workspace_manager_engine.int!aggregate_single_alternative(v1, v2, v3, conflict_mode)
+	## 
+	## Aggregate design data for a single alternative (V1), using
+	## V2 as the replica to copy from and V3 as the base.
+	## CONFLICT_MODE is the conflict resolution mode to use.
+	##
+
+	_if conflict_mode _is :force_parent_with_manifold_interaction
+	_then
+		(ch?, roots, c) << v1.mss_aggregator_merge_with_manifold_interaction(v2, v3)
+	_else
+		old_cm << v1.params[:mss_aggregator_conflict_mode]
+		_protect
+			v1.params[:mss_aggregator_conflict_mode] << conflict_mode
+			(ch?, roots, c) << v1.mss_aggregator_merge(v2, v3, _false, _false)
+		_protection
+			v1.params[:mss_aggregator_conflict_mode] << old_cm
+		_endprotect
+	_endif
+
+	_if c _isnt _unset
+	_then
+		# Sorry, I don't know what to do if unresolved conflicts arise
+		# at this point.  Just undo and terminate.
+		c.undo_merge()
+		c.terminate()
+	_endif
+	
+_endmethod
+$

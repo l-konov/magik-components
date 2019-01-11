@@ -1,0 +1,76 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-11-11 23:13:00 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-05-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_style.as_image_file(file_path, _optional type, a_window, draw_method)
+	## Write me out as a jpeg to FILE_NAME
+	## A_WINDOW can be a memory canvas to reduce reuse. This is as
+	## returned in my second result, or can be some other memory_canvas
+	## which will define the size of the output image.
+	## DRAW_METHOD can be used to replace the method used to render
+	## the style. the dfeualt is :draw_image_on()
+
+	# (03-26-2005 Brad Sileo): created.
+	draw_method << draw_method.default(:|draw_image_on()|)
+	_if a_window _is _unset 
+	_then
+		#debug show("Created new MC")
+		a_window << memory_canvas.new(100, 100)
+	_endif 
+	a_window.clear()
+	bb << a_window.inner_bounds
+
+	# Get the boundaries.
+	geom_x << bb.xmin
+	geom_y << (bb.height/2).rounded
+	line_length << bb.width
+
+	# Get the style drawn on the window
+	anything? << draw_method.send_to(_self,a_window)
+	
+	_if anything? _is _true 
+	_then
+		a_window.write_to_file(file_path, type.default(:jpeg),_unset,_unset,:optimise_for_speed)
+	_endif
+	>> anything?, a_window
+_endmethod 
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method gis_style.draw_image_on(a_window)
+	## Backstop - does nothing. subclasses must draw themselves to
+	## fill A_WINDOW. Return TRUE if anything was drawn. This one
+	## is always false.
+	## 
+	##
+
+	# (04-17-2005 Brad Sileo): created.
+	>> _false 
+_endmethod
+$

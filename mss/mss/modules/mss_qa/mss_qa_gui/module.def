@@ -1,0 +1,10 @@
+mss_qa_gui	1
+
+description
+	MSS Quality Assurance GUI
+end
+
+requires
+	mss_swaf_changes
+	mss_qa_engine
+end

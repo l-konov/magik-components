@@ -1,0 +1,131 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_remote_admin_service
+##
+## Service class to perform remote administration (i.e. change
+## log level).
+##
+
+def_slotted_exemplar(:mss_http_remote_admin_service,
+{},
+{:mss_http_service})
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_remote_admin_service.process_service_request(req)
+	##
+	## Perform the remote admin operation encoded in
+	## the mss_http_server_request REQ.
+	##
+
+	.request << req
+	_self.process_remote_admin_file_service_request()
+	_self.server.send_request_response(req)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_remote_admin_service.process_remote_admin_file_service_request()
+	##
+	## Perform the requested remote admin operation.
+	##
+
+	req << .request
+	resp << req.response
+
+	_if (leaf_name << .init_properties[:leaf_name]) ~= "ra" _orif
+	    (query_string << .init_properties[:query].default("")) = ""
+	_then
+		resp.default_not_found_response()
+	      _return
+	_endif
+
+	ok? << _false
+	anything_done? << _false
+	
+	_local s << internal_text_output_stream.new()
+	_local tag << "any_error".copy()
+	_catch tag
+		_handling error _with
+		_proc(cond)
+			_import s, tag
+			cond.report_contents_on(s)
+			s.write(newline_char)
+			!traceback!(s)
+			_throw tag
+		_endproc
+		
+		svr << _self.server
+		qprops << mss_http_url_parser.new().parse_query_string(query_string)
+		
+		_if query_string.index_of_seq("ping") _isnt _unset
+		_then
+			action_desc << _self.message(:admin_action, "ping")
+			s.write(date_time.now(), " ", action_desc, newline_char)
+
+			# Perform some simple actions which ensure that a database
+			# connection still exists.
+			_if mss_workspace_manager_engine _isnt _unset _andif 
+			    (dbv << mss_workspace_manager_engine.view) _isnt _unset
+			_then 
+				s.write(_self.message(:admin_ping_users, dbv.current_readers.size), newline_char)
+				dbv.rollforward()
+				s.write(_self.message(:admin_ping_jobs, dbv.collections[:mss_job].size), newline_char)
+			_endif 
+			anything_done? << _true 
+		_endif 
+			
+		_if (ll_str << qprops["log_level"]) _isnt _unset
+		_then
+			_if (ll_val << ll_str.as_integer()) _isnt _unset
+			_then
+				action_desc << _self.message(:admin_action, write_string("log_level=", ll_val))
+				condition.raise(:mss_http_information, :priority, 1, :string, action_desc)
+				s.write(date_time.now(), " ", action_desc, newline_char)
+				svr.set_log_level(ll_val)
+				anything_done? << _true 
+			_endif
+		_endif 
+
+		_if qprops["servershutdown"] = "yes"
+		_then
+			action_desc << _self.message(:admin_action, "servershutdown=yes")
+			condition.raise(:mss_http_information, :priority, 1, :string, action_desc)
+			s.write(date_time.now(), " ", action_desc, newline_char)
+			svr.perform_server_shutdown()
+			anything_done? << _true 
+		_endif
+		
+		_if qprops["serverrestart"] = "yes"
+		_then
+			action_desc << _self.message(:admin_action, "serverrestart=yes")
+			condition.raise(:mss_http_information, :priority, 1, :string, action_desc)
+			s.write(date_time.now(), " ", action_desc, newline_char)
+			svr.perform_server_restart()
+			anything_done? << _true 
+		_endif
+		
+		ok? << _true 
+	_endcatch 
+
+	resp.set_header_field("Cache-Control", "private,max-age=0")
+	resp.response_object << s.string
+	_if ok? _andif anything_done?
+	_then 
+		resp.set_status_code(200)
+	_else
+		resp.set_status_code(500)
+	_endif
+	
+_endmethod
+$

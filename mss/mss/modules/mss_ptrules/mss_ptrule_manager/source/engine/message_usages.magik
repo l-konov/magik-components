@@ -1,0 +1,21 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+message_handler.new(:mss_insert_ptrule).set_uses_list({:mss_ptrule})
+$
+message_handler.new(:mss_simple_add_geometry_ptrule).set_uses_list({:mss_insert_ptrule})
+$
+message_handler.new(:mss_simple_insert_ptrule).set_uses_list({:mss_insert_ptrule})
+$
+message_handler.new(:mss_trail_insert_ptrule).set_uses_list({:mss_insert_ptrule})
+$
+message_handler.new(:mss_transform_ptrule).set_uses_list({:mss_ptrule})
+$
+message_handler.new(:mss_transform_vertex_ptrule).set_uses_list({:mss_transform_ptrule})
+$

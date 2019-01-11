@@ -1,0 +1,120 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+##
+## mss_application_databus_mixin
+##
+## Superclass for components which normally get placed in a
+## framework beneath the top-level application, but which also
+## require communication on the application databus.
+##
+## Subclasses of this mixin must have a writable private
+## property named int!application_databus.
+##
+
+def_mixin(:mss_application_databus_mixin)
+$
+
+_pragma(classify_level=advanced, usage={subclassable})
+mss_application_databus_mixin.define_shared_constant(
+	:application_databus_consumer_data_types,
+	## Declare the data type names that this component will consume
+	## from the application databus.
+	{},
+	:public)
+$
+
+_pragma(classify_level=advanced, usage={subclassable})
+mss_application_databus_mixin.define_shared_constant(
+	:application_databus_producer_data_types,
+	## Declare the data type names that this component will place
+	## on the application databus.
+	{},
+	:public)
+$
+
+_pragma(classify_level=basic)
+_method mss_application_databus_mixin.application_databus << appl_databus
+	##
+	## Register self with the main application databus.
+	##
+
+	old_databus << _self.int!application_databus
+	_if appl_databus _isnt old_databus
+	_then
+		_if old_databus _isnt _unset
+		_then
+			old_databus.remove_member(_self)
+		_endif
+		_self.int!application_databus << appl_databus
+		_if appl_databus _isnt _unset
+		_then
+			_if (x << _self.application_databus_consumer_data_types).size > 0
+			_then 
+				appl_databus.add_consumer(_self, _scatter x)
+			_endif
+			_if (x << _self.application_databus_producer_data_types).size > 0
+			_then 
+				appl_databus.add_producer(_self, _scatter x)
+			_endif
+		_endif 
+	_endif
+
+	_return appl_databus
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_application_databus_mixin.application_databus_make_data_available(data_type_name, data)
+	## 
+	## Make data available on self's application_databus.
+	##
+
+	_if (db << _self.int!application_databus) _isnt _unset
+	_then 
+		db.make_data_available(data_type_name, data)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_application_databus_mixin.application_databus_request_data(data_type_name, _gather args)
+	## 
+	## Returns the first data item of the given type found on the
+	## application_databus.
+	##
+
+	_if (db << _self.int!application_databus) _isnt _unset
+	_then
+		_return db.request_data(data_type_name, _self, _scatter args)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_iter _method mss_application_databus_mixin.application_databus_request_all_data(data_type_name, _gather args)
+	## 
+	## Returns the all data items of the given type found on the
+	## application_databus.
+	##
+
+	_if (db << _self.int!application_databus) _isnt _unset
+	_then
+		_for i _over db.request_all_data(data_type_name, _self, _scatter args)
+		_loop
+			_loopbody(i)
+		_endloop 
+	_endif
+	
+_endmethod
+$

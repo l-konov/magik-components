@@ -1,0 +1,99 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_job_type
+##
+## A job type describes the nature of work being done in a job
+## (i.e. electric vs. gas, new construction vs. replacement).
+## A job type is associated with a workflow and one or more
+## datasets.
+##
+
+# Implementation note: this is not a datastore record - all
+# configuration for a workflow is defined in code.  The
+# following implementation is structured so that this could be
+# changed in the future.
+
+def_slotted_exemplar(:mss_job_type,
+{
+	{:name, _unset, :readable},
+	{:workflow, _unset, :readable},
+	{:dataset_names, _unset, :readable}
+},
+{:mss_workspace_record_mixin})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+mss_job_type.define_shared_variable(
+	:defined_job_types,
+	## Equality hash table of all defined job types, keyed on name.
+	equality_hash_table.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_job_type.new(name, workflow, dataset_names)
+	## 
+	## Return a new job type named NAME, associated with the given
+	## WORKFLOW and DATASET_NAMES.
+	##
+
+	_for jt _over _self.defined_job_types.fast_elements()
+	_loop
+		_if jt.name.lowercase = name.lowercase
+		_then
+			_self.user_error(:duplicate_name, name)
+		_endif
+	_endloop
+
+	new_rec << _clone.init(name, workflow, dataset_names)
+	_self.defined_job_types[name] << new_rec
+
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_private _method mss_job_type.init(name, workflow, dataset_names)
+	## 
+	## 
+
+	.name << name
+	.workflow << workflow
+	.dataset_names << dataset_names
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job_type.get_by_name(name)
+	## 
+	## Returns the job type with a name value of NAME
+	##
+
+	_return _self.defined_job_types[name]
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_job_type.remove_job_type_definition(name)
+	## 
+	## Removes the job type definition for the job type named NAME.
+	##
+
+	_return _self.defined_job_types.remove_key(name)
+	
+_endmethod
+$

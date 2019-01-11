@@ -1,0 +1,377 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef_config_menu
+##
+
+def_slotted_exemplar(:mss_ptdef_config_menu,
+{
+	{:database, _unset, :readable},
+	{:dummy_actions, _unset, :readable}
+},
+{:gui_framework})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+##
+## Defines the colour which is used to highlight geometry.
+## Only needed for compatibility with editor_manager, which
+## requires this property on its owning application.
+##
+mss_ptdef_config_menu.def_property(
+	:highlight_colour,
+	:type, :object,
+	:default_value, colour.new_rgb(1.0, 1.0, 0.0),
+	:readable?, _true,
+	:writable?, _false)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptdef_config_menu.define_shared_constant(
+	:databus_producer_data_types,
+	{:view_mode, :view_changes, :view_lwt},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+
+	soc_name << mss_ptrule_manager.mss_config_spatial_object_controller_name
+	.database << sw_database.new(soc_name, _self, :initial_soc_name, soc_name)
+	
+	.dummy_actions << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.spatial_object_controller
+	## 
+	## 
+
+	_return _self.database
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.post_activation()
+	## 
+	## 
+
+	_super.post_activation()
+	.database.add_dependent(_self, :view, :lwt, :mode)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.on_deactivation()
+	## 
+	## 
+
+	_super.on_deactivation()
+	.database.remove_dependent(_self, :view, :lwt, :mode)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.note_change(who, what, data, _gather more_data)
+	## 
+	## 
+
+	_if who _is mss_ptrule_manager.dbview
+	_then
+		_if what _is :mode
+		_then
+			_self.databus_make_data_available(:view_mode, data)
+		_elif what _is :view _and data _is :changes
+		_then
+			_self.databus_make_data_available(:view_changes, more_data)
+		_elif what _is :view _and data _is :lwt
+		_then
+			_self.databus_make_data_available(:view_lwt, more_data)
+		_endif
+	_endif
+	
+	_super.note_change(who, what, data)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.init_actions()
+	## 
+	## 
+
+	_self.add_action(_self.database.action(:undo))
+	_self.add_action(_self.database.action(:redo))
+
+	_self.add_action(sw_action.new(:close,
+				       :engine, _self,
+				       :action_message, :|close()|))
+	_self.add_action(sw_action.new(:activate_pointing_rule_editor,
+				       :engine, _self,
+				       :action_message, {:|activate_editor_for_table()|, :mss_ptdef}))
+
+	# Proxy actions for cut/copy/paste, etc.
+	.dummy_actions[:cut] <<
+		sw_action.new(:cut,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+	.dummy_actions[:copy] <<
+		sw_action.new(:copy,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+	.dummy_actions[:paste] <<
+		sw_action.new(:paste,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+	.dummy_actions[:refresh] <<
+		sw_action.new(:refresh,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+	.dummy_actions[:edit_pointing_rule] <<
+		sw_action.new(:edit_pointing_rule,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+	.dummy_actions[:clone_pointing_rule] <<
+		sw_action.new(:clone_pointing_rule,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+	.dummy_actions[:import_pointing_rules] <<
+		sw_action.new(:import_pointing_rules,
+			      :engine, _self,
+			      :action_message, :|do_nothing()|,
+			      :enabled?, _false)
+
+	_self.add_action(action_proxy.new(.dummy_actions[:cut]))
+	_self.add_action(action_proxy.new(.dummy_actions[:copy]))
+	_self.add_action(action_proxy.new(.dummy_actions[:paste]))
+	_self.add_action(action_proxy.new(.dummy_actions[:refresh]))
+	_self.add_action(action_proxy.new(.dummy_actions[:edit_pointing_rule]))
+	_self.add_action(action_proxy.new(.dummy_actions[:clone_pointing_rule]))
+	_self.add_action(action_proxy.new(.dummy_actions[:import_pointing_rules]))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.post_build_gui()
+	## 
+	## 
+
+	tb << _self.get_gui_element_with_role(:main_tab_box)
+	tb.page_change_selector << :|set_current_control()|
+	_self.manage_proxy_actions()
+
+	# Force versions to display system info, since there is no
+	# options dialog to control that.
+	versions << _self.plugin(:versions)
+	pl << versions.get_preferences()
+	pl[:show_system_info?] << _true
+	versions.set_preferences(pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.popup_for_folder_list(ti)
+	## 
+	## Returns the popup menu as defined under the heading
+	## "folder_list" in the gui_manager's definition file.
+	##
+
+	_return _self.gui_manager.popup_menu(ti, "folder_list")
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.popup_for_folder_contents_list(ti)
+	## 
+	## Returns the popup menu as defined under the heading
+	## "folder_contents_list" in the gui_manager's definition file.
+	##
+
+	_return _self.gui_manager.popup_menu(ti, "folder_contents_list")
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.popup_for_folder_ptdef_list(ti)
+	## 
+	## Returns the popup menu as defined under the heading
+	## "folder_ptdef_list" in the gui_manager's definition file.
+	##
+
+	_return _self.gui_manager.popup_menu(ti, "folder_ptdef_list")
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.set_current_control(page_nr)
+	## 
+	## 
+
+	_self.manage_proxy_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.manage_proxy_actions()
+	## 
+	## 
+
+	_handling component_no_such_action _with procedure
+	
+	_if (tb << _self.get_gui_element_with_role(:main_tab_box)) _is _unset
+	_then
+		_return
+	_endif
+	new_manager << _unset 
+	_for i _over _self.components()
+	_loop
+		_if i.method(:|is_tab_active_page?()|) _isnt _unset _andif
+		    i.is_tab_active_page?(tb.active_page)
+		_then
+			new_manager << i
+			_leave
+		_endif
+	_endloop
+		
+	_for pa _over {:cut, :copy, :paste, :refresh,
+		       :edit_pointing_rule, :clone_pointing_rule, :import_pointing_rules}.fast_elements()
+	_loop
+		_if new_manager _is _unset _orif 
+		    (sub_action << new_manager.action(pa)) _is _unset
+		_then
+			sub_action << .dummy_actions[pa]
+		_endif
+		_self.action(pa).real_subject << sub_action
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_menu.status_info << a_string
+	## 
+	## 
+
+	_self.changed(:status_info, :text, a_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_menu.activate_editor_for_table(tbl_or_name)
+	## 
+	## Activate the editor for TBL_OR_NAME (either a database
+	## table, or the name of one).
+	##
+
+	_if tbl_or_name.is_class_of?(symbol)
+	_then
+		tbl_or_name << mss_ptrule_manager.dbview.collections[tbl_or_name]
+	_endif
+	_return _self.get_service_provider(:editor_manager).edit_collection(tbl_or_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_menu.activate_editor_for_object(rec)
+	## 
+	## Activate the editor for REC.
+	##
+
+	_return _self.get_service_provider(:editor_manager).edit_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_menu.ace
+	## 
+	## If self is not plugged into a higher level application, then
+	## there is no ace available.
+	##
+
+	_if (app << _self.application) _is _self
+	_then 
+		_return _unset
+	_endif
+	_return app.ace
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_menu.has_spatial_contexts_for?(an_object)
+	## 
+	## No spatial data is managed in the mss_config database.
+	##
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptdef_config_menu.get_ace_control_for(ace_name)
+	## 
+	## Required for use by explorer, if self is the top-level
+	## application.
+	##
+
+	_return .database.gs_factory.get_ace_control_for(ace_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.undo_manager
+	## 
+	## Return self's database as the manager for undo operations.
+	##
+
+	_return .database
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_config_menu.in_swaf_environment?
+	##
+	## Required by non-application things which have an
+	## editor_manager.  Return true.
+	##
+	
+	_return _true
+	
+_endmethod
+$

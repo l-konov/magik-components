@@ -1,0 +1,279 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_query_framework
+##
+## Framework to allow user to select CUs for insert/update/delete.
+##
+
+def_slotted_exemplar(:mss_cu_query_framework,
+{
+	{:current_object, _unset},
+	{:owner, _unset, :readable},
+	{:ok_callback, _unset, :readable},
+	{:ok_callback_identifier, _unset, :readable},
+	{:updated?, _unset, :readable}
+},
+{:gui_framework})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_query_framework.define_shared_constant(
+	:databus_consumer_data_types,
+	{:cu_updated, :current_cu_list},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_query_framework.define_shared_constant(
+	:databus_producer_data_types,
+	{:current_object, :current_object_and_query_values,
+	 :set_cu_list, :cu_lister_properties, :cu_query_properties},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.owner << _self
+	.ok_callback << :|cancel()|
+	.ok_callback_identifier << _unset 
+	.updated? << _false
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:ok,
+				       :engine, _self,
+				       :action_message, :|ok()|,
+				       :enabled?, _false))
+	_self.add_action(sw_action.new(:cancel,
+				       :engine, _self,
+				       :action_message, :|cancel()|))
+	_self.add_action(sw_action.new(:apply,
+				       :engine, _self,
+				       :action_message, :|apply()|,
+				       :enabled?, _false))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.build_framework_gui(container)
+	## 
+	## 
+
+	p_last << panel.new(container)
+	p_last.border_width << p_last.border_height << 2
+	p_last.height_spacing << p_last.width_spacing << 6
+	p_last.resize_x? << _true
+	p_last.resize_y? << _false
+
+	p_last.start_row()
+	simple_panel.new(p_last).resize_x? << _true 
+	x << _self.action(:ok).place_control_on(p_last, :dialog)
+	x.min_width << 75
+	x << _self.action(:cancel).place_control_on(p_last, :dialog)
+	x.min_width << 75
+	x << _self.action(:apply).place_control_on(p_last, :dialog)
+	x.min_width << 75
+
+	_return p_last
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.register_ok_callback(owner, ok_callback, ok_cb_id)
+	## 
+	## Register the callback to be performed when the OK or Apply
+	## button is pressed.  OWNER is the object that will receive
+	## the callback, and OK_CALLBACK is the message that will be
+	## passed (with self and OK_CB_ID as an argument).
+	##
+
+	.owner << owner
+	.ok_callback << ok_callback
+	.ok_callback_identifier << ok_cb_id
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.wm_close()
+	## 
+	## 
+
+	_self.perform_safely(:|cancel()|)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.cancel()
+	## 
+	## Discard any pending updates and close the framework.
+	##
+
+	_self.updated? << _false 
+	_self.close()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.apply()
+	## 
+	## Apply pending changes.
+	##
+
+	.ok_callback.send_to(.owner, _self, .ok_callback_identifier)
+	_self.updated? << _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.ok()
+	## 
+	## Apply pending changes, and dismiss the menu.
+	##
+
+	_self.apply()
+	_self.cancel()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.updated? << x
+	## 
+	## 
+
+	.updated? << x
+	_self.action(:ok).enabled? << x
+	_self.action(:apply).enabled? << x
+	_return .updated?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.current_object
+	## 
+	## Ensure it is valid before returning it.
+	##
+
+	_if .current_object _isnt _unset _andif
+	    _not .current_object.is_valid?
+	_then
+		.current_object << _unset
+	_endif
+	_return .current_object
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.current_object << cur_obj
+	## 
+	## Set current object, and broadcast this to databus.
+	##
+
+	.current_object << cur_obj
+	_self.databus_make_data_available(:current_object, cur_obj)
+	_return cur_obj
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.set_current_object_and_query_values(cur_obj, pvals)
+	## 
+	## 
+
+	.current_object << cur_obj
+	_self.databus_make_data_available(:current_object_and_query_values, {cur_obj, pvals})
+	_return cur_obj
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.set_cu_lister_properties(pl)
+	## 
+	## Forward proposed CU lister properties on the databus.
+	##
+
+	_self.databus_make_data_available(:cu_lister_properties, pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.set_cu_query_properties(pl)
+	## 
+	## Forward proposed CU query properties on the databus.
+	##
+
+	_self.databus_make_data_available(:cu_query_properties, pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_query_framework.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :cu_updated
+	_then
+		_self.updated? << _true
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_query_framework.set_cu_list(cu_list)
+	## 
+	## Given a collection CU_LIST of mss_cu_holder records, make
+	## these the current list of CUs chosen.  This is typically
+	## done immediately after the framework is activated to show to
+	## current CUs for a given object.
+	##
+
+	_self.databus_make_data_available(:set_cu_list, cu_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_query_framework.current_cu_list()
+	## 
+	## Return a collection of mss_cu_holder records that represent
+	## the results of the current query.
+	##
+
+	_return _self.databus_request_data(:current_cu_list).default({})
+	
+_endmethod
+$

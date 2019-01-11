@@ -1,0 +1,52 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+########################################################################
+
+_pragma(classify_level=basic)
+## the Graphviz DOT language graph.
+def_slotted_exemplar(:dot_subgraph,
+      {
+	      
+      },
+      {:dot_container}
+)
+$
+_pragma(classify_level=basic)
+_method dot_subgraph.new(id,parent)
+	## new(string ID,
+	##     dot_container PARENT) : dot_subgraph
+	## 
+	## creates a new dot_subgraph that is a child to PARENT. 
+
+	_return _clone.init(id,parent)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method dot_subgraph.init(id,parent)
+	## init(string ID,
+	##      dot_container PARENT) : dot_subgraph
+	##
+	## initialises self
+
+	_super.init(id,parent)
+	
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=restricted)
+_private _method dot_subgraph.graph_type
+	## graph_type : string
+	##
+	## returns "subgraph"
+
+	_return "subgraph"
+_endmethod
+$

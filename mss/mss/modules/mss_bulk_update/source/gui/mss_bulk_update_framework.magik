@@ -1,0 +1,188 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+##
+## mss_bulk_update_framework
+##
+## GUI framework for handling the bulk update menu.
+##
+
+def_slotted_exemplar(:mss_bulk_update_framework,
+{
+	{:current_object, _unset, :readable}
+},
+{:gui_framework})
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+ mss_bulk_update_framework.define_shared_constant(
+	 :databus_consumer_data_types,
+	 {:bu_current_object, :run_status_string, :status_string},
+	 :public)
+$
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+ mss_bulk_update_framework.define_shared_constant(
+	 :databus_producer_data_types,
+	 {:current_object},
+	 :public)
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:close,
+				       :engine, _self,
+				       :action_message, :|close()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.sw_databus_data_available(data_type_name, data)
+	## 
+	## If receiving a bu_current_object notification, store this in
+	## self's current_object slot.  Also, update the status bar to
+	## indicate status messages from any plugin.
+	##
+
+	_if data_type_name _is :bu_current_object
+	_then
+		_self.current_object << data
+	_elif data_type_name _is :run_status_string
+	_then
+		_self.update_statusbar(:run_status_string, :text, data)
+	_elif data_type_name _is :status_string
+	_then
+		_self.update_statusbar(:status_string, :text, data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.current_object << data
+	## 
+	## If the current_object changes, then send a current_object
+	## notification to instruct the editor field lister to update
+	## itself.
+	##
+
+	_if .current_object _isnt _unset _andif
+	    _not .current_object.is_valid?
+	_then
+		.current_object << _unset
+	_endif 
+	_if .current_object = data
+	_then
+		_return data
+	_endif
+	.current_object << data
+	_self.databus_make_data_available(:current_object, .current_object)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.collection
+	## 
+	## Required for compatibility with editor_field_lister.
+	##
+
+	_if .current_object _isnt _unset
+	_then
+		_return .current_object.source_collection
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.ace
+	## 
+	## Required for compatibility with editor_field_lister.
+	## 
+
+	_if (app << _self.application) _is _self
+	_then
+		_return _unset
+	_endif 
+	_return app.ace
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.work_record()
+	## 
+	## Makes and returns a detached_record populated with actual or
+	## proposed field values.
+	##
+
+	_if .current_object _is _unset
+	_then
+		_return
+	_endif
+	dr << .current_object.detached()
+	pvals << _self.get_proposed_field_values(:insert)
+	
+	_for f_name _over dr.physical_field_names()
+	_loop
+		_if (v << pvals[f_name]) _isnt _unset 
+		_then
+			dr.perform(f_name.with_chevron, v)
+		_endif
+	_endloop
+	_return dr
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.get_proposed_field_values(operation)
+	## 
+	## Same functionality as for object_editor.
+	##
+
+	_local proposed_values << property_list.new()
+
+	data_type_name << _if operation _is :insert
+			  _then
+				  >> :proposed_values_for_insert
+			  _elif operation _is :update
+			  _then
+				  >> :proposed_values_for_update
+			  _endif
+	
+	_for values _over _self.databus_request_all_data(data_type_name)
+	_loop
+		_for key, value _over values.fast_keys_and_elements()
+		_loop
+			proposed_values[key] << value
+		_endloop
+	_endloop
+
+	_return proposed_values
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bulk_update_framework.highlight_on_selection?
+	## 
+	## No geometry fields to highlight.
+	##
+
+	_return _false
+	
+_endmethod
+$

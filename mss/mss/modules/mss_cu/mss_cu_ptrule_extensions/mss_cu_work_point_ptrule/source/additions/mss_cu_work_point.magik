@@ -1,0 +1,48 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_cu, mss_ptrule})
+_method mss_cu_work_point.mss_populate_from_gui_plugin(ptrule)
+	## 
+	## Populate self's attributes based on a custom GUI plugin.
+	##
+
+	_if (pi << ptrule.get_property(:gui_plugin)) _is _unset
+	_then
+		# This is an error, but let downstream processing deal with it.
+		_return
+	_endif 
+	prefix << pi.input_value(:prefix).default("")
+	_if (number << pi.input_value(:number).default("").write_string) = ""
+	_then
+		_self.user_error(:mss_wp_gui_plugin_no_number)
+	_endif 
+
+	_self.set_mss_design_id()
+	_self.prefix << prefix
+	_self.number << number
+	_self.work_point_number << _self.derived_work_point_number()
+	_self.validate_unique_work_point_number()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu, mss_ptrule})
+_method mss_cu_work_point.gui_plugin_next_available_number(ptrule)
+	## 
+	## Update the GUI to display the next available number.
+	##
+
+	_if (pi << ptrule.get_property(:gui_plugin)) _isnt _unset
+	_then
+		pi.get_next_available_number(_true)
+	_endif
+	
+_endmethod
+$

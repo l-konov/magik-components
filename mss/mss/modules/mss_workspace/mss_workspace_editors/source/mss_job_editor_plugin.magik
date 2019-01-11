@@ -1,0 +1,209 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_job_editor_plugin.magik
+##
+## Editor plugin for mss_job object.
+##
+
+def_slotted_exemplar(:mss_job_editor_plugin,
+{
+	{:current_object, _unset}
+},
+{:editor_plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_job_editor_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:current_object},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_job_editor_plugin.define_shared_constant(
+	:managed_table_name,
+	:mss_job,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_job_editor_plugin.define_shared_constant(
+	:history_menu_class_name,
+	:mss_job_history_viewer,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job_editor_plugin.current_object
+	## 
+	## 
+
+	_if (rec << .current_object) _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << .current_object << _unset
+	_endif
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_job_editor_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:show_history,
+				       :engine, _self,
+				       :action_message, :|show_history()|))
+	_self.add_action(sw_action.new(:show_related_documents,
+				       :engine, _self,
+				       :action_message, :|show_related_documents()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_iter _method mss_job_editor_plugin.actions()
+	## 
+	## Yield actions in a repeatable order so that they show up on
+	## the Specials pulldown in a consistent way.
+	##
+
+	_loopbody(_self.action(:show_history))
+	_loopbody(_self.action(:show_related_documents))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job_editor_plugin.show_history()
+	## 
+	## 
+
+	_if (rec << _self.current_object) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_current_object))
+	_endif
+
+	_if (m << _self.get_dialog(:history_viewer)) _is _unset
+	_then
+		m << get_global_value(_self.history_menu_class_name).new_dialog(_self.top_frame)
+		_self.cache_dialog(:history_viewer, m)
+		m.activate_relative_to(_unset, _self.top_frame, 50, 50)
+		_self.add_dependent(m, :current_object)
+	_else 
+		m.reactivate()
+	_endif
+	
+	_self.set_current_object(rec, _true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job_editor_plugin.show_related_documents()
+	## 
+	## 
+
+	_if (rec << _self.current_object) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_current_object))
+	_endif
+
+	msg_key << :title_for_ + _self.managed_table_name
+	_if (m << _self.get_dialog(:mss_wm_related_document_framework)) _is _unset
+	_then
+		m << mss_wm_related_document_framework.new(:mss_wm_related_document_framework, _self)
+		_self.cache_dialog(:mss_wm_related_document_framework, m)
+		m.activate_relative_to(_self.top_frame, m.message(msg_key), _self.top_frame, 50, 50)
+		_self.add_dependent(m, :current_object)
+	_else 
+		m.activate(_self.top_frame, m.message(msg_key))
+	_endif
+	
+	_self.set_current_object(rec, _true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job_editor_plugin.databus << new
+	## 
+	## Due to the way that the databus is hooked up for editor
+	## plugins, the first current_object notification is missed.
+	## So, deal with it here.
+	##
+
+	_super.databus << new
+	_if new _isnt _unset
+	_then
+		_self.set_current_object(_self.framework.current_object)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job_editor_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :current_object
+	_then
+		_self.set_current_object(data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job_editor_plugin.set_current_object(rec, _optional force_update?)
+	## 
+	## 
+
+	_if rec _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << _unset
+	_endif
+
+	# Ensure that this is from the "right" table, since the way
+	# that notifications come from the rwo_specials_plugin, that is
+	# not always the case.
+	_if rec _isnt _unset _andif
+	    rec.source_collection.name _isnt _self.managed_table_name
+	_then
+		rec << _unset
+	_endif
+	
+	_if force_update? _is _true _orif
+	    rec ~= _self.current_object
+	_then
+		.current_object << rec 
+		_self.manage_actions_for_current_object(rec)
+		_self.changed(:current_object, rec)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_job_editor_plugin.manage_actions_for_current_object(rec)
+	## 
+	## 
+
+	_self.action(:show_history).enabled? << rec _isnt _unset
+	_self.action(:show_related_documents).enabled? << rec _isnt _unset
+	
+_endmethod
+$

@@ -1,0 +1,14 @@
+<config>
+  <plugins>
+    <plugin name="editor_manager" class_name="editor_manager">
+      <properties>
+        <property name="editor_gui_definition_module_name" value="mss_scheduler_editor"/>
+        <property name="editor_config_definition_module_name" value="mss_scheduler_editor"/>
+        <property name="default_editor_class" value="mss_scheduler_object_editor"/>
+      </properties>
+    </plugin>
+
+    <plugin name="mss_scheduler_engine" class_name="mss_scheduler_engine"/>
+    <plugin name="mss_scheduler_results_plugin" class_name="mss_scheduler_results_plugin"/>
+  </plugins>
+</config>

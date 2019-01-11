@@ -1,0 +1,211 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptdef_attribute
+##
+## Pointing rule attribute definition.
+##
+
+def_slotted_exemplar(:mss_ptdef_attribute,
+{},
+{:mss_ptdef_ds_record})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_attribute.general_validator()
+	## 
+	## Ensure that there are no duplicate attribute names within
+	## the parent mss_ptdef record.
+	##
+
+	_if (p << _self.ptdef) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_parent_mss_ptdef))
+	_endif
+
+	my_name << _self.name
+	my_id << _self.id
+	_for attr _over p.attributes.fast_elements()
+	_loop
+		_if attr.id = my_id _then _continue _endif
+		_if attr.name = my_name
+		_then
+			condition.raise(:user_error, :string, _self.message(:duplicate_attribute_name, my_name))
+		_endif
+	_endloop
+	
+	_return _super.general_validator()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef_attribute.can_match?(fd)
+	## 
+	## Derive values for various fields from the actual data model.
+	##
+
+	_if {:name, :value}.includes?(fd.name)
+	_then
+		_return _true
+	_endif
+	_return _super.can_match?(fd)
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptdef_attribute.match_string(fd, a_string, _optional record)
+	## 
+	## Derive values for various fields from the actual data model.
+	## 
+
+	_if (fdn << fd.name) _is :name
+	_then
+		_return _self.match_string_attribute_names(a_string, record)
+	_elif fdn _is :value
+	_then
+		_return _self.match_string_attribute_values(a_string, record)
+	_endif
+	_return _super.match_string(fd, a_string, record)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_attribute.match_string_attribute_names(a_string, _optional record)
+	## 
+	## Determine the list of possible attribute names from the
+	## actual collection.
+	##
+
+	a_string << a_string.default("")
+	len << a_string.size
+	record << record.default(_self)
+
+	r << rope.new()
+
+	# N.B.: record can be a record_template, which cannot follow
+	# joins directly.  Need to query mss_ptdef table instead.
+	# Also, note that due to strangeness in the way that this may
+	# be accessed by editors, record can also be a detached record
+	# that has not yet been populated (mss_ptdef_id attribute is 0
+	# or unset).  So, try to get that from the attached record.
+	_if ((parent_id << record.mss_ptdef_id) _is _unset _orif
+	     parent_id = 0) _andif
+	    (self_id << record.id.default(0)) ~= 0
+	_then
+		_if (attached_rec << record.source_collection.at(self_id)) _isnt _unset
+		_then
+			parent_id << attached_rec.mss_ptdef_id
+		_endif
+	_endif 
+	
+	_if parent_id _is _unset _orif
+	    (parent << record.source_view.collections[:mss_ptdef].at(parent_id)) _is _unset _orif
+	    (tbl << parent.actual_collection) _is _unset 
+	_then
+		_return r
+	_endif 
+
+	sc << sorted_collection.new()
+	_for fd _over tbl.all_fields.fast_elements()
+	_loop
+		n << fd.name
+		n_str << n.as_charvec()
+		ok? << _false 
+		_if fd.is_physical?
+		_then
+			_if _not {:ds!version, :rwo_id}.includes?(n)
+			_then
+				ok? << _true
+			_endif
+		_elif fd.is_join? _andif
+		      fd.join_type _is :text
+		_then
+			ok? << _true
+		_endif
+
+		_if ok? _andif
+		    a_string.cf_subseq(n_str, 1, 1, len) _is _maybe
+		_then
+			sc.add(n_str)
+		_endif
+	_endloop
+
+	r.add_all_last(sc)
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_attribute.match_string_attribute_values(a_string, _optional record)
+	## 
+	## Determine the list of attribute values from the enumerator
+	## for the corresponding field on the actual collection.
+	##
+	
+	a_string << a_string.default("")
+	len << a_string.size
+	record << record.default(_self)
+
+	# N.B.: record can be a record_template, which cannot follow
+	# joins directly.  Need to query mss_ptdef table instead.
+	# Also, note that due to strangeness in the way that this may
+	# be accessed by editors, record can also be a detached record
+	# that has not yet been populated (mss_ptdef_id attribute is 0
+	# or unset).  So, try to get that from the attached record.
+	_if ((parent_id << record.mss_ptdef_id) _is _unset _orif
+	     parent_id = 0) _andif
+	    (self_id << record.id.default(0)) ~= 0
+	_then
+		_if (attached_rec << record.source_collection.at(self_id)) _isnt _unset
+		_then
+			parent_id << attached_rec.mss_ptdef_id
+		_endif
+	_endif 
+	
+	_if parent_id _is _unset _orif
+	    (parent << record.source_view.collections[:mss_ptdef].at(parent_id)) _is _unset _orif
+	    (tbl << parent.actual_collection) _is _unset _orif
+	    (fd << tbl.all_fields[record.name.default("").as_symbol()]) _is _unset 
+	_then
+		_return {}
+	_endif 
+
+	_if (rec_ex << tbl.record_exemplar) _isnt _unset _andif
+	    rec_ex.can_match?(fd)
+	_then
+		_return rec_ex.match_string(fd, a_string)
+	_endif
+
+	_return {}
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptdef_attribute.mss_strict_enumeration?(fd)
+	## 
+	## Don't strictly enforce enumeration on the value field, since
+	## it only applies if the corresponding field on the actual
+	## collection is enumerated.
+	##
+
+	_if fd.name _is :value
+	_then
+		_return _false
+	_endif
+	_return _true
+	
+_endmethod
+$

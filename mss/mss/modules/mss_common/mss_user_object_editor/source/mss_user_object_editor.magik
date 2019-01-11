@@ -1,0 +1,308 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic)
+##
+## mss_user_object_editor
+##
+## Useful extensions to object_editor for editing standard data
+## model objects.
+##
+
+def_slotted_exemplar(:mss_user_object_editor,
+{
+},
+{:object_editor})
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.init_actions()
+	## 
+	## Add custom actions for the object editor.
+	##
+
+	_self.add_action(sw_action.new(:copy_to_scrapbook,
+				       :image, {:copy, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|copy_to_scrapbook()|))
+	
+	_super.init_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.sw_databus_data_requested(data_type_name)
+	## 
+	## Respond to requests for :collection.
+	##
+
+	_if data_type_name _is :collection
+	_then
+		_return _self.collection
+	_endif
+	_return _super.sw_databus_data_requested(data_type_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.manage_actions()
+	## 
+	## Manage custom actions for the object editor.
+	## 
+
+	_super.manage_actions()
+	_self.action(:copy_to_scrapbook).enabled? << .current_object _isnt _unset 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.reset()
+	## 
+	## Note the fact that a reset is taking place, so that plugins
+	## that care can react to it.
+	##
+
+	_dynamic !mss_user_object_editor_reset!
+
+	_if (current_object << _self.current_object) _is _unset
+	_then 
+		current_collection << _self.collection
+	_else
+		current_collection << current_object.source_collection
+	_endif
+
+	!mss_user_object_editor_reset! << {current_collection, current_object}
+
+	_return _super.reset()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+mss_user_object_editor.define_shared_constant(
+	:perform_place_on_insert?,
+	## Most installations actually do want to perform "place"
+	## functionality as part of an insert, and also want the
+	## standard icon provided by the insert action.  Setting
+	## this true causes the insert action to perform place
+	## functionality.
+	_true,
+	:public)
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.insert()
+	## 
+	## Ensure that default geometry is set (this is actually
+	## accomplished by the place action, but that has a
+	## non-standard icon).
+	##
+
+	_dynamic !mss_user_object_editor_insert_from_place?!
+	
+	_if !mss_user_object_editor_insert_from_place?! _is _true _orif
+	    _self.perform_place_on_insert? _is _false
+	_then
+		_return _super.insert()
+	_else
+		_return _self.place()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.place()
+	## 
+	## Set a dynamic to avoid the potential to bounce back and
+	## forth between place() and insert().  Also, only clear the
+	## trail if a default geometry actually got created.
+	##
+
+	# MSS START CHANGE (relative to superclass):
+	_dynamic !mss_user_object_editor_insert_from_place?! << _true
+	# MSS END CHANGE
+	
+	proposed_values << _self.get_proposed_field_values( :insert )
+	(ok?, geom_created?) << _self.set_default_geometry( proposed_values )
+
+	_if ok?
+	_then
+		_protect
+			ok? << _false
+			_self.insert()
+			ok? << _true
+		_protection
+			_if _not ok? _andif geom_created?
+			_then
+				# Clear the geom if it was a generated default
+				val << property_list.new_with(_self.default_geom_field_name(),_unset)
+				_self.set_proposed_values(val)
+			_endif
+		_endprotect
+
+		# Only get here if insert was successful. If it wasn't we
+		# don't empty the trail
+		# MSS START CHANGE (relative to superclass):
+		_if geom_created?
+		_then 
+			_self.trail.empty()
+		_endif
+		# MSS END CHANGE
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.set_default_geometry(proposed_values)
+	## 
+	## Unlike the superclass, do not raise an error if there is no
+	## default geometry.
+	##
+
+	_if _self.default_geom_field_name() _is _unset
+	_then
+		_return _true, _false
+	_endif
+	_return _super.set_default_geometry(proposed_values)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_user_object_editor.current_object << new_object
+	## 
+	## Makes NEW_OBJECT the current object.
+	##
+
+	# 2005/05/20 TM  Consider it to be a new object if the
+	#                datasets are different.
+	# 2007/02/16 TM  Updated for V4.1 compatibility.
+	# 2011/04/25 TM  Updated for V4.2 compatibility, moved here from
+	#                object_editor class.
+	
+	_self.interrupt_work()
+	
+	_if new_object _isnt _unset _andif _not new_object.is_valid?
+	_then
+		new_object << _unset
+	_endif
+	
+	new_collection << _if new_object _isnt _unset
+			  _then
+				  >> new_object.source_collection
+			  _endif
+
+	# collection does not change if new object is unset 
+	# Workaround for Oracle objects that wrongly claims to be the same object
+	collection_changed? << new_object _isnt _unset _andif
+			       .collection _isnt new_collection
+
+	object_changed? <<  ( .current_object _isnt _unset _andif _not .current_object.is_valid? ) _orif
+			    .current_object <> new_object _orif
+			    (.collection _isnt _unset _andif .collection.dataset.dataset_type _is :oracle)
+	# TM START CHANGE (relative to superclass):
+	_if _not object_changed? _andif
+	    new_object _isnt _unset _andif
+	    new_object.source_view _isnt .current_object.source_view
+	_then
+		object_changed? << _true
+	_endif
+	# TM END CHANGE
+	
+	_self.int!current_object << new_object
+	
+	_self.changed( :status, :label, "" )
+	
+	_self.manage_actions()
+
+	_if object_changed? _andif
+	    ( new_object _is _unset _orif
+	      new_object.source_collection.read_authorised? )
+	_then 
+		_if collection_changed?
+		_then
+			_self.set_frame_title()
+		_endif
+		_self.notify_current_object_changed( new_object )
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.current_selection
+	## 
+	## Convenience function to get current selection from the
+	## application databus.
+	##
+
+	(map, sel) << (_scatter _self.application.databus.request_data(:map_selection).default({}))
+	_if sel _is _unset
+	_then
+		sel << equality_geometry_set.new()
+	_endif 
+	_return sel
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_object_editor.current_geometry
+	## 
+	## Convenience function to get current geometry from the
+	## application databus.
+	##
+
+	sel << _self.current_selection
+	_if sel.size = 1
+	_then
+		_return sel.an_element()
+	_else
+		_return _unset
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mss_user_object_editor.ensure_current_object()
+	##
+	## This checks if there is a current object in the editor. If
+	## not, it will raise a condition, else it returns the current
+	## record. 
+	##
+	
+	_if .current_object _is _unset _orif
+	    _not .current_object.is_valid?
+	_then
+		condition.raise(:editor_no_current_object)
+	_endif 
+	_return .current_object
+	
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mss_user_object_editor.copy_to_scrapbook()
+	## 
+	## Copy the current object to the scrapbook.
+	##
+
+	cr << _self.ensure_current_object()
+	scrapbook << gis_program_manager.scrapbook()	
+	scrapbook.set_clipboard(_self.message(:copy_to_scrapbook_data, cr.description()),
+				{rwo_set.new_with(cr)}, :object_editor)
+	
+_endmethod
+$

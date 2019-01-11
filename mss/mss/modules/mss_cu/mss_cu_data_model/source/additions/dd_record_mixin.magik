@@ -1,0 +1,47 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_cus_allowed?()
+	## 
+	## Return true if Compatible Units can be associated with this object.
+	##
+
+	_if (desc << _self.descriptor) _is _unset _orif
+	    desc.internal_table? _orif
+	    _self.source_view.collections[:mss_cu_reference] _is _unset
+	_then
+		_return _false
+	_endif
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={subclassable})
+_method dd_record_mixin.mss_clone_cu_references(new_rec)
+	## 
+	## Clones self's mss_cu_reference records to parent NEW_REC.
+	##
+
+	# 2005/04/24 TM  Created.  Actually a new method, but it is tied
+	#                to the basic change to rwo_record_mixin.clone().
+	# 2006/05/03 TM  Moved here from rwo_record_mixin.
+	
+	_if new_rec _isnt _unset _andif
+	    _self.mss_cus_allowed?()
+	_then 
+		_for i _over mss_cu_reference.tracking_records_for(_self).fast_elements()
+		_loop
+			i.clone_tracking_record(new_rec)
+		_endloop
+	_endif
+	
+_endmethod
+$

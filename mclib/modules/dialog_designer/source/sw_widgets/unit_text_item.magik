@@ -1,0 +1,334 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## UNIT_TEXT_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=advanced, topic={raster},usage={redefinable})
+_method unit_text_item.dimensions
+	## Construct the value list for dimension choices.
+	## 
+
+	unit_list << sorted_collection.new()
+
+	_for a _over sw:unit_manager.dimensionalities.fast_elements()
+	_loop
+		_if a.name.write_string.index_of_seq("currency") _is 1
+		_then
+			_continue 
+		_endif
+		unit_list.add(a.name.write_string)
+	_endloop
+
+	>> {}.new_with(_scatter unit_list)
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={raster},usage={redefinable})
+_method unit_text_item.unit_list(which)
+	## 
+	## Return a simple vector of units of dimension WHICH.
+	
+	unit_list << rope.new()
+
+	_for u _over sw:unit_manager.dimensionality(which).units.fast_keys()
+	_loop
+		unit_list.add_last(u.write_string)
+	_endloop
+
+	>> {}.new_with(_scatter unit_list)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+unit_text_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :display_length,:integer,
+					  :value_default,:float,
+					  :value_display_unit,unit_text_item.unit_list(:length),
+					  :value_dimension,unit_text_item.dimensions,
+					  :value_internal_unit,unit_text_item.unit_list(:length)),
+				  :public)
+$
+
+
+_pragma(classify_level=advanced, topic={raster},usage={redefinable})
+_method unit_text_item.switch_dimension(new)
+	## 
+	## Update the properties of SELF so they reflect the NEW dimensionality.
+	
+	_self.dd_properties[:value_display_unit] <<
+		_self.dd_properties[:value_internal_unit] << _self.unit_list(new.as_symbol())
+
+	_self.value_display_unit <<
+		_self.value_internal_unit << _self.dd_properties[:value_display_unit].an_element()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over unit_text_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	props.remove_key(:incremental_change_selector)
+	props.remove_key(:value)
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	fm << unit_specific_format.new(:m)
+	um << unit_manager.unit(:mm)
+	rec << _self.new(rc,_unset,fm,
+			 :internal_units,um,
+			 :row,row,:col,col,
+			 :col_alignment,:fill,
+			 :display_length,7,
+			 :row_alignment,:top)
+	id << _self.get_property(:dialog_element_id).write_string.split_by(%_).last
+	rec.value_default << 1.23
+	rec.value_internal_unit << "feet"
+	rec.value_dimension     << "length"
+	rec.value_display_unit  << "m"
+	>> rec
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+
+	vts << vtext_style.new(_self.font)
+	txt << _self.dd_display_string
+	>> vts.box_coordinates(txt).bounds.width.rounded + _self.label_width
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.dd_display_string
+	## 
+	## Return the string that will be rendered.
+
+	_dynamic !print_float_precision! << _self.display_length.as_number().default(10)
+	val_i << unit_value.new(_self.value_default.default(0.0),_self.value_internal_unit.as_symbol())
+	val_e << val_i.convert_to(_self.value_display_unit.as_symbol())
+
+	>> val_e.value.write_string + " " + val_e.unit.write_string
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	vts << vtext_style.new(_self.font)
+	>> vts.box_coordinates(_self.value.write_string.default("")).bounds.height.rounded
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	fm << unit_specific_format.new(props[:value_display_unit])
+	um << unit_manager.unit(props[:value_internal_unit])
+	val << props[:value_default].as_number()
+
+	old_props << props.copy()
+
+	_for k _over {:value_display_unit,
+		      :value_internal_unit,
+		      :value_dimension,
+		      :value_default}.elements()
+	_loop
+		props.remove_key(k)
+	_endloop
+
+	rec << _self.new(parent,_unset,fm,
+			 :internal_units,um,
+			 _scatter props)
+	
+	id << _self.get_property(:dialog_element_id).write_string.split_by(%_).last
+	
+	rec.value_default       << val
+	rec.switch_dimension(old_props[:value_dimension])
+	rec.value_dimension     << old_props[:value_dimension]
+	rec.value_internal_unit << old_props[:value_internal_unit]
+	rec.value_display_unit  << old_props[:value_display_unit]
+
+	>> rec
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	!dialog_element_footprints![pbb.deep_copy()] << _self
+
+	# Adjust when there's label 
+	lab_w << _self.label_width
+	pbb.xmin +<< lab_w
+	w -<< lab_w
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	txt << _self.dd_display_string
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	canv.draw_text(ts,pbb.xmin+2,pbb.ymax-4,txt)
+
+	lab << _self.message_from_keyed_message(_self.label)
+	canv.draw_text(ts,pbb.xmin+2-lab_w,pbb.ymax-4,lab)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,".items[:",_self.dialog_element_id,"] << unit_text_item.new(",parent_id,%,,"_unset")
+	txt.write(%,,%newline,%tab*3,"unit_specific_format.new(:",_self.value_display_unit,")")
+	txt.write(%,,%newline,%tab*3,":internal_units,",%tab,"unit_manager.unit(:",_self.value_internal_unit,")")
+	txt.write(%,,%newline,%tab*3,":value,",%tab,_self.value_default)
+
+	txt.write(%,,%newline,%tab*3,":model,",%tab,"_self")
+
+	_for n,v _over _self.valid_properties()
+	_loop		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, _self.message(",km[1],%))
+		_else
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, ",%",km[2],%")
+		_endif
+	_endif 
+				
+	txt.write(" )",%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_default
+	## 
+	## Return the :dialog_element_id property.
+	>> _self.properties[:value_default]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_default << va
+	## 
+	## Set the :dialog_element_id property.
+
+	_self.properties[:value_default] << va.default(0.0)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_display_unit
+	## 
+	## Return the :dialog_element_id property.
+	>> _self.properties[:value_display_unit]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_display_unit << du
+	## 
+	## Set the :dialog_element_id property.
+	_self.properties[:value_display_unit] << du
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_dimension
+	## 
+	## Return the :dialog_element_id property.
+	>> _self.properties[:value_dimension]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_dimension << vd
+	## 
+	## Set the :dialog_element_id property.
+	_self.properties[:value_dimension] << vd
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_internal_unit
+	## 
+	## Return the :dialog_element_id property.
+	>> _self.properties[:value_internal_unit]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method unit_text_item.value_internal_unit << ui
+	## 
+	## Set the :dialog_element_id property.
+	_self.properties[:value_internal_unit] << ui
+_endmethod
+$
+
+

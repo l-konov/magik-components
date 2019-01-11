@@ -1,0 +1,9 @@
+mss_http_client	1
+
+description
+	Wrapper for HTTP client request/response functionality
+end
+
+requires
+	tics
+end

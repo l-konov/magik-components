@@ -1,0 +1,203 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+##
+## mss_wm_auth_engine
+##
+## Class for validating custom authorisation settings for
+## workspace manager functionality.
+##
+
+def_slotted_exemplar(:mss_wm_auth_engine,
+{
+	{:rules, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+mss_wm_auth_engine.define_shared_constant(
+	:default_access_levels,
+	## Default access levels to allow if no custom rules are defined.
+	hash_table.new_with(
+		:state_transition_own, _true,
+		:state_transition_other, _false,
+		:design_open_write_own, _true,
+		:design_open_write_other, _false,
+		:design_open_readonly_own, _true,
+		:design_open_readonly_other, _true,
+		:design_change_owner_own, _false,
+		:design_change_owner_other, _false,
+		:design_delete_own, _true,
+		:design_delete_other, _false),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_auth_engine.init()
+	## 
+	## 
+
+	_if .rules _isnt _unset
+	_then
+		_return _self
+	_endif 
+	.rules << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_auth_engine.check_access(key, _optional subject)
+	## 
+	## Returns true or false to indicate whether the operation
+	## identified by KEY can be performed to the subject record
+	## SUBJECT.
+	##
+
+	_dynamic !auth_context!
+	
+	# Ensure self is initialized.
+	_self.init()
+
+	# Special case: if this is a state transition, and if the state
+	# transition has an authorisation level of :none, then access
+	# is never permitted.
+	_if (key _is :state_transition_own _orif
+	     key _is :state_transition_other) _andif
+	    subject.auth_groups _is :none
+	_then
+		_return _false
+	_endif
+	
+	# If there is no auth view, or if the user is a super-user,
+	# return true.  Also, if there is no auth context, return true.
+	_if (av << gis_program_manager.authorisation_view) _is _unset _orif
+	    av.user_is_admin? _orif
+	    !auth_context! _is _unset 
+	_then
+		_return _true
+	_endif 
+
+	# Figure out all current group names.
+	my_group_names << rope.new()
+	_block
+		_for i _over av.current_groups.fast_elements()
+		_loop
+			_dynamic !auth_context! << _unset
+			my_group_names.add_last(i.name)
+		_endloop
+	_endblock
+	
+	allowed?? << _maybe 
+	_if (per_group_rules << .rules[key]) _isnt _unset
+	_then
+		# For each current group name, see if the action is permitted.
+		_for group_name _over my_group_names.fast_elements()
+		_loop
+			_if (per_group_data << per_group_rules[group_name]) _is _unset
+			_then
+				_continue
+			_endif
+			_if per_group_data[1] _is _true
+			_then
+				allowed?? << _true
+				_leave
+			_elif per_group_data[1] _is _false
+			_then
+				allowed?? << _false
+				# But, don't leave yet, because it may be permitted for another
+				# group. 
+			_elif per_group_data.size >= 2
+			_then 
+				_if (test? << _self.perform(per_group_data[2], key, subject)) _is _true
+				_then
+					allowed?? << _true
+					_leave
+				_elif test? _is _false
+				_then
+					allowed?? << _false
+					# But, don't leave yet, because it may be permitted for another
+					# group.
+				_endif 
+			_endif 
+		_endloop
+	_endif
+
+	# If no custom rules defined, use the default.
+	_if allowed?? _is _maybe
+	_then
+		allowed?? << _self.default_access_levels[key].default(_false)
+	_endif
+	
+	# For state transitions, even if they are permitted in general,
+	# ensure that this particular one is permitted for the current
+	# user's groups.
+	_if (key _is :state_transition_own _orif
+	     key _is :state_transition_other) _andif
+	    allowed?? _is _true _andif
+	    (transition_groups << subject.auth_groups) _isnt _unset 
+	_then
+		_if equality_set.new_from(my_group_names).intersection(transition_groups).size = 0
+		_then
+			allowed?? << _false
+		_endif
+	_endif
+	
+	_return allowed??
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_auth_engine.define_rule(key, group_name, value, _optional method_name)
+	## 
+	## Define a new authorisation rule:
+	## - KEY is the operation to be checked (c.f. the possible
+	##   values in mss_wm_auth_engine.default_access_levels).
+	## - GROUP_NAME is the name of the authorisation group that
+	##   this applies to.
+	## - VALUE is the permission value - this may be true, false, or
+	##   maybe.
+	## - METHOD_NAME - if VALUE is maybe, then METHOD_NAME will be
+	##   performed on self to decide if the operation is to be
+	##   permitted.  Note that the implementer must write this
+	##   custom method.
+	##
+
+	_self.init()
+	
+	_if method_name _is _unset
+	_then
+		_if value _is _unset
+		_then
+			# Eventually remove the key.
+			data << _unset
+		_else 
+			data << {value}
+		_endif 
+	_else
+		data << {value, method_name}
+	_endif
+	_if (per_group_rules << .rules[key]) _is _unset
+	_then
+		per_group_rules << .rules[key] << equality_property_list.new()
+	_endif
+
+	_if data _is _unset
+	_then
+		per_group_rules.remove_key(group_name)
+	_else 
+		per_group_rules[group_name] << data
+	_endif 
+	
+_endmethod
+$

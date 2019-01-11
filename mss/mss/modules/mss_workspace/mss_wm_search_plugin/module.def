@@ -1,0 +1,10 @@
+mss_wm_search_plugin	1
+
+description
+	Plugin for managing searches for jobs and designs
+end
+
+requires
+	mss_application_databus
+	mss_workspace_manager
+end

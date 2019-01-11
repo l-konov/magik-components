@@ -1,0 +1,74 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-06-07 22:43:18 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 04-13-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib 
+
+_pragma(classify_level=basic)
+## A plugin which you can include in an application to allow
+## you to launch the thread manager.
+def_slotted_exemplar(:thread_manager_plugin,
+                       {},
+		       {:plugin})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_plugin.init_actions()
+	## 
+	## 
+	##
+
+	# (04-13-2005 Brad Sileo): created.
+	_self.add_action(sw_action.new(:launch_thread_manager,
+				       :engine,_self,
+				       :action_message,:|launch_thread_manager()| ,
+				       :toolbar_control,:button_item ,
+				       :caption,_self.message(:launch_thread_manager  ),
+				       :short_help_text,_self.message(:launch_thread_manager_sh  ),
+				       :tooltip,_self.message(:launch_thread_manager_tt)  )
+	      ) 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_plugin.launch_thread_manager()
+	## Starts the thread manager
+	## 
+	##
+
+	# (04-13-2005 Brad Sileo): created.
+	_if (d << _self.get_dialog(:thread_manager)) _is _unset 
+	_then
+		_self.cache_dialog(:thread_manager,thread_manager.open())
+	_else
+		d.activate()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_plugin.terminate()
+	## 
+	## 
+	##
+
+	# (05-19-2005 Brad Sileo): created.
+	_if (tm << _self.get_dialog(:thread_manager)) _isnt _unset 
+	_then
+		tm.close()
+	_endif
+	_super.terminate()
+_endmethod
+$

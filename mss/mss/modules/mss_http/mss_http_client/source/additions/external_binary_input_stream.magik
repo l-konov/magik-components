@@ -1,0 +1,103 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method external_binary_input_stream.mss_get_ascii_line(_optional max_to_do, work_pl)
+	## 
+	## Get all characters up to the next return (13) or linefeed
+	## (10), as a string.  In cases where the string ends with
+	## CRLF, The last return character (13) is not included in the
+	## result.
+	##
+	## If WORK_PL is provided, then it be a property list with the
+	## following keys:
+	## - :stream - the internal_text_output_stream to use for
+	##   reading chars.
+	## - :count - the character count (initially 0)
+	## - :last_nl? - initially false, but true if the last char is
+	##   a newline.
+	## The intent of this data structure is to capture partial
+	## results if this thread is interrupted (i.e. due to timeout).
+	##
+
+	_if work_pl _isnt _unset
+	_then
+		s << work_pl[:stream]
+		work_pl[:count] << 0
+		work_pl[:last_nl?] << _false 
+	_else 
+		s << internal_text_output_stream.new()
+	_endif 
+	count << 0
+	any? << _false
+	last_nl? << _false 
+	_loop
+		_if max_to_do _isnt _unset _andif
+		    count >= max_to_do
+		_then
+			_leave
+		_endif
+		
+		_if (c << _self.get()) _is _unset _then _leave _endif
+		any? << _true
+		count +<< 1
+		_if work_pl _isnt _unset
+		_then
+			work_pl[:count] +<< 1
+		_endif
+		
+		_if c = 10
+		_then
+			# LF: we're done.
+			last_nl? << _true 
+			_if work_pl _isnt _unset
+			_then
+				work_pl[:last_nl?] << _true
+			_endif 
+			_leave
+		_endif 
+
+		_if c = 13
+		_then
+			# CR: look ahead for LF, unless this is the very last character.
+			last_nl? << _true
+			_if work_pl _isnt _unset
+			_then
+				work_pl[:last_nl?] << _true
+			_endif 
+			_if max_to_do _isnt _unset _andif
+			    count >= max_to_do
+			_then
+				_leave
+			_endif
+			
+			_if (c2 << _self.get()) _isnt _unset _andif
+			    c2 ~= 10
+			_then
+				_self.unget(c2)
+			_else
+				count +<< 1
+				_if work_pl _isnt _unset
+				_then
+					work_pl[:count] +<< 1
+				_endif
+			_endif
+			_leave
+		_endif
+		s.write(c.as_character())
+	_endloop
+	_if _not any?
+	_then
+		_return _unset, _false, 0, last_nl?
+	_else
+		_return s.string, _true, count, last_nl?
+	_endif
+	
+_endmethod
+$

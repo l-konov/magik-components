@@ -1,0 +1,134 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-07 09:24:27 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## Allows a call to goto a location ro record in Smallworld.
+## The application and map manager to use must be ocnfigured in
+## my properties
+##
+## We currently implement the URN approach for this, so use a
+## call like:
+##   http://localhost:32457/goto?urn=<urn>
+##
+## Where URN comes from urn_record_handler.get_urn_from_object(a_record)
+##
+def_slotted_exemplar(:mclib_http_swaf_edit_service,
+                      {
+		      },
+		      {:http_service_plugin})
+$
+
+mclib_http_swaf_edit_service.define_property(:application_name,
+					 :symbol,
+					 "The name of the application where my editor manager is found. If unset, its in the http listener.",
+					 _true,_true,_unset)
+$
+
+mclib_http_swaf_edit_service.define_property(:editor_manager_name,
+					 :symbol,
+					 "The name of the editor manager to use for editing objects",
+					 _true,_true,:maps)
+$
+
+_pragma(classify_level=basic)
+_method mclib_http_swaf_edit_service.run(params, input_stream, output_stream, headers)
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	a_em << _self.get_editor_manager()
+	obj << _self.get_object(params)
+	_if a_em _is _unset _orif
+	    obj _is _unset 
+	_then
+		_return 
+	_endif
+	a_em.activate_editor_for_object(obj)
+	_self.send_result(200,"OK")
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mclib_http_swaf_edit_service.defined_parameters
+	## Returns my known parameters
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> property_list.new_with(
+		   :urn,property_list.new_with(:name,"The URN of the object to edit")
+		   )
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mclib_http_swaf_edit_service.get_object(params)
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	>> _if (a_urn << params[:urn]) _isnt _unset 
+	_then
+		>> _self.object_for_urn(a_urn)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mclib_http_swaf_edit_service.object_for_urn(a_urn)
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	obj << urn_manager.get_object_from_urn(a_urn)
+	>> obj
+_endmethod
+$
+
+_method mclib_http_swaf_edit_service.get_editor_manager()
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	_try
+		_if _self.application_name _is _unset _then
+			app << _self.application
+		_else
+			app << smallworld_product.application(_self.application_name)
+		_endif 
+		em << app.plugin(_self.editor_manager_name)
+	_when error
+	_endtry
+	>> em
+_endmethod
+$
+

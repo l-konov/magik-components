@@ -1,0 +1,172 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+##
+## mss_wm_overlay_geometry_set
+##
+## Geometry set to allow an overlay view of a design
+## alternative. 
+##
+
+def_slotted_exemplar(:mss_wm_overlay_geometry_set,
+{
+	{:override_only?, _unset, :writable},
+	{:overlay_dataset_manager, _unset, :readable},
+	{:override_style_system, _unset, :readable}
+},
+{:ds_geometry_set})
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_geometry_set.set_overlay_dataset_manager(a_ds_manager)
+	## 
+	## Set self's parent dataset manager - used to determine which
+	## geometries should be drawn in an override style.
+	##
+
+	.overlay_dataset_manager << a_ds_manager
+	_return a_ds_manager
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_geometry_set.style_system << a_style_system
+	## 
+	## Set up _self to use A_STYLE_SYSTEM for rendering.
+	##
+
+	_if .override_style_system _is _unset
+	_then
+		_self.override_style_system << a_style_system
+	_endif
+	_return _super.style_system << a_style_system
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_geometry_set.override_style_system << a_style_system
+	## 
+	## Set up _self to use A_STYLE_SYSTEM for override rendering.
+	##
+
+	_return .override_style_system << a_style_system
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_overlay_geometry_set.select(selector, _gather args)
+	## 
+	## Perform super processing, and then set the override style
+	## system on the result.
+	##
+
+	res << _super.select(selector, _scatter args)
+	_if (oss << _self.override_style_system) _isnt _unset _andif
+	    res.responds_to?(:|override_style_system<<|)
+	_then
+		res.override_only? << _self.override_only?
+		res.override_style_system << oss.copy()
+	_endif 
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_iter _method mss_wm_overlay_geometry_set.scan_elements(bounds, select_filter, _optional rwo_predicates)
+	## 
+	## See comments on superclass.  If self's override_only?
+	## property is true, then this will only return those
+	## geometries that are in the override set.
+	##
+
+	override? << .override_only?.default(_true)
+	_if (odm << .overlay_dataset_manager) _is _unset
+	_then
+		# Shouldn't be the case, but if so, don't try to use it.
+		override? << _false
+	_endif
+	
+	_for a_geom _over _super.scan_elements(bounds, select_filter, rwo_predicates)
+	_loop
+		_if override? _andif
+		    _not odm.geometry_changed_in_replica?(a_geom)
+		_then
+			_continue
+		_endif
+		_loopbody(a_geom)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_overlay_geometry_set.draw_on(window, _optional style)
+	## 
+	## Do not use the optimized drawing done in the superclass.
+	## Instead, selectively draw elements based on their presence
+	## in the replica_geoms set of self's parent dataset manager.
+	##
+
+	# Note that drawing with an override colour is generally very
+	# slow, due to the way that styles are realized (caching is not
+	# done in this case).  It will be worthwhile to figure out how
+	# to speed this up if this overlay processing ever gets heavily
+	# used.
+	
+	_dynamic !current_mss_wm_overlay_geometry_set! << _self
+	_dynamic !current_sts!
+	
+	# For debugging:
+	#t1 << system.elapsed_seconds()
+
+	_if !current_sts! _is _unset
+	_then
+		!current_sts! << _self.default_style_system()
+	_endif
+
+	orig_sts << !current_sts!
+	override_sts << _self.override_style_system
+	override? << .override_only?.default(_true)
+	_if (odm << .overlay_dataset_manager) _is _unset
+	_then
+		# Shouldn't be the case, but if so, don't try to use it.
+		override? << _false
+	_endif 
+
+	c1 << 0
+	c2 << 0
+	_for a_geom _over _self.elements()
+	_loop
+		_if odm _isnt _unset _andif
+		    odm.geometry_changed_in_replica?(a_geom)
+		_then
+			!current_sts! << override_sts
+			c1 +<< 1
+		_else 
+			_if override?
+			_then
+				_continue
+			_endif
+			# Not in override mode, so let regular drawing take place.
+			!current_sts! << orig_sts
+			c2 +<< 1
+		_endif
+
+		a_geom.draw_on(window, style)
+	_endloop
+
+	#write("Done mss_wm_overlay_geometry_set.draw_on(): ", system.elapsed_seconds()-t1, %,, c1, %,, c2)
+	
+_endmethod
+$

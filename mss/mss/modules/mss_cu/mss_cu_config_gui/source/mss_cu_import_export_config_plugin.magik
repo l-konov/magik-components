@@ -1,0 +1,2854 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_import_export_config_plugin
+##
+## Plugin to allow import and export of Compatible Unit
+## properties.
+##
+
+def_slotted_exemplar(:mss_cu_import_export_config_plugin,
+{
+	{:sorter, _unset, :readable},
+	{:sorter2, _unset, :readable},
+	{:line_count, _unset, :readable},
+	{:error_count, _unset, :readable}
+},
+{:mss_cu_general_config_plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_import_export_config_plugin.define_shared_constant(
+	:csv_date_format,
+	## Format string for exchanging dates in CSV format.
+	"#m/#d/#Y",
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_import_export_config_plugin.define_shared_constant(
+	:csv_separator,
+	## Character to use as a field separator in CSV format.
+	%,,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_import_export_config_plugin.define_shared_constant(
+	:csv_quote_char,
+	## Character to use as a quote character in CSV format.
+	%",
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={redefinable})
+mss_cu_import_export_config_plugin.define_shared_variable(
+	:import_max_errors,
+	## The maximum number of errors allowed during an import
+	## process before it is stopped.
+	10,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_import_export_config_plugin.define_shared_variable(
+	:export_format_nested?,
+	## Set this to true for export results nested by CU, rather
+	## than having separate sections for each export category.
+	_false,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.init(name, a_framework)
+	##
+	##
+
+	_super.init(name, a_framework)
+	_self.set_option(:export_mode_cus?, _true)
+	_self.set_option(:export_mode_cost_groups?, _false)
+	_self.set_option(:filter_cu_code, _self.message(:default_filter_cu_code))
+	_self.set_option(:filter_description, "")
+	_self.set_option(:export_cus?, _true)
+	_self.set_option(:export_cu_operations?, _true)
+	_self.set_option(:export_cu_facilities?, _true)
+	_self.set_option(:export_cu_groups?, _true)
+	_self.set_option(:export_cu_job_types?, _true)
+	_self.set_option(:export_cu_mus?, _true)
+	_self.set_option(:current_cu_cost_group, 0)
+	_self.set_option(:cg_export_override_only?, _true)
+	.sorter << sorted_collection.new(10, _self.standard_sort_proc)
+	.sorter2 << sorted_collection.new(10, _self.standard_sort_proc)
+	_return _self
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:refresh,
+				       :engine, _self,
+				       :action_message, :|refresh()|))
+	_self.add_action(sw_action.new(:import_cu_definitions,
+				       :engine, _self,
+				       :action_message, :|import_cu_definitions()|))
+	_self.add_action(sw_action.new(:export_cu_definitions,
+				       :engine, _self,
+				       :action_message, :|export_cu_definitions()|))
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.build_gui(a_container)
+	## 
+	## 
+
+	main_p << panel.new(a_container)
+	main_p.border_width << main_p.border_height << 0
+	main_p.height_spacing << 0
+	main_p.width_spacing << 0
+	main_p.resize_x? << main_p.resize_y? << _true
+	main_p.tab_label << _self.message(:tab_label)
+	.items[:top_panel] << main_p
+
+	ps << :|perform_safely()|
+	go << :|get_option()|
+	so << :|set_option()|
+	tabs << {50}
+	
+	p << panel.new(main_p)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << p.resize_y? << _false
+
+	p.start_row()
+	.items[:export_mode_cus?] <<
+		toggle_item.new(p, _self.message(:export_mode_cus?),
+				:model, _self,
+				:aspect, :export_mode_cus?,
+				:change_selector, {ps, :|export_mode_cus?<<|},
+				:value_selector, {go, :export_mode_cus?})
+
+	p.start_row()
+	.items[:filter_cu_code] << x <<
+		text_item.new(p, _self.message(:filter_cu_code),
+			      :display_length, 12,
+			      :model, _self,
+			      :aspect, :filter_cu_code,
+			      :change_selector, {ps, so, :filter_cu_code},
+			      :value_selector, {go, :filter_cu_code})
+	x.set_left(tabs[1])
+	
+	.items[:filter_description] <<
+		text_item.new(p, _self.message(:filter_description),
+			      :display_length, 20,
+			      :model, _self,
+			      :aspect, :filter_description,
+			      :change_selector, {ps, so, :filter_description},
+			      :value_selector, {go, :filter_description})
+
+	_for option_key _over {:export_cus?, :export_cu_operations?, :export_cu_facilities?,
+			       :export_cu_groups?, :export_cu_job_types?, :export_cu_mus?}.fast_elements()
+	_loop 
+		p.start_row()
+		.items[option_key] << x <<
+			toggle_item.new(p, _self.message(option_key),
+					:model, _self,
+					:aspect, option_key,
+					:change_selector, {ps, so, option_key},
+					:value_selector, {go, option_key})
+		x.set_left(tabs[1])
+	_endloop
+	
+	p.start_row()
+	.items[:export_mode_cost_groups?] <<
+		toggle_item.new(p, _self.message(:export_mode_cost_groups?),
+				:model, _self,
+				:aspect, :export_mode_cost_groups?,
+				:change_selector, {ps, :|export_mode_cost_groups?<<|},
+				:value_selector, {go, :export_mode_cost_groups?})
+
+	p.start_row()
+	.items[:current_cu_cost_group] << x << 
+		text_choice_item.new(p, _self.message(:current_cu_cost_group),
+				     :items, _self.current_cu_cost_group_choices,
+				     :model, _self,
+				     :aspect, :current_cu_cost_group,
+				     :change_selector, {ps, :|current_cu_cost_group<<|},
+				     :value_selector, {go, :current_cu_cost_group})
+	x.set_left(tabs[1])
+	
+	p.start_row()
+	.items[:cg_export_override_only?] << x <<
+		toggle_item.new(p, _self.message(:cg_export_override_only?),
+				:model, _self,
+				:aspect, :cg_export_override_only?,
+				:change_selector, {ps, so, :cg_export_override_only?},
+				:value_selector, {go, :cg_export_override_only?})
+	x.set_left(tabs[1])
+
+	_return main_p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.pre_activation()
+	## 
+	## 
+
+	mss_cu_engine.view.add_dependent(_self, :view, :mode)
+	mss_cu_engine.view.add_observer(_self, {:insert, :update, :post_delete},
+					{:mss_cu_cost_group})
+	_super.pre_activation()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.post_activation()
+	## 
+	## 
+
+	_super.post_activation()
+	_self.handle_cu_cost_group_change()
+	_self.manage_actions_for_mode_change()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.terminate()
+	## 
+	## 
+
+	mss_cu_engine.view.remove_dependent(_self, :view, :mode)
+	mss_cu_engine.view.remove_observer(_self, {:insert, :update, :post_delete},
+					   {:mss_cu_cost_group})
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_super.note_change(who, what, _scatter data)
+	_if who _is mss_cu_engine.view
+	_then
+		_if what _is :mode
+		_then
+			_self.manage_actions_for_mode_change()
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.set_proxy_actions_for_active_page(a_page, pl)
+	## 
+	## Set any proxy actions in property list PL when A_PAGE
+	## becomes the current page on the main tab control.
+	## 
+
+	_if a_page _is .items[:top_panel]
+	_then
+		pl[:refresh] << _self.action(:refresh)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.manage_actions_for_mode_change()
+	## 
+	## 
+
+	w? << mss_cu_engine.view.writable?
+	_self.action(:import_cu_definitions).enabled? << w?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.export_mode_cus? << x
+	## 
+	## If setting this mode to true, deselect other modes.
+	##
+
+	_self.set_option(:export_mode_cus?, x, _true)
+	_if x _is _true
+	_then
+		_self.export_mode_cost_groups? << _false 
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.export_mode_cost_groups? << x
+	## 
+	## If setting this mode to true, deselect other modes.
+	##
+
+	_self.set_option(:export_mode_cost_groups?, x, _true)
+	_if x _is _true
+	_then
+		_self.export_mode_cus? << _false 
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.refresh()
+	## 
+	## Update all displayed lists.
+	##
+
+	_self.handle_cu_cost_group_change()
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.import_cu_definitions(_optional fname)
+	## 
+	## Import all CU information found in the file named FNAME.
+	## If FNAME is not provided, it will be prompted.
+	##
+
+	_if _not mss_cu_engine.view.writable?
+	_then
+		_self.user_error(:view_not_writable)
+	_endif
+	
+	_if fname _is _unset
+	_then
+		fd << file_dialog.new(_self, {:|perform_safely()|, :|do_import_cu_definitions()|}, _unset,
+				      :directory, "",
+				      :operation, :open,
+				      :filter, {_self.message(:csv_filter), "*.csv"},
+				      :title, _self.message(:import_dialog_title))
+		fd.activate()
+	_else
+		_self.do_import_cu_definitions(fname)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.do_import_cu_definitions(fname)
+	## 
+	## Import all CU information found in the file named FNAME.
+	##
+
+	suf << _self.message(:csv_filetype)
+	_if fname.size <= suf.size _orif
+	    fname.lowercase.slice_to_end(fname.size - suf.size + 1) ~= suf.lowercase
+	_then
+		fname << write_string(fname, suf)
+	_endif
+
+	_try 
+		f << external_text_input_stream.new(fname)
+	_when error 
+		_if f _isnt _unset _then f.close() _endif
+		_self.user_error(:file_not_readable, fname)
+	_endtry
+
+	ok? << _false 
+	_protect
+		_self.do_import(f)
+		ok? << _true 
+	_protection
+		_if f _isnt _unset _then f.close() _endif
+		_if _not ok?
+		_then
+			_self.status_string << _self.message(:failed)
+		_elif .error_count > _self.import_max_errors
+		_then
+			_self.status_string << _self.message(:imp_max_errors_exceeded, _self.import_max_errors)
+		_else
+			_self.status_string << _self.message(:import_complete, .line_count, .error_count)
+		_endif 
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.do_import(f)
+	## 
+	## Import all CU information found in stream F.
+	##
+
+	_dynamic !mss_cu_property_config_ignore_notification?! << _true 
+
+	_local me << _self 
+	.line_count << 0
+	.error_count << 0
+	header? << _false
+	ok? << _false 
+	lkp << equality_property_list.new_with(
+		       "CU", :|int!import_cu()|,
+		       "CU_RENAME", :|int!import_cu_rename()|,
+		       "OP", :|int!import_cu_operation()|,
+		       "FAC", :|int!import_cu_facility()|,
+		       "CU_GROUP", :|int!import_cu_group()|,
+		       "CU_GROUP_RENAME", :|int!import_cu_group_rename()|,
+		       "CU_GROUP_END", :|int!import_cu_group_end()|,
+		       "CU_GROUP_ITEM", :|int!import_cu_group_item()|,
+		       "CU_JT", :|int!import_cu_job_type()|,
+		       "CU_JT_RENAME", :|int!import_cu_job_type_rename()|,
+		       "CU_JT_END", :|int!import_cu_job_type_end()|,
+		       "CU_JT_ITEM", :|int!import_cu_job_type_item()|,
+		       "CU_MU", :|int!import_cu_mu()|,
+		       "CU_MU_END", :|int!import_cu_mu_end()|,
+		       "CU_MU_ITEM", :|int!import_cu_mu_item()|,
+		       "COST_GROUP", :|int!import_cu_cost_group()|,
+		       "COST_GROUP_RENAME", :|int!import_cu_cost_group_rename()|,
+		       "COST_GROUP_END", :|int!import_cu_cost_group_end()|,
+		       "COST_GROUP_ITEM", :|int!import_cu_cost_group_item()|,
+		       "CU_DELETE", :|int!import_cu_delete()|,
+		       "OP_DELETE", :|int!import_cu_operation_delete()|,
+		       "FAC_DELETE", :|int!import_cu_facility_delete()|,
+		       "CU_GROUP_DELETE", :|int!import_cu_group_delete()|,
+		       "CU_GROUP_ITEM_DELETE", :|int!import_cu_group_item_delete()|,
+		       "CU_JT_DELETE", :|int!import_cu_job_type_delete()|,
+		       "CU_JT_ITEM_DELETE", :|int!import_cu_job_type_item_delete()|,
+		       "CU_MU_ITEM_DELETE", :|int!import_cu_mu_item_delete()|,
+		       "COST_GROUP_DELETE", :|int!import_cu_cost_group_delete()|,
+		       "COST_GROUP_ITEM_DELETE", :|int!import_cu_cost_group_item_delete()|
+				      )
+
+	max_errors << _self.import_max_errors
+	_self.set_option(:imp!current_cu_group, _unset)
+	_self.set_option(:imp!current_cu_job_type, _unset)
+	_self.set_option(:imp!current_cu_mu, _unset)
+	_self.set_option(:imp!current_cu_cost_group, _unset)
+	_loop
+		_if .error_count >= max_errors
+		_then
+			_self.log_import_error(:warning, _self.message(:imp_max_errors_exceeded, max_errors))
+			_leave
+		_endif
+		
+		_catch :any_error
+			_handling user_error, enumerator_value_not_found _with
+			_proc(cond)
+				_import me
+				me.log_import_error(:error, cond.report_contents_string)
+				_throw :any_error
+			_endproc
+			_handling error _with
+			_proc(cond)
+				_import me
+				me.log_import_error(:error, cond.report_contents_string)
+				cond.report_on(!terminal!)
+				!traceback!(!terminal!)
+				_throw :any_error
+			_endproc
+			_handling warning _with
+			_proc(cond)
+				_import me
+				me.log_import_error(:warning, cond.report_contents_string)
+			_endproc
+			
+			_if (l << f.get_line()) _is _unset
+			_then
+				ok? << _true 
+				_leave
+			_endif
+			.line_count +<< 1
+			_if .line_count _mod 100 = 0
+			_then
+				_self.status_string << _self.message(:import_progress, .line_count)
+			_endif
+			
+			data << l.mss_parse_for_csv(_self.csv_separator, _self.csv_quote_char)
+
+			# Skip blank lines.
+			_if data.size = 0 _orif
+			    ((key << data[1].trim_spaces().uppercase) = "" _andif data.size = 1)
+			_then
+				_continue
+			_endif
+
+			# Allow comment lines - anything starting with '#' will
+			# be ignored.
+			_if key.size >= 1 _andif
+			    key[1] _is %#
+			_then
+				_continue
+			_endif
+			
+			_if _not header?
+			_then
+				# Verify header line.
+				_if _self.int!import_cu_header(data) _isnt _true
+				_then
+					_leave
+				_endif
+				header? << _true
+				_continue 
+			_endif
+			
+			_if (meth << lkp[key]) _is _unset
+			_then
+				_self.log_import_error(:error, _self.message(:imp_unknown_key, key))
+				_continue
+			_endif
+			_self.perform(meth, data)
+		_endcatch
+	_endloop
+
+	_return ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.log_import_error(sev, msg)
+	## 
+	## Log an error encountered during the import process.  SEV is
+	## a severity indicator (:error or :warning), and MSG is the
+	## error text.
+	##
+
+	f << !output!
+	f.write(.line_count, " ", sev[1].uppercase, " ", msg, newline_char)
+	f.flush()
+	.error_count +<< 1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.ensure_data_vector_length(data, size)
+	## 
+	## Ensure that DATA is at least SIZE long - if not, return a
+	## copy of length SIZE padded with empty strings.
+	##
+
+	_if data.size >= size
+	_then
+		_return data
+	_endif
+	new << simple_vector.new(size)
+	_for i _over 1.upto(size)
+	_loop
+		_if i <= data.size
+		_then
+			new[i] << data[i]
+		_else
+			new[i] << ""
+		_endif
+	_endloop
+	_return new
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.import_read_date(date_string)
+	## 
+	## Convert DATE_STRING to either a real date, or unset.  If it
+	## cannot be parsed, log an import error and return false.
+	##
+
+	_if (date_string << date_string.default("").trim_spaces()) = ""
+	_then
+		_return _unset
+	_endif 
+
+	dt << _unset 
+	_try
+		# Use CSV format first.
+		dt << date.from_string(date_string, _self.csv_date_format)
+	_when error
+	_endtry
+
+	_if dt _is _unset
+	_then
+		_try
+			# Try again with default date format.
+			dt << date.from_string(date_string, _self.csv_date_format)
+		_when error
+		_endtry
+	_endif
+
+	_if dt _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_unknown_date_format, date_string))
+		_return _false
+	_endif
+
+	_return dt
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={redefinable})
+_method mss_cu_import_export_config_plugin.import_check_attribute_match_for?(fd)
+	## 
+	## Return true if the attribute identified by field descriptor
+	## FD should be validated using can_match?() and match_string()
+	## when importing values for it.  This method always returns
+	## true, but it may be redefined in cases where this checking
+	## is not practical (i.e. custom match_string() methods that
+	## depend on other attributes of record exemplar).
+	##
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.import_ensure_single_cu(cu_code)
+	## 
+	## Ensure that there is a single CU definition with the given
+	## CU_CODE - if not, log an import error and return unset.
+	##
+
+	_if cu_code _is _unset _orif cu_code = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_cu_entered))
+		_return
+	_endif
+	all_cus << mss_cu_engine.cus_for_attributes(property_list.new_with(:cu_code, cu_code))
+	_if (acs << all_cus.size) > 1
+	_then
+		_self.log_import_error(:error, _self.message(:imp_multiple_matching_cus, cu_code, acs))
+		_return
+	_elif acs = 0
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_cu, cu_code))
+		_return
+	_endif
+
+	_return all_cus.an_element()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_header(data)
+	## 
+	## Import CU header information using data vector DATA.
+	##
+
+	_if data[1] ~= "CU_EXPORT"
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_header))
+		_return _false 
+	_endif
+	_if data.size < 2
+	_then
+		version << _unset
+	_else
+		version << data[2].as_number()
+	_endif
+	_if version _is _unset _orif
+	    version < 1 _orif 
+	    version > 1
+	_then
+		_self.log_import_error(:error, _self.message(:imp_wrong_version, 1, 1, version))
+		_return _false
+	_endif
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu(data)
+	## 
+	## Import a single CU definition using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 7)
+	
+	# Find a single CU with a matching cu_code - if there more than
+	# one, then this is an error.
+	_if (cu_code << _self.format_cu_code_for_import(data[2])) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_cu_entered))
+		_return
+	_endif
+	
+	all_cus << mss_cu_engine.cus_for_attributes(property_list.new_with(:cu_code, cu_code))
+	_if (acs << all_cus.size) > 1
+	_then
+		_self.log_import_error(:error, _self.message(:imp_multiple_matching_cus, cu_code, acs))
+		_return	
+	_endif
+
+	_if acs = 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		cu_rec << all_cus[1]
+		dr << cu_rec.detached()
+	_else
+		# Inserting a new one.
+		insert? << _true
+		cu_rec << _unset
+		dr << mss_cu_engine.view.collections[:mss_cu_definition].new_detached_record()
+		dr.cu_code << cu_code
+	_endif 
+		
+	dr.description << data[3]
+	dr.usage << data[4]
+	dr.dimensionality << data[5]
+	_if (dt << _self.import_read_date(data[6])) _is _false _then _return _endif
+	dr.effective_date << dt
+	_if (dt << _self.import_read_date(data[7])) _is _false _then _return _endif
+	dr.obsolete_date << dt
+
+	_if insert?
+	_then
+		cu_rec << dr.source_collection.insert(dr)
+	_else
+		# If this is not an MU, then make sure there are no MU references.
+		_if cu_rec.usage = mss_cu_engine.macro_unit_usage_value _andif 
+		    dr.usage ~= mss_cu_engine.macro_unit_usage_value
+		_then
+			_for i _over cu_rec.mss_cu_operation_definitions.fast_elements()
+			_loop
+				_for j _over i.c_mss_cu_mu_relationships.fast_elements()
+				_loop
+					j.delete()
+				_endloop 
+			_endloop
+		_endif
+		
+		# If nothing changed, don't need to update.
+		any_change? << _false 
+		_for fname _over {:description, :usage, :dimensionality, :effective_date,
+				  :obsolete_date}.fast_elements()
+		_loop
+			_if cu_rec.perform(fname) ~= dr.perform(fname)
+			_then
+				any_change? << _true
+				_leave
+			_endif
+		_endloop
+		_if any_change?
+		_then
+			cu_rec << dr.source_collection.update(dr)
+		_endif
+	_endif
+
+	_return cu_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_rename(data)
+	## 
+	## Import a single CU rename operation using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	
+	# Find a single CU with a matching cu_code - if there more than
+	# one, or no matches, then this is an error.
+	_if (cu_code << _self.format_cu_code_for_import(data[2])) = "" _orif
+	    (new_cu_code << _self.format_cu_code_for_import(data[3])) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_cu_entered))
+		_return
+	_endif
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+	
+	dr << cu_rec.detached()
+	dr.cu_code << new_cu_code
+	cu_rec << dr.source_collection.update(dr)
+
+	_return cu_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_operation(data)
+	## 
+	## Import a single CU operation using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 5)
+	_if (op_code << data[3].default("")) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_operation_entered))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# It is unlikely that there are two identical operations for
+	# the same CU, but if there are, then deal with this data error
+	# by deleting all duplicates.
+	r << rope.new_from(cu_rec.mss_cu_operation_definitions.select(predicate.eq(:operation, op_code, :ci)))
+	_for i _over 2.upto(r.size)
+	_loop
+		r[i].delete()
+	_endloop
+
+	_if r.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		op_rec << r[1]
+		dr << op_rec.detached()
+	_else
+		# Inserting a new one.
+		insert? << _true
+		op_rec << _unset
+		dr << mss_cu_engine.view.collections[:mss_cu_operation_definition].new_detached_record()
+		dr.mss_cu_definition_id << cu_rec.id
+	_endif 
+	dr.operation << op_code
+	dr.material_cost << data[4].as_number().default(0.0)
+	dr.labor_cost << data[5].as_number().default(0.0)
+
+	_if insert?
+	_then
+		op_rec << dr.source_collection.insert(dr)
+	_else 
+		# If nothing changed, don't need to update.
+		any_change? << _false 
+		_for fname _over {:operation, :material_cost, :labor_cost}.fast_elements()
+		_loop
+			_if op_rec.perform(fname) ~= dr.perform(fname)
+			_then
+				any_change? << _true
+				_leave
+			_endif
+		_endloop
+		_if any_change?
+		_then
+			op_rec << dr.source_collection.update(dr)
+		_endif
+	_endif
+
+	_return op_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_facility(data)
+	## 
+	## Import a single CU facility using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 5)
+	_if (op_code << data[5].default("")) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_operation_entered))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# Ensure CU has this operation.
+	_if (op_rec << cu_rec.operation_definition_for(op_code)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_operation, cu_code, op_code))
+		_return
+	_endif
+	
+	# Convert partition name and table name to a table code value.
+	p_name << data[3].trim_spaces()
+	t_name << data[4].trim_spaces()
+	_if (p_num << p_name.as_number()) _isnt _unset _andif
+	    t_name = ""
+	_then
+		# Table code entered directly.
+		table_code << p_num
+		fac_def << mss_cu_facility_definition.get_for_id(table_code)
+	_else
+		# Look up from facility definition.
+		_if (fac_def << mss_cu_facility_definition.get_for_partition_and_table_name(
+					p_name.as_symbol(), t_name.as_symbol())) _is _unset
+		_then
+			_self.log_import_error(:error, _self.message(:imp_fac_no_partition_and_table, p_name, t_name))
+			_return
+		_endif
+		table_code << fac_def.id
+	_endif
+
+	_if fac_def _is _unset _orif
+	    (target_table << fac_def.target_table) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_fac_def_no_target_table))
+		_return
+	_endif
+	rec_ex << target_table.record_exemplar
+	
+	# It is unlikely that there are two identical fac rels for
+	# the same CU, but if there are, then deal with this data error
+	# by deleting all duplicates.
+	pred << predicate.eq(:table_code, table_code) _and
+		predicate.eq(:operation, op_rec.operation, :ci)
+	r << rope.new_from(cu_rec.mss_cu_facility_relationships.select(pred))
+	_for i _over 2.upto(r.size)
+	_loop
+		r[i].delete()
+	_endloop
+
+	_if r.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		fac_rel << r[1]
+	_else
+		# Inserting a new one.
+		insert? << _true
+		dr << mss_cu_engine.view.collections[:mss_cu_facility_relationship].new_detached_record()
+		dr.mss_cu_definition_id << cu_rec.id
+		dr.cu_code << cu_rec.cu_code
+		dr.table_code << table_code
+		dr.operation << op_rec.operation
+		fac_rel << dr.source_collection.insert(dr)
+	_endif
+
+	# Figure out a property list of attributes.
+	attr_data << data.slice_to_end(6)
+	attr_pl << property_list.new()
+	next_idx << 1
+	_loop
+		_if next_idx > attr_data.size _then _leave _endif
+		attr_key << attr_data[next_idx].trim_spaces().uppercase
+		_if attr_data.size >= next_idx + 1
+		_then
+			attr_name << attr_data[next_idx + 1].lowercase.as_symbol()
+		_else
+			attr_name << "".as_symbol()
+		_endif
+		_if  attr_data.size >= next_idx + 2
+		_then
+			attr_value << _self.format_facility_attribute_for_import(attr_data[next_idx + 2])
+		_else
+			attr_value << ""
+		_endif
+		next_idx +<< 3
+
+		# Permit blanks (could be side effects of CSVs).
+		_if attr_key = "" _then _continue _endif
+		_if attr_key ~= "ATTR"
+		_then
+			_self.log_import_error(:error, _self.message(:imp_fac_no_attr_key, attr_key))
+			_return
+		_endif
+		_if _not fac_def.attribute_names.includes?(attr_name) _orif
+		    (fd << target_table.all_fields[attr_name]) _is _unset 
+		_then
+			_self.log_import_error(:error, _self.message(:imp_fac_no_attr_name, attr_name,
+							     fac_def.partition_name, fac_def.table_name))
+			_return
+		_endif
+
+		# Validate that attr_value is legitimate.
+		_if _self.import_check_attribute_match_for?(fd) _andif 
+		    rec_ex.can_match?(fd)
+		_then
+			match? << _false 
+			cands << rec_ex.match_string(fd, attr_value)
+			_for cand _over cands.fast_elements()
+			_loop
+				_if cand = attr_value _orif
+				    cand.write_string = attr_value
+				_then
+					match? << _true
+					_leave
+				_endif
+			_endloop
+			_if _not match?
+			_then
+				_self.log_import_error(:error, _self.message(:imp_fac_no_match_attr_value,
+									     fd.name, attr_value))
+				_return
+			_endif
+		_endif
+		
+		attr_pl[attr_name] << attr_value
+	_endloop
+
+	# At this point, we've got a validated property list of
+	# attribute values.  Use it to perform database updates.
+	tbd << rope.new()
+	_for attr_def _over fac_rel.mss_cu_facility_attributes.fast_elements()
+	_loop
+		_if (attr_name << attr_def.attribute_name) _is _unset _orif
+		    attr_name = ""
+		_then
+			tbd.add_last(attr_def)
+			_continue
+		_endif
+		attr_name << attr_name.as_symbol()
+		_if (val << attr_pl.remove_key(attr_name)) _is _unset
+		_then
+			tbd.add_last(attr_def)
+		_elif attr_def.attribute_value ~= val
+		_then
+			dr << attr_def.detached()
+			dr.attribute_value << val
+			dr.source_collection.update(dr)
+		_endif
+	_endloop
+
+	# Delete ones that no longer exist.
+	_for i _over tbd.fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	# Add in new ones.
+	tbl << mss_cu_engine.view.collections[:mss_cu_facility_attribute]
+	_for i, j _over attr_pl.fast_keys_and_elements()
+	_loop
+		dr << tbl.new_detached_record()
+		dr.attribute_name << i
+		dr.attribute_value << j
+		dr.mss_cu_facility_relationship << fac_rel
+		dr.source_collection.insert(dr)
+	_endloop 
+	
+	_return fac_rel
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_group(data)
+	## 
+	## Import a single CU group using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	tbl << mss_cu_engine.view.collections[:mss_cu_group_definition]
+	name << data[2]
+	
+	# If there are multiple entries, delete all except for the one
+	# with the most CU definitions.  This situation is not expected.
+	sc << sorted_collection.new(5, _proc(a, b) _return b[1] _cf a[1] _endproc)
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		sc.add({i.mss_cu_definitions.size, i})
+	_endloop
+	_for i _over 2.upto(sc.size)
+	_loop
+		sc[i][2].delete()
+	_endloop
+	_if sc.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		grp_rec << sc[1][2]
+	_else
+		# Inserting a new one.
+		insert? << _true
+		dr << tbl.new_detached_record()
+		dr.name << data[2]
+		grp_rec << dr.source_collection.insert(dr)
+	_endif
+	
+	_self.set_option(:imp!current_cu_group, grp_rec)
+	_return grp_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_group_rename(data)
+	## 
+	## Import a single CU group rename operation using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	tbl << mss_cu_engine.view.collections[:mss_cu_group_definition]
+
+	_if (name << data[2]) = "" _orif
+	    (new_name << data[3]) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_cu_group_entered))
+		_return
+	_endif
+	
+	# If there are multiple entries, delete all except for the one
+	# with the most CU definitions.  This situation is not expected.
+	sc << sorted_collection.new(5, _proc(a, b) _return b[1] _cf a[1] _endproc)
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		sc.add({i.mss_cu_definitions.size, i})
+	_endloop
+	_for i _over 2.upto(sc.size)
+	_loop
+		sc[i][2].delete()
+	_endloop
+	
+	_if sc.size = 0
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_cu_group, name))
+		_return
+	_endif
+
+	dr << sc[1][2].detached()
+	dr.name << new_name
+	grp_rec << dr.source_collection.update(dr)
+	_return grp_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_group_end(data)
+	## 
+	## Import a single CU group end marker using data vector DATA.
+	##
+
+	# No updates: just flag it so that there is no current group
+	# being worked on.
+	_self.set_option(:imp!current_cu_group, _unset)
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_group_item(data)
+	## 
+	## Import a single CU group item using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	_if (cg << _self.get_option(:imp!current_cu_group)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_group, data[1].uppercase))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# To avoid unnecessary updates, check to see if the
+	# relationship exists before forging it.
+	_if _not cu_rec.mss_cu_group_definitions.includes?(cg)
+	_then
+		cu_rec.mss_cu_group_definitions.add(cg)
+	_endif 
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_job_type(data)
+	## 
+	## Import a single CU job_type using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 4)
+	tbl << mss_cu_engine.view.collections[:mss_cu_job_type]
+	name << data[2]
+	mcm << data[3].as_number().default(1.0).as_float
+	lcm << data[4].as_number().default(1.0).as_float
+	
+	# If there are multiple entries, delete all except for the one
+	# with the most CU definitions.  This situation is not expected.
+	sc << sorted_collection.new(5, _proc(a, b) _return b[1] _cf a[1] _endproc)
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		sc.add({i.mss_cu_definitions.size, i})
+	_endloop
+	_for i _over 2.upto(sc.size)
+	_loop
+		sc[i][2].delete()
+	_endloop
+	_if sc.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		jt_rec << sc[1][2]
+		dr << jt_rec.detached()
+		_if dr.name ~= name _orif
+		    dr.material_cost_multiplier ~= mcm _orif
+		    dr.labor_cost_multiplier ~= lcm
+		_then
+			dr.name << name
+			dr.material_cost_multiplier << mcm
+			dr.labor_cost_multiplier << lcm
+			dr.source_collection.update(dr)
+		_endif 
+	_else
+		# Inserting a new one.
+		insert? << _true
+		dr << tbl.new_detached_record()
+		dr.name << data[2]
+		dr.material_cost_multiplier << mcm
+		dr.labor_cost_multiplier << lcm
+		jt_rec << dr.source_collection.insert(dr)
+	_endif
+	
+	_self.set_option(:imp!current_cu_job_type, jt_rec)
+	_return jt_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_job_type_rename(data)
+	## 
+	## Import a single CU job_type rename operation using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	tbl << mss_cu_engine.view.collections[:mss_cu_job_type]
+
+	_if (name << data[2]) = "" _orif
+	    (new_name << data[3]) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_cu_job_type_entered))
+		_return
+	_endif
+	
+	# If there are multiple entries, delete all except for the one
+	# with the most CU definitions.  This situation is not expected.
+	sc << sorted_collection.new(5, _proc(a, b) _return b[1] _cf a[1] _endproc)
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		sc.add({i.mss_cu_definitions.size, i})
+	_endloop
+	_for i _over 2.upto(sc.size)
+	_loop
+		sc[i][2].delete()
+	_endloop
+	
+	_if sc.size = 0
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_cu_job_type, name))
+		_return
+	_endif
+
+	dr << sc[1][2].detached()
+	dr.name << new_name
+	jt_rec << dr.source_collection.update(dr)
+	_return jt_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_job_type_end(data)
+	## 
+	## Import a single CU job_type end marker using data vector DATA.
+	##
+
+	# No updates: just flag it so that there is no current job_type
+	# being worked on.
+	_self.set_option(:imp!current_cu_job_type, _unset)
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_job_type_item(data)
+	## 
+	## Import a single CU job_type item using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	_if (cg << _self.get_option(:imp!current_cu_job_type)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_job_type, data[1].uppercase))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# To avoid unnecessary updates, check to see if the
+	# relationship exists before forging it.
+	_if _not cu_rec.mss_cu_job_types.includes?(cg)
+	_then
+		cu_rec.mss_cu_job_types.add(cg)
+	_endif 
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_mu(data)
+	## 
+	## Import a single CU macro unit using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	_if (op_code << data[3].default("")) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_operation_entered))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# Ensure it can be an MU.
+	_if cu_rec.usage ~= mss_cu_engine.macro_unit_usage_value
+	_then
+		_self.log_import_error(:error, _self.message(:imp_not_macro_unit, cu_code))
+		_return
+	_endif
+	
+	# Ensure CU has this operation.
+	_if (op_rec << cu_rec.operation_definition_for(op_code)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_operation, cu_code, op_code))
+		_return
+	_endif
+
+	# No actual updating required: just mark current MU.
+	_self.set_option(:imp!current_cu_mu, op_rec)
+	
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_mu_end(data)
+	## 
+	## Import a single CU MU end marker using data vector DATA.
+	##
+
+	# No updates: just flag it so that there is no current MU
+	# being worked on.
+	_self.set_option(:imp!current_cu_mu, _unset)
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_mu_item(data)
+	## 
+	## Import a single CU macro unit item using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 5)
+	_if (cmu << _self.get_option(:imp!current_cu_mu)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_mu, data[1].uppercase))
+		_return
+	_endif
+	_if (op_code << data[3].default("")) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_operation_entered))
+		_return
+	_endif
+	
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (child_cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# Ensure CU has this operation.
+	_if (child_op_rec << child_cu_rec.operation_definition_for(op_code)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_operation, cu_code, op_code))
+		_return
+	_endif
+
+	# It is unlikely that there are two identical MUs for
+	# the same CU, but if there are, then deal with this data error
+	# by deleting all duplicates.
+	tbl << cmu.source_view.collections[:mss_cu_mu_relationship]
+	pred << predicate.eq(:c_mss_cu_operation_definition_id, child_op_rec.id) _and
+		predicate.eq(:p_mss_cu_operation_definition_id, cmu.id)
+	r << rope.new_from(tbl.select(pred))
+	_for i _over 2.upto(r.size)
+	_loop
+		r[i].delete()
+	_endloop
+
+	_if r.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		rel_rec << r[1]
+		dr << rel_rec.detached()
+	_else
+		# Inserting a new one.
+		insert? << _true
+		rel_rec << _unset
+		dr << tbl.new_detached_record()
+		dr.p_mss_cu_operation_definition_id << cmu.id
+		dr.c_mss_cu_operation_definition_id << child_op_rec.id
+	_endif 
+	dr.quantity << data[4].as_number().default(1)
+	dr.unit_multiplier << data[5].as_number()
+
+	_if insert?
+	_then
+		rel_rec << dr.source_collection.insert(dr)
+	_else 
+		# If nothing changed, don't need to update.
+		any_change? << _false 
+		_for fname _over {:quantity, :unit_multiplier}.fast_elements()
+		_loop
+			_if rel_rec.perform(fname) ~= dr.perform(fname)
+			_then
+				any_change? << _true
+				_leave
+			_endif
+		_endloop
+		_if any_change?
+		_then
+			rel_rec << dr.source_collection.update(dr)
+		_endif
+	_endif
+
+	_return rel_rec
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_cost_group(data)
+	## 
+	## Import a single CU cost group using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+	name << data[2]
+	
+	# If there are multiple entries, delete all except for the one
+	# with the most cost group items.  This situation is not expected.
+	sc << sorted_collection.new(5, _proc(a, b) _return b[1] _cf a[1] _endproc)
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		sc.add({i.mss_cu_cost_group_items.size, i})
+	_endloop
+	_for i _over 2.upto(sc.size)
+	_loop
+		sc[i][2].delete()
+	_endloop
+	_if sc.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		cg_rec << sc[1][2]
+	_else
+		# Inserting a new one.
+		insert? << _true
+		dr << tbl.new_detached_record()
+		dr.name << data[2]
+		cg_rec << dr.source_collection.insert(dr)
+	_endif
+	
+	_self.set_option(:imp!current_cu_cost_group, cg_rec)
+	_return cg_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_cost_group_rename(data)
+	## 
+	## Import a single CU cost group rename operation using data
+	## vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+
+	_if (name << data[2]) = "" _orif
+	    (new_name << data[3]) = ""
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_cu_cost_group_entered))
+		_return
+	_endif
+	
+	# If there are multiple entries, delete all except for the one
+	# with the most CU definitions.  This situation is not expected.
+	sc << sorted_collection.new(5, _proc(a, b) _return b[1] _cf a[1] _endproc)
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		sc.add({i.mss_cu_cost_group_items.size, i})
+	_endloop
+	_for i _over 2.upto(sc.size)
+	_loop
+		sc[i][2].delete()
+	_endloop
+	
+	_if sc.size = 0
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_cu_cost_group, name))
+		_return
+	_endif
+
+	dr << sc[1][2].detached()
+	dr.name << new_name
+	cg_rec << dr.source_collection.update(dr)
+	_return cg_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_cost_group_end(data)
+	## 
+	## Import a single CU cost group end marker using data vector DATA.
+	##
+
+	# No updates: just flag it so that there is no current group
+	# being worked on.
+	_self.set_option(:imp!current_cu_cost_group, _unset)
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_cost_group_item(data)
+	## 
+	## Import a single CU cost group item using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 5)
+	_if (cg << _self.get_option(:imp!current_cu_cost_group)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_cost_group, data[1].uppercase))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	op_code << data[3]
+	material_cost << data[4].as_number()
+	labor_cost << data[5].as_number()
+
+	# Note that if material and labor are both unset, this is
+	# equivalent to a delete.
+	_if material_cost _is _unset _andif
+	    labor_cost _is _unset
+	_then
+		_return _self.int!import_cu_cost_group_item_delete(data)
+	_endif
+	
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# Ensure CU has this operation.
+	_if (op_rec << cu_rec.operation_definition_for(op_code)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_operation, cu_code, op_code))
+		_return
+	_endif
+
+	# If there are multiples, delete the duplicates.
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group_item]
+	pred << predicate.eq(:mss_cu_cost_group_id, cg.id) _and
+		predicate.eq(:mss_cu_operation_definition_id, op_rec.id)
+	r << rope.new_from(tbl.select(pred))
+	_for i _over 2.upto(r.size)
+	_loop
+		r[i].delete()
+	_endloop
+
+	_if r.size >= 1
+	_then
+		# Updating an existing record.
+		insert? << _false 
+		cgi_rec << r[1]
+		dr << cgi_rec.detached()
+	_else
+		# Inserting a new one.
+		insert? << _true
+		cgi_rec << _unset
+		dr << tbl.new_detached_record()
+		dr.mss_cu_cost_group_id <<  cg.id
+		dr.mss_cu_operation_definition_id << op_rec.id
+	_endif
+	
+	dr.material_cost << material_cost
+	dr.labor_cost << labor_cost
+
+	_if insert?
+	_then
+		cgi_rec << dr.source_collection.insert(dr)
+	_else 
+		# If nothing changed, don't need to update.
+		any_change? << _false 
+		_for fname _over {:material_cost, :labor_cost}.fast_elements()
+		_loop
+			_if cgi_rec.perform(fname) ~= dr.perform(fname)
+			_then
+				any_change? << _true
+				_leave
+			_endif
+		_endloop
+		_if any_change?
+		_then
+			cgi_rec << dr.source_collection.update(dr)
+		_endif
+	_endif
+
+	_return cgi_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_delete(data)
+	## 
+	## Import a single CU delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	cu_code << _self.format_cu_code_for_import(data[2])
+	all_cus << mss_cu_engine.cus_for_attributes(property_list.new_with(:cu_code, cu_code))
+
+	# Since a delete has been requested - just go ahead and delete
+	# everything (even if it is already gone, or if there is a data
+	# error consisting of two or more with the same name, no
+	# warnings/errors are needed).
+	_for i _over all_cus.fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_operation_delete(data)
+	## 
+	## Import a single CU operation delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	cu_code << _self.format_cu_code_for_import(data[2])
+	op_code << data[3]
+	all_cus << mss_cu_engine.cus_for_attributes(property_list.new_with(:cu_code, cu_code))
+	pred << predicate.eq(:operation, op_code, :ci)
+
+	# Delete everything (i.e. ignore duplicate CU or operation errors).
+	_for cu_rec _over all_cus.fast_elements()
+	_loop
+		_for op_rec _over cu_rec.mss_cu_operation_definitions.select(pred).fast_elements()
+		_loop
+			op_rec.delete()
+		_endloop
+
+		# Also delete facility relationships that rely on this operation.
+		_for fac_rel _over cu_rec.mss_cu_facility_relationships.select(pred).fast_elements()
+		_loop
+			fac_rel.delete()
+		_endloop
+	_endloop
+	
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_facility_delete(data)
+	## 
+	## Import a single CU facility delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 5)
+	cu_code << _self.format_cu_code_for_import(data[2])
+	op_code << data[5]
+	all_cus << mss_cu_engine.cus_for_attributes(property_list.new_with(:cu_code, cu_code))
+
+	# Convert partition name and table name to a table code value.
+	p_name << data[3].trim_spaces()
+	t_name << data[4].trim_spaces()
+	_if (p_num << p_name.as_number()) _isnt _unset _andif
+	    t_name = ""
+	_then
+		# Table code entered directly.
+		table_code << p_num
+		fac_def << mss_cu_facility_definition.get_for_id(table_code)
+	_else
+		# Look up from facility definition.
+		_if (fac_def << mss_cu_facility_definition.get_for_partition_and_table_name(
+					p_name.as_symbol(), t_name.as_symbol())) _is _unset
+		_then
+			_self.log_import_error(:error, _self.message(:imp_fac_no_partition_and_table, p_name, t_name))
+			_return
+		_endif
+		table_code << fac_def.id
+	_endif
+	
+	# Delete everything (i.e. ignore duplicate CU or operation errors).
+	pred << predicate.eq(:table_code, table_code) _and
+		predicate.eq(:operation, op_code, :ci)
+	_for cu_rec _over all_cus.fast_elements()
+	_loop
+		_for fac_rel _over cu_rec.mss_cu_facility_relationships.select(pred).fast_elements()
+		_loop
+			fac_rel.delete()
+		_endloop
+	_endloop
+	
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_group_delete(data)
+	## 
+	## Import a single CU group delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	tbl << mss_cu_engine.view.collections[:mss_cu_group_definition]
+	name << data[2]
+	
+	# If there are multiple entries, delete all of them.  This
+	# situation is not expected. 
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	_self.set_option(:imp!current_cu_group, _unset)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_group_item_delete(data)
+	## 
+	## Import a single CU group item delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	_if (cg << _self.get_option(:imp!current_cu_group)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_group, data[1].uppercase))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	cg.mss_cu_definitions.remove(cu_rec)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_job_type_delete(data)
+	## 
+	## Import a single CU job_type delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	tbl << mss_cu_engine.view.collections[:mss_cu_job_type]
+	name << data[2]
+	
+	# If there are multiple entries, delete all of them.  This
+	# situation is not expected. 
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	_self.set_option(:imp!current_cu_job_type, _unset)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_job_type_item_delete(data)
+	## 
+	## Import a single CU group item delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	_if (cg << _self.get_option(:imp!current_cu_job_type)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_job_type, data[1].uppercase))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	cg.mss_cu_definitions.remove(cu_rec)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_mu_item_delete(data)
+	## 
+	## Import a single CU MU item delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	_if (cmu << _self.get_option(:imp!current_cu_mu)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_mu, data[1].uppercase))
+		_return
+	_endif
+
+	# Brute force approach - loop over all items and delete
+	# matching values.
+	cu_code << _self.format_cu_code_for_import(data[2].default("")).lowercase
+	op_code << data[3].default("").lowercase
+	_for mu_rel _over cmu.c_mss_cu_mu_relationships.fast_elements()
+	_loop
+		_if mu_rel.cu_code.default("").lowercase = cu_code _andif
+		    mu_rel.operation.default("").lowercase = op_code
+		_then
+			mu_rel.delete()
+		_endif
+	_endloop
+	
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_cost_group_delete(data)
+	## 
+	## Import a single CU cost group delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 2)
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group]
+	name << data[2]
+	
+	# If there are multiple entries, delete all of them.  This
+	# situation is not expected. 
+	_for i _over tbl.select(predicate.eq(:name, name, :ci)).fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	_self.set_option(:imp!current_cu_cost_group, _unset)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!import_cu_cost_group_item_delete(data)
+	## 
+	## Import a single CU cost group item delete using data vector DATA.
+	##
+
+	data << _self.ensure_data_vector_length(data, 3)
+	_if (cg << _self.get_option(:imp!current_cu_cost_group)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_current_cu_cost_group, data[1].uppercase))
+		_return
+	_endif
+	cu_code << _self.format_cu_code_for_import(data[2])
+	op_code << data[3]
+
+	_if (cu_rec << _self.import_ensure_single_cu(cu_code)) _is _unset
+	_then
+		_return
+	_endif
+
+	# Ensure CU has this operation.
+	_if (op_rec << cu_rec.operation_definition_for(op_code)) _is _unset
+	_then
+		_self.log_import_error(:error, _self.message(:imp_no_matching_operation, cu_code, op_code))
+		_return
+	_endif
+
+	# If there are multiples, delete the duplicates.
+	tbl << mss_cu_engine.view.collections[:mss_cu_cost_group_item]
+	pred << predicate.eq(:mss_cu_cost_group_id, cg.id) _and
+		predicate.eq(:mss_cu_operation_definition_id, op_rec.id)
+	_for i _over tbl.select(pred).fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.export_cu_definitions(_optional recs, fname)
+	## 
+	## Export all CU definitions in RECS to the file named FNAME.
+	## If RECS is not provided, it will be determined from self's
+	## current settings.  If FNAME is not provided, it will be
+	## prompted.
+	##
+
+	_if recs _is _unset
+	_then
+		recs << _self.figure_recs_for_export()
+	_endif
+
+	_if fname _is _unset
+	_then
+		fd << file_dialog.new(_self, {:|perform_safely()|, :|do_export_cu_definitions()|, recs}, _unset,
+				      :directory, "",
+				      :operation, :save,
+				      :filter, {_self.message(:csv_filter), "*.csv"},
+				      :title, _self.message(:export_dialog_title))
+		fd.activate()
+	_else
+		_self.do_export_cu_definitions(recs, fname)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.do_export_cu_definitions(recs, fname)
+	## 
+	## Export all CU definitions in RECS to the file named FNAME.
+	##
+
+	suf << _self.message(:csv_filetype)
+	_if fname.size <= suf.size _orif
+	    fname.lowercase.slice_to_end(fname.size - suf.size + 1) ~= suf.lowercase
+	_then
+		fname << write_string(fname, suf)
+	_endif
+
+	ok? << _false 
+
+	_try 
+		f << external_text_output_stream.new(fname)
+	_when error 
+		_if f _isnt _unset _then f.close() _endif
+		_self.user_error(:file_not_writable, fname)
+	_endtry
+
+	_protect
+		# Note that different code paths are required depending of what
+		# type of record we're dealing with (mss_cu_definition or
+		# mss_cu_cost_group).  This is probably safe to pick up from
+		# the options settings, but it would be possible that if this
+		# is called from the command line then the RECS argument
+		# wouldn't necessarily have to match those settings.
+		first_rec << recs.an_element()
+		_if first_rec _isnt _unset _andif
+		    first_rec.source_collection.name _is :mss_cu_cost_group
+		_then
+			mode << :cu_cost_group
+			ok? << _self.do_export_for_cu_cost_groups(f, recs)
+		_else
+			mode << :cu_definition
+			ok? << _self.do_export_for_cu_definitions(f, recs)
+		_endif
+		
+	_protection
+		_if f _isnt _unset _then f.close() _endif
+		_if ok? _is _true 
+		_then
+			_if mode _is :cu_cost_group
+			_then 
+				_self.status_string << _self.message(:export_cu_cost_group_done)
+			_else
+				_self.status_string << _self.message(:export_cus_done, recs.size)
+			_endif 
+		_else 
+			_self.status_string << _self.message(:failed)
+		_endif 
+	_endprotect
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.figure_recs_for_export()
+	## 
+	## Determine the set of CU records to be exported.
+	##
+
+	_if _self.get_option(:export_mode_cus?) _is _true
+	_then
+		# Work around a core focus bug: if invoking the export function
+		# on a pulldown menu immediately after entering data in a text
+		# item, the text item has not yet lost focus and so has not yet
+		# set the stored option.
+		_for i _over {:filter_cu_code, :filter_description}.fast_elements()
+		_loop
+			_if (mi << .items[i]) _isnt _unset _andif
+			    mi.value ~= _self.get_option(i)
+			_then
+				_self.set_option(i, mi.value)
+			_endif
+		_endloop
+		
+		tbl << mss_cu_engine.view.collections[:mss_cu_definition]
+		pred << _self.figure_filter_predicate()
+		recs << tbl.select(pred)
+		_if recs.an_element() _is _unset
+		_then
+			_self.user_error(:no_cus_for_export)
+		_endif
+		_if pred _is _unset _orif pred = predicate
+		_then
+			_self.set_option(:export_cus_unpredicated?, _true)
+		_else
+			_self.set_option(:export_cus_unpredicated?, _false)
+		_endif
+		
+	_elif _self.get_option(:export_mode_cost_groups?) _is _true
+	_then
+		_if (rec << _self.selected_cu_cost_group) _is _unset
+		_then 
+			_self.user_error(:no_cu_cost_group_for_export)
+		_endif
+		recs << {rec}
+	_else
+		_self.user_error(:no_export_mode_selected)
+	_endif 
+
+	_return recs
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.do_export_for_cu_definitions(f, recs)
+	## 
+	## Perform all output steps for a CU definition export of all
+	## RECS to stream F.
+	##
+
+	nested? << (_self.export_format_nested? _is _true)
+	done_cu_defs? << _false
+	
+	_self.int!export_header(f)
+	_if _self.get_option(:export_cus?)
+	_then
+		_self.int!export_cu_definitions(f, recs)
+		done_cu_defs? << _true 
+	_endif 
+	_if _self.get_option(:export_cu_operations?)
+	_then
+		_if nested? _andif done_cu_defs?
+		_then
+			# These will already be exported as part of the nested format.
+		_else 
+			_self.int!export_cu_operation_definitions(f, recs)
+		_endif 
+	_endif 
+	_if _self.get_option(:export_cu_facilities?)
+	_then
+		_if nested? _andif done_cu_defs?
+		_then
+			# These will already be exported as part of the nested format.
+		_else 
+			_self.int!export_cu_facility_relationships(f, recs)
+		_endif 
+	_endif 
+	_if _self.get_option(:export_cu_groups?)
+	_then
+		_self.int!export_cu_groups(f, recs)
+	_endif
+	_if _self.get_option(:export_cu_job_types?)
+	_then
+		_self.int!export_cu_job_types(f, recs)
+	_endif
+	_if _self.get_option(:export_cu_mus?)
+	_then
+		_self.int!export_cu_mus(f, recs)
+	_endif
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.do_export_for_cu_cost_groups(f, recs)
+	## 
+	## Perform all output steps for a CU cost group export of all
+	## RECS to stream F.
+	##
+
+	_self.int!export_header(f)
+	_self.int!export_cu_cost_groups(f, recs)
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_header(f)
+	## 
+	## Export a header record to stream F.
+	##
+
+	# Write an identifying keyword, version information, and timestamp.
+	sep << _self.csv_separator
+	f.write("CU_EXPORT", sep)
+	f.write("1", sep)
+	f.write(date_time.now(), newline_char)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_definitions(f, recs)
+	## 
+	## Export all CU definitions in RECS to stream F.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cus)
+	_for i _over recs.fast_elements()
+	_loop
+		_if (cu_code << i.cu_code) _is _unset
+		_then
+			_continue
+		_endif
+		sc.add({{mss_cu_holder.cu_code_sort_key(cu_code)}, i})
+	_endloop
+
+	sc_size << sc.size
+	_for i, j _over sc.fast_keys_and_elements()
+	_loop
+		cu_def << j[2]
+		_self.int!export_single_cu_definition(f, cu_def)
+		_if i _mod 10 = 0
+		_then
+			_self.status_string << _self.message(:export_cus_progress, i, sc_size)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_operation_definitions(f, recs)
+	## 
+	## Export all CU operation definitions in RECS to stream F.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cu_ops)
+	_for i _over recs.fast_elements()
+	_loop
+		_if (cu_code << i.cu_code) _is _unset
+		_then
+			_continue
+		_endif
+		_for j _over i.mss_cu_operation_definitions.fast_elements()
+		_loop 
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code),
+				 {j.operation.default("").as_charvec()}}, j})
+		_endloop
+	_endloop
+	
+	sc_size << sc.size
+	_for i, j _over sc.fast_keys_and_elements()
+	_loop
+		cu_op_def << j[2]
+		_self.int!export_single_cu_operation_definition(f, cu_op_def)
+		_if i _mod 10 = 0
+		_then
+			_self.status_string << _self.message(:export_cu_ops_progress, i, sc_size)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_facility_relationships(f, recs)
+	## 
+	## Export all CU facility relationships in RECS to stream F.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cu_facs)
+	_for i _over recs.fast_elements()
+	_loop
+		_if (cu_code << i.cu_code) _is _unset
+		_then
+			_continue
+		_endif
+		_for j _over i.mss_cu_facility_relationships.fast_elements()
+		_loop
+			_if (fac_def << mss_cu_facility_definition.get_for_id(j.table_code)) _is _unset
+			_then
+				# Bad data - report output with table code directly.
+				p_name << j.table_code.write_string
+				t_name << ""
+			_else
+				p_name << fac_def.partition_name
+				t_name << fac_def.table_name
+			_endif
+			op_code << j.operation.default("")
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code),
+				 {p_name, t_name, op_code.canonical}}, j})
+		_endloop
+	_endloop
+	
+	sc_size << sc.size
+	_for i, j _over sc.fast_keys_and_elements()
+	_loop
+		fac_rel << j[2]
+		p_name << j[1][2][1]
+		t_name << j[1][2][2]
+		_self.int!export_single_cu_facility_relationship(f, fac_rel, p_name, t_name)
+		_if i _mod 10 = 0
+		_then
+			_self.status_string << _self.message(:export_cu_facs_progress, i, sc_size)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_groups(f, recs)
+	## 
+	## Export all CU groups associated with the CU definitions in
+	## RECS to stream F.  As a special case - if an unpredicated
+	## query was done, then all groups will be exported - this
+	## allows groups with no CUs to still be reported.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cu_groups)
+	_if _self.get_option(:export_cus_unpredicated?) _is _true
+	_then
+		# Get all groups.
+		grp_defs << mss_cu_engine.view.collections[:mss_cu_group_definition]
+	_else
+		# Only get groups associated with these CUs.
+		grp_defs << equality_set.new()
+		_for i _over recs.fast_elements()
+		_loop
+			_for j _over i.mss_cu_group_definitions.fast_elements()
+			_loop
+				grp_defs.add(j)
+			_endloop
+		_endloop
+	_endif
+	
+	_for i _over grp_defs.fast_elements()
+	_loop
+		_if (n << i.name) _is _unset
+		_then
+			_continue
+		_endif
+		sc.add({{{n.canonical}}, i})
+	_endloop
+
+	sc_size << sc.size
+	_for i, j _over sc.fast_keys_and_elements()
+	_loop
+		grp_def << j[2]
+		_self.int!export_single_cu_group_definition(f, grp_def)
+		_if i _mod 10 = 0
+		_then
+			_self.status_string << _self.message(:export_cu_groups_progress, i, sc_size)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_job_types(f, recs)
+	## 
+	## Export all CU job types associated with the CU definitions in
+	## RECS to stream F.  As a special case - if an unpredicated
+	## query was done, then all job types will be exported - this
+	## allows job types with no CUs to still be reported.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cu_job_types)
+	_if _self.get_option(:export_cus_unpredicated?) _is _true
+	_then
+		# Get all job types.
+		jt_defs << mss_cu_engine.view.collections[:mss_cu_job_type]
+	_else
+		# Only get job types associated with these CUs.
+		jt_defs << equality_set.new()
+		_for i _over recs.fast_elements()
+		_loop
+			_for j _over i.mss_cu_job_types.fast_elements()
+			_loop
+				jt_defs.add(j)
+			_endloop
+		_endloop
+	_endif
+	
+	_for i _over jt_defs.fast_elements()
+	_loop
+		_if (n << i.name) _is _unset
+		_then
+			_continue
+		_endif
+		sc.add({{{n.canonical}}, i})
+	_endloop
+
+	sc_size << sc.size
+	_for i, j _over sc.fast_keys_and_elements()
+	_loop
+		jt_def << j[2]
+		_self.int!export_single_cu_job_type(f, jt_def)
+		_if i _mod 10 = 0
+		_then
+			_self.status_string << _self.message(:export_cu_job_types_progress, i, sc_size)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_mus(f, recs)
+	## 
+	## Export all CU macro unit definitions in RECS to stream F.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cu_mus)
+	_for i _over recs.fast_elements()
+	_loop
+		_if i.usage ~= mss_cu_engine.macro_unit_usage_value _orif 
+		    (cu_code << i.cu_code) _is _unset
+		_then
+			_continue
+		_endif
+		_for j _over i.mss_cu_operation_definitions.fast_elements()
+		_loop 
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code),
+				 {j.operation.default("").as_charvec()}}, j})
+		_endloop
+	_endloop
+	
+	sc_size << sc.size
+	_for i, j _over sc.fast_keys_and_elements()
+	_loop
+		cu_op_def << j[2]
+		_self.int!export_single_cu_mu(f, cu_op_def)
+		_if i _mod 10 = 0
+		_then
+			_self.status_string << _self.message(:export_cu_mus_progress, i, sc_size)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_cu_cost_groups(f, recs)
+	## 
+	## Export all CU cost groups in RECS to stream F.
+	##
+
+	sc << .sorter
+	sc.empty()
+
+	_self.status_string << _self.message(:export_gathering_cus)
+	_for i _over recs.fast_elements()
+	_loop
+		sc.add({{{i.name.canonical}}, i})
+	_endloop
+
+	# N.B.: this is structured so that sorter is freed up for use
+	# by downstream methods.  Normally, it will only contain one
+	# element here (unless called from the command line), but
+	# downstream processing can save some resources by reusing it.
+	r << rope.new_from(sc)
+	_for i, j _over r.fast_keys_and_elements()
+	_loop
+		cg << j[2]
+		_self.status_string << _self.message(:export_cu_cost_group_progress, cg.name)
+		_self.int!export_single_cu_cost_group(f, cg)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_definition(f, cu_def)
+	## 
+	## Export a single CU definition CU_DEF to stream F.
+	##
+
+	# First line - write the CU itself.
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	f.write("CU", sep)
+	f.write(_self.format_cu_code_for_export(cu_def.cu_code.default("")).mss_format_for_csv(sep, qc), sep)
+	f.write(cu_def.description.default("").mss_format_for_csv(sep, qc), sep)
+	f.write(cu_def.usage.default("").mss_format_for_csv(sep, qc), sep)
+	f.write(cu_def.dimensionality.default("").mss_format_for_csv(sep, qc), sep)
+	_if (d << cu_def.effective_date) _isnt _unset
+	_then
+		d.format_to(f, _self.csv_date_format)
+	_endif 
+	f.write(sep)
+	_if (d << cu_def.obsolete_date) _isnt _unset
+	_then
+		d.format_to(f, _self.csv_date_format)
+	_endif 
+	f.write(newline_char)
+
+	_if _self.export_format_nested? _isnt _true
+	_then
+		_return
+	_endif
+
+	# The following code allows the output results to be put in a
+	# nested format for each CU.  I think it makes the output a
+	# fair bit harder to read and manipulate, but I'll keep the
+	# code in case anyone wants to use this format.  The import
+	# should work OK either way, since each line can stand on its
+	# own.
+	
+	# Write a line for each operation definition.
+	_if _self.get_option(:export_cu_operations?)
+	_then 
+		sc << sorted_collection.new(5, _proc(a, b)
+						       _return a.operation.default("") _cf
+							       b.operation.default("")
+					    _endproc)
+		sc.add_all(cu_def.mss_cu_operation_definitions)
+		_for op_def _over sc.fast_elements()
+		_loop
+			_self.int!export_single_cu_operation_definition(f, op_def)
+		_endloop 
+	_endif
+	
+	# Write a line for each facility definition.
+	_if _self.get_option(:export_cu_facilities?)
+	_then 
+		sc << sorted_collection.new(5, _proc(a, b)
+						       _if (x << a[1] _cf b[1]) _isnt _maybe
+						       _then
+							       _return x
+						       _endif
+						       _if (x << a[2] _cf b[2]) _isnt _maybe
+						       _then
+							       _return x
+						       _endif
+						       _return a[3].operation.default("") _cf
+							       b[3].operation.default("")
+					    _endproc)
+		_for i _over cu_def.mss_cu_facility_relationships.fast_elements()
+		_loop
+			_if (fac_def << mss_cu_facility_definition.get_for_id(i.table_code)) _is _unset
+			_then
+				# Bad data - report output with table code directly.
+				sc.add({i.table_code.write_string, "", i})
+			_else 
+				sc.add({fac_def.partition_name, fac_def.table_name, i})
+			_endif
+		_endloop
+		_for fac_rel_data _over sc.fast_elements()
+		_loop
+			_self.int!export_single_cu_facility_relationship(f, fac_rel_data[3],
+									 fac_rel_data[1], fac_rel_data[2])
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_operation_definition(f, op_def)
+	## 
+	## Export a single CU operation definition CU_OP_DEF to stream F.
+	##
+
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	cu_def << op_def.mss_cu_definition
+	
+	f.write("OP", sep)
+	f.write(_self.format_cu_code_for_export(cu_def.cu_code.default("")).mss_format_for_csv(sep, qc), sep)
+	f.write(op_def.operation.default("").mss_format_for_csv(sep, qc), sep)
+	_if (v << op_def.material_cost) _isnt _unset
+	_then
+		f.write(v.as_fixed_string(0, mss_cu_operation_definition.material_cost_decimal_places))
+	_endif
+	f.write(sep)
+	_if (v << op_def.labor_cost) _isnt _unset
+	_then
+		f.write(v.as_fixed_string(0, mss_cu_operation_definition.labor_cost_decimal_places))
+	_endif
+	f.write(newline_char)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_facility_relationship(
+		f, fac_rel, _optional partition_name, table_name)
+	## 
+	## Export a single CU facility_relationship FAC_REL to stream F.
+	## If PARTITION_NAME and TABLE_NAME are provided, this is the
+	## partition and table associated with this facility definition
+	## - otherwise, the facility definition record is looked up to
+	## find this information.
+	##
+
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	cu_def << fac_rel.mss_cu_definition
+
+	_if partition_name _is _unset _orif
+	    table_name _is _unset 
+	_then 
+		_if (fac_def << mss_cu_facility_definition.get_for_id(fac_rel.table_code)) _isnt _unset
+		_then
+			partition_name << fac_def.partition_name
+			table_name << fac_def.table_name
+		_endif
+	_endif 
+
+	f.write("FAC", sep)
+	f.write(_self.format_cu_code_for_export(cu_def.cu_code.default("")).mss_format_for_csv(sep, qc), sep)
+	f.write(partition_name, sep)
+	f.write(table_name, sep)
+	f.write(fac_rel.operation.default("").mss_format_for_csv(sep, qc))
+			
+	sc2 << sorted_collection.new(5, _proc(a, b)
+						_return a.attribute_name.default("") _cf
+							b.attribute_name.default("")
+				     _endproc)
+	sc2.add_all(fac_rel.mss_cu_facility_attributes)
+	_for fac_attr _over sc2.fast_elements()
+	_loop
+		f.write(sep, "ATTR", sep)
+		f.write(fac_attr.attribute_name.default("").mss_format_for_csv(sep, qc), sep)
+		f.write(_self.format_facility_attribute_for_export(fac_attr.attribute_value.default("")).mss_format_for_csv(sep, qc))
+	_endloop
+	f.write(newline_char)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_group_definition(f, cu_grp)
+	## 
+	## Export a single CU group definition CU_GRP to stream F.
+	##
+
+	# First line - write the CU group itself.
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	f.write("CU_GROUP", sep)
+	f.write(cu_grp.name.default("").mss_format_for_csv(sep, qc), newline_char)
+	sc2 << .sorter2
+	sc2.empty()
+	
+	_for i _over cu_grp.mss_cu_definitions.fast_elements()
+	_loop
+		sc2.add({{mss_cu_holder.cu_code_sort_key(i.cu_code.default(""))}, i})
+	_endloop
+	_for cu_def_info _over sc2.fast_elements()
+	_loop
+		cu_def << cu_def_info[2]
+		f.write("CU_GROUP_ITEM", sep)
+		f.write(_self.format_cu_code_for_export(cu_def.cu_code.default("")).mss_format_for_csv(sep, qc), newline_char)
+	_endloop
+	f.write("CU_GROUP_END", newline_char)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_job_type(f, cu_jt)
+	## 
+	## Export a single CU job type definition CU_JT to stream F.
+	##
+
+	# First line - write the CU job type itself.
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	f.write("CU_JT", sep)
+	f.write(cu_jt.name.default("").mss_format_for_csv(sep, qc), sep)
+	f.write(cu_jt.material_cost_multiplier.as_fixed_string(0, 6), sep)
+	f.write(cu_jt.labor_cost_multiplier.as_fixed_string(0, 6), newline_char)
+	sc2 << .sorter2
+	sc2.empty()
+	
+	_for i _over cu_jt.mss_cu_definitions.fast_elements()
+	_loop
+		sc2.add({{mss_cu_holder.cu_code_sort_key(i.cu_code.default(""))}, i})
+	_endloop
+	_for cu_def_info _over sc2.fast_elements()
+	_loop
+		cu_def << cu_def_info[2]
+		f.write("CU_JT_ITEM", sep)
+		f.write(_self.format_cu_code_for_export(cu_def.cu_code.default("")).mss_format_for_csv(sep, qc), newline_char)
+	_endloop
+	f.write("CU_JT_END", newline_char)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_mu(f, op_def)
+	## 
+	## Export a single CU macro unit definition OP_DEF to stream F.
+	##
+
+	# First line - write the CU MU operation itself.
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	f.write("CU_MU", sep)
+	f.write(_self.format_cu_code_for_export(op_def.cu_code.default("")).mss_format_for_csv(sep, qc), sep)
+	f.write(op_def.operation.default("").mss_format_for_csv(sep, qc), newline_char)
+	sc2 << .sorter2
+	sc2.empty()
+	
+	_for i _over op_def.c_mss_cu_mu_relationships.fast_elements()
+	_loop
+		_if (c_op_def << i.c_mss_cu_operation_definition) _is _unset _orif
+		    (cu_code << i.cu_code) _is _unset 
+		_then
+			_continue
+		_endif
+		op << c_op_def.operation.default("")
+		sc2.add({{mss_cu_holder.cu_code_sort_key(cu_code), {op}}, i})
+	_endloop
+	_for cu_mu_info _over sc2.fast_elements()
+	_loop
+		cu_mu_rel << cu_mu_info[2]
+		f.write("CU_MU_ITEM", sep)
+		f.write(_self.format_cu_code_for_export(cu_mu_rel.cu_code.default("")).mss_format_for_csv(sep, qc), sep)
+		f.write(cu_mu_rel.operation.default("").mss_format_for_csv(sep, qc), sep)
+		f.write(cu_mu_rel.quantity.default(1), sep)
+		_if (v << cu_mu_rel.unit_multiplier) _isnt _unset
+		_then
+			f.write(v.as_fixed_string(0, 6))
+		_endif
+		f.write(newline_char)
+	_endloop
+	f.write("CU_MU_END", newline_char)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_import_export_config_plugin.int!export_single_cu_cost_group(f, cg)
+	## 
+	## Export a single CU cost group CG to stream F.
+	##
+
+	# First line - write the cost group itself.
+	sep << _self.csv_separator
+	qc << _self.csv_quote_char
+	f.write("COST_GROUP", sep)
+	f.write(cg.name.default("").mss_format_for_csv(sep, qc), newline_char)
+
+	sc << .sorter
+	sc.empty()
+	_if _self.get_option(:cg_export_override_only?)
+	_then
+		# Only add explicit records.
+		_for i _over cg.mss_cu_cost_group_items.fast_elements()
+		_loop
+			_if (op_def << i.mss_cu_operation_definition) _is _unset _orif
+			    (cu_def << op_def.mss_cu_definition) _is _unset _orif
+			    (cu_code << cu_def.cu_code) _is _unset 
+			_then
+				_continue
+			_endif
+			sc.add({{mss_cu_holder.cu_code_sort_key(cu_code),
+				 {op_def.operation.default("").as_charvec()}}, cu_def, op_def, i})
+		_endloop 
+	_else
+		# Add all CU operations in the database.
+		_for i _over mss_cu_engine.view.collections[:mss_cu_definition].fast_elements()
+		_loop
+			_if (cu_code << i.cu_code) _is _unset
+			_then
+				_continue
+			_endif
+			_for j _over i.mss_cu_operation_definitions.fast_elements()
+			_loop
+				cgi << j.cu_cost_group_item_for(cg)
+				sc.add({{mss_cu_holder.cu_code_sort_key(cu_code),
+					 {j.operation.default("").as_charvec()}}, i, j, cgi})
+			_endloop
+		_endloop
+	_endif
+	
+	_for cu_def_info _over sc.fast_elements()
+	_loop
+		cu_def << cu_def_info[2]
+		op_def << cu_def_info[3]
+		cgi << cu_def_info[4]
+		
+		f.write("COST_GROUP_ITEM", sep)
+		f.write(_self.format_cu_code_for_export(cu_def.cu_code.default("")).mss_format_for_csv(sep, qc), sep)
+		f.write(op_def.operation.default("").mss_format_for_csv(sep, qc), sep)
+		_if cgi _isnt _unset
+		_then
+			_if (v << cgi.material_cost) _isnt _unset
+			_then
+				f.write(v.as_fixed_string(0, mss_cu_operation_definition.material_cost_decimal_places))
+			_endif
+			f.write(sep)
+			_if (v << cgi.labor_cost) _isnt _unset
+			_then
+				f.write(v.as_fixed_string(0, mss_cu_operation_definition.labor_cost_decimal_places))
+			_endif
+		_else
+			f.write(sep)
+		_endif
+		f.write(newline_char)
+	_endloop
+	f.write("COST_GROUP_END", newline_char)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={redefinable})
+_method mss_cu_import_export_config_plugin.format_cu_code_for_export(cu_code)
+	## 
+	## Format the cu_code string CU_CODE for export.  This can be
+	## used to work around auto-formatting performed by other
+	## applications such as Excel.
+	##
+
+	# Default processing: if CU_CODE has a leading zero, then put a
+	# single quote in front of it to ensure that it is not interpreted as
+	# a number (which would strip leading zeroes as a result).
+	_if cu_code _isnt _unset _andif
+	    cu_code.size >= 1 _andif
+	    cu_code[1] _is %0
+	_then
+		_return write_string("'", cu_code).trim_spaces()
+	_endif
+	_return cu_code.default("").trim_spaces()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={redefinable})
+_method mss_cu_import_export_config_plugin.format_cu_code_for_import(cu_code)
+	## 
+	## Format the cu_code string CU_CODE for import.  This can be
+	## used to work around auto-formatting performed by other
+	## applications such as Excel.
+	##
+
+	# Default processing is to undo the tweaking in
+	# format_cu_code_for_export().
+	_if cu_code _isnt _unset _andif
+	    cu_code.size >= 2 _andif
+	    cu_code[1] _is %' _andif 
+	    cu_code[2] _is %0
+	_then
+		_return cu_code.slice_to_end(2)
+	_endif
+	_return cu_code
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={redefinable})
+_method mss_cu_import_export_config_plugin.format_facility_attribute_for_export(val)
+	## 
+	## Format the attribute value VAL for export.  This can be
+	## used to work around auto-formatting performed by other
+	## applications such as Excel.
+	##
+
+	_return val
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu}, usage={redefinable})
+_method mss_cu_import_export_config_plugin.format_facility_attribute_for_import(val)
+	## 
+	## Format the attribute value VAL for import.  This can be
+	## used to work around auto-formatting performed by other
+	## applications such as Excel.
+	##
+
+	_return val
+	
+_endmethod
+$

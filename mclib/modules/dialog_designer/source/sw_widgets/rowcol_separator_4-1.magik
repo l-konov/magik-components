@@ -1,0 +1,29 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## ROWCOL_SEPARATOR (4.1) - the rowcol_separator class does not
+## exist at SW4.1 so this code defines a sw package exemplar so
+## that the code in rowcol_separator.magik will load into a
+## SW4.1 image.   The functionality of this widget will NOT be
+## available in SW4.1 - the widget is dissabled based on core
+## system version.
+##
+##########################################################################################
+_package sw
+$
+def_slotted_exemplar(:rowcol_separator,{{:side_by_side?,_unset}},:rowcol)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol_separator.define_slot_access(:side_by_side?,:writable)
+$
+

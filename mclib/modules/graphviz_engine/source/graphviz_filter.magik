@@ -1,0 +1,80 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+########################################################################
+
+_pragma(classify_level=advanced)
+## a class that is used to great the charts based on
+## dot_graph. 
+def_slotted_exemplar(:graphviz_filter,{},{})
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method graphviz_filter.run(filter_type,a_graph,output_format,output_file)
+	## run() : _unset 
+	##
+	## FILTER_TYPE is one of:
+	##  :dot
+	##  :fdp
+	##  :sfdp
+	##  :circo
+	##  :twopi
+	
+
+	_local temp_dot_file << system.temp_file_name("graphviz_dot_file.txt")
+
+	_local str << external_text_output_stream.new(temp_dot_file)
+
+	_protect
+		a_graph.write_on(str)
+	_protection
+		str.close()
+	_endprotect
+	
+	_protect
+		_local quote_string << _proc@quote_string(a_string)
+					       >> write_string(%",a_string,%")
+				       _endproc
+
+		_local arguments << {write_string("-T",output_format)}
+		
+		_local args_str << internal_text_output_stream.new()
+		args_str.write_list_with_separator(arguments," ")
+		
+		_local command_string << write_string(_self.int!dot_executable(filter_type)," ",
+						      quote_string(temp_dot_file)," ",
+						      args_str.string," > ",
+						      quote_string(output_file))
+		
+		system.do_command(command_string)
+	_protection
+		system.unlink(temp_dot_file)
+	_endprotect
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_private _method graphviz_filter.int!dot_executable(output_type)
+	## int!dot_executable() : string
+	##
+	## returns the full pathname to the dot.exe executable. 
+
+	_local exe_file << smallworld_product.get_data_file(system.pathname_down("bin",write_string(output_type,".exe")),_self.module_name)
+
+	_local path_var << system.getenv("PATH")
+
+	_if path_var.canonical.index_of_seq(system.pathname_up(exe_file).canonical) _is _unset 
+	_then
+		system.putenv("PATH",system.pathname_up(exe_file))
+	_endif
+	
+	_return exe_file
+_endmethod
+$
+
+

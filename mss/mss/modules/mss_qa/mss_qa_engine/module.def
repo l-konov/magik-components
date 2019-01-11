@@ -1,0 +1,9 @@
+mss_qa_engine	1
+
+description
+	MSS Quality Assurance engine
+end
+
+requires
+	mss_component_framework
+end

@@ -1,0 +1,19 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+	       
+message_handler.new(:mss_config_editor_field_lister).set_uses_list({:object_editor_field_lister})
+$	       
+message_handler.new(:mss_config_field_item_lister).set_uses_list({:field_item_lister})
+$	       
+message_handler.new(:mss_config_editor_manager).set_uses_list({:editor_manager})
+$	       
+message_handler.new(:mss_config_in_place_combo_field_editor).set_uses_list({:in_place_choice_field_editor})
+$	       
+message_handler.new(:mss_config_object_editor).set_uses_list({:object_editor})
+$	       

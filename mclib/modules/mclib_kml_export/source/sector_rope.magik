@@ -1,0 +1,38 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-03-23 22:45:56 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-23-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method sector_rope.as_kml_coords(_optional height)
+	## returns a coordinates XML Element for me in KML
+	##
+
+	# (03-23-2006 Brad Sileo): created.
+	coords << ""
+	height << height.default(0)
+	# Things are in long/lat at this point...
+	_for a_sec _over _self.faceted(0.000001).fast_elements()
+	_loop
+		_for a_coord _over a_sec.fast_elements()
+		_loop
+			coords << write_string(coords,a_coord.x,%,,a_coord.y,%,,a_coord.z.default(height),%space)
+		_endloop
+	_endloop
+	# remove training comma
+	coords << coords.slice(1,coords.size-1)
+	>> simple_xml_thing.new(:coordinates,coords)
+_endmethod
+$

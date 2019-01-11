@@ -1,0 +1,182 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_scheduled_task_handler
+##
+## Superclass for scheduled task handlers.
+##
+
+def_slotted_exemplar(:mss_scheduled_task_handler,
+{
+	{:task, _unset, :readable},
+	{:type, _unset, :readable},
+	{:parameters, _unset, :readable},
+	{:standard_output, _unset, :readable},
+	{:error_output, _unset, :readable},
+	{:failure_code, _unset, :writable}
+},
+{})
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduled_task_handler.new(a_task, _optional type, parameters)
+	## 
+	## Create a new handler to process the mss_scheduled_task_result
+	## record A_TASK.  If TYPE and/or PARAMETERS are set, they will
+	## override what is provided by A_TASK.
+	##
+
+	_return _clone.init(a_task, type, parameters)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={subclassable})
+_method mss_scheduled_task_handler.init(a_task, _optional type, parameters)
+	## 
+	## 
+
+	_if (.task << a_task) _isnt _unset
+	_then
+		.type << a_task.type
+		.parameters << a_task.parameters()
+	_endif
+	_if type _isnt _unset
+	_then
+		.type << type
+	_endif
+	_if parameters _isnt _unset
+	_then
+		.parameters << parameters
+	_endif
+	
+	.standard_output << internal_text_output_stream.new()
+	.error_output << internal_text_output_stream.new()
+	.failure_code << _unset
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduled_task_handler.message(message_id, _gather args)
+	## 
+	## 
+
+	mh_name << _self.class_name
+	_return message_handler.new(mh_name).human_string(message_id, _unset, _scatter args)
+				    
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduled_task_handler.external_name_for_task(task)
+	## 
+	## 
+
+	_return _self.message(task.type.as_symbol())
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduled_task_handler.external_name_for_task_type(task_type)
+	## 
+	## 
+
+	_return _self.message(task_type)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable, subclassable})
+_method mss_scheduled_task_handler.parameters_for_task_type(task_type)
+	## 
+	## Return a property_list that describes the parameters for the
+	## given TASK_TYPE.  Each key is the parameter name, and each
+	## value is a vector of the following elements:
+	## - the first item is the data type (:boolean, :symbol,
+	##   :integer, :float, :string, :date, :date_time, :filename)
+	## - the second item, if entered, is the domain of possible
+	##   values (as a vector).
+	##
+	
+	_return property_list.new()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduled_task_handler.run()
+	## 
+	## Perform the task, with appropriate handling.
+	##
+
+	_local me << _self
+	_catch :any_error
+	       _handling user_error _with
+	       _proc(cond)
+		       _import me
+		       cond.report_on(me.error_output)
+		       _throw :any_error
+	       _endproc
+	       _handling error _with
+	       _proc(cond)
+		       _import me
+		       cond.report_on(me.error_output)
+		       !traceback!(me.error_output)
+		       _throw :any_error
+	       _endproc
+	       _handling information, warning _with
+	       _proc(cond)
+		       _import me
+		       cond.report_on(me.standard_output)
+	       _endproc
+
+	       retval << _self.int!run()
+	_endcatch
+
+	_return retval 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable})
+_method mss_scheduled_task_handler.int!run()
+	## 
+	## Perform the work required to complete the task.  This method
+	## must be subclassed.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduled_task_handler.process_description
+	## 
+	## Log of work performed by this task.
+	##
+
+	_return .standard_output.string
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduled_task_handler.error_description
+	## 
+	## Log of errors produced by this task.
+	##
+
+	_return .error_output.string
+	
+_endmethod
+$

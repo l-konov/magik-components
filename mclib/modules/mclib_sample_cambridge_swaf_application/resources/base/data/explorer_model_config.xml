@@ -1,0 +1,30 @@
+<config base="cam_db_swaf_professional_application.explorer_model_config">
+  <plugins>
+    <plugin name="diff" class_name="mclib:explorer_model_difference_stream_plugin" >
+      <plugin_data>
+          <elements>
+	     <element name="Gis">
+                <datasets display_all="yes">
+		   <dataset name="gis" alias="North"/>
+	        </datasets>
+                <aces>
+		   <ace name="Electricity"/>
+	        </aces>
+             </element>
+	     <element name="Electricity">
+                <datasets>
+		   <dataset name="electricity"/>
+	        </datasets>
+                <aces>
+		   <ace name="Electricity"/>
+		   <ace name="Substation Internals"/>
+	        </aces>
+             </element>
+          </elements>
+       </plugin_data>
+    </plugin>
+  </plugins>
+
+</config>
+
+

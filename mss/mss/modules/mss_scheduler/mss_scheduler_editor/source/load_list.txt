@@ -1,0 +1,4 @@
+message_usages.magik
+
+mss_scheduler_object_editor.magik
+mss_scheduler_properties_plugin.magik

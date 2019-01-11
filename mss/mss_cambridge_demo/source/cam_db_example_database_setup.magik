@@ -1,0 +1,124 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# The following procedure is an example that can be used to create
+# all standard MSS databases that are used by the MSS Cambridge
+# DB demo.
+#
+# General usage notes:
+# - Before using: ensure that subdirectories mss_config,
+#   mss_scheduler, and mss_workspace exist underneath the root ds
+#   directory.
+# - Review the procedure mss_cam_db_create_databases: set the
+#   directory variables CAM_DB_ROOT_DIR and MSS_PRODUCT appropriately.
+# - Execute procedure mss_cam_db_create_databases(), to create the
+#   MSS Cambridge databases and additional alternatives and UVAs.
+# - Perform manage_soc() to do the following:
+#   - Set st_connection_spec required for mss_workspace and
+#     mss_scheduler databases (c.f. admin guides for more details).
+#   - Open all datasets (mss_config, mss_workspace, mss_scheduler).
+# - Carry on with CASE archive loading and applies, as
+#   described in the various admin guides.
+
+_global mss_cam_db_create_databases <<
+_proc()
+	cam_db_root_dir << "c:\mss_420\mss_cambridge_demo\ds"
+	mss_product << "c:\mss_420\mss"
+
+	_if gis_program_manager.ace_top_view _is _unset
+	_then
+		write("No ACE database available - open it before proceeding.")
+		write("(Example: manage_soc(<ACE_DB_DIR>))")
+		_return 
+	_endif
+	_if gis_program_manager.cached_dataset(:gis) _is _unset _orif
+	    gis_program_manager.cached_dataset(:electricity) _is _unset
+	_then
+		write("GIS and Electricity datasets are not open - use manage_soc() to open these before proceeding.")
+		_return
+	_endif
+	
+	# Ensure all data model modules are loaded (if not already done).
+	smallworld_product.add_product(mss_product)
+	sw_module_manager.load_module(:mss_ptdef_data_model, _unset, :update_image?, _false)
+	sw_module_manager.load_module(:mss_workspace_data_model, _unset, :update_image?, _false)
+	sw_module_manager.load_module(:mss_cu_data_model, _unset, :update_image?, _false)
+	sw_module_manager.load_module(:mss_scheduler_data_model, _unset, :update_image?, _false)
+
+	# Get writable access to ACE, so that SOC additions can be recorded.
+	gis_program_manager.ace_top_view.switch(:write)
+
+	# mss_config data and CASE partitions:
+	dbv << create_gis_dataset(system.pathname_down(cam_db_root_dir, "mss_config"),
+				  :mss_config, :mss_config,
+				  :universes, 8,
+				  :default_universe, {"gis", 1, 8},
+				  :default_world, {"gis", "gis", :units, :mm})
+	dbv.discard()
+	dbv << create_case_dataset(system.pathname_down(cam_db_root_dir, "mss_config"),
+				   :mss_config_case, :mss_config_case)
+	dbv.discard()
+
+	# mss_workspace data and CASE partitions:
+	dbv << create_gis_dataset(system.pathname_down(cam_db_root_dir, "mss_workspace"),
+				  :gis, :mss_workspace,
+				  :universes, 8,
+				  :default_universe, {"gis", 1, 8},
+				  :default_world, {"gis", "gis", :units, :mm})
+	dbv.discard()
+	dbv << create_case_dataset(system.pathname_down(cam_db_root_dir, "mss_workspace"),
+				   :mss_workspace_case, :mss_workspace_case)
+	dbv.discard()
+
+	# mss_scheduler data and CASE partitions:
+	dbv << create_gis_dataset(system.pathname_down(cam_db_root_dir, "mss_scheduler"),
+				  :mss_scheduler, :mss_scheduler,
+				  :universes, 8,
+				  :default_universe, {"gis", 1, 8},
+				  :default_world, {"gis", "gis", :units, :mm})
+	dbv.discard()
+	dbv << create_case_dataset(system.pathname_down(cam_db_root_dir, "mss_scheduler"),
+				   :mss_scheduler_case, :mss_scheduler_case)
+	dbv.discard()
+	
+	# Commit SOC changes.
+	gis_program_manager.ace_top_view.commit()
+	
+	# Create alternatives and UVAS in gis and electricity partitions.
+	_for dbv_name _over {:gis, :electricity}.fast_elements()
+	_loop 
+		dbv << gis_program_manager.cached_dataset(dbv_name)
+		dbv.goto_top_alternative()
+		dbv.switch(:write)
+		_if _not dbv.has_alternative?("MSS_ROOT")
+		_then
+			dbv.spawn("MSS_ROOT")
+		_endif
+		_if dbv.uvas[:mss_workspace_tracking_record] _is _unset
+		_then
+			_if dbv_name _is :electricity
+			_then
+				dbv.create_uva64(:mss_workspace_tracking_record, "rwo.ds")
+			_else 
+				dbv.create_uva(:mss_workspace_tracking_record, "rwo.ds")
+			_endif 
+		_endif 
+		_if dbv.uvas[:mss_cu_reference] _is _unset
+		_then
+			_if dbv_name _is :electricity
+			_then
+				dbv.create_uva64(:mss_cu_reference, "rwo.ds")
+			_else 
+				dbv.create_uva(:mss_cu_reference, "rwo.ds")
+			_endif 
+		_endif 
+	_endloop
+		
+_endproc
+$

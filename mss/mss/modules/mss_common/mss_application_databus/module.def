@@ -1,0 +1,9 @@
+mss_application_databus	1
+
+description
+	MSS application databus functionality
+end
+
+requires
+	mss_component_framework
+end

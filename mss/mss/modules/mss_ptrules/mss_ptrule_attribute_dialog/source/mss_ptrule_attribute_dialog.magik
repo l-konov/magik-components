@@ -1,0 +1,449 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_attribute_dialog
+##
+## Standard dialog to prompt for attributes as part of a
+## pointing rule.
+##
+
+def_slotted_exemplar(:mss_ptrule_attribute_dialog,
+{
+	{:top_ptrule, _unset, :readable},
+	{:current_ptrule, _unset, :readable},
+	{:activation_mode, _unset, :readable},
+	{:wait_queue, _unset, :readable},
+	{:locked_fields, _unset, :readable}
+},
+{:gui_framework})
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+mss_ptrule_attribute_dialog.define_shared_constant(
+	:databus_consumer_data_types,
+	{:proposed_values_for_update},
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+mss_ptrule_attribute_dialog.define_shared_constant(
+	:databus_producer_data_types,
+	{:collection,
+	 :current_object,
+	 :current_text_joins,
+	 :activation_mode,
+	 :current_ptrule,
+	 :top_ptrule},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.set_current_ptrule(new_ptrule)
+	## 
+	## Update self to display the attributes for NEW_PTRULE.
+	##
+
+	_if new_ptrule _isnt _unset _andif
+	    new_ptrule _isnt .current_ptrule
+	_then
+		# The following junk is required because of an interaction
+		# problem with the tree_item in mss_ptrule_hierarchy_display:
+		# when a new pointing rule is selected there, the lost_focus
+		# event for whatever control is being edited in the
+		# mss_ptrule_attribute_lister does NOT get fired until all of
+		# this processing is done.  This means that if work-in-progress
+		# is being typed in a field, it will be lost, and if there is a
+		# field validation error, it is not reported.  The result of
+		# the following causes the field validation error to get
+		# suppressed, but at least if a proper value is enterd, it will
+		# be retained.
+		_if (pl << _self.plugin(:attribute_lister)) _isnt _unset
+		_then
+			_protect
+				ok? << _false
+				_catch :goofy_error
+				       _handling cancel_selection_change _with
+				       _proc()
+					       _throw :goofy_error
+				       _endproc 
+				       pl.terminate_editing(_true)
+				       ok? << _true
+				_endcatch 
+			_protection
+				_if _not ok?
+				_then 
+					pl.terminate_editing(_false)
+				_endif 
+			_endprotect 
+		_endif
+		
+		_self.update_current_detached_record()
+
+		.current_ptrule << new_ptrule
+		_self.databus_make_data_available(:current_ptrule, .current_ptrule)
+		_self.databus_make_data_available(:current_object, _self.current_object)
+		_self.databus_make_data_available(:current_text_joins, _self.current_text_joins)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.activation_mode << new
+	## 
+	## Set the activation_mode property, which may be :release or
+	## :complete (depending on whether self has been activated by a
+	## PDR release, or by an explicit complete request from the user).
+	##
+
+	.activation_mode << new
+	_self.databus_make_data_available(:activation_mode, new)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+
+	.top_ptrule << _unset
+	.current_ptrule << _unset
+	.locked_fields << {}
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:ok,
+				       :engine, _self,
+				       :action_message, :|ok()|))
+	_self.add_action(sw_action.new(:cancel,
+				       :engine, _self,
+				       :action_message, :|cancel()|))
+			 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.build_framework_gui(f)
+	## 
+	## Place OK and Cancel buttons in the standard location.
+	##
+	
+	p << panel.new(f)
+	p.resize_x? << _false
+	p.resize_y? << _true
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	simple_panel.new(p).resize_x? << _true
+
+	b << _self.action(:ok).place_control_on(p, :dialog)
+	b.min_width << 75
+	b << _self.action(:cancel).place_control_on(p, :dialog)
+	b.min_width << 75
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_if data_type_name _is :collection
+	_then
+		_return _self.collection
+	_elif data_type_name _is :current_object
+	_then
+		_self.update_current_detached_record()
+		_return _self.current_object
+	_elif data_type_name _is :current_text_joins
+	_then
+		_self.update_current_detached_record()
+		_return _self.current_text_joins
+	_elif data_type_name _is :activation_mode
+	_then
+		_return .activation_mode
+	_elif data_type_name _is :current_ptrule
+	_then
+		_return .current_ptrule
+	_elif data_type_name _is :top_ptrule
+	_then
+		_return .top_ptrule
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.wait()
+	## 
+	## Allows the prompter to wait synchronously. Note that this
+	## can't be done from the events-thread since you would never
+	## be able to press the OK or Cancel button.
+	##
+
+	_if _thisthread _is events_thread
+	_then
+		_self.error("Cannot wait for prompter in the event thread")
+	_endif
+	.wait_queue << atomic_queue.new(1)
+	_return .wait_queue.get()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.ok()
+	## 
+	## 
+
+	_self.update_current_detached_record()
+
+	_block
+		_handling dd_mandatory_field, dd_bad_field_value, db_value_wrong_type,
+		db_value_out_of_range _with _self.user_error_handler
+
+		_for i _over .top_ptrule.all_child_ptrules(_true).fast_elements()
+		_loop
+			i.validate_for_mss_ptrule_attribute_dialog(_self)
+		_endloop
+	_endblock
+	
+	_self.close()
+	_if .wait_queue _isnt _unset
+	_then
+		_if .wait_queue.reads_possible = 1
+		_then
+			# Something's errored out somewhere - clear the queue.
+			.wait_queue.get(_true)
+		_endif 
+		.wait_queue.put(_true)
+		.wait_queue << _unset 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.cancel()
+	## 
+	## 
+
+	_self.close()
+	_if .wait_queue _isnt _unset
+	_then
+		_if .wait_queue.reads_possible = 1
+		_then
+			# Something's errored out somewhere - clear the queue.
+			.wait_queue.get(_true)
+		_endif 
+		.wait_queue.put(_false)
+		.wait_queue << _unset 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.wm_close()
+	## 
+	## 
+
+	_self.cancel()
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.close(_optional force_terminate?)
+	## 
+	## 
+	
+	_if (pl << _self.plugin(:attribute_lister)) _isnt _unset
+	_then
+		pl.terminate_editing(_false)
+	_endif
+	_return _super.close(force_terminate?)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.top_ptrule << new_ptrule
+	## 
+	## Change the topmost pointing rule being displayed to
+	## NEW_PTRULE.
+	##
+
+	.top_ptrule << new_ptrule
+	.current_ptrule << _unset 
+	_self.databus_make_data_available(:top_ptrule, new_ptrule)
+	
+	# Note that the above call should ultimately set
+	# .current_ptrule to be the first record displayed, which is
+	# not necessarily the same as NEW_PTRULE (if that record is not
+	# being prompted).  In fact, if .current_ptrule is unset at this
+	# stage, probably an error should be issued, because something
+	# downstream from here will probably break...
+	_if .current_ptrule _is _unset
+	_then
+		.current_ptrule << new_ptrule
+		_self.databus_make_data_available(:current_ptrule, .current_ptrule)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.update_current_detached_record()
+	## 
+	## Update the detached record associated with the current
+	## pointing rule being displayed, based on what has been
+	## entered on this menu.
+	##
+
+	_handling dd_mandatory_field, dd_bad_field_value, db_value_wrong_type,
+	db_value_out_of_range _with _self.user_error_handler
+	
+	_if .current_ptrule _is _unset _orif
+	    _not .current_ptrule.responds_to?(:detached_record)
+	_then
+		_return
+	_endif
+	dr << .current_ptrule.detached_record
+	_if .current_ptrule.responds_to?(:detached_text_joins)
+	_then
+		tj << .current_ptrule.detached_text_joins
+	_endif 
+	_for values _over _self.databus_request_all_data(:proposed_values_for_update)
+	_loop
+		_for key, value _over values.fast_keys_and_elements()
+		_loop
+			fd << dr.source_collection.all_fields[key]
+			_if fd.is_join? _andif fd.join_type _is :text
+			_then
+				tj[key] << value
+			_else
+				dr.perform(fd.chevronned_name, value)
+			_endif 
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.ace
+	## 
+	## 
+
+	_return _self.application.ace
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.collection
+	## 
+	## 
+
+	_if .current_ptrule _is _unset _orif 
+	    _not .current_ptrule.responds_to?(:detached_record)
+	_then
+		_return _unset
+	_endif
+	_return .current_ptrule.detached_record.source_collection
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.current_object
+	## 
+	## 
+
+	_if .current_ptrule _is _unset _orif 
+	    _not .current_ptrule.responds_to?(:detached_record)
+	_then
+		_return _unset
+	_endif
+	_return .current_ptrule.detached_record
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.current_text_joins
+	## 
+	## 
+
+	_if .current_ptrule _is _unset _orif 
+	    _not .current_ptrule.responds_to?(:detached_text_joins)
+	_then
+		_return _unset
+	_endif
+	_return .current_ptrule.detached_text_joins
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.work_record()
+	## 
+	## 
+
+	_if (cr << _self.current_object) _is _unset
+	_then
+		_return _unset
+	_endif 
+	dr << cr.copy()
+	_for values _over _self.databus_request_all_data(:proposed_values_for_update)
+	_loop
+		_for key, value _over values.fast_keys_and_elements()
+		_loop
+			_try
+				fd << dr.source_collection.all_fields[key]
+				_if fd _is _unset _orif
+				    fd.is_join? _andif fd.join_type _is :text
+				_then
+					_continue
+				_endif
+				dr.perform(fd.chevronned_name, value)
+			_when error
+			_endtry 
+		_endloop
+	_endloop
+	_return dr
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_dialog.highlight_on_selection?
+	## 
+	## No geometry fields to highlight.
+	##
+
+	_return _false
+	
+_endmethod
+$

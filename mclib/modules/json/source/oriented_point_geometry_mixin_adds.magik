@@ -1,0 +1,15 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	oriented_point_geometry_mixin.write_as_json(a_stream)
+	##
+	##
+	_local s << a_stream
+	
+	s.write("{", %", "type", %", ": ", %", "Point", %", ", ")
+	s.write(%", "coordinates", %", ": ")
+	_self.coord.write_as_json(a_stream)
+	s.write("}")		
+_endmethod
+$

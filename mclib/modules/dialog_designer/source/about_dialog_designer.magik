@@ -1,0 +1,127 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## About Dialog Designer.  Code to support the 'About' and
+## 'Documentation' pulldown action found in the 'Help' menu.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dialog_designer.define_shared_constant(:dd_version,"2.7",:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.about_dialog_designer()
+	## 
+	## About the Dialog Designer ...
+	
+	txt << write_string("Dialog Designer 2.7 (Sept 2012)",%newline*2,
+			    "Created by : Graham Garlick, iFactor Consulting",%newline*2,
+			    "Email : graham@ifactorconsulting.com")
+	
+	# ... this pushes my email into the system clipboard.
+	.items[:ws].clipboard_text << "graham@ifactorconsulting.com"
+
+	_self.show_about_dd(:about_dialog_designer,txt)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.show_about_dd(title_msg_key,txt)
+	## 
+	## Show a simple alert box, setting the title and text shown.
+	## A button to launch a webbrowser to the update page appears
+	## next to the Close button.
+
+	_if (fr << .items[title_msg_key]) _is _unset 
+	_then
+		fr << frame.new(_self.message(title_msg_key))
+		rc << rowcol.new(fr,_unset,1,:pixel,:style,:top_level)
+		l << label_item.new(rc,txt)
+		rc2 << rowcol.new(rc,1,_unset,:pixel,:style,:nested,:col_alignment,:fill)
+		button_item.new(rc2,_self.message(:dd_webpage),_self,:|dd_webpage()|,
+				:min_width,130,
+				:col_alignment,:left)
+		button_item.new(rc2,_self.message(:close),fr,:|deactivate()|,
+				:min_width,70,
+				:col_alignment,:right)
+		
+		fr.minimizable? << _false
+		fr.maximizable? << _false
+		fr.resizable? << _false
+
+		.items[title_msg_key] << fr
+	_endif
+
+	# Position at center of Dialog Designer frame.
+	fr.position << _self.top_frame.bounds.centre - pixel_coordinate(120,56)
+
+	fr.activate()
+	fr.actual.always_visible? << _true 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dd_webpage()
+	##
+	## Launch the Dialog Designer download webpage.
+
+	cmd_string << write_string("start http://www.ifactorconsulting.com/services/dialog-designer/")
+	
+	system.do_command(cmd_string)
+	
+_endmethod
+$
+
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dd_documentation()
+	## 
+	## Open the included documentation.
+
+	pth << sw_module_manager.module(:dialog_designer).full_directory + "/Dialog Designer v2-7.pdf"
+
+	_if system.file_exists?(pth)
+	_then
+		pth << system.windows_short_pathname(pth)
+		cmd_string << write_string("start ",%",%"," ",%",pth, %")
+
+		_self.status << :busy
+		system.do_command(cmd_string)
+		_self.status << :ready
+	_else
+		_self.show_alert(_self.message(:missing_documentation_file,pth))
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dialog_designer.dd_release_notes()
+	## 
+	## Open the included release notes.
+	
+	pth << sw_module_manager.module(:dialog_designer).full_directory + "/release_notes.txt"
+
+	_if system.file_exists?(pth)
+	_then
+		pth << system.windows_short_pathname(pth)
+		cmd_string << write_string("start ",%",%"," ",%",pth, %")
+		system.do_command(cmd_string)
+	_else
+		_self.show_alert(_self.message(:missing_release_notes_file,pth))
+	_endif
+_endmethod
+$

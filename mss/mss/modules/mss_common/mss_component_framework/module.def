@@ -1,0 +1,9 @@
+mss_component_framework	1
+
+description
+	MSS extensions to component_framework
+end
+
+requires
+	component_framework
+end

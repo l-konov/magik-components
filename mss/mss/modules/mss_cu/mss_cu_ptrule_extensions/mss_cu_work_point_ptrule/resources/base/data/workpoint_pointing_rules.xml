@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="windows-1252" standalone="yes"?>
+<serial_xml_thing format="1">
+	<indexed class="sw:rope" size="8">
+		<keyed class="sw:property_list" size="1">
+			<entry key="version">
+				<number>1</number>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Work Point - extent geometry</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_extent</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_trail_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<string>gis</string>
+			</entry>
+			<entry key="table_name">
+				<string>mss_cu_work_point</string>
+			</entry>
+			<entry key="geometry_name">
+				<string>extent</string>
+			</entry>
+			<entry key="help_text">
+				<string>Place a trail to define the extent of the work point.  Press F9 when complete.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="3">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>-1</number>
+						</entry>
+						<entry key="action_method">
+							<string>perform_on_detached_record()</string>
+						</entry>
+						<entry key="param_1">
+							<string>mss_populate_from_gui_plugin()</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>2</number>
+						</entry>
+						<entry key="action_method">
+							<string>start_one_shot_add_geometry_ptrule()</string>
+						</entry>
+						<entry key="param_1">
+							<string>add_annotation_generic</string>
+						</entry>
+						<entry key="param_2">
+							<string>Add annotation to Work Point</string>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>1</number>
+						</entry>
+						<entry key="action_method">
+							<string>perform_on_current_record()</string>
+						</entry>
+						<entry key="param_1">
+							<string>gui_plugin_next_available_number()</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_single_ptrule_plugin</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Multi Work Point (multiple points, multiple spans)</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_multi_point_multi_span</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_trail_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Place a trail to define the location of each work point.  Press F9 when complete.  In addition to work points at each trail point, a work span will be created between each work point.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>mss_wp_multi_create()</string>
+						</entry>
+						<entry key="param_1">
+							<string>multi_point_multi_span</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="2">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_multi_ptrule_plugin</string>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>insert_on_complete</string>
+						</entry>
+						<entry key="value">
+							<string>never</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Multi Work Point (multiple points, no spans)</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_multi_point_no_span</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_trail_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Place a trail to define the location of each work point.  Press F9 when complete.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>mss_wp_multi_create()</string>
+						</entry>
+						<entry key="param_1">
+							<string>multi_point_no_span</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="2">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_multi_ptrule_plugin</string>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>insert_on_complete</string>
+						</entry>
+						<entry key="value">
+							<string>never</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Multi Work Point (multiple points, single span)</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_multi_point_single_span</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_trail_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Place a trail to define the location of each work point.  Press F9 when complete.  In addition to work points at each trail point, a work span will be created between the first and last point.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>mss_wp_multi_create()</string>
+						</entry>
+						<entry key="param_1">
+							<string>multi_point_single_span</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="2">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_multi_ptrule_plugin</string>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>insert_on_complete</string>
+						</entry>
+						<entry key="value">
+							<string>never</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Multi Work Point (no points, multiple spans)</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_no_point_multi_span</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_trail_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="table_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="geometry_name">
+				<atomic>sw:unset</atomic>
+			</entry>
+			<entry key="help_text">
+				<string>Place a trail to define the location of each work span.  Press F9 when complete.  A work span will be created between each trail point.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="action_method">
+							<string>mss_wp_multi_create()</string>
+						</entry>
+						<entry key="param_1">
+							<string>no_point_multi_span</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="2">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_multi_ptrule_plugin</string>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>insert_on_complete</string>
+						</entry>
+						<entry key="value">
+							<string>never</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Work Point - point geometry</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_point</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_simple_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<string>gis</string>
+			</entry>
+			<entry key="table_name">
+				<string>mss_cu_work_point</string>
+			</entry>
+			<entry key="geometry_name">
+				<string>location</string>
+			</entry>
+			<entry key="help_text">
+				<string>Point to the location for the work point.  Annotation will be added a fixed distance from the location.  Press the shift key while dragging to rotate.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="3">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Press</string>
+						</entry>
+						<entry key="seq">
+							<number>-1</number>
+						</entry>
+						<entry key="action_method">
+							<string>perform_on_detached_record()</string>
+						</entry>
+						<entry key="param_1">
+							<string>mss_populate_from_gui_plugin()</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Post Release</string>
+						</entry>
+						<entry key="seq">
+							<number>-1</number>
+						</entry>
+						<entry key="action_method">
+							<string>start_one_shot_add_geometry_ptrule()</string>
+						</entry>
+						<entry key="param_1">
+							<string>add_annotation_generic</string>
+						</entry>
+						<entry key="param_2">
+							<string>Add annotation to Work Point</string>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Post Release</string>
+						</entry>
+						<entry key="seq">
+							<number>-2</number>
+						</entry>
+						<entry key="action_method">
+							<string>perform_on_current_record()</string>
+						</entry>
+						<entry key="param_1">
+							<string>gui_plugin_next_available_number()</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_single_ptrule_plugin</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+		<keyed class="sw:property_list" size="13">
+			<entry key="name">
+				<string>Work Point - route geometry</string>
+			</entry>
+			<entry key="internal_name">
+				<string>mss_wp_route</string>
+			</entry>
+			<entry key="ptrule_class">
+				<string>mss_trail_insert_ptrule</string>
+			</entry>
+			<entry key="dataset_name">
+				<string>gis</string>
+			</entry>
+			<entry key="table_name">
+				<string>mss_cu_work_point</string>
+			</entry>
+			<entry key="geometry_name">
+				<string>route</string>
+			</entry>
+			<entry key="help_text">
+				<string>Place a trail to define the route of the work point.  Press F9 when complete.
+
+Note that this pointing rule does not activate a separate menu for prompting for attributes - enter the attributes directly on the &quot;Custom&quot; tab.</string>
+			</entry>
+			<entry key="actions">
+				<indexed class="sw:rope" size="3">
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>-1</number>
+						</entry>
+						<entry key="action_method">
+							<string>perform_on_detached_record()</string>
+						</entry>
+						<entry key="param_1">
+							<string>mss_populate_from_gui_plugin()</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>2</number>
+						</entry>
+						<entry key="action_method">
+							<string>start_one_shot_add_geometry_ptrule()</string>
+						</entry>
+						<entry key="param_1">
+							<string>add_annotation_generic</string>
+						</entry>
+						<entry key="param_2">
+							<string>Add annotation to Work Point</string>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+					<keyed class="sw:property_list" size="6">
+						<entry key="type">
+							<string>Complete</string>
+						</entry>
+						<entry key="seq">
+							<number>1</number>
+						</entry>
+						<entry key="action_method">
+							<string>perform_on_current_record()</string>
+						</entry>
+						<entry key="param_1">
+							<string>gui_plugin_next_available_number()</string>
+						</entry>
+						<entry key="param_2">
+							<atomic>sw:unset</atomic>
+						</entry>
+						<entry key="param_3">
+							<atomic>sw:unset</atomic>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="attributes">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="cu_references">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="properties">
+				<indexed class="sw:rope" size="1">
+					<keyed class="sw:property_list" size="2">
+						<entry key="name">
+							<string>gui_plugin_key</string>
+						</entry>
+						<entry key="value">
+							<string>mss_wp_single_ptrule_plugin</string>
+						</entry>
+					</keyed>
+				</indexed>
+			</entry>
+			<entry key="child_ptdefs">
+				<indexed class="sw:rope" size="0"/>
+			</entry>
+			<entry key="folders">
+				<indexed class="sw:rope" size="1">
+					<indexed class="sw:rope" size="3">
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>cambridge_demo</string>
+							</entry>
+							<entry key="seq">
+								<number>0</number>
+							</entry>
+						</keyed>
+						<keyed class="sw:property_list" size="2">
+							<entry key="name">
+								<string>Work Points</string>
+							</entry>
+							<entry key="seq">
+								<number>2</number>
+							</entry>
+						</keyed>
+						<number>0</number>
+					</indexed>
+				</indexed>
+			</entry>
+		</keyed>
+	</indexed>
+</serial_xml_thing>

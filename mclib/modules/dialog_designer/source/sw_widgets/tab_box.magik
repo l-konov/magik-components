@@ -1,0 +1,50 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## TAB_BOX - added functionality specific to the
+## dialog_designer.  Sets link between this class and the class
+## actually used by the dialog_designer (dd_tab_box).
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method tab_box.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	ddtb << dd_tab_box.new(rc,1,1,:pixel,
+			    :style,:nested,
+			    :resize?,_true,
+			    :top_spacing,25,
+			    :left_spacing,5,
+			    :right_spacing,5,
+			    :bottom_spacing,5,
+			    :default_col_alignment,:fill,
+			    :default_row_alignment,:fill,
+			    :multiline?,_false,
+			    :row,row,:col,col)
+
+	tbrc << rowcol.new_dialog_default(ddtb,1,1)
+	tbrc.tab_label << "Tab"
+
+	pages << rope.new()
+	pages.add(tbrc)
+	
+	ddtb.set_property(:active_page_n,1)
+	ddtb.set_property(:tab_location,:top)
+
+	>> ddtb
+_endmethod
+$
+

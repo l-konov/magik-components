@@ -1,0 +1,10 @@
+mclib_action_property_mixin	4000
+
+description
+	provides a mixin that aides in making actions from properties for sw_components
+end
+
+requires
+	actions
+	mclib_directory_action
+end

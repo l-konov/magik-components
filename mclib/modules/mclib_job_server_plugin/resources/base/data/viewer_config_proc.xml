@@ -1,0 +1,46 @@
+<config base="job_server_plugin.viewer_config_proc">
+  <framework_data>
+	<visible_fields>
+	  <field name="name"/>
+	  <field name="user"/>
+	  <field name="type_name"/>
+	  <field name="status"/>
+	  <field name="summary"/>
+	  <field name="outcome_summary"/>
+	  <field name="submitted"/>
+	  <field name="started"/>
+	  <field name="ended"/>
+	  <field name="server"/>
+	  <field name="id"/>
+	  <field name="priority"/>
+	  <field name="repeats?"/>
+	</visible_fields>
+	<visible_statuses>
+	  <status name="ABANDONED"/>
+	  <status name="Cancelled"/>
+	  <status name="Completed"/>
+	  <status name="Expired"/>
+	  <status name="FAILED"/>
+	</visible_statuses>
+	<show_filter_jobs_by_user all_jobs="true"/>
+	<filter_out_types>
+	  <!-- job_type type="multi_merge_scheme" default="true"/ -->
+	</filter_out_types>
+	<text_find>
+	  <categories>
+		<category name="name" default="yes" />
+		<category name="user" />
+		<category name="summary" />
+		<category name="outcome_summary" />
+		<category name="server" />
+		<category name="priority" />
+		<category name="repeats?" />
+		<!-- <category name="outcome_description" />
+		<category name="description" />
+		<category name="history" />
+		<category name="id" /> -->
+	  </categories>
+	  <default_text id ="find_text"/>
+	</text_find>
+  </framework_data>
+</config>

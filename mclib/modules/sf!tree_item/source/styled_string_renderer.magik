@@ -1,0 +1,558 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+_package sw
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+##
+## This shard constant maps (part of) a font name to an HTML
+## font style element.
+##
+styled_string_renderer.define_shared_constant( :sf!font_pattern_to_style,
+	equality_hash_table.new_with(
+		"*bold*",	"B",
+		"*fixed*",	"TT",
+		"*italic",	"I",
+		"*emphasis*",	"EM",
+		"*code*",	"TT" ),
+	:private )
+$
+
+
+_pragma(classify_level=advanced)
+_method styled_string_renderer.sf!message( a_msg_id, _gather msg_args )
+
+	## Returns a message from the message system.
+
+	>> sw:tree_item.sf!message( a_msg_id, _scatter msg_args )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method styled_string_renderer.sf!export_text_on( a_stream, _optional a_sep )
+
+	## Write the simple values of _self (strings and tabs) on A_STREAM.
+	## This code just provides some raw data output for text, all fancy
+	## formatting (colors and icons) will not be exported.
+
+	_local data << sw:rope.new()
+
+	_if a_sep _is _unset _then a_sep << %tab _endif
+	
+	_for a_text,a_style,a_token,x,y,add_info _over _self.texts_and_text_styles()
+	_loop
+		_if a_token = :value _orif
+		    a_token = :text
+		_then
+			_if a_style = :resolved_image
+			_then
+				_continue
+			_endif
+
+			data.add_last( a_text )
+			_continue
+
+		_elif a_token = :tab
+		_then
+			# write out the current data...
+
+		_elif a_token = :merge _andif
+		      add_info.default( 0 ) > 1
+		_then
+			data.add_last( a_sep * add_info )
+		_else
+			#
+			# Ignore whatever is to be displayed...
+			#
+			_continue
+		_endif
+
+		a_stream.write( data.join_as_strings( "" ), a_sep )
+
+		data.empty()
+	_endloop
+
+	_if _not data.empty?
+	_then
+		a_stream.write( data.join_as_strings( "" ) )
+	_endif
+
+	a_stream.write( %newline )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced)
+_method styled_string_renderer.sf!export_html_on( a_stream,
+			_optional column_alignment_info,
+			_gather font_style_elements  )
+
+	## Write the simple values of _self (strings and tabs) on A_STREAM
+	## as items of a row (in a table).
+
+	_local format << sw:property_list.new()
+	_local column << 1
+	_local ca_max << _if column_alignment_info _isnt _unset
+			 _then >> column_alignment_info.size
+			 _endif
+	_local data   << sw:rope.new()
+	_local fse
+	_local align
+	_local color
+	_local span
+	_local last
+	_local image
+
+	a_stream.write( _self.sf!message( :sf!html_tr_cmd ) )
+
+	_for a_text,a_style,a_token,x,y,add_info _over _self.texts_and_text_styles()
+	_loop
+#write( a_token, ", ", a_text, ", ", a_style, ", ", x, ", ", y, ", ", add_info )
+		_if a_token = :value _orif
+		    a_token = :text
+		_then
+			#
+			# Ignore any bitmap information...
+			#
+			_if a_style = :resolved_image
+			_then
+				image << _self.sf!locate_image( a_text )
+				_if image _isnt _unset _then data.add( image ) _endif
+				_continue
+			_endif
+
+			color << _if a_style _isnt _unset _andif
+				     a_style.method( :foreg_colour ) _isnt _unset
+				 _then >> _self.sf!html_font_color_number(
+						  a_style.foreg_colour )
+				 _endif
+			fse   << _if a_style _isnt _unset _andif
+				     font_style_elements.empty?
+				 _then >> _self.sf!html_font_style_elements(
+						  a_style )
+				 _endif
+			data.add_last( a_text )
+			_continue
+
+		_elif a_token = :tab
+		_then
+			#
+			# If a_style is not _unset, we got information how
+			# the next column should be aligned; remember this
+			# for the formatting of the next iteration...
+			#
+			_if a_style _isnt _unset
+			_then
+				align << a_style
+			_endif
+
+			_if last _isnt _unset _andif
+			    last <> :tab
+			_then
+				last << :tab ; _continue
+			_endif
+
+			data.add_last( "" )
+
+		_elif a_token = :merge _andif
+		      add_info.default( 0 ) > 1
+		_then
+			# colspan="<num>"
+			format[ :colspan ] << { :sf!html_colspan_cmd,
+						add_info }
+			span << add_info
+			_continue
+
+		_elif a_token = :image _andif
+		      a_style = :resolved_image
+		_then
+			#
+			# a_text is an image locator: a 2-element vector
+			# with image and module name; if bitmaps would
+			# be in gif, jpeg or png, we could dump them into
+			# the HTML code that is generated...
+			#
+			image << _self.sf!locate_image( a_text )
+			_if image _isnt _unset _then data.add( image ) _endif
+			_continue
+
+		_elif a_token _is :align _andif
+		      _not add_info.default( {} ).empty?
+		_then
+			#
+			# Alignment information is stored in ADD_INFO;
+			# it contains horizontal and vertical alignment...
+			#
+			align << add_info.first
+			format[ :align ] << { :sf!html_align_cmd,
+					      _if align = :centre
+					      _then >> :center
+					      _else >> align
+					      _endif }
+			_continue
+		_else
+			#
+			# Ignore whatever is to be displayed or any other
+			# formatting information...
+			#
+			_continue			
+		_endif
+		#
+		# It's time to write all data that has been gathered...
+		#
+		_self.sf!write_column_data(
+			a_stream, a_token,
+			data, format, column, color, column_alignment_info,
+			fse.default( font_style_elements ) )
+
+		format.empty()
+		data.empty()
+
+		column +<< _if span _is _unset
+			   _then >> 1
+			   _else >> span
+			   _endif
+		last  << a_token
+		span  << _unset
+		image << _unset
+		align << _unset
+	_endloop
+	#
+	# If the there is no :value tag for the last column, the data
+	# list could be not empty and has to be formatted for HTML...
+	#
+	_if _not data.empty? 
+	_then
+		_self.sf!write_column_data(
+			a_stream, :data,
+			data, format, column, color, column_alignment_info,
+			fse.default( font_style_elements ) )
+	_endif
+	a_stream.write( %newline )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method styled_string_renderer.sf!html_font_color_number( a_color )
+
+	## Returns a string (a hexadecimal number) that represents
+	## A_COLOR as a color value for HTML.
+	##
+	## This method should be defined on class colour - like
+	## colour.sf!as_html_font_color() - but I do not want to
+	## add a method on a core class that does not really belong
+	## to this module...
+
+	_if a_color _is _unset _then _return _endif
+
+		       # "0123456789ABCDEF"
+	_local map  << _self.sf!message( :sf!chr_map_string )
+	_local strm << internal_text_output_stream.new()
+	_local val
+	_local d
+	_local r
+
+	_for num _over { a_color.red,
+			 a_color.green,
+			 a_color.blue }.fast_elements()
+	_loop
+		val << ( num * 255 ).rounded
+		(d, r ) << val.div_mod( 16 )
+		
+		strm.write( map[ d + 1 ], map[ r + 1 ] )
+	_endloop
+
+	>> strm.string
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method styled_string_renderer.sf!html_font_style_elements(
+			 a_text_style )
+
+	## Returns a (potentially empty) vector with HTML font style
+	## information.
+
+	_local styles    << {}
+	_local font_info << a_text_style.font.identification
+
+	_if font_info _is _unset _orif
+	    font_info.size < 2 _orif
+	    _not ( font_info << font_info[ 2 ] ).is_kind_of?( "" )
+	_then
+		_return styles
+	_endif
+
+	font_info << font_info.lowercase
+
+	_for a_pattern,a_style _over _self.sf!font_pattern_to_style.
+				     fast_keys_and_elements()
+	_loop
+		_if font_info.matches?( a_pattern )
+		_then
+			styles << styles.new_appending( a_style )
+		_endif
+	_endloop
+
+	>> styles
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method styled_string_renderer.sf!locate_image( an_image_locator )
+
+	## Returns an IMG element for the HTML output - if the resource
+	## referenced by AN_IMAGE_LOCATOR can be found.
+
+	#
+	# Sometimes an icon is used from the cached data in
+	# !window_system!.images_data - e.g. an_image_locator
+	# is just a symbol and not a simple vector. In that
+	# case try to map the bitmap to a known bitmap in CST.
+	#
+	_if :||.is_kind_of?( an_image_locator )
+	_then
+		_local il << _self.sf!bitmap_to_image_locator( an_image_locator )
+		_if il _isnt _unset
+		_then
+			_return _self.sf!locate_image( il )
+		_endif
+		_return
+	_endif
+
+	_local base_file_name
+	_local file_name
+	_local module_name
+	_local image_file
+
+	( base_file_name, module_name ) << ( _scatter an_image_locator )
+
+	_for ext _over !window_system!.raster_extensions.fast_elements()
+	_loop 
+		file_name  << system.
+			      check_filename_extension( base_file_name, ext )
+		image_file << smallworld_product.
+			      int!get_raster_image( file_name, module_name )
+
+		_if image_file _is _unset _then _continue _endif
+
+		# <IMG src="<image_file>" alt="<%space>">&nbsp 
+		_return _self.sf!message( :sf!html_img_ref,
+					  system.canonicalise( image_file ),
+					  %space )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method styled_string_renderer.sf!bitmap_to_image_locator(
+			 an_image_name )
+
+	## Try to map the bitmap name (AN_IMAGE_NAME) to an
+	## image-locator object (a simple vector containing a
+	## file name and a module name).
+	## If possible an image-locator is returned, else _unset.
+
+	_local res << _self.sf!bitmap_to_image_locator[ an_image_name ]
+
+	_if res _isnt _unset _then _return res _endif
+
+	#
+	# If the image name ends on _icon, try to locate a
+	# bitmap in the CST product ui_resources module...
+	#
+	_local pos << an_image_name.index_of_seq( :|_icon| )
+
+	_if pos _isnt _unset _andif
+	    ( pos + 4 ) = an_image_name.size
+	_then
+		_return { an_image_name.subseq( 1, pos-1 ), :ui_resources }
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method styled_string_renderer.sf!write_column_data( a_stream,
+			 a_token, output_data, format_data, column_no, a_color,
+			 _optional column_alignment_info, font_style_elements )
+
+	## Helper method to write a single HTML column entry in a row.
+	##
+	## A_STREAM   : The stream where the data is written to.
+	## A_TOKEN    : A symbol (provided by the styled string) that
+	##              describes what is being written now.
+	## OUTPUT_DATA: A list of item that is to be "printed";
+	##              usually a combination of strings and/or bitmaps.
+	## FORMAT_DATA: A property_list that contains
+	##              formatting information for the column;
+	##              the value for each key is a vector that contains
+	##              a message-id and arguments when the actual text
+	##              is retrieved from the message system.
+	## COLUMN_NO:   An integer providing the current column number
+	##              (counting starts at 1).
+	## A_COLOR:     A string (in hexadecimal format) that provides the
+	##              information which color should be used to rendert text.
+	## COLUMN_ALIGNMENT_INFO:
+	##              A vector with alignment information for each column;
+	##              (e.g. one of these symbols :left, :right, :center
+	##               for each column). If no data is found for the
+	##              current column the default alignment is :left.
+	## FONT_STYLE_ELEMENTS:
+	##              A list to style elements to change the apperance
+	##              of the font text is written in. The data that
+	##              is passed should be an HTML font style or phrase
+	##              element - see for example the class constant
+	##              tree_item.sf!html_header_font_style_elements.
+
+	#
+	# Check for columns where the visibility was switched off...
+	#
+	_if _self.headings_holder.column_visibilities[ column_no ] _isnt _true
+	_then
+		_return
+	_endif
+
+	_local align_kw << _self.sf!message( :sf!html_align_keyword )
+	_local align
+	_local hierarchy_info
+	_local re_align_info
+
+	_if column_no = 1
+	_then
+		( hierarchy_info, re_align_info ) <<
+			_self.sf!provide_hierarchy_info( a_stream )
+	_endif
+	#
+	# Create alignment information for the current column - if it is
+	# not already present...
+	#
+	_if _not format_data.includes_key?( :align ) _andif
+	    column_alignment_info _isnt _unset _andif
+	    column_no <= column_alignment_info.size
+	_then
+		align << column_alignment_info[ column_no ]
+		_if align _isnt _unset
+		_then
+			format_data[ :align ] << { :sf!html_align_cmd, align }
+		_endif
+	_endif
+
+	_if re_align_info _isnt _unset
+	_then
+		format_data[ :align ] << { :sf!html_align_cmd, re_align_info }
+	_endif
+
+	# <TD <format_data.string> >
+	a_stream.write(
+		_self.sf!message( :sf!html_td_tag_cmd,
+				  _self.sf!format_data_string( format_data ) ) )
+
+	_if output_data.empty? _then _return _endif
+
+	#
+	# Provide some rudimentary hierarchy display
+	#
+	_if hierarchy_info _isnt _unset
+	_then
+		a_stream.write( hierarchy_info )
+	_endif
+	#
+	# Write any given font style element formatting information...
+	#
+	_for a_fse _over font_style_elements.fast_elements()
+	_loop
+		a_stream.write( %<, a_fse, %> )
+	_endloop
+	#
+	# Create any color information...
+	#
+	_if a_color _isnt _unset
+	_then
+		# <font color=#<a_color> >
+		a_stream.write(
+			_self.sf!message( :sf!html_color_open_cmd, a_color ) )
+	_endif
+	#
+	# Write the actual data from the display_tree...
+	#
+	_for an_item _over output_data.fast_elements()
+	_loop
+		a_stream.write( an_item, %space )
+	_endloop
+	#
+	# Close the color information tag...
+	#
+	_if a_color _isnt _unset
+	_then
+		# </font>
+		a_stream.write( _self.sf!message( :sf!html_color_close_cmd ) )
+	_endif
+	#
+	# Close all font style element formatting information...
+	#
+	_for a_fse _over font_style_elements.elements_in_reverse()
+	_loop
+		a_stream.write( %<, %/, a_fse, %> )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method styled_string_renderer.sf!provide_hierarchy_info()
+
+	## The default/backstop implementation does nothing.
+	## An actual implementation should return this information
+	## (either could be _unset):
+	## - a string that provides hierarchy information
+	## - a string or symbol that provides column alignment
+	##   information (e.g. :left, :center, or :right).
+	##   Because in HTML tables it is not possible to align
+	##   some part of cell left (like hierachy information) and
+	##   other data to the right or centered, it is usually
+	##   a good idea to return :left here if hierachy information 
+	##   should be displayed too.
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_private _method styled_string_renderer.sf!format_data_string(
+			 a_property_list )
+
+	## Returns a string based on the data found in A_PROPERTY_LIST.
+
+	_local strm << internal_text_output_stream.new()
+
+	_for data _over a_property_list.fast_elements()
+	_loop
+		strm.write( _self.sf!message( _scatter data ) )
+	_endloop
+
+	>> strm.string
+_endmethod
+$

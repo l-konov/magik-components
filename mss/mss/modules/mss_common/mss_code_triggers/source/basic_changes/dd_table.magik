@@ -1,0 +1,28 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method dd_table.run_triggers(thing, type, _optional list, old_rec)
+	## 
+	## In addition to running regular triggers, run all triggers
+	## defined in code.
+	##
+
+	# 2004/10/02 TM  Created.  This is actually a new method,
+	#                but it is classified as a basic change since
+	#                it is a restricted subclass.
+
+	_super.run_triggers(thing, type, list, old_rec)
+	_if thing.is_valid?
+	_then
+		thing.mss_run_code_triggers(type, old_rec)
+	_endif
+	
+_endmethod
+$

@@ -1,0 +1,1116 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_design
+##
+## A design represents a set of database alternatives that
+## comprise a unit of planned construction for a job.
+##
+
+def_slotted_exemplar(:mss_design,
+{},
+{:mss_workspace_rwo_record})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_design.define_shared_constant(
+	:track_history_fields,
+	## A vector of field names for which history should be
+	## tracked.  If any of these fields change, a history record
+	## will be created.
+	{:name, :owner, :status},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.general_validator()
+	##
+	## Ensure that self's name is unique within all designs of
+	## self's job.
+	##
+
+	_if (job << _self.mss_job) _is _unset
+	_then
+		_self.user_error(:no_job, _self)
+	_endif
+	my_name << _self.name
+	_for i _over job.mss_designs.fast_elements()
+	_loop
+		_if i.id = _self.id
+		_then
+			_continue
+		_endif
+		_if i.name = my_name
+		_then
+			_self.user_error(:duplicate_name, job.name, _self.name)
+		_endif
+	_endloop 
+	_return _super.general_validator()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.validate_delete()
+	## 
+	## A design cannot be deleted if it has sub-designs, if it is
+	## in a state that cannot be deleted, or if not authorised to
+	## do so.
+	##
+
+	_if _not _self.validate_delete_for_child_designs?()
+	_then
+		_self.user_error(:cannot_delete_subdesigns, _self.short_description)
+	_endif
+	_if _not _self.validate_delete_for_state?()
+	_then
+		_self.user_error(:cannot_delete_for_state, _self.short_description, _self.status)
+	_endif
+	_if _not _self.validate_delete_for_authorisation?()
+	_then
+		_self.user_error(:auth_design_delete_error, _self.short_description)
+	_endif
+	
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.validate_delete_for_child_designs?()
+	##
+	## Return false if there are any child designs.
+	##
+
+	_return _self.child_designs.an_element() _is _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.validate_delete_for_state?()
+	## 
+	## A design cannot be deleted if it is in a state that
+	## cannot be deleted.
+	##
+
+	_if (st << _self.state(_true)) _isnt _unset _andif
+	    st.get_property(:can_delete_design?) _is _false
+	_then
+		_return _false 
+	_endif 
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.validate_delete_for_authorisation?()
+	## 
+	## A design cannot be deleted if not authorised to do so.
+	##
+
+	_global mss_wm_auth_engine
+	
+	_if _self.owned_by_current_user?()
+	_then
+		auth_key << :design_delete_own
+	_else
+		auth_key << :design_delete_other
+	_endif
+	_if mss_wm_auth_engine _isnt _unset _andif
+	    mss_wm_auth_engine.check_access(auth_key, _self) _is _false
+	_then
+		_return _false 
+	_endif
+	
+	_return _true 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.insert_trigger(_gather args)
+	## 
+	## 
+
+	_dynamic !mss_workspace_initiator!
+	_if !mss_workspace_initiator! _is _unset
+	_then
+		_self.user_error(:insert_no_initiator)
+	_endif
+	_super.insert_trigger(_scatter args)
+	_self.track_history(:insert)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.update_trigger(_gather args)
+	## 
+	## 
+
+	_global mss_wm_auth_engine
+	
+	_dynamic !mss_workspace_initiator!
+	old_rec << args[2]
+	_if _self.status ~= old_rec.status
+	_then 
+		_if !mss_workspace_initiator! _is _unset
+		_then
+			_self.user_error(:update_status_no_initiator)
+		_endif
+		_self.validate_singular_state(_self.status)
+	_endif
+
+	_if _self.owner ~= old_rec.owner
+	_then
+		_if old_rec.owned_by_current_user?()
+		_then
+			auth_key << :design_change_owner_own
+		_else
+			auth_key << :design_change_owner_other
+		_endif
+		_if mss_wm_auth_engine _isnt _unset _andif
+		    mss_wm_auth_engine.check_access(auth_key, old_rec) _is _false
+		_then
+			_self.user_error(:auth_design_change_owner_error, _self.short_description,
+					 old_rec.owner, _self.owner)
+		_endif
+	_endif
+	
+	_super.update_trigger(_scatter args)
+	_self.track_history(:update, old_rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.delete_trigger(_gather args)
+	## 
+	## 
+
+	_dynamic !mss_workspace_initiator!
+	_if !mss_workspace_initiator! _is _unset
+	_then
+		_self.user_error(:delete_no_initiator)
+	_endif
+	_super.delete_trigger(_scatter args)
+	_self.validate_delete()
+	_self.track_history(:delete)
+	_self.delete_related_documents()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.validate_singular_state(status_val)
+	## 
+	## Raise an error if changing self's status to STATUS_VAL will
+	## violate singularity rules.
+	##
+
+	_if (a_job << _self.mss_job) _is _unset _orif
+	    a_job.singular_children? _is _false
+	_then
+		# No singularity rules to enforce.
+		_return
+	_endif
+
+	st << _self.workflow().get_state(status_val)
+	_if st.get_property(:singular?) _isnt _true
+	_then
+		# The state associated with STATUS_VAL is not a singular state.
+		_return
+	_endif
+	
+	my_id << _self.id
+	_for i _over a_job.mss_designs.fast_elements()
+	_loop
+		_if i.id = my_id _then _continue _endif
+		_if (st << i.state(_true)) _isnt _unset _andif
+		    st.get_property(:singular?) _is _true
+		_then
+			# Error - there is already a singular design.
+			_self.user_error(:already_singular_design, _self.short_description, status_val,
+					 i.short_description, i.status)
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.validate_overlay_copy_from(another)
+	## 
+	## Return true if it is permitted to copy overlay data from
+	## ANOTHER design into self, or raise a condition if not
+	## permitted. 
+	##
+	## If allowed, then a second return value will be a property
+	## list that describes how the overlay copy will be performed
+	## (c.f. mss_wm_overlay_view_copy_engine.set_copy_parameters()).
+	##
+	
+	my_state << _self.state()
+	another_state_name << another.state().name
+	another_wf_name << another.workflow().internal_name
+
+	_for copy_from_data _over my_state.properties[:overlay_copy_from].default({}).fast_elements()
+	_loop
+		_if copy_from_data[1] = another_wf_name _andif
+		    copy_from_data[2] = another_state_name
+		_then
+			_if copy_from_data.size >= 3
+			_then
+				how << copy_from_data[3]
+			_else
+				how << _unset
+			_endif 
+			_return _true, how
+		_endif
+	_endloop
+	_self.user_error(:overlay_copy_from_not_allowed, my_state.name, another_state_name, another.workflow().name)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.validate_aggregate_from(another)
+	## 
+	## Return true if it is permitted to aggregate all data from
+	## ANOTHER design into self, or either raise a condition if not
+	## permitted.
+	##
+	## If allowed, then a second return value will be a property
+	## list that describes how the aggregation will be performed
+	## (c.f. mss_workspace_manager_engine.aggregate_design()).
+	##
+
+	# Cannot aggregate into self.
+	_if another = _self
+	_then
+		_self.user_error(:self_aggregate_not_allowed, _self.short_description)
+	_endif
+
+	# Cannot aggregate when one design is the immediate parent of
+	# the other.
+	p1 << _self.ordered_design_path
+	p2 << another.ordered_design_path
+	_if equality_set.new_from(p1).includes?(another)
+	_then
+		_self.user_error(:pc_aggregate_not_allowed, another.short_description, _self.short_description)
+	_endif
+	_if equality_set.new_from(p2).includes?(_self)
+	_then
+		_self.user_error(:pc_aggregate_not_allowed, _self.short_description, another.short_description)
+	_endif
+	
+	my_state << _self.state()
+	another_state_name << another.state().name
+	another_wf_name << another.workflow().internal_name
+
+	_for copy_from_data _over my_state.properties[:aggregate_from].default({}).fast_elements()
+	_loop
+		_if copy_from_data[1] = another_wf_name _andif
+		    copy_from_data[2] = another_state_name
+		_then
+			_if copy_from_data.size >= 3
+			_then
+				how << copy_from_data[3]
+			_else
+				how << _unset
+			_endif 
+			_return _true, how
+		_endif
+	_endloop
+	_self.user_error(:aggregate_from_not_allowed, my_state.name, another_state_name, another.workflow().name,
+			 another.short_description)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.annotation_text
+	## 
+	## If self is the only design for a job, just use the job
+	## name.  Otherwise, use job and design name.
+	##
+
+	_if (parent << _self.mss_job) _isnt _unset
+	_then
+		_if parent.mss_designs.size > 1
+		_then
+			_return _self.job_and_design_name
+		_else
+			_return parent.name
+		_endif
+	_endif
+	_return ""
+		
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.history_table
+	## 
+	## 
+
+	_return _self.source_view.collections[:mss_design_history]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.history_records
+	## 
+	## 
+
+	_return _self.history_table.select(predicate.eq(:mss_design_id, _self.id))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.track_history(operation, _optional old_rec)
+	## 
+	## Log additional information relating to insert/update/delete
+	## history.
+	##
+
+	upd_user << _self.last_update_user << gis_program_manager.login_name
+	upd_time << _self.last_update_time << date_time.now()
+	_if operation _is :update
+	_then
+		# No further tracking needs to be done, unless an essential
+		# field value has changed.
+		any_change? << _false 
+		_for fname _over _self.track_history_fields.fast_elements()
+		_loop
+			_if _self.perform(fname) ~= old_rec.perform(fname)
+			_then
+				any_change? << _true
+				_leave
+			_endif
+		_endloop
+		_if _not any_change?
+		_then
+			_return
+		_endif
+	_endif
+
+	ndr << _self.history_table.new_detached_record()
+	_if operation _is :insert _then ndr.operation << 1
+	_elif operation _is :delete _then ndr.operation << 3
+	_else ndr.operation << 2
+	_endif
+	_if (parent_job << _self.mss_job) _isnt _unset
+	_then ndr.mss_job_id << parent_job.id
+	_else ndr.mss_job_id << 0
+	_endif 
+	ndr.mss_design_id << _self.id
+	ndr.last_update_user << upd_user
+	ndr.last_update_time << upd_time
+	_for fname _over _self.track_history_fields.fast_elements()
+	_loop
+		ndr.perform(fname.with_chevron, _self.perform(fname))
+	_endloop
+	ndr.source_collection.insert(ndr)
+
+	_if operation _is :delete
+	_then
+		_self.create_archive_record(:mss_design_archive)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.fire_pre_insert_actions(prop_values)
+	## 
+	## Create a world for self's extent if needed.
+	##
+
+	_super.fire_pre_insert_actions(prop_values)
+	_if prop_values[:last_update_user] _is _unset
+	_then
+		prop_values[:last_update_user] << gis_program_manager.login_name
+	_endif 
+	_if prop_values[:last_update_time] _is _unset
+	_then
+		prop_values[:last_update_time] << date_time.now()
+	_endif 
+	_self.create_world_for_extent(prop_values)
+	_return prop_values
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.fire_pre_update_actions(prop_values)
+	## 
+	## Create a world for self's extent if needed.
+	##
+
+	_super.fire_pre_update_actions(prop_values)
+	_self.create_world_for_extent(prop_values)
+	_return prop_values
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_design.create_world_for_extent(prop_values)
+	## 
+	## Create a world for self's extent if needed.
+	## 
+	
+	_if (geom << prop_values[:extent]) _isnt _unset _andif
+	    (orig_world << geom.world) _isnt _unset 
+	_then
+		orig_world << orig_world.dataset_worlds.an_element()
+		mss_world << _self.source_view.matching_world(orig_world)
+		_if mss_world _is _unset
+		_then
+			# Creating this geometry in a new world... create the world
+			# first.  In this case, the configurer must have set up
+			# universes.  For example, in the Cambridge system:
+			#  - v.define_world_type("internals", 2**20, 8)
+			mss_world << _self.source_view.create_world(
+					     orig_world.universe_name,
+					     orig_world.name,
+					     :world_bounds, orig_world.bounds,
+					     :world_used_bounds, orig_world.used_bounds,
+					     :units, orig_world.unit.name)
+		_endif
+		geom.world << mss_world
+	_endif
+	
+	_return prop_values
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_design.init_default_attributes(attr_pl, mode)
+	## 
+	## Initialize default values in the attribute property_list
+	## ATTR_PL when creating a new design as described by MODE (one
+	## of :job_and_design, :design (for a top-level design), or
+	## :sub_design).
+	##
+
+	attr_pl[:owner] << gis_program_manager.login_name
+	_if mode _is :job_and_design
+	_then
+		attr_pl[:name] << _self.message(:first_design_name)
+	_endif
+	_return attr_pl
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.can_match?(fd)
+	## 
+	## Derive values for various fields from the actual data model.
+	##
+
+	_if {:status}.includes?(fd.name)
+	_then
+		_return _true
+	_endif
+	_return _super.can_match?(fd)
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.match_string(fd, a_string, _optional record)
+	## 
+	## Derive values for various fields from the actual data model.
+	## 
+
+	_if (fdn << fd.name) _is :status
+	_then
+		_return _self.get_subsequent_state_names(_false)
+	_endif
+	_return _super.match_string(fd, a_string, record)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.last_update_date
+	## 
+	## 
+
+	_if (t << _self.last_update_time) _isnt _unset
+	_then
+		_return date.new_from(t)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.job_type(_optional ignore_errors?)
+	## 
+	## Return self's job_type, based on job type of owning job.
+	## If IGNORE_ERRORS? is true, then an error in the workflow
+	## configuration will simply be ingored.
+	##
+
+	retval << _unset 
+	_if (job << _self.mss_job) _isnt _unset
+	_then
+		retval << job.job_type(ignore_errors?)
+	_endif
+	_if retval _is _unset _andif
+	    ignore_errors? _isnt _true
+	_then
+		_self.user_error(:no_job_type_for_record, _self.short_description)
+	_endif 
+	_return retval 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.workflow(_optional ignore_errors?)
+	## 
+	## Return self's workflow, based on workflow of owning job.
+	## If IGNORE_ERRORS? is true, then an error in the workflow
+	## configuration will simply be ingored.
+	## 
+
+	retval << _unset 
+	_if (job << _self.mss_job) _isnt _unset
+	_then
+		retval << job.workflow(ignore_errors?)
+	_endif
+	_if retval _is _unset _andif
+	    ignore_errors? _isnt _true
+	_then
+		_self.user_error(:no_workflow_for_record, _self.short_description)
+	_endif 
+	_return retval 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.state(_optional ignore_errors?)
+	## 
+	## Return self's state, based on job type and status.  If
+	## IGNORE_ERRORS? is true, then an error in the workflow
+	## configuration will simply be ingored. 
+	##
+
+	retval << _unset 
+	_if (wf << _self.workflow(ignore_errors?)) _isnt _unset _andif
+	    (st << _self.status) _isnt _unset 
+	_then
+		retval << wf.get_state(st.as_charvec())
+	_endif
+	_if retval _is _unset _andif
+	    ignore_errors? _isnt _true
+	_then
+		_self.user_error(:no_state_for_record, _self.short_description)
+	_endif 
+	_return retval 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.short_description
+	## 
+	## Use self's job_and_design_full_name for a short description.
+	##
+
+	_return _self.job_and_design_full_name
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.get_subsequent_state_names(strict?)
+	## 
+	## Return all state names that self can transition to.
+	## If STRICT? is false, then this is intended for a
+	## match_string() type of query, and it will include self's
+	## current state - and all states if self doesn't have a
+	## workflow defined.  If STRICT? is true, then this is intended
+	## for performing a state change operation, and only allowable
+	## transition names will be returned.
+	##
+	
+	_if (wf << _self.workflow(_true)) _is _unset
+	_then
+		_if strict?
+		_then
+			_return {}
+		_else 
+			_return mss_workflow.all_state_names.as_sorted_collection()
+		_endif 
+	_endif
+
+	_if (st << _self.status) = ""
+	_then
+		st << _unset
+	_else
+		st << st.as_charvec()
+	_endif
+
+	_if st _is _unset _andif strict?
+	_then
+		_return {}
+	_endif
+	
+	eq << equality_set.new_from(wf.get_subsequent_state_names(_self, st))
+	_if st _isnt _unset _andif _not strict?
+	_then
+		eq.add(st)
+	_endif 
+	_return eq.as_sorted_collection()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.owned_by_current_user?(_optional uname)
+	## 
+	## Return true is self is owned by the given user name
+	## (defaults to gis_program_manager.login_name)
+	##
+
+	_if uname _is _unset
+	_then 
+		uname << gis_program_manager.login_name
+	_endif
+	_if uname _is _unset _orif
+	    _self.owner _is _unset 
+	_then
+		_return _true
+	_endif 
+	_return uname.canonical = _self.owner.canonical
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.parent_design
+	## 
+	## Return self's parent design, or unset if self is a top-level
+	## design.
+	##
+
+	_if (parent_id << _self.mss_design_id) _isnt _unset
+	_then
+		_return _self.source_collection.at(parent_id)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.child_designs
+	## 
+	## Return all immediate sub-designs of self.
+	##
+
+	_return _self.source_collection.select(predicate.eq(:mss_design_id, _self.id))
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.ordered_sub_designs(_optional include_self?)
+	## 
+	## Return all related designs by performing a depth first
+	## traversal.  If INCLUDE_SELF? is true, then self will also be
+	## included at the top of the list.
+	##
+
+	done_recs << equality_set.new()
+	done_recs.add(_self)
+	st << stack.new()
+	st.push(_self)
+	r << rope.new()
+	_loop
+		_if (next << st.pop()) _is _unset _then _leave _endif
+		_if include_self? _is _true _orif
+		    next ~= _self
+		_then
+			r.add_last(next)
+		_endif
+		_for child _over next.child_designs.fast_elements()
+		_loop
+			_if _not done_recs.includes?(child)
+			_then
+				done_recs.add(child)
+				st.push(child)
+			_endif
+		_endloop
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.ordered_design_path
+	## 
+	## Return a rope of all designs from self's top-level design
+	## down to self.
+	##
+
+	r << rope.new()
+	work_rec << _self
+	tbl << _self.source_collection
+	r.add_last(work_rec)
+	_loop
+		_if (parent_rec << work_rec.parent_design) _is _unset
+		_then 
+			_leave
+		_endif
+		work_rec << parent_rec
+		r.add_last(work_rec)
+	_endloop
+	_return r.reversed()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.full_name
+	## 
+	## Return the name of all designs in self's ordered design
+	## path, separated by "/".
+	##
+
+	s << internal_text_output_stream.new()
+	sep << ""
+	_for i _over _self.ordered_design_path.fast_elements()
+	_loop
+		s.write(sep, i.name)
+		sep << " / "
+	_endloop
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.job_and_design_name
+	## 
+	## Return a concatenation of self's job name and design name.
+	##
+
+	s << internal_text_output_stream.new()
+	_if (j << _self.mss_job) _isnt _unset
+	_then
+		s.write(j.name)
+	_endif
+	s.write(" - ", _self.name)
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.job_and_design_full_name
+	## 
+	## Return a concatenation of self's job name and design full name.
+	##
+
+	s << internal_text_output_stream.new()
+	_if (j << _self.mss_job) _isnt _unset
+	_then
+		s.write(j.name)
+	_endif
+	s.write(" - ", _self.full_name)
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.synchronize_job_status(state_trans)
+	## 
+	## When performing the state transition STATE TRANS, update the
+	## status of self's job so that it is the most "forward" of the
+	## designs in that job.  However, if one or more designs have
+	## reached the approved state, it will instead be the most
+	## "backward" of those approved designs. 
+	##
+
+	_if (a_job << _self.mss_job) _is _unset _orif
+	    (wf << a_job.workflow(_true)) _is _unset 
+	_then
+		_return
+	_endif
+
+	most_forward_state << _unset
+	most_forward_state_score << _unset
+	most_backward_approved_state << _unset
+	most_backward_approved_state_score << _unset
+
+	_for a_design _over a_job.mss_designs.fast_elements()
+	_loop
+		st_name << a_design.status.as_charvec()
+		_if (st << wf.get_state(st_name)) _is _unset
+		_then
+			_continue
+		_endif
+		_if (score << st.get_property(:progress_score)) _is _unset
+		_then
+			_continue
+		_endif
+		_if most_forward_state_score _is _unset _orif
+		    most_forward_state_score < score
+		_then
+			most_forward_state << st_name
+			most_forward_state_score << score
+		_endif 
+		_if (approved? << st.get_property(:singular?).default(_false))
+		_then
+			_if most_backward_approved_state_score _is _unset _orif
+			    most_backward_approved_state_score > score
+			_then
+				most_backward_approved_state << st_name
+				most_backward_approved_state_score << score
+			_endif
+		_endif 
+	_endloop
+
+	_if most_backward_approved_state _isnt _unset
+	_then
+		new_job_state << most_backward_approved_state
+	_elif most_forward_state _isnt _unset
+	_then
+		new_job_state << most_forward_state
+	_else
+		_return
+	_endif
+
+	_if a_job.status ~= new_job_state
+	_then 
+		dr << a_job.detached()
+		dr.status << new_job_state
+		dr.source_collection.update(dr)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_design.ensure_active_design()
+	## 
+	## Ensure that self is the currently active design.
+	##
+
+	_if (ad << mss_workspace_manager_engine.active_design) _is _unset _orif
+	    ad.id ~= _self.id
+	_then
+		_self.user_error(:not_active_design, _self.short_description)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_design.track_records_in_design?()
+	## 
+	## Return true if inserted/updated/deleted records are to be
+	## tracked in this design (c.f. the mss_workspace_manager_engine.
+	## mss_workspace_tracking_trigger() method).
+	##
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_iter _method mss_design.tracking_records(_optional all_parents?, track_view_pl, rec_view_pl,
+					  track_table_name, want_tracked_too?)
+	## 
+	## Returns all tracking records for this design found in
+	## collection TRACK_TABLE_NAME (defaults to :mss_workspace_tracking_record).
+	## If ALL_PARENTS? is true, then this will also return all tracked
+	## records for all parent designs.
+	##
+	## TRACK_VIEW_PL may be a property list (keyed on view name) of the
+	## database views to examine to search for tracking records.
+	## This defaults to the cached datasets associated with this design.
+	##
+	## REC_VIEW_PL may be a property list (keyed on view name) of the
+	## database views to examine to search for the actual records
+	## associated with the tracking records.  Note that REC_VIEW_PL
+	## parameter is only relevant if the WANT_TRACKED_TOO?
+	## parameter is true (it defaults to false).
+	##
+	## This defaults to the cached datasets associated with this design.
+	## This allows, for example, deleted records to be retrieved
+	## from a base view.  However, note that this method does not
+	## validate that the design is the active design, and therefore
+	## the caller must ensure that the database views being
+	## operated on are sensible for the design in question. 
+	##
+	## Each loop in this iterator will return the following
+	## - If WANT_TRACKED_TOO?, it will return the tracked record
+	##   associated with the tracking record as the first result.
+	## - The tracking record will be the next result.
+	##
+
+	track_table_name << track_table_name.default(:mss_workspace_tracking_record)
+	want_tracked_too? << want_tracked_too?.default(_false)
+	_if all_parents? _is _true
+	_then
+		all_designs << _self.ordered_design_path
+	_else
+		all_designs << {_self}
+	_endif
+
+	_if track_view_pl _isnt _unset
+	_then
+		my_ds_names << track_view_pl.keys
+	_else
+		my_ds_names << _self.job_type().dataset_names
+	_endif
+
+	r << rope.new()
+	_for a_design _over all_designs.fast_elements()
+	_loop
+		_for ds_name _over my_ds_names.fast_elements()
+		_loop
+			_if track_view_pl _isnt _unset
+			_then
+				track_dbv << track_view_pl[ds_name]
+			_else 
+				track_dbv << gis_program_manager.cached_dataset(ds_name)
+			_endif
+			_if track_dbv _is _unset _then _continue _endif
+			
+			_if rec_view_pl _isnt _unset
+			_then
+				rec_dbv << rec_view_pl[ds_name]
+			_else 
+				rec_dbv << gis_program_manager.cached_dataset(ds_name)
+			_endif
+			rec_dbv << rec_dbv.default(track_dbv)
+			_if (tbl << track_dbv.collections[track_table_name]) _is _unset
+			_then
+				_continue
+			_endif
+			dr << tbl.record_exemplar
+			_for track_rec _over dr.tracking_records_for(_unset, a_design).fast_elements()
+			_loop
+				_if _not track_rec.is_valid?
+				_then
+					# Deleted by something external which is using this iterator.
+					_continue
+				_endif 
+				_if want_tracked_too?
+				_then
+					real_rec << track_rec.tracked_record(rec_dbv)
+					_loopbody(real_rec, track_rec)
+				_else
+					_loopbody(track_rec)
+				_endif 
+			_endloop
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.tracked_records(_optional all_parents?, track_view_pl, rec_view_pl,
+				   track_table_name)
+	## 
+	## Returns all rope of tracking information found via relationships to
+	## tracking records for this design.  Refer to the comments for
+	## the method tracking_records(), as these parameters are
+	## passed through to that method.
+	##
+	## Each item in the returned rope is a two-element vector
+	## of the form {REAL_REC, TRACKING_REC}, where REAL_REC is the
+	## database record being tracked, and TRACKING_REC is the
+	## record from TRACK_TABLE_NAME that tracked it.
+	##
+	## Note that this is preferable to using the tracking_records()
+	## iterator in cases where you may be deleting records as you
+	## process the results.
+	##
+	
+	r << rope.new()
+	_for real_rec, track_rec _over _self.tracking_records(all_parents?, track_view_pl, rec_view_pl,
+							      track_table_name, _true)
+	_loop
+		r.add_last({real_rec, track_rec})
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.perform_as_writable_active_design(meth_name, _gather args)
+	## 
+	## Perform the method METH_NAME (with arguments ARGS), in the
+	## following environment:
+	## - First, ensure that self is the active design.
+	## - Switch all design datasets to write mode.
+	## - Perform the method.
+	## - Commit results if the method completes successfully, or
+	##   rollback results otherwise.
+	## - Restore readonly/write access to all datasets to be what
+	##   it was at the start of this process.
+	##
+
+	# Self must be the active design to carry on.
+	_self.ensure_active_design()
+
+	# Get all datasets associated with self.
+	ds_rope << rope.new()
+	_for i _over mss_workspace_manager_engine.active_design_dataset_names.fast_elements()
+	_loop
+		ds_rope.add_last(gis_program_manager.cached_dataset(i))
+	_endloop
+
+	ok? << _false 
+	vmds_state << mss_workspace_manager_engine.save_vmds_state()
+	_protect
+		# Force all datasets associated with self to be writable for
+		# the duration of this operation.
+		_for i _over ds_rope.fast_elements()
+		_loop
+			i.switch(:write)
+		_endloop
+
+		result << _allresults _self.perform_private(meth_name, _scatter args)
+		ok? << _true 
+	_protection
+		mss_workspace_manager_engine.restore_vmds_state(vmds_state, ok?)
+	_endprotect 
+
+	_if result _is _unset
+	_then
+		_return _unset
+	_endif 
+	_return _scatter result
+	
+_endmethod
+$

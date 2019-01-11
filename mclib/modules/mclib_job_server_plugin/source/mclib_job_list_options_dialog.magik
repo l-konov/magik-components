@@ -1,0 +1,191 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+
+_package mclib
+$
+
+def_slotted_exemplar(:mclib_job_list_options_dialog,
+	## 
+	## 
+	## 
+	{},
+	{ :job_list_options_dialog})
+$
+_pragma(classify_level=restricted, topic={report})
+_method mclib_job_list_options_dialog.activate_in( a_frame )
+
+	##
+	## This override is to add the 'Filter Out' date fields to the
+	## options dialog
+	##
+
+	_self.title << _self.message(:title)
+	
+	.items << hash_table.new()
+	a_frame.resizable? << _false 
+	spacing << 7
+	min_width << 75
+
+	main_rc << rowcol.new( a_frame, 4 )
+
+	main_rc.top_spacing <<
+		main_rc.bottom_spacing <<
+		main_rc.left_spacing <<
+		main_rc.right_spacing <<
+		main_rc.row_spacing << spacing
+
+	nvm << numeric_value_manager.new( :integer?, _true )
+
+	refresh_gb << group_box.new(main_rc, _self.message(:job_list_refresh),
+				    :col_alignment, :fill
+				)
+	refresh_rc << rowcol.new( refresh_gb, 2 )
+	.items[:auto_refresh] << toggle_item.new(refresh_rc,
+						 _self.message(:auto_refresh),
+						 :value,
+						 .owner.application.get_preference(
+							 :job_refresh_auto
+								    ).default(_true)
+					     )
+	duration_rc << rowcol.new( refresh_rc, _unset, 3 )
+	label_item.new(duration_rc, _self.message( :repeat_every ) )
+	.items[:repeat_seconds] << managed_value_text_item.new(
+					   duration_rc,
+					   _unset,
+					   :manager, nvm,
+					   :display_length, 4,
+					   :value,
+					   .owner.application.get_preference(
+						   :job_refresh_time
+							      ).default(60)
+							   )
+	label_item.new(duration_rc, _self.message( :repeat_unit ) )
+
+	colour_gb << group_box.new(main_rc,
+				   _self.message( :colour_settings ),
+				   :col_alignment, :fill
+			       )
+	colour_rc << rowcol.new( colour_gb, _unset, 2)
+
+	label_item.new(colour_rc, _self.message(:suspended_colour))
+	.items[:suspended_colour] << colour_choice_item.new(
+					     colour_rc,
+					     _unset,
+					     :width, 100,
+					     :palette, :named,
+					     :allow_custom_colours?, _false,
+					     :allow_no_value?, _false,
+					     :value,
+					     colour.called(
+						     .owner.application.get_preference(
+							     :job_suspended_colour
+									).default(:gray))
+							)
+
+	label_item.new(colour_rc, _self.message(:failed_colour))
+	.items[:failed_colour] << colour_choice_item.new(
+					  colour_rc,
+					  _unset,
+					  :width, 100,
+					  :allow_custom_colours?, _false,
+					  :allow_no_value?, _false,
+					  :palette, :named,
+					  :value,
+					  colour.called(
+						  .owner.application.get_preference(
+							  :job_failed_colour
+								     ).default(:red))
+						     )
+	## Begin MCLIB 
+	date_gb << group_box.new(main_rc,
+							 _self.message( :filter_out_criteria ),
+							 :col_alignment, :fill )
+
+	date_rc << rowcol.new( date_gb, _unset , 2)
+	# using the calendar only seems to work with days, not date_time..
+	#dvm << date_time_value_manager.new( :time?, _true )
+	dvm << date_time_value_manager.new( :time?, _false )
+
+	def_val << .owner.application.get_preference(:job_only_after_date)
+	label_item.new(date_rc, _self.message(:ignore_before))
+	.items[:only_after_date] << job_date_item.new( date_rc,_unset, _self, 
+												   :value, def_val,
+												   :manager, dvm,
+												   :display_length, 12
+											  )
+	
+	dvm2 << date_time_value_manager.new( :time?, _false )
+	label_item.new(date_rc, _self.message(:ignore_after))
+	.items[:only_before_date] << job_date_item.new( date_rc, _unset,_self,
+													:value, _unset,
+													:manager, dvm2,
+													:display_length, 12
+											   )
+	
+	#END MCLIB
+	bottom_rc << rowcol.new(main_rc, _unset, 2, _unset, :col_alignment, :fill,
+				:col_spacing, spacing,
+				:top_spacing, spacing
+						)
+	.items[:help] << image_button_item.new(bottom_rc,
+					       smallworld_product.get_raster_image(
+						       :help, :ui_resources ),
+					       _self, {:|help()|, _self.help_id},
+					  :col_alignment, :left)
+	std_button_rc << rowcol.new(bottom_rc, _unset, 2, _unset, :col_alignment, :right,
+				    :col_spacing, spacing
+				)
+	.items[:ok] << button_item.new(std_button_rc, _self.message(:ok),
+				       _self, :set_options|()|,
+				       :col_alignment, :right,
+				       :min_width, min_width
+				   )
+	.items[:cancel] << button_item.new(std_button_rc, _self.message(:cancel),
+					   _self, :close|()|,
+					   :col_alignment, :right,
+					   :min_width, min_width
+				       )
+	_return main_rc
+_endmethod
+$
+_pragma(classify_level=restricted, topic={report})
+_method mclib_job_list_options_dialog.set_options()
+	##
+	## this override is to set these date preferences before
+	## closing the dialog
+	##
+
+	.owner.application.set_preference(
+		:job_only_after_date, .items[:only_after_date].value )
+
+	.owner.application.set_preference(
+		:job_only_before_date, .items[:only_before_date].value )
+
+	_return _super.set_options()
+_endmethod
+$
+

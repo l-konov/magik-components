@@ -1,0 +1,176 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_url_parser
+##
+## Tool to parse a URL into components.
+##
+## Note: currently, this does not deal with escaping reserved
+## or unsafe characters into their escaped equivalents.
+##
+
+def_slotted_exemplar(:mss_http_url_parser,
+{},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_url_parser.new()
+	## 
+	## Currently, all operations can be done on exemplar, so just
+	## return self.
+	##
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_url_parser.parse_url(a_url)
+	## 
+	## A_URL is a URL in this format (c.f. RFC 2396)
+	## <scheme>://<userinfo>@<host>:<port>/<path>?<query>#<fragment>
+	## Return a property list containing each of these components.
+	##
+	## This implementation is simplistic, and does not deal with
+	## character encoding or escaping of reserved characters.
+	##
+
+	# TODO: must deal with encoding/escaping/unescaping characters.
+	
+	pl << property_list.new()
+	str << a_url
+	_if (idx << str.index_of_seq("://")) _isnt _unset
+	_then
+		pl[:scheme] << str.slice(1, idx - 1).lowercase
+		str << str.slice_to_end(idx + 3)
+	_endif
+
+	_if (idx << str.rindex_of(%#)) _isnt _unset
+	_then
+		pl[:fragment] << str.slice_to_end(idx + 1)
+		str << str.slice(1, idx - 1)
+	_endif
+	
+	_if (idx << str.index_of(%?)) _isnt _unset
+	_then
+		pl[:query] << str.slice_to_end(idx + 1)
+		str << str.slice(1, idx - 1)
+	_endif
+	
+	_if (idx << str.index_of(%@)) _isnt _unset
+	_then
+		pl[:userinfo] << str.slice(1, idx - 1)
+	_endif
+	
+	_if (idx << str.index_of(%/)) _isnt _unset
+	_then
+		hostport << str.slice(1, idx - 1)
+		str << str.slice_to_end(idx + 1)
+	_else
+		hostport << str
+		str << _unset
+	_endif 
+
+	_if (idx << hostport.index_of(%:)) _isnt _unset
+	_then
+		pl[:host] << hostport.slice(1, idx - 1)
+		pl[:port] << hostport.slice_to_end(idx + 1).as_integer()
+	_else
+		pl[:host] << hostport
+	_endif
+	pl[:path] << str.default("")
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_url_parser.parse_query_string(qstr)
+	## 
+	## Split query_string into an equality_property_list of keys
+	## and values.
+	##
+	## N.B.: assumes that QSTR is in an escaped form (i.e. a
+	## character "?" is instead represented as "%3F").  But, this
+	## method does not yet deal with unescaping characters yet.
+	##
+
+	# TODO: deal with escaping/unescaping.
+	
+	retval << equality_property_list.new()
+	_for i _over qstr.split_by(%&).fast_elements()
+	_loop
+		_if (idx << i.index_of(%=)) _is _unset _then _continue _endif
+		_if (key << i.slice(1, idx - 1).trim_spaces()) = "" _then _continue _endif
+		val << i.slice_to_end(idx + 1).trim_spaces()
+		retval[key] << val
+	_endloop
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_url_parser.uri_encode(str)
+	## 
+	## Perform Uniform Resource Identifier encoding on string STR.
+	## Can be called on the exemplar.
+	##
+	## N.B.: the current implementation is not internationalized,
+	## and results are undefined for non-ascii input.
+	##
+
+	subs << {{%%, "%25"},
+		 {%!, "%21"},
+		 {%*, "%2A"},
+		 {%', "%27"},
+		 {%(, "%28"},
+		 {%), "%29"},
+		 {%;, "%3B"},
+		 {%:, "%3A"},
+		 {%@, "%40"},
+		 {%&, "%26"},
+		 {%=, "%3D"},
+		 {%+, "%2B"},
+		 {%$, "%24"},
+		 {%,, "%2C"},
+		 {%/, "%2F"},
+		 {%?, "%3F"},
+		 {%#, "%23"},
+		 {%[, "%5B"},
+		 {%], "%5D"},
+		 {%<, "%3C"},
+		 {%>, "%3E"},
+		 {%~, "%7E"},
+		 {%., "%2E"},
+		 {%", "%22"},
+		 {%{, "%7B"},
+		 {%}, "%7D"},
+		 {%|, "%7C"},
+		 {%\, "%5C"},
+		 {%-, "%2D"},
+		 {%`, "%60"},
+		 {%_, "%5F"},
+		 {%^, "%5E"},
+		 {space_char, "%20"}}
+	
+	retval << str
+	_for i _over subs.fast_elements()
+	_loop
+		retval << retval.substitute_string(i[1], i[2])
+	_endloop
+	_return retval
+	
+_endmethod
+$

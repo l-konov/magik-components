@@ -1,0 +1,1340 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_properties_dialog
+##
+## Dialog to allow display and editing of properties for a
+## selected CU definition.
+##
+
+def_slotted_exemplar(:mss_cu_properties_dialog,
+{
+	{:current_object, _unset},
+	{:items, _unset, :readable},
+	{:updated?, _unset, :readable},
+	{:all_operations, _unset, :readable},
+	{:operation_list, _unset, :readable},
+	{:op_excl_incl_cache, _unset, :readable}
+},
+{:model})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.init()
+	## 
+	## 
+
+	_super.init()
+	.current_object << _unset
+	.items << property_list.new()
+	.updated? << _false
+	.all_operations << rope.new()
+	tbl << mss_cu_engine.view.collections[:mss_cu_operation_definition]
+	fd << tbl.all_fields[:operation]
+	_for op _over tbl.record_exemplar.match_string(fd, "").fast_elements()
+	_loop 
+		_if op.default("") ~= ""
+		_then
+			.all_operations.add_last(op)
+		_endif
+	_endloop
+
+	.operation_list << rope.new()
+	_self.update_operation_list()
+
+	sort_proc << _proc(a, b)
+			     _if (x << a.value[:external_partition_name] _cf
+				       b.value[:external_partition_name]) _isnt _maybe
+			     _then
+				     _return x
+			     _endif
+			     _return a.value[:external_table_name] _cf
+				     b.value[:external_table_name]
+		     _endproc
+	.op_excl_incl_cache << equality_property_list.new()
+	_for op _over .all_operations.fast_elements()
+	_loop
+		.op_excl_incl_cache[op] << {sorted_collection.new(10, sort_proc),
+					    sorted_collection.new(10, sort_proc)}
+	_endloop
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.update_operation_list()
+	## 
+	## Update the contents of the operation_list to reflect the
+	## current object.
+	##
+
+	op_list << .operation_list
+	op_list.empty()
+
+	op_data << equality_property_list.new()
+	_if (cu_rec << _self.current_object) _isnt _unset
+	_then
+		_for i _over cu_rec.mss_cu_operation_definitions.fast_elements()
+		_loop
+			op_data[i.operation] <<
+				property_list.new_with(
+					:material_cost, i.material_cost.default(0.0),
+					:labor_cost, i.labor_cost.default(0.0))
+		_endloop
+	_endif
+	
+	sstr1 << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+				   :value, :operation, :tab,
+				   :value, :material_cost, :tab,
+				   :value, :labor_cost)
+	sstr2 << styled_string.new(:gray, :align, :centre, :toggle, :enabled?, :tab,
+				   :value, :operation, :tab,
+				   :value, :material_cost, :tab,
+				   :value, :labor_cost)
+
+	all_ops << .all_operations
+	_for op _over all_ops.fast_elements()
+	_loop
+		_if (cu_rec_op_data << op_data[op]) _isnt _unset
+		_then
+			sstr << sstr1
+			enabled? << _true
+			material_cost << cu_rec_op_data[:material_cost]
+			labor_cost << cu_rec_op_data[:labor_cost]
+		_else
+			sstr << sstr2
+			enabled? << _false
+			material_cost << 0.0
+			labor_cost << 0.0
+		_endif
+		
+		pl << property_list.new_with(:enabled?, enabled?,
+					     :operation, op,
+					     :material_cost, material_cost,
+					     :labor_cost, labor_cost)
+		dt << display_tree.new(op, pl)
+		dt.styled_string << sstr
+		op_list.add_last(dt)
+	_endloop
+
+	_self.changed(:operation_list, :refresh)
+	_return op_list
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.on_activation()
+	##
+	## Make dependent on the config view, and refresh all menu
+	## items and lists. 
+	##
+
+	_super.on_activation()
+	mss_cu_engine.view.add_dependent(_self, :view)
+	
+	_self.changed(:current_object_description)
+	_self.changed(:operation_list, :renew)
+	_self.changed(:excl_facility_list, :renew)
+	_self.changed(:incl_facility_list, :renew)
+	_self.changed(:attribute_list, :renew)
+
+	_self.manage_actions_for_excl_facility_list_selection()
+	_self.manage_actions_for_incl_facility_list_selection()
+	_self.manage_actions_for_attribute_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.on_deactivation()
+	## 
+	## Remove dependence on config view.
+	##
+
+	mss_cu_engine.view.remove_dependent(_self, :view)
+	_super.on_deactivation()
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.note_change(who, what, data)
+	## 
+	## 
+
+	_if who _is mss_cu_engine.view
+	_then
+		_if what _is :view
+		_then
+			# Undo/redo/rollback: force a full refresh if data no longer
+			# valid, and also update current object description (which may
+			# have changed).
+			_if .current_object _isnt _unset _andif
+			    _not .current_object.is_valid?
+			_then 
+				_self.set_current_object(_self.current_object)
+			_endif
+			_self.changed(:current_object_description)
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.activate_in(f)
+	## 
+	## 
+
+	f.default_resize? << _false 
+	p << panel.new(f)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.resize_x? << _true
+	p.resize_y? << _false
+
+	p.start_row()
+	.items[:current_object_description] <<
+		label_item.new(p, _self.current_object_description,
+			       :model, _self,
+			       :aspect, :current_object_description)
+
+	p.start_row()
+	label_item.new(p, _self.message(:operation_header))
+	
+	p.start_row()
+	.items[:operation_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :operation_list,
+			      :data_selector, :operation_list,
+			      :select_notifier, :|operation_list_selected()|,
+			      :editor_required_notifier, :|operation_list_editor_required()|,
+			      :value_changed_notifier, :|operation_list_value_changed()|,
+			      :column_widths, {60, 100, 100, 100},
+			      :column_headings, {_self.message(:ch_enabled?),
+						 _self.message(:ch_operation),
+						 _self.message(:ch_material_cost),
+						 _self.message(:ch_labor_cost)},
+			      :height_in_chars, .operation_list.size + 1,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _false) 
+
+	sh << ti.style_holder
+	ndec << mss_cu_operation_definition.material_cost_decimal_places
+	sh.add_value_formatter(:material_cost, float_format.new_with_properties(:float_decimal_places, ndec))
+	ndec << mss_cu_operation_definition.labor_cost_decimal_places
+	sh.add_value_formatter(:labor_cost, float_format.new_with_properties(:float_decimal_places, ndec))
+
+	p.start_row()
+
+	p2 << panel.new(f)
+	p2.border_width << p2.border_height << 0
+	p2.height_spacing << p2.width_spacing << 0
+	p2.resize_x? << p2.resize_y? << _true
+
+	p3 << panel.new(p2)
+	p3.border_width << p3.border_height << 2
+	p3.height_spacing << p3.width_spacing << 6
+	p3.resize_x? << p3.resize_y? << _true
+
+	p3.start_row()
+	label_item.new(p3, _self.message(:excl_facility_header))
+	
+	p3.start_row()
+	.items[:excl_facility_list] << ti << 
+		tree_item.new(p3,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :excl_facility_list,
+			      :data_selector, :excl_facility_list,
+			      :select_notifier, :|excl_facility_list_selected()|,
+			      :column_widths, {70, 140},
+			      :column_headings, {_self.message(:ch_partition_name),
+						 _self.message(:ch_table_name)},
+			      :height_in_chars, 12,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :distribute_spare_width, :always,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+
+	p4 << panel.new(p2)
+	p4.border_width << p4.border_height << 2
+	p4.height_spacing << p4.width_spacing << 6
+	p4.resize_x? << _false
+	p4.resize_y? << _true
+
+	p4.start_column()
+	label_item.new(p4, "")
+	simple_panel.new(p4).resize_y? << _true
+	
+	ri1 << smallworld_product.get_raster_image(:forward, :ui_resources)
+	ri2 << smallworld_product.get_raster_image(:forward_grey, :ui_resources)
+	.items[:add_incl_facility] <<
+		image_button_item.new_safe(p4, ri1, _self, :|add_incl_facility()|,
+					   :insensitive_image, ri2,
+					   :balloon_help_text, _self.message(:add_incl_facility))
+
+	ri1 << smallworld_product.get_raster_image(:back, :ui_resources)
+	ri2 << smallworld_product.get_raster_image(:back_grey, :ui_resources)
+	.items[:remove_incl_facility] <<
+		image_button_item.new_safe(p4, ri1, _self, :|remove_incl_facility()|,
+					   :insensitive_image, ri2,
+					   :balloon_help_text, _self.message(:remove_incl_facility))
+	
+	.items[:remove_incl_facility].set_below(.items[:add_incl_facility], 20)
+	simple_panel.new(p4).resize_y? << _true
+
+	p5 << panel.new(p2)
+	p5.border_width << p5.border_height << 2
+	p5.height_spacing << p5.width_spacing << 6
+	p5.resize_x? << p5.resize_y? << _true
+
+	p5.start_row()
+	label_item.new(p5, _self.message(:incl_facility_header))
+	
+	p5.start_row()
+	.items[:incl_facility_list] << ti << 
+		tree_item.new(p5,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :incl_facility_list,
+			      :data_selector, :incl_facility_list,
+			      :select_notifier, :|incl_facility_list_selected()|,
+			      :column_widths, {70, 140},
+			      :column_headings, {_self.message(:ch_partition_name),
+						 _self.message(:ch_table_name)},
+			      :height_in_chars, 12,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :distribute_spare_width, :always,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+
+	p6 << panel.new(p2)
+	p6.border_width << p6.border_height << 2
+	p6.height_spacing << p6.width_spacing << 6
+	p6.resize_x? << p6.resize_y? << _true
+
+	p6.start_row()
+	label_item.new(p6, _self.message(:attribute_header))
+	
+	p6.start_row()
+	.items[:attribute_list] << ti << 
+		tree_item.new(p6,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :attribute_list,
+			      :data_selector, :attribute_list,
+			      :select_notifier, :|attribute_list_selected()|,
+			      :editor_required_notifier, :|attribute_list_editor_required()|,
+			      :value_changed_notifier, :|attribute_list_value_changed()|,
+			      :column_widths, {60, 120, 120},
+			      :column_headings, {_self.message(:ch_enabled?),
+						 _self.message(:ch_attribute_name),
+						 _self.message(:ch_attribute_value)},
+			      :height_in_chars, 12,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :distribute_spare_width, :always,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+
+	p_last << panel.new(f)
+	p_last.border_width << p_last.border_height << 2
+	p_last.height_spacing << p_last.width_spacing << 6
+	p_last.resize_x? << _true
+	p_last.resize_y? << _false
+	simple_panel.new(p_last).resize_x? << _true 
+	.items[:ok] <<
+		button_item.new_safe(p_last, _self.message(:ok),
+				     _self, :|ok()|,
+				     :min_width, 75,
+				     :enabled?, _false)
+	.items[:cancel] <<
+		button_item.new_safe(p_last, _self.message(:cancel),
+				     _self, :|cancel()|,
+				     :min_width, 75)
+	.items[:apply] <<
+		button_item.new_safe(p_last, _self.message(:apply),
+				     _self, :|apply()|,
+				     :min_width, 75,
+				     :enabled?, _false)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.wm_close()
+	## 
+	## 
+
+	_self.perform_safely(:|cancel()|)
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.cancel()
+	## 
+	## Discard any pending updates and close the dialog.
+	##
+
+	# If there are pending updates, prompt for confirmation.
+	_if (cur_cu << _self.current_object) _isnt _unset _andif
+	    _self.updated?
+	_then 
+		q << _self.show_query({_self.message(:yes), _self.message(:no), _self.message(:cancel)},
+				      {:yes, :no, :cancel}, :yes,
+				      _self.message(:prompt_save_changes, _unset, cur_cu.cu_code))
+		_if q _is :yes
+		_then
+			_self.int!apply()
+		_elif q _is :cancel
+		_then
+			_return
+		_endif 
+	_endif
+	
+	# Reset all cached information for the current CU.  In any
+	# errors happen, ignore them so that the menu close can happen
+	# properly.
+	_try _with cond
+		_self.update_operation_list()
+		_self.set_op_excl_incl_cache()
+	_when error
+		write(cond.report_contents_string)
+	_endtry
+
+	_self.updated? << _false 
+	_self.quit(_true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.apply()
+	## 
+	## Apply the changes, and then refresh the menu to reflect the
+	## now-updated CU.
+	##
+
+	_self.int!apply()
+	_self.set_current_object(_self.current_object, _true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.ok()
+	## 
+	## Apply the changes, and dismiss the menu.
+	##
+
+	_self.int!apply()
+	_self.cancel()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.int!apply()
+	## 
+	## Apply any pending updates.
+	##
+
+	dbv << mss_cu_engine.view
+	_if _not dbv.writable?
+	_then
+		_self.user_error(:not_writable)
+	_endif
+	
+	ok? << dbv.start_lwt()
+	_protect
+		_self.apply_operations()
+		_self.apply_facilities_and_attributes()
+		ok? << _true
+	_protection
+		undo_data << property_list.new_with(:function, _self.message(:transaction_apply))
+		dbv.end_lwt(ok?, _true, _unset, undo_data)
+	_endprotect
+
+	_self.updated? << _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.apply_operations()
+	## 
+	## Apply changes based on the operation_list.
+	##
+
+	_if (cu_rec << _self.current_object) _is _unset
+	_then
+		_return
+	_endif
+
+	# Build a structure of all enabled operations.
+	pl << equality_property_list.new()
+	_for i _over .operation_list.fast_elements()
+	_loop
+		_if i.value[:enabled?] _is _true
+		_then
+			pl[i.key] << i.value
+		_endif
+	_endloop
+	
+	# The following does the updating in an incremental manner.
+	tbd << rope.new()
+	_for op_def _over cu_rec.mss_cu_operation_definitions.fast_elements()
+	_loop
+		_if (val << pl.remove_key(op_def.operation)) _is _unset
+		_then
+			tbd.add_last(op_def)
+		_else
+			dr << op_def.detached()
+			dr.material_cost << val[:material_cost].default(0.0)
+			dr.labor_cost << val[:labor_cost].default(0.0)
+			dr.source_collection.update(dr)
+		_endif
+	_endloop
+
+	# Delete ones that no longer exist.
+	_for i _over tbd.fast_elements()
+	_loop
+		i.delete()
+	_endloop
+
+	# Add in new ones.
+	tbl << mss_cu_engine.view.collections[:mss_cu_operation_definition]
+	_for i, j _over pl.fast_keys_and_elements()
+	_loop
+		dr << tbl.new_detached_record()
+		dr.operation << i
+		dr.material_cost << j[:material_cost].default(0.0)
+		dr.labor_cost << j[:labor_cost].default(0.0)
+		dr.mss_cu_definition << cu_rec
+		dr.source_collection.insert(dr)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.apply_facilities_and_attributes()
+	## 
+	## Apply changes based on the op_excl_incl_cache data structure.
+	##
+
+	_if (cu_rec << _self.current_object) _is _unset
+	_then
+		_return
+	_endif
+	cu_code << cu_rec.cu_code
+
+	# Build a list of what is enabled and what isn't - if an
+	# operation is not enabled, then don't store any facility
+	# relationships for it.
+	op_enabled_data << equality_property_list.new()
+	_for i _over .operation_list.fast_elements()
+	_loop
+		op_enabled_data[i.key] << i.value[:enabled?]
+	_endloop
+	
+	# Process each defined operation separately.
+	_for op, excl_incl_data _over .op_excl_incl_cache.fast_keys_and_elements()
+	_loop
+		# Build a structure of all included facilities.
+		pl << property_list.new()
+		_if op_enabled_data[op] _is _true
+		_then 
+			_for incl_data _over excl_incl_data[2].fast_elements()
+			_loop
+				pl[incl_data.key] << incl_data.value
+			_endloop
+		_endif 
+		attrs_per_fac_rel << equality_property_list.new()
+		
+		# The following does the facility updating in an incremental manner.
+		tbd << rope.new()
+		_for fac_rel _over cu_rec.mss_cu_facility_relationships.fast_elements()
+		_loop
+			_if fac_rel.operation ~= op _then _continue _endif
+			_if (val << pl.remove_key(fac_rel.table_code)) _is _unset
+			_then
+				tbd.add_last(fac_rel)
+			_else
+				# This one is to be updated - save attributes for later.
+				attrs_per_fac_rel[fac_rel] << val[:attribute_list]
+			_endif 
+		_endloop 
+
+		# Delete ones that no longer exist.
+		_for i _over tbd.fast_elements()
+		_loop
+			i.delete()
+		_endloop
+
+		# Add in new ones.
+		tbl << mss_cu_engine.view.collections[:mss_cu_facility_relationship]
+		_for i, j _over pl.fast_keys_and_elements()
+		_loop
+			dr << tbl.new_detached_record()
+			dr.cu_code << cu_code
+			dr.table_code << i
+			dr.operation << op
+			dr.mss_cu_definition << cu_rec
+			new_fac_rel << dr.source_collection.insert(dr)
+			attrs_per_fac_rel[new_fac_rel] << j[:attribute_list]
+		_endloop
+
+		# Perform a similar incremental update for each attribute
+		# associated with each inserted/updated facility relationship.
+		_for fac_rel, attr_list _over attrs_per_fac_rel.fast_keys_and_elements()
+		_loop
+			attr_pl << property_list.new()
+			_for i _over attr_list.fast_elements()
+			_loop
+				_if i.value[:enabled?] _is _true
+				_then
+					attr_pl[i.key.name] << i.value
+				_endif
+			_endloop
+
+			tbd << rope.new()
+			_for attr_def _over fac_rel.mss_cu_facility_attributes.fast_elements()
+			_loop
+				_if (attr_name << attr_def.attribute_name) _is _unset _orif
+				    attr_name = ""
+				_then
+					tbd.add_last(attr_def)
+					_continue
+				_endif
+				attr_name << attr_name.as_symbol()
+				_if (val << attr_pl.remove_key(attr_name)) _is _unset
+				_then
+					tbd.add_last(attr_def)
+				_elif attr_def.attribute_value ~= val[:attribute_value].default("")
+				_then
+					dr << attr_def.detached()
+					dr.attribute_value << val[:attribute_value].default("")
+					dr.source_collection.update(dr)
+				_endif
+			_endloop
+
+			# Delete ones that no longer exist.
+			_for i _over tbd.fast_elements()
+			_loop
+				i.delete()
+			_endloop
+
+			# Add in new ones.
+			tbl << mss_cu_engine.view.collections[:mss_cu_facility_attribute]
+			_for i, j _over attr_pl.fast_keys_and_elements()
+			_loop
+				dr << tbl.new_detached_record()
+				dr.attribute_name << i
+				dr.attribute_value << j[:attribute_value].default("")
+				dr.mss_cu_facility_relationship << fac_rel
+				dr.source_collection.insert(dr)
+			_endloop 
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.current_object_description
+	## 
+	## Return a description of the current CU.
+	##
+
+	_if (cu_rec << _self.current_object) _is _unset
+	_then
+		_return _self.message(:current_object_desc_none)
+	_else
+		_return _self.message(:current_object_desc, _unset, cu_rec.cu_code,
+				      cu_rec.description.default(""))
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.updated? << x
+	## 
+	## 
+
+	.updated? << x
+
+	_if _self.current_object _is _unset
+	_then
+		ok_enabled? << _false
+	_else
+		ok_enabled? << x
+	_endif 
+	_for mi_name _over {:ok, :apply}.fast_elements()
+	_loop 
+		_if (mi << .items[mi_name]) _isnt _unset
+		_then
+			mi.enabled? << ok_enabled?
+		_endif
+	_endloop
+	
+	_return .updated?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.operation_list_editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## 
+
+	_if a_tree.value[:enabled?] _is _false
+	_then
+		# Disallow editing disabled rows.
+		_return
+	_endif
+	
+	ed << _unset 
+	_if value_id _is :material_cost _orif
+	    value_id _is :labor_cost
+	_then
+		_if value_id _is :material_cost
+		_then
+			ndec << mss_cu_operation_definition.material_cost_decimal_places
+		_else
+			ndec << mss_cu_operation_definition.labor_cost_decimal_places
+		_endif 
+		ed << in_place_value_editor.new(an_agent)
+		ed.manager << numeric_value_manager.new_with_properties(:integer?, _false,
+									:precision, ndec)
+	_endif
+
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.operation_list_value_changed(a_tree, value_id, new_value, old_value)
+	## 
+	## 
+
+	_if old_value ~= new_value
+	_then 
+		_self.updated? << _true
+	_endif
+	
+	_if value_id _is :enabled?
+	_then
+		_if new_value _is _true
+		_then 
+			sstr << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+						  :value, :operation, :tab,
+						  :value, :material_cost, :tab,
+						  :value, :labor_cost)
+		_else
+			sstr << styled_string.new(:gray, :align, :centre, :toggle, :enabled?, :tab,
+						  :value, :operation, :tab,
+						  :value, :material_cost, :tab,
+						  :value, :labor_cost)
+		_endif
+		a_tree.styled_string << sstr
+		# N.B.: the following will also cause excl_facility_list and
+		# incl_facility_list to refresh based on the new enabled? value.
+		_self.changed(:operation_list, :refresh)
+
+	_elif value_id _is :material_cost _orif
+	      value_id _is :labor_cost 
+	_then
+		# Force it to be a floating point value.
+		_if new_value.species _is 1.species
+		_then
+			new_value << new_value.as_float
+			a_tree.value[value_id] << new_value
+		_endif
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.attribute_list_editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## 
+
+	_if a_tree.value[:enabled?] _is _false
+	_then
+		# Disallow editing disabled rows.
+		_return
+	_endif
+	
+	ed << _unset 
+	_if value_id _is :attribute_value
+	_then
+		# Provide a suitable editor.  Use a plain string-type editor
+		# for everything except for enumerated fields.  Note that the
+		# editor used is cached here, because there is a overhead
+		# involved in recreating an in_place_choice_editor.
+		_if (ed << a_tree.value[:in_place_editor]) _is _unset
+		_then 
+			tbl << a_tree.value[:parent_tree].value[:table]
+			rec_ex << tbl.record_exemplar
+			fd << a_tree.key
+			_if rec_ex.can_match?(fd)
+			_then
+				items << rec_ex.match_string(fd, "")
+				ed << in_place_choice_editor.new(an_agent, :items, items)
+			_else 
+				ed << in_place_value_editor.new(an_agent)
+			_endif
+
+			a_tree.value[:in_place_editor] << ed
+		_endif
+	_endif
+	
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.attribute_list_value_changed(a_tree, value_id, new_value, old_value)
+	## 
+	## 
+
+	_if old_value ~= new_value
+	_then 
+		_self.updated? << _true
+	_endif
+	
+	_if value_id _is :enabled?
+	_then
+		_if new_value _is _true
+		_then 
+			sstr << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+						  :value, :external_attribute_name, :tab,
+						  :value, :attribute_value)
+		_else
+			sstr << styled_string.new(:gray, :align, :centre, :toggle, :enabled?, :tab,
+						  :value, :external_attribute_name, :tab,
+						  :value, :attribute_value)
+		_endif
+		a_tree.styled_string << sstr
+
+	_elif value_id _is :attribute_value 
+	_then
+		# N.B.: the following handlers are explicitly provided, because
+		# something else internal to tree_item processing is causing my
+		# handlers to not be used if an in_place_choice_editor is used.
+		_handling user_error, db_bad_input, units_bad_string_input _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		
+		# Validate that the value entered is not too long, and that it
+		# can be converted to the appropriate data type.
+		max_len << mss_cu_engine.view.collections[:mss_cu_facility_attribute].
+			   all_fields[:attribute_value].type.size
+		_if new_value _isnt _unset _andif
+		    new_value.write_string.size > max_len
+		_then
+			a_tree.value[:attribute_value] << old_value
+			_self.changed(:attribute_list, :refresh)
+			_self.user_error(:max_attribute_length_exceeded, _unset, max_len)
+		_endif
+		
+		tbl << a_tree.value[:parent_tree].value[:table]
+		rec_ex << tbl.record_exemplar
+		fd << a_tree.key
+		_if new_value _isnt _unset
+		_then
+			# This is a bit heavy handed, but try it once to see if any
+			# error occurs.  If it does, then reset to the old value, and
+			# invoke the condition so that the user gets the real error
+			# message. 
+			conv_ok? << _false
+			raised_error << _unset 
+			_try _with cond
+				test_conversion << rec_ex.value_from_string(fd, new_value.write_string)
+				conv_ok? << _true 
+			_when error
+				raised_error << cond
+			_endtry
+
+			_if raised_error _isnt _unset 
+			_then
+				a_tree.value[:attribute_value] << old_value
+				_self.changed(:attribute_list, :refresh)
+				raised_error.invoke()
+			_endif 
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_properties_dialog.current_object
+	## 
+	## 
+
+	_if .current_object _isnt _unset _andif
+	    _not .current_object.is_valid?
+	_then
+		.current_object << _unset
+	_endif
+	_return .current_object
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_properties_dialog.set_current_object(cu_rec, _optional force?)
+	## 
+	## Set the current object to be CU_REC (which may be unset),
+	## and update all lists of information.
+	##
+
+	# If updated, need to provide an opportunity to either
+	# save the current settings, or cancel.
+	_if force? _isnt _true _andif
+	    _self.updated? _andif
+	    (cur_cu << _self.current_object) _isnt _unset _andif
+	     cur_cu ~= cu_rec
+	_then
+		q << _self.show_query({_self.message(:yes), _self.message(:no), _self.message(:cancel)},
+				      {:yes, :no, :cancel}, :yes,
+				      _self.message(:prompt_save_changes, _unset, cur_cu.cu_code))
+		_if q _is :yes
+		_then
+			_self.int!apply()
+		_elif q _is :cancel
+		_then
+			_return
+		_endif 
+	_endif
+
+	_if force? _isnt _true _andif
+	    cu_rec _isnt _unset _andif
+	    cu_rec = _self.current_object
+	_then
+		# Do not refresh cached information if the record is unchanged.
+	_else 
+		.current_object << cu_rec
+		_self.update_operation_list()
+		_self.set_op_excl_incl_cache()
+		_self.updated? << _false
+	_endif
+	
+	_self.changed(:current_object_description)
+	_self.changed(:excl_facility_list, :refresh)
+	_self.changed(:incl_facility_list, :refresh)
+	_self.changed(:attribute_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.set_op_excl_incl_cache()
+	## 
+	## Initialize the cache of which tables are included/excluded,
+	## keyed on operation.
+	##
+
+	_for i _over .op_excl_incl_cache.fast_elements()
+	_loop
+		i[1].empty()
+		i[2].empty()
+	_endloop
+	
+	_if (cu_rec << _self.current_object) _is _unset
+	_then
+		_return
+	_endif
+
+	# Pre-process all table_codes for all operations for the
+	# current CU.
+	fac_ids_by_op << equality_property_list.new()
+	_for op _over .all_operations.fast_elements()
+	_loop
+		fac_ids_by_op[op] << property_list.new()
+	_endloop
+	
+	_for i _over cu_rec.mss_cu_facility_relationships.fast_elements()
+	_loop
+		_if (fibo << fac_ids_by_op[i.operation]) _isnt _unset
+		_then
+			fibo[i.table_code] << i.mss_cu_facility_attributes
+		_endif
+	_endloop
+
+	attr_sstr1 << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+					:value, :external_attribute_name, :tab,
+					:value, :attribute_value)
+	attr_sstr2 << styled_string.new(:gray, :align, :centre, :toggle, :enabled?, :tab,
+					:value, :external_attribute_name, :tab,
+					:value, :attribute_value)
+
+	# Build an overall list of tables that are being managed.
+	r << rope.new()
+	_for key, i _over mss_cu_facility_definition.defined_facilities_by_id.fast_keys_and_elements()
+	_loop
+		_if (target_tbl << i.target_table) _is _unset
+		_then
+			# Configuration error - perhaps should dump something to the
+			# terminal to let the configurer know about it?
+			_continue
+		_endif
+		val << property_list.new_with(
+			       :external_partition_name, target_tbl.source_view.external_name,
+			       :external_table_name, target_tbl.external_name,
+			       :facility_definition, i,
+			       :table, target_tbl)
+
+		# Build a collection of all attributes for this facility.
+		attr_r << rope.new()
+		_for j _over i.attribute_names.fast_elements()
+		_loop
+			_if (fd << target_tbl.all_fields[j]) _is _unset
+			_then
+				# Configuration error - perhaps should dump something to the
+				# terminal to let the configurer know about it?
+				_continue
+			_endif
+			attr_val << property_list.new_with(
+					    :enabled?, _false,
+					    :external_attribute_name, fd.external_name,
+					    :attribute_name, fd.name,
+					    :attribute_value, _unset)
+			attr_dt << display_tree.new(fd, attr_val)
+			attr_dt.styled_string << attr_sstr2
+			attr_r.add_last(attr_dt)
+		_endloop
+		val[:attribute_list] << attr_r
+		r.add_last({key, val})
+	_endloop
+
+	# For each operation, build the list of what is included and excluded.
+	sstr << styled_string.new(:value, :external_partition_name, :tab,
+				  :value, :external_table_name)
+	_for op _over .all_operations.fast_elements()
+	_loop
+		fibo << fac_ids_by_op[op]
+		data << .op_excl_incl_cache[op]
+		_for i _over r.fast_elements()
+		_loop
+			key << i[1]
+			val << i[2].copy()
+			# Need to explicitly copy the attribute_list and create new
+			# display trees so that these are completely unshared.
+			val[:attribute_list] << rope.new()
+			_for j _over i[2][:attribute_list].fast_elements()
+			_loop
+				attr_dt << display_tree.new(j.key, j.value.copy())
+				attr_dt.styled_string << j.styled_string
+				val[:attribute_list].add_last(attr_dt)
+			_endloop
+			
+			dt << display_tree.new(key, val)
+			_for j _over dt.value[:attribute_list].fast_elements()
+			_loop
+				j.value[:parent_tree] << dt
+			_endloop 
+			dt.styled_string << sstr
+			_if (attr_recs << fibo[key]) _isnt _unset 
+			_then
+				data[2].add(dt)
+				# Update attributes for this display tree, based on the data
+				# stored in ATTR_RECS.  In preparation, convert the attribute
+				# list to a structure keyed on attribute name for ease of
+				# manipulation. 
+				attr_hash << equality_hash_table.new()
+				_for j _over dt.value[:attribute_list].fast_elements()
+				_loop
+					attr_hash[j.value[:attribute_name].write_string] << j
+				_endloop
+				_for attr_rec _over attr_recs.fast_elements()
+				_loop
+					_if (attr_dt << attr_hash[attr_rec.attribute_name.write_string]) _isnt _unset
+					_then
+						attr_dt.value[:enabled?] << _true
+						attr_dt.value[:attribute_value] << attr_rec.attribute_value.default("")
+						attr_dt.styled_string << attr_sstr1
+					_endif
+				_endloop 
+			_else
+				data[1].add(dt)
+			_endif
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_properties_dialog.excl_facility_list
+	## 
+	## Derive this from the selected operation.
+	##
+
+	(op, dt) << _self.selected_operation
+	_if op _is _unset _orif
+	    dt.value[:enabled?] _isnt _true _orif 
+	    (data << .op_excl_incl_cache[op]) _is _unset
+	_then
+		_return {}
+	_endif
+	_return data[1]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_properties_dialog.incl_facility_list
+	## 
+	## Derive this from the selected operation.
+	##
+
+	(op, dt) << _self.selected_operation
+	_if op _is _unset _orif
+	    dt.value[:enabled?] _isnt _true _orif 
+	    (data << .op_excl_incl_cache[op]) _is _unset
+	_then
+		_return {}
+	_endif
+	_return data[2]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_properties_dialog.attribute_list
+	## 
+	## Derive this from the selected incl_facility_list item.
+	##
+
+	_if (ifl << _self.selected_incl_facility_list) _is _unset
+	_then
+		_return {}
+	_endif
+	_return ifl.value[:attribute_list].default({})
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.operation_list_selected(selection)
+	## 
+	## When an operation is selected, update excl_facility_list and
+	## incl_facility_list to display the facilities for this operation.
+	##
+
+	_self.changed(:excl_facility_list, :refresh)
+	_self.changed(:incl_facility_list, :refresh)
+	_self.changed(:attribute_list, :refresh)
+
+	_self.manage_actions_for_excl_facility_list_selection()
+	_self.manage_actions_for_incl_facility_list_selection()
+	_self.manage_actions_for_attribute_list_selection()
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.excl_facility_list_selected(selection)
+	## 
+	## Enable/diable items as appropriate when a selection is
+	## made.
+	##
+
+	_self.manage_actions_for_excl_facility_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.incl_facility_list_selected(selection)
+	## 
+	## Enable/diable items as appropriate when a selection is
+	## made.
+	## 
+
+	_self.manage_actions_for_incl_facility_list_selection()
+	_self.changed(:attribute_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.attribute_list_selected(selection)
+	## 
+	## Enable/diable items as appropriate when a selection is
+	## made.
+	##
+
+	_self.manage_actions_for_attribute_list_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.selected_operation
+	## 
+	## 
+
+	_if (ti << .items[:operation_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		op << sel.value[:operation]
+		_return op, sel
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.selected_excl_facility_list
+	## 
+	## 
+
+	_if (ti << .items[:excl_facility_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		_return sel
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.selected_incl_facility_list
+	## 
+	## 
+
+	_if (ti << .items[:incl_facility_list]) _isnt _unset _andif 
+	    (sel << ti.selection.an_element()) _isnt _unset
+	_then
+		_return sel
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.manage_actions_for_excl_facility_list_selection()
+	## 
+	## 
+
+	sel? << _self.selected_excl_facility_list _isnt _unset
+	_if (x << .items[:add_incl_facility]) _isnt _unset
+	_then
+		x.enabled? << sel?
+	_endif 
+		     
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.manage_actions_for_incl_facility_list_selection()
+	## 
+	## 
+
+	sel? << _self.selected_incl_facility_list _isnt _unset
+	_if (x << .items[:remove_incl_facility]) _isnt _unset
+	_then
+		x.enabled? << sel?
+	_endif 
+		     
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.manage_actions_for_attribute_list_selection()
+	## 
+	## 
+
+	# N.B.: at this time, no items need to be enabled/disabled here.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.add_incl_facility()
+	## 
+	## Add the selection in the excl_facility_list to the
+	## incl_facility_list.
+	##
+
+	# Ensure that a selection is made, and that the selection does
+	# exist in the list.  This can be done by identity.  In case
+	# the selection is out-of-sync with the list, the index_of()
+	# check will fail, and I'll ignore it (I don't know how this
+	# can happen, but I need to get the index of the selection
+	# anyways...)
+	_if (sel << _self.selected_excl_facility_list) _is _unset _orif
+	    (excl_list << _self.excl_facility_list) _is _unset _orif
+	    (incl_list << _self.incl_facility_list) _is _unset _orif
+	    (idx << excl_list.index_of(sel)) _is _unset
+	_then
+		_return
+	_endif
+
+	excl_list.remove_nth(idx)
+	incl_list.add(sel)
+	_self.changed(:excl_facility_list, :renew)
+	_self.changed(:incl_facility_list, :renew)
+	_self.changed(:attribute_list, :renew)
+	_self.updated? << _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_properties_dialog.remove_incl_facility()
+	## 
+	## Remove the selection in the incl_facility_list.
+	##
+
+	# Ensure that a selection is made, and that the selection does
+	# exist in the list.  This can be done by identity.  In case
+	# the selection is out-of-sync with the list, the index_of()
+	# check will fail, and I'll ignore it (I don't know how this
+	# can happen, but I need to get the index of the selection
+	# anyways...)
+	_if (sel << _self.selected_incl_facility_list) _is _unset _orif
+	    (excl_list << _self.excl_facility_list) _is _unset _orif
+	    (incl_list << _self.incl_facility_list) _is _unset _orif
+	    (idx << incl_list.index_of(sel)) _is _unset
+	_then
+		_return
+	_endif
+
+	incl_list.remove_nth(idx)
+	excl_list.add(sel)
+	_self.changed(:excl_facility_list, :renew)
+	_self.changed(:incl_facility_list, :renew)
+	_self.changed(:attribute_list, :renew)
+	_self.updated? << _true
+	
+_endmethod
+$

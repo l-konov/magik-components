@@ -1,0 +1,1063 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## ROWCOL - added functionality specific to the dialog_designer.
+## This object is used extensively by the dialog_designer and
+## several widget classes (eg. paned_window, tab_box) are
+## actually represented by subclasses of rowcol to centralise
+## more complex behaviour through this class.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_constant(:dd_properties,
+			      property_list.new_with(
+				      :rowcol_style,            {:top_level,:nested,:group_box,:button_box,:custom},
+				      :row_spacing,            :integer,
+				      :col_spacing,            :integer,
+				      :left_spacing,           :integer,
+				      :right_spacing,          :integer,
+				      :top_spacing,            :integer,
+				      :bottom_spacing,         :integer,
+				      :col_resize_values,      :vector,
+				      :row_resize_values,      :vector,
+				      :tab_label,              :string,
+				      :window_name,            :string,
+				      :default_row_alignment,  {:fill,:top,:centre,:bottom},
+				      :default_col_alignment,  {:fill,:left,:centre,:right}),
+			      :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_variable(:default_min_width,20,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_variable(:default_min_height,20,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_variable(:interior_cell_line_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:blue),
+		:width,1,
+		:dash_pattern,dash_pattern.short_dash),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_variable(:rc_outline_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:red),
+		:width,1,
+		:dash_pattern,dash_pattern.short_dash),:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_constant(:dd_rowcols,{:dd_group_box,:dd_paned_window},:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_constant(:hidden_properties,
+	property_list.new_with(
+		:ncols,:integer,
+		:nrows,:integer),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.rowcol_style
+	## 
+	## Return the ROWCOL_STYLE property.
+	
+	>> _self.get_property(:rowcol_style)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.rowcol_style << new_style
+	## 
+	## Set the ROWCOL_STYLE property.
+	
+	_self.set_property(:rowcol_style,new_style)
+
+	_self.set_spacing_from_style(new_style)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.set_spacing_from_style(style)
+	## 
+	## Set the spacing attributes to match STYLE which is one of :
+	## :top_level, :nested, :button_box, :group_box or :custom.
+	## For :custom, no changes are made.
+
+	_try
+		_if style _is :top_level
+		_then
+			_self.row_spacing << 6
+			_self.col_spacing << 7
+			_self.left_spacing << 6
+			_self.right_spacing << 6
+			_self.top_spacing << 6
+			_self.bottom_spacing << 6
+			_self.row_alignment << _unset
+			_self.col_alignment << _unset
+			
+		_elif style _is :nested 
+		_then
+			_self.row_spacing << 6
+			_self.col_spacing << 7
+			_self.left_spacing << 0
+			_self.right_spacing << 0
+			_self.top_spacing << 0
+			_self.bottom_spacing << 0
+			_self.row_alignment << _unset
+			_self.col_alignment << _unset
+
+		_elif style _is :button_box
+		_then
+			_self.row_spacing << 6
+			_self.col_spacing << 7
+			_self.left_spacing << 0
+			_self.right_spacing << 0
+			_self.top_spacing << 0
+			_self.bottom_spacing << 0
+			_self.row_alignment << :centre
+			_self.col_alignment << :fill
+			
+		_elif style _is :group_box
+		_then
+			_self.row_spacing << 6
+			_self.col_spacing << 7
+			_self.left_spacing << 6
+			_self.right_spacing << 6
+			_self.top_spacing << 2
+			_self.bottom_spacing << 6
+			_self.row_alignment << _unset
+			_self.col_alignment << _unset
+			
+		_endif
+	_when error
+		# Trap errors associated with setting alignements
+	_endtry
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol.define_shared_constant(:alignment_attributes,
+	{"row_spacing","col_spacing",
+	 "left_spacing","right_spacing",
+	 "top_spacing","bottom_spacing"},:private)
+$
+	
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.cascading_changes(what,new)
+	## 
+	## If alignment parameter changes, update to :custom rowcol_style.
+
+	_if _self.alignment_attributes.index_equal_of(what) _isnt _unset 
+	_then
+		_self.rowcol_style << :custom
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over rowcol.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	pc << _self.parent.class_name
+
+	_if pc _isnt :unset _andif pc _isnt :dd_tab_box
+	_then
+		props.remove_key(:tab_label)
+	_endif
+
+	_if pc _isnt :unset _andif pc _isnt :dd_window_stack
+	_then
+		props.remove_key(:window_name)
+	_endif
+
+	props.remove_key(:balloon_tooltip)
+
+	>> props
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.render_on(canv,bb,_optional x0,y0)
+	## 
+	## Render SELF on canvas CANV within are BB with optional
+	## offset (X0,Y0).
+
+	_dynamic !dialog_element_footprints!	
+	_dynamic !rowcol_cells! 
+	_dynamic !show_rowcol_cells?!
+
+	x0 << x0.default(0)
+	y0 << y0.default(0)
+
+	(row_h,col_w,total_h,total_w,pbb) << _self.cell_sizes(bb)
+	
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+	pbb << pixel_bounding_box.new(pbb.xmin+x0,pbb.ymin+y0,pbb.xmax+x0,pbb.ymax+y0)
+
+	total_w << max(total_w,16)
+	total_h << max(total_h,16)
+
+	# Expand the outer most rowcol to fill available frame.
+	_if _self.parent.class_name _is :frame
+	_then
+		pbb.xmax +<< max(0,_self.parent.width-total_w)
+	_endif
+	
+	!dialog_element_footprints![pbb] << _self 
+
+	in_ls   << _self.interior_cell_line_style
+
+	xbb << pbb.xmin + max(_self.left_spacing,4)
+	ybb << pbb.ymin + max(_self.top_spacing,4)
+	
+	_for i _over 1.upto(max(1,.nrows.default(1)))
+	_loop
+		_for j _over 1.upto(max(1,.ncols.default(1)))
+		_loop
+			cbb << pbb.new(xbb,ybb,xbb+col_w[j],ybb+row_h[i])
+
+			_if .col_alignment _is :fill _andif
+			    j _is .ncols.default(1) _andif
+			    cbb.xmax < pbb.xmax-10
+			_then
+				cbb.xmax << pbb.xmax-10
+			_endif
+
+			_if .row_alignment _is :fill _andif
+			    i _is .nrows.default(1) _andif
+			    cbb.ymax < pbb.ymax-10
+			_then
+				cbb.ymax << pbb.ymax-10
+			_endif
+
+			 !rowcol_cells![cbb] << {_self,i,j}
+
+			 _self.pre_render(canv,cbb,i,j)
+
+			 (empty?,item) << _self.empty_cell?(i,j)
+			 
+			 _if _not empty?
+			 _then
+				 item.render_on(canv,cbb)
+			 _elif !show_rowcol_cells?!.default(_true)
+			 _then
+				 canv.draw(cbb,in_ls)
+			 _endif
+
+			 _self.post_render(canv,cbb,i,j)
+
+			 # Add the drop spots as needed (Top & Bottom here)
+			 _if _self.allow_tb_insertion?
+			 _then
+				 y << cbb.ymin - max(_self.top_spacing,4) _div 2
+				 mbb << pixel_bounding_box.new(cbb.xmin,y-2,cbb.xmax,y+2).expand(2)
+				 !rowcol_cells![mbb] << {_self,i-0.5,j}						 
+				 
+				 _if i _is .nrows.default(1)
+				 _then
+					 y << cbb.ymax + max(_self.top_spacing,4) _div 2
+ 					 mbb << pixel_bounding_box.new(cbb.xmin,y-2,cbb.xmax,y+2).expand(2)
+					 !rowcol_cells![mbb] << {_self,i+0.5,j}
+				 _endif 
+			 _endif
+
+			 # Left and Right drop areas here.
+			 _if _self.allow_lr_insertion?
+			 _then
+				 x << cbb.xmin - max(_self.left_spacing,4) _div 2
+				 mbb << pixel_bounding_box.new(x-2,cbb.ymin,x+2,cbb.ymax).expand(2)
+				 !rowcol_cells![mbb] << {_self,i,j-0.5}						 
+				 
+				 _if j _is .ncols.default(1)
+				 _then
+					 x << cbb.xmax + max(_self.right_spacing,4) _div 2
+					 mbb << pixel_bounding_box.new(x-2,cbb.ymin,x+2,cbb.ymax).expand(2)
+					 !rowcol_cells![mbb] << {_self,i,j+0.5}
+				 _endif 
+			 _endif
+
+			xbb +<< col_w[j] + max(.col_spacing,4)
+		_endloop
+
+		ybb +<< row_h[i] + max(.row_spacing,4)
+		xbb << pbb.xmin + max(4,_self.left_spacing)
+	_endloop
+
+	_if !show_rowcol_cells?!.default(_true) _andif
+	    _not {:dd_tab_box,:dd_window_stack}.includes?(_self.class_name)
+	_then
+		canv.draw(pbb,_self.rc_outline_style)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.pre_render(cbb)
+	## 
+	## Do nothing.  Subclasses of RowCol use this method.
+	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.post_render(cbb)
+	## 
+	## Do nothing.  Subclasses of RowCol use this method.
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.allow_lr_insertion?
+	## 
+	## Return TRUE if new widgets can be inserted to left or right
+	## of existing widgets, FALSE otherwise.
+	
+	>> _not _self.items.empty?
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.allow_tb_insertion?
+	## 
+	## Return TRUE if new widgets can be inserted above or below
+	## existing widgets, FALSE otherwise.
+
+	>> _not _self.items.empty? 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.dialog_footprint(_optional bb)
+	## 
+	## Return the rendering footprint of SELF.
+	
+	(row_h,col_w,total_h,total_w) << _self.cell_sizes(bb)
+
+	x << 0
+	y << 0
+
+	_if bb _isnt _unset 
+	_then
+		x << bb.xmin 
+		y << bb.ymin
+
+		dca << _self.default_col_alignment
+		ca << _self.col_alignment
+		dra << _self.default_row_alignment
+		ra << _self.row_alignment
+		
+		_if dca _is :right _orif ca _is :write
+		_then
+			x << bb.xmax - total_w 
+		_elif dca _is :centre _orif ca _is :centre
+		_then
+			x << bb.centre.x - total_w _div 2	
+		_elif dca _is :fill _orif ca _is :fill
+		_then
+			total_w << bb.width
+		_endif
+		
+		_if dra _is :bottom _orif ra _is :bottom
+		_then
+			y << bb.ymax - total_h
+		_elif dra _is :centre _orif ra _is :centre
+		_then
+			y << bb.centre.y - total_h _div 2	
+		_elif dra _is :fill _orif ra _is :fill
+		_then
+			total_h << bb.height
+		_endif
+	_endif
+	
+	_if _self.parent.class_name _is :frame
+	_then
+		(r,c) << (1,1)
+	_else
+		(r,c) << (_self.row,_self.col)
+	_endif
+
+	total_w << max(total_w,16)
+	total_h << max(total_h,16)
+
+	>> r,c,total_h,total_w,pixel_bounding_box.new(x,y,x+total_w,y+total_h)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	>> rowcol.new(rc,1,1,:pixel,:style,:nested,
+		      :resize?,_true,
+		      :default_col_alignment,:fill,
+		      :default_row_alignment,:fill,
+		      :rowcol_style,:nested,
+		      :row,row,:col,col)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.validate_rowcol_cnts()
+	## 
+	## Ensure the NROWS and NCOLS slots are correct.
+	 
+	r << 1
+	c << 1
+
+	_for i _over .items.fast_elements()
+	_loop
+		r << max(r,i.row)
+		c << max(c,i.col)
+	_endloop
+
+	.nrows << r
+	.ncols << c
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.cell_sizes(_optional bb)
+	## 
+	## Return simple vectors of the heights/widths of all the cells
+	## of SELF.  This is called recursively through the
+	## :dialog_footprint() method to accommodate complex designs.
+
+	_self.validate_rowcol_cnts()
+
+	row_h << {}.new(max(1,.nrows)).fill_with(12)
+	col_w << {}.new(max(1,.ncols)).fill_with(12)
+
+	_for i _over .items.fast_elements()
+  	_loop
+		(r,c,h,w) << i.dialog_footprint()
+
+		row_h[r] << max(row_h[r],h)
+		col_w[c] << max(col_w[c],w)
+	_endloop
+
+	total_w << max(4,.left_spacing) + max(4,.right_spacing) +
+		   (col_w.size-1) * max(.col_spacing,4)
+
+	_for cw _over col_w.fast_elements()
+	_loop
+		total_w +<< cw
+	_endloop
+
+	# Adjust the cell widths so they grow into available space
+	# depending on the 'col_resize_values'
+	_if bb _isnt _unset _andif bb.width > total_w _andif
+	    _self.col_resize_values _isnt _unset 
+	_then
+		crv << _if _self.col_resize_values.class_name _isnt :char16_vector
+		       _then
+			       >> _self.col_resize_values
+		       _else
+			       >> _self.col_resize_values.split_by(%,)
+		       _endif
+
+		extra << bb.width-total_w
+
+		_for i _over 1.upto(min(crv.size,col_w.size))
+		_loop
+			col_w[i] +<< (crv[i].as_number().default(0)*extra/100.0).floor
+		_endloop
+	_endif
+
+	total_h <<  max(4,.top_spacing) +  max(4,.bottom_spacing) +
+		   (row_h.size-1) * max(.row_spacing,4)
+
+	_for rh _over row_h.fast_elements()
+	_loop
+		total_h +<< rh
+	_endloop
+
+	# Adjust the cell widths so they grow into available space
+	# depending on the 'row_resize_values'
+	_if bb _isnt _unset _andif bb.height > total_h _andif
+	    _self.row_resize_values _isnt _unset 
+	_then
+		rrv << _if _self.row_resize_values.class_name _isnt :char16_vector
+		       _then
+			       >> _self.row_resize_values
+		       _else
+			       >> _self.row_resize_values.split_by(%,)
+		       _endif
+		extra << bb.height-total_h
+
+		_for i _over 1.upto(min(rrv.size,row_h.size))
+		_loop
+			row_h[i] +<< (rrv[i].as_number().default(0)*extra/100.0).floor
+		_endloop
+	_endif
+
+	# Make sure single cells or rows fill available space
+	_if bb _isnt _unset 
+	_then
+		_if col_w.size _is 1 _andif _self.col_alignment _is :fill
+		_then
+			col_w[1] << bb.width -  max(4,.left_spacing) -  max(4,.right_spacing)
+		_endif	
+
+		_if row_h.size _is 1 _andif _self.row_alignment _is :fill
+		_then
+			row_h[1] << bb.height - max(4,.top_spacing) -  max(4,.bottom_spacing)
+		_endif
+	_endif
+
+	>> row_h,col_w,max(total_h,30,row_h[1]),max(total_w,60,col_w[1])
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.empty_cell?(r,c)
+	## 
+	## Return FALSE if any of SELF's items have row=R and col=C,
+	## else return TRUE.
+	
+	_for i _over .items.fast_elements()
+	_loop
+		_if i.row=r _andif i.col=c
+		_then
+			_return _false,i 
+		_endif
+	_endloop
+
+	_return _true
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.expand_at(r,c)
+	## 
+	## Expand SELF's rows or columns depending which of R or C has
+	## class :float.  Increments either .nrows or .ncols
+	## appropriately and move all existing items to the right or
+	## down appropriately.
+
+	_if r.class_name _is :float
+	_then
+		.nrows +<< 1	
+
+		_for i _over .items.fast_elements()
+		_loop
+			_if i.row > r
+			_then
+				i.row +<< 1			
+			_endif
+		_endloop
+	_else
+		.ncols +<< 1	
+
+		_for i _over .items.fast_elements()
+		_loop
+			_if i.col > c
+			_then
+				i.col +<< 1			
+			_endif
+		_endloop
+		
+	_endif
+_endmethod
+$ 
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.remove_element(el)
+	## 
+	## Remove the element EL from SELF.
+
+	_self.items.remove(el)
+	_self.compact_grid()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.compact_grid()
+	## 
+	## Try to compact SELF grid by removing and empty row or column
+	## from it.
+	
+	row_items << {}.new(.nrows).fill_with(0)
+	col_items << {}.new(.ncols).fill_with(0)
+
+	_for el _over .items.fast_elements()
+	_loop
+		row_items[el.row] +<< 1
+		col_items[el.col] +<< 1
+	_endloop
+
+	_for ri _over 1.upto(row_items.size)
+	_loop
+		_if row_items[ri] _is 0
+		_then
+			_self.remove_row(ri)
+		_endif
+	_endloop
+
+	_for ci _over 1.upto(col_items.size)
+	_loop
+		_if col_items[ci] _is 0
+		_then
+			_self.remove_col(ci)
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.remove_row(i)
+	## 
+	## Remove row I from SELF.  Items below this row are brought up
+	## 1 row and .nrows is decremented.
+	
+	_for el _over .items.fast_elements()
+	_loop
+		_if el.row > i
+		_then
+			el.row -<< 1
+		_endif
+	_endloop
+
+	_if .nrows > 1
+	_then
+		.nrows -<< 1		
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.remove_col(i)
+	## 
+	## Remove column I from SELF.  Items right of this column are
+	## moved left 1 column and .ncols is decremented.
+	
+	_for el _over .items.fast_elements()
+	_loop
+		_if el.col > i
+		_then
+			el.col -<< 1
+		_endif
+	_endloop
+
+	_if .ncols > 1
+	_then
+		.ncols -<< 1		
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.empty_rowcol()
+	## 
+	## Empty SELF's grid of all items.
+	
+	.items << rope.new()
+	.nrows << 1
+	.ncols << 1
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.all_sub_elements()
+	## 
+	## Return a rope of all the sub elements()
+	
+	>> rope.new_from_iter(_self,:|gui_elements()|)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method rowcol.gui_elements(_optional which, only_one_level?)
+	## 
+	## Return all the items of SELF in row order.  This calls
+	## embedded rowcol-like objects recursively.
+
+	_dynamic  used
+
+	used << used.default(set.new())
+
+	# First, loop over all the embedded elements
+	_for item _over _self.row_ordered_items()
+	_loop
+		_if (which _is :all _orif item.class_name _is which.default(item.class_name)) _andif
+		    _not used.includes?(item.dialog_element_id)
+		_then
+			_loopbody(item)
+			used.add(item.dialog_element_id)
+		_endif 
+	_endloop
+
+	# Shortcut out of the interator...
+	_if only_one_level?.default(_false) _then _return _endif
+	
+	# Second, recurse into ROWCOL-like elements.  By doing this in
+	# two steps we can more easily split large build_gui() methods
+	# into pieces more logically.
+	_for item _over _self.row_ordered_items()
+	_loop
+		_if item.is_kind_of?(rowcol)
+		_then
+			_for el _over item.gui_elements(which)
+			_loop
+				_if  _not used.includes?(el.dialog_element_id)
+				_then
+					_loopbody(el)
+					used.add(item.dialog_element_id)
+				_endif
+			_endloop
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method rowcol.row_ordered_items()
+	## 
+	## Return the items of SELF in row order, left to right, top to
+	## bottom.
+
+	_for r _over 1.upto(.nrows)
+	_loop
+		_for c _over 1.upto(.ncols)
+		_loop
+			_if (item << _self.rc_item(r,c)) _isnt _unset 
+			_then
+				_loopbody(item)
+			_endif
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.rc_item(r,c)
+	## 
+	## Return the item at row R column C of SELF.
+	
+	_for i _over .items.fast_elements()
+	_loop
+		_if i.row _is r _andif i.col _is c
+		_then
+			_return i
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.gui_code(txt,_optional parent_el,overrides,tab_label)
+	## 
+	## Write the interpretable gui code for SELF the text stream TXT.
+
+	overrides << overrides.default(property_list.new())
+
+	skipped_fields << equality_set.new_with("parent","dialog_element_id","dialog_description")
+
+	txt.write(%tab,_self.dialog_element_id," << rowcol.new(",
+		  parent_el.default(_self.parent.dialog_element_id),%,,.nrows,%,,.ncols,",:pixel,",
+		  %newline,%tab*2,":resize?,",%tab,"_true")
+
+	(props,sc) << _self.sorted_props(overrides)
+
+	# Just in case the user puts the design in a tab_box
+	_if parent_el _is _unset 
+	_then
+		txt.write(%,,%newline,%tab*2,":tab_label,",%tab,%",tab_label.default("Tab"),%")
+	_endif
+	
+	# Ensure row and col are set
+	_if parent_el.default(_self.parent.dialog_element_id).class_name _is :symbol
+	_then
+		props[:row] << _self.row
+		props[:col] << _self.col
+
+		_if sc.index_of(:row) _is _unset
+		_then 
+			sc.add(:row)
+			sc.add(:col)
+		_endif 
+	_endif
+
+	# Paned window and Tab Box do not understand :set_item_col() or :set_item_row()
+	pel << _self.parent.class_name.write_string
+	_if pel.index_of_seq("paned_window") _isnt _unset _orif
+	    pel.index_of_seq("tab_box") _isnt _unset _orif
+	    pel.index_of_seq("window_stack") _isnt _unset 
+	_then
+		props.remove_key(:row)
+		props.remove_key(:col)
+	_endif
+
+	props.remove_key(:rowcol_style)
+
+	# Write the magik code to the TXT stream
+	_for name _over sc.fast_elements()
+	_loop
+		value << props[name]
+		
+		v << value.write_string
+		n << name.write_string.split_by(%!).last
+
+		_if skipped_fields.includes?(n) _orif value _is _unset 
+		_then
+			_continue 
+		_endif
+		
+		_if n = "layout_info" _andif value _isnt _unset 
+		_then
+			pl << property_list.new_with(_scatter value)
+			
+			_for name2,value2 _over pl.fast_keys_and_elements()
+			_loop
+				(n3,v3) << _self.gui_name_and_value(name2,value2)
+
+				txt.write(%,,%newline,2*%tab,":",n3,%,,%tab,v3)
+			_endloop
+			
+		_elif n.index_of_seq("_resize_values") _isnt _unset 
+		_then
+			rv_txt << ""
+
+			_for rv _over value.fast_elements()
+			_loop
+				rv_txt +<< write_string(rv,%,)
+			_endloop
+
+			_if rv_txt.size > 1
+			_then
+				txt.write(%,,%newline,2*%tab,":",n,%,,%tab,%{,rv_txt.slice(1,rv_txt.size-1),%})
+			_endif
+
+			
+		_elif  value.default("") <> ""
+		_then
+			(n3,v3) << _self.gui_name_and_value(n,v)
+
+			_if _not _self.dd_rowcols.includes?(_self.class_name) _andif 
+			    n3.index_of_seq("default_") _is 1 _andif
+			    _self.parent.dialog_element_id.write_string.index_of_seq("rowcol") _is 1
+			_then
+				n3 << write_string(n3.slice_to_end(9))
+			_endif 
+				     
+			txt.write(%,,%newline,2*%tab,":",n3,%,,%tab,v3)
+		_endif
+	_endloop
+
+	txt.write(%),%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.sorted_props(overrides)
+	## 
+	## Return SELF properties as a sorted list, overriding 
+	
+	props << equality_hash_table.new()
+
+	_for p _over _self.dd_properties().fast_keys()
+	_loop
+		props[p] << _self.perform(p)
+	_endloop
+
+	_for k,v _over overrides.fast_keys_and_elements()
+	_loop
+		props[k] << v
+	_endloop
+
+	sc << sorted_collection.new()
+	_for p _over props.fast_keys()
+	_loop
+		sc.add(p)
+	_endloop
+	
+	_if _self.parent.class_name _is :rowcol _andif
+	    _self.class_name _isnt :dd_group_box
+	_then
+		props[:row] << _self.row
+		props[:col] << _self.col
+		sc.add(:row)
+		sc.add(:col)
+		
+	_elif _self.parent.class_name _is :dd_paned_window
+	_then 
+		props.remove_key("row")
+		props.remove_key("col")
+	_endif
+
+	>> props,sc
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.gui_element_methods()
+	## 
+	## Recursively search for all the methods required by all the
+	## items of SELF.
+	
+	sc << sorted_collection.new()
+
+	_for i _over .items.fast_elements()
+	_loop
+		_for m _over i.gui_element_methods().fast_elements()
+		_loop
+			_if m <> "()"
+			_then
+				sc.add(m)
+			_endif
+		_endloop
+	_endloop
+
+	>> sc
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.hidden_xml_properties(txt,n_tabs)
+	## 
+	## Write hidden properties the text stream TXT.
+	
+	_for p _over _self.hidden_properties.fast_keys()
+	_loop
+		txt.write((n_tabs+1)*%tab,%<,
+			  "property name=",%",p,%",
+			  " value=",%",_self.perform(p),%",
+			  "/>",%newline)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.parse_items_xml(sx,rc_name)
+	## 
+	## Parse widget items out the simple_xml SX whose parent is RC_NAME.
+	
+	rc_items << sx.elements_matching("widget","dd_parent",rc_name)
+
+	rcs << {:rowcol,:dd_group_box,:dd_radio_group,:dd_tab_box,:dd_window_stack,:dd_paned_window}
+
+	_for item _over rc_items.fast_elements()
+	_loop
+		props << _self.xml_properties(item)
+		ex << method_table.exemplar_for_name(cl << props[:dd_class].as_symbol())
+
+		wgt_props << ex.wgt_properties(props)
+		wgt << ex.new_with_xml_properties(_self,wgt_props)
+
+		wgt.dialog_element_id << item.attributes["name"].as_symbol()
+		condition.raise(:dd_xml_parsing_progress,:step,"GUI Layout : "+item.attributes["name"])
+
+		_if rcs.includes?(cl)
+		_then
+			wgt.empty_rowcol()
+			wgt.parse_items_xml(sx,wgt.dialog_element_id)
+		_endif
+
+		wgt.parse_inner_structure(item)
+	_endloop
+
+	# For dd_tab_boxes, etc.
+	.nrows << max(.nrows,.items.size)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.new_with_xml_properties(parent,props)
+	## 
+	## Return a new instance of SELF with properties PROPS and
+	## parent PARENT.
+	
+	nrows << props[:nrows].as_number()
+	ncols << props[:ncols].as_number()
+
+	_for k _over {:row_resize_values,:col_resize_values}.fast_elements()
+	_loop
+		_if props[k] _isnt _unset _andif
+		    props[k].class_name _isnt :simple_vector
+		_then
+			sp << props[k].split_by(%,)
+
+			_for i _over 1.upto(sp.size)
+			_loop
+				sp[i] << sp[i].as_number()
+			_endloop
+
+			props[k] << _if sp.size > 1
+				    _then
+					    >> sp.copy()
+				    _endif 
+		_endif
+	_endloop
+
+	>> rowcol.new(parent,nrows,ncols,:pixel,:style,:nested,_scatter props)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method rowcol.dd_child_elements()
+	## 
+	## Recursive iterator returning SELF and all elements in slot
+	## :items.
+	## 
+
+	_for i _over .items.fast_elements()
+	_loop
+		_loopbody(i)
+
+		_for c _over i.dd_child_elements()
+		_loop
+			_loopbody(c)
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol.xml_copy()
+	## 
+	## Recursively drill into SELF's sub-elements compiling a
+	## complete XML description to return.
+
+	_local txt << internal_text_output_stream.new()
+	txt.write(_self.xml_description())
+
+	_for el _over _self.gui_elements()
+	_loop
+		txt.write(el.xml_copy())
+	_endloop
+
+	>> txt.string
+_endmethod
+$

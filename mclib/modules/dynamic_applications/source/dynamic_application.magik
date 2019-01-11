@@ -1,0 +1,107 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-06-23 11:39:13 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-25-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## A class used to luanch an application that requires code to
+## be loaded first. The extra properties supported for this are:
+##   :dynamic_application_class - the real class name for the application
+##   :dynamic_module_name - the name of a module to load first.
+def_slotted_exemplar(:dynamic_application,
+                      {},
+		      {})
+$
+
+_pragma(classify_level=basic)
+_method dynamic_application.new_from_def(an_app_def)
+	## Loads the needed code for me base don an_app_def and then
+	## starts the real application, which is returned.
+	## 
+	##
+
+	# (02-25-2005 Brad Sileo): created.
+	_self.load_needed_modules(an_app_def)
+	props << an_app_def.properties
+	>> _self.actual_application(an_app_def).new_from_def(_self.actual_application_definition(an_app_def))
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method dynamic_application.actual_application_definition(an_app_def)
+	## gets the definition described by
+	## :dynamic_application_definition. If this is not found, we
+	## use an_app_def
+	## 
+	##
+
+	# (02-25-2005 Brad Sileo): created.
+	_if (name << an_app_def.properties[:dynamic_application_definition]) _is _unset 
+	_then
+		_return an_app_def
+	_elif (real_def << smallworld_product.application_definition(name.as_symbol())) _is _unset
+	_then
+		_return an_app_def
+	_endif
+	>> real_def
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method dynamic_application.actual_application(an_app_def)
+	## returns the exmeplar for the real application class I
+	## dynamically start
+	## 
+	##
+
+	# (02-25-2005 Brad Sileo): created.
+	a_name << an_app_def.properties[:dynamic_application_class]
+	application_exemplar << get_global_value( a_name.as_symbol() )
+	_if application_exemplar _is _unset
+	_then
+		condition.raise( :invalid_application_class,
+				 :name, an_app_def.properties[:application_name],
+				 :app_name, a_name )
+	_endif
+	>> application_exemplar
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method dynamic_application.load_needed_modules(an_app_def)
+	## Start a load of the module required for me.
+	## 
+	##
+	# (02-25-2005 Brad Sileo): created.
+	_if (a_module << an_app_def.properties[:dynamic_module_name]) _isnt _unset _andif
+	    _not sw_module_manager.module_is_loaded?(a_module)
+	_then
+		# Skip saving Magikc files as it is possible we don't even
+		# have access to do so.
+		sw_module_manager.load_module(a_module,_unset , :save_magikc?,_false)
+	_endif 
+_endmethod
+$

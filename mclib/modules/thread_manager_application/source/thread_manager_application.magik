@@ -1,0 +1,131 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Created By: Brad Sileo
+## Date: 04-13-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+$
+def_slotted_exemplar(:thread_manager_application,
+                             {
+				     {:manager,_unset}
+			     },
+			     {})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.new_from_def()
+	## Just returns me
+	## 
+	##
+
+	# (04-13-2005 Brad Sileo): created.
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.activate()
+	## starts a thread_manager
+	## 
+	##
+
+	# (04-13-2005 Brad Sileo): created.
+	.manager << thread_manager.open()
+	.manager.add_dependent(_self)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.databus
+	## Keeps the databuys montiopr from choking
+	## 
+	##
+
+	# (04-13-2005 Brad Sileo): created.
+	>> sw_databus.new() 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.external_name
+	## 
+	## 
+	##
+
+	# (04-13-2005 Brad Sileo): created.
+	>> _self.class_name
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.close()
+	## 
+	## 
+	##
+
+	# (05-19-2005 Brad Sileo): created.
+	.manager.close()
+	_self.changed( :stop_application )
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.note_change(who,what)
+	## 
+	## 
+	##
+
+	# (06-07-2005 Brad Sileo): created.
+	_if who _is .manager _andif
+	    what _is :deactivate
+	_then
+		_self.changed( :stop_application )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method thread_manager_application.top_frame
+	## compatibility
+	>> _unset 
+_endmethod 
+$
+_pragma(classify_level=restricted)
+_method thread_manager_application.startable?()
+	# returns _true
+
+	_return _true 
+_endmethod
+$
+_pragma(classify_level=restricted)
+_method thread_manager_application.force_close()
+
+	
+_endmethod
+$
+_pragma(classify_level=restricted)
+_method thread_manager_application.establish_sysevent_handlers()
+	
+_endmethod
+$
+
+
+
+
+_pragma(classify_level=restricted)
+_method thread_manager.on_deactivation()
+	system.remove_dependent(_self, :known_threads)
+	# start change
+	_self.changed(:deactivate)
+	# end change
+_endmethod
+$
+

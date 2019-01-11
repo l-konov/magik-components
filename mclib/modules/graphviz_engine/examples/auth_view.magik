@@ -1,0 +1,64 @@
+_package sw
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method auth_view.graphviz_groups(output_format,output_filename,_optional filter_type)
+	## 
+	## gis_program_manager.authorisation_view.graphviz_groups("png","\\imcltgis01\Project_Homes\asawatz\graphs\auth_view\groups_rights.png",:dot)
+
+	
+	_global dg
+
+	dg << dot_graph.new("AuthViewInfo")
+
+	dg.set_attribute(:ranksep,"5")
+	
+	_local a_node , a_edge
+
+	a_node << dg.create_node("node")
+	a_node.set_attribute(:width,"0.25")
+	a_node.set_attribute(:height,"0.375")
+	a_node.set_attribute(:fontsize,"9")
+
+	a_node << dg.create_node("edge")
+	a_node.set_attribute(:arrowhead,"none")
+
+	_for i_group _over _self.all_groups.fast_elements()
+	_loop
+		a_node << dg.create_node(i_group.name)
+		a_node.set_attribute(:color,"red")
+		a_node.set_attribute(:shape,"square")
+	_endloop
+
+	_for i_right _over _self.all_rights.fast_elements()
+	_loop
+		a_node << dg.create_node(i_right.name)
+		a_node.set_attribute(:color,"blue")
+	_endloop
+
+	_for i_group _over _self.all_groups.fast_elements()
+	_loop
+		_for i_right _over i_group.rights.fast_elements()
+		_loop
+			dg.create_edge({i_right.name,i_group.name})
+		_endloop
+	_endloop
+
+	_for i_user _over _self.all_users.fast_elements()
+	_loop
+		a_node << dg.create_node(i_user.name)
+		a_node.set_attribute(:shape,"circle")
+		a_node.set_attribute(:label,'""')
+		a_node.set_attribute(:height,"0.12")
+		a_node.set_attribute(:width,"0.12")
+		a_node.set_attribute(:fontsize,"1")
+		_for i_group _over i_user.groups.fast_elements()
+		_loop
+			dg.create_edge({i_group.name,i_user.name})
+		_endloop
+	_endloop
+
+	
+
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+_endmethod
+$

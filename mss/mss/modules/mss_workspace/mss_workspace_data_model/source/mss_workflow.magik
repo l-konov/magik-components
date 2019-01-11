@@ -1,0 +1,330 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_workflow
+##
+## A workflow represents the sequential steps that describe
+## the life cycle of a job or design.
+##
+
+# Implementation note: this is not a datastore record - all
+# configuration for a workflow is defined in code.  The
+# following implementation is structured so that this could be
+# changed in the future.
+
+def_slotted_exemplar(:mss_workflow,
+{
+	{:internal_name, _unset, :readable},
+	{:name, _unset, :readable},
+	{:states, _unset, :readable},
+	{:initial_states, _unset, :readable},
+	{:state_transitions, _unset, :readable}
+},
+{:mss_workspace_record_mixin})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+mss_workflow.define_shared_variable(
+	:defined_workflows,
+	## Hash table of all defined workflows, keyed on internal
+	## name.
+	hash_table.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.new(internal_name, name)
+	## 
+	## Return a new, empty workflow with the given INTERNAL_NAME
+	## and NAME.  INTERNAL_NAME must be a symbol; NAME must be a
+	## string. 
+	##
+	
+	_for sm _over _self.defined_workflows.fast_elements()
+	_loop
+		_if sm.internal_name _is internal_name
+		_then
+			_self.user_error(:duplicate_internal_name, internal_name)
+		_endif 
+		_if sm.name.lowercase = name.lowercase
+		_then
+			_self.user_error(:duplicate_name, name)
+		_endif
+	_endloop
+
+	new_rec << _clone.init(internal_name, name)
+	_self.defined_workflows[internal_name] << new_rec
+
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_private _method mss_workflow.init(internal_name, name)
+	## 
+	## 
+
+	.internal_name << internal_name
+	.name << name
+	.states << equality_hash_table.new()
+	.initial_states << hash_table.new()
+	.state_transitions << hash_table.new()
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workflow.get_by_name(name)
+	## 
+	## Returns the workflow with a name value of NAME
+	##
+
+	_for sm _over _self.defined_workflows.fast_elements()
+	_loop
+		_if sm.name = name
+		_then
+			_return sm
+		_endif
+	_endloop
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workflow.get_by_internal_name(internal_name)
+	## 
+	## Returns the workflow with an internal_name value of
+	## INTERNAL_NAME.
+	##
+
+	_for sm _over _self.defined_workflows.fast_elements()
+	_loop
+		_if sm.internal_name = internal_name
+		_then
+			_return sm
+		_endif
+	_endloop
+	_return _unset
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.remove_workflow_definition(internal_name)
+	## 
+	## Removes the workflow definition for the workflow with
+	## internal name INTERNAL_NAME.
+	##
+
+	_return _self.defined_workflows.remove_key(internal_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workflow.add_state(state)
+	## 
+	## Adds a mss_state record STATE to self.  Do not use directly -
+	## use mss_state.new() instead.
+	##
+
+	_if .states[state.name] _isnt _unset
+	_then
+		_self.user_error(:duplicate_state, state.name)
+	_endif
+	.states[state.name] << state
+
+	_if state.get_property(:initial_for_job?) _is _true
+	_then
+		.initial_states[:job] << state
+	_endif
+	_if state.get_property(:initial_for_design?) _is _true
+	_then
+		.initial_states[:design] << state
+	_endif
+	
+	_return state
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.get_state(state_name)
+	## 
+	## Return the state named STATE_NAME.
+	##
+
+	_return .states[state_name]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workflow.add_state_transition(state_trans)
+	## 
+	## Adds a mss_state_transition record STATE_TRANS to self.  Do
+	## not use directly - use mss_state_transition.new() instead.
+	##
+
+	rt << state_trans.record_type
+	fsn << state_trans.from_state_name
+	tsn << state_trans.to_state_name
+	_if _self.get_state_transition(rt, fsn, tsn) _isnt _unset 
+	_then
+		_self.user_error(:duplicate_state_transition, rt, fsn, tsn)
+	_endif
+	_if .states[fsn] _is _unset
+	_then
+		_self.user_error(:missing_state, fsn)
+	_endif
+	_if .states[tsn] _is _unset
+	_then
+		_self.user_error(:missing_state, tsn)
+	_endif
+	_if (st_data << .state_transitions[rt]) _is _unset
+	_then
+		st_data << .state_transitions[rt] << equality_dual_key_a_table.new()
+	_endif
+	st_data[fsn, tsn] << state_trans
+
+	_return state_trans
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.get_state_transition(record_type, from_state_name, to_state_name)
+	## 
+	## Return the mss_state_transition record of the given
+	## RECORD_TYPE - :job, :mss_job (which are synonymous),
+	## :design, or :mss_design (which also are synonymous).
+	## FROM_STATE_NAME and TO_STATE_NAME identify the from and to
+	## states. 
+	##
+
+	_if record_type _is :mss_job _then record_type << :job _endif
+	_if record_type _is :mss_design _then record_type << :design _endif
+	
+	_if (st_data << .state_transitions[record_type]) _is _unset
+	_then
+		_return _unset
+	_endif
+	_return st_data[from_state_name, to_state_name]
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.get_subsequent_states(record, from_state_name)
+	## 
+	## Return a rope of all states that can be reached starting at
+	## FROM_STATE_NAME, for the given RECORD (a mss_job or mss_design).
+	##
+	## As a special case, if FROM_STATE_NAME is unset, then this
+	## will return the initial state for the given RECORD_TYPE, or
+	## raise an error if no initial state has been set.
+	##
+
+	_global mss_wm_auth_engine
+
+	_if record.source_collection.name _is :mss_job
+	_then
+		record_type << :job
+	_else
+		record_type << :design
+	_endif 
+	
+	r << rope.new()
+	_if from_state_name _is _unset
+	_then
+		# Return the initial state.
+		_if (s << .initial_states[record_type]) _is _unset
+		_then
+			_self.user_error(:no_initial_state, record_type)
+		_endif
+		r.add_last(s)
+		_return r
+	_endif
+
+	_if (st_data << .state_transitions[record_type]) _is _unset
+	_then
+		_return r
+	_endif
+
+	auth_key << _unset 
+	_for i, a_trans _over st_data.fast_keys_and_elements()
+	_loop
+		_if i[1] = from_state_name _andif
+		    (s << .states[i[2]]) _isnt _unset
+		_then
+			_if auth_key _is _unset
+			_then
+				_if record.owned_by_current_user?()
+				_then
+					auth_key << :state_transition_own
+				_else
+					auth_key << :state_transition_other
+				_endif
+			_endif
+			
+			# Ensure that the transition is authorised.
+			_if mss_wm_auth_engine _is _unset _orif
+			    mss_wm_auth_engine.check_access(auth_key, a_trans) _is _true
+			_then 
+				r.add_last(s)
+			_endif 
+		_endif 
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.get_subsequent_state_names(record, from_state_name)
+	## 
+	## Return a rope of all states that can be reached starting at
+	## FROM_STATE_NAME, for the given RECORD (a mss_job or
+	## mss_design).  See get_subsequent_states() for details.
+	## 
+
+	r << rope.new()
+	_for i _over _self.get_subsequent_states(record, from_state_name).fast_elements()
+	_loop
+		r.add_last(i.name)
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workflow.all_state_names
+	## 
+	## Return an equality set of all known state names.
+	##
+
+	s << equality_set.new()
+	_for sm _over _self.defined_workflows.fast_elements()
+	_loop
+		_for state_name _over sm.states.fast_keys_and_elements()
+		_loop
+			s.add(state_name)
+		_endloop
+	_endloop
+	_return s
+	
+_endmethod
+$

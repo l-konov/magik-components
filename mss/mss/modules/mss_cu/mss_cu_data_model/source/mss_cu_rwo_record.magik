@@ -1,0 +1,31 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_rwo_record
+##
+## Superclass for mss_cu_data_model RWO records.
+##
+
+def_slotted_exemplar(:mss_cu_rwo_record,
+{},
+{:rwo_record, :mss_cu_record_mixin})
+$
+
+_pragma(classify_level=advanced)
+_method mss_cu_rwo_record.mss_track_record?()
+	##
+	## These should never be tracked.
+	##
+
+	_return _false
+	
+_endmethod
+$

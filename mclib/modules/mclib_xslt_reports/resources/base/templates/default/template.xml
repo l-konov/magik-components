@@ -1,0 +1,51 @@
+<!-- This is just a sample template with no real functionality -->
+<template name="default">
+       <!-- You can specify a BASE template.  The contents of it are used and then overridden by this template -->
+       <base name="default" directory="sample" module_name="mclib_xslt_reports" file_name="template.xml" />
+       <!-- Each file section is used to generate a single or several output files in the target directory -->
+       <!--  The entry can include a stylesheet and filename for generating some output file directly with the stylesheet -->
+       <!-- It can also reference a collection in which case all records in that collection are used to generate a single file
+             each. Each file gets PREFIX at the front, and file_name_property is called on each record
+             to get the rest of the file name, followed by SUFFIX  -->
+       <files>
+	 <!-- This one does a single output file creating field_types_tree.html using case_dump_field_types_list.xsl to process my base XML -->
+         <file name="field_type_tree">
+           <file_name>field_types_tree.html</file_name>
+	   <stylesheet_name>case_dump_field_types_list.xsl</stylesheet_name>
+         </file>
+	 <file name="manifold">
+	   <!-- This one loops over all records in te sw_gis!case_manifold table. For each record, we call the "name" method to get the value of the file_name, 
+                   and prefix the reuslt with manifold_ to make a complete filename. Note that it is up to the called ot make sure all the names are unique to 
+                   avoid overwriting output files. The suffix ".html" is put on the end of the name.  -->
+	   <stylesheet_name>case_dump_manifold.xsl</stylesheet_name>
+	   <collection name="sw_gis!case_manifold" prefix="manifold_" suffix=".html" file_name_property="name" />
+         </file>
+       </files>
+       <collections>
+         <!-- each collection listed here will be output to the resulting XML files.  You can reference them by SOC, dataset, name. If SOC is omitted, 
+              then whatever is configured fo rhte plugin would be used. This can be valuable for allowing a single report config to run on may different SOCs, 
+              such as different CASE SOCS. -->
+	 <!-- you may also include a predicate in the collection spec to limit the records, as shown below. The rpedicate attribute value is evaluate()d for processing-->
+          <!-- collection soc="soc_name" dataset="dataset_name" name="coll_name"/-->
+	  <!-- fields -->
+	     <!-- field name="field_name to include"-->
+	     <!-- field name="field_name to include"-->
+	  <!-- / field -->
+          <collection name="sw_gis!node">
+	     <fields>
+	       <field name="node_id"/>
+	       <field name="coord"/>
+	     </fields>
+          <collection name="pole" predicate="predicate.gt(:height,45)">
+	     <fields>
+	       <field name="node_id"/>
+	       <field name="coord"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!chain">
+	     <fields>
+	       <field name="gis_id"/>
+	     </fields>
+	  </collection>
+       </collections>
+</template>

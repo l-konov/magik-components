@@ -1,0 +1,166 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_facility_definition
+##
+## Definition record for a type of facility that can be
+## associated with a compatible unit.
+##
+
+# Implementation note: this is not a datastore record - all
+# configuration is defined in code.  The following
+# implementation is structured so that this could be changed in
+# the future. 
+
+def_slotted_exemplar(:mss_cu_facility_definition,
+{
+	{:id, _unset, :readable},
+	{:partition_name, _unset, :readable},
+	{:table_name, _unset, :readable},
+	{:attribute_names, _unset, :readable}
+},
+{:mss_cu_record_mixin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_facility_definition.define_shared_variable(
+	:defined_facilities_by_id,
+	## Hash table of all defined records, keyed on ID.
+	hash_table.new(),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_facility_definition.define_shared_variable(
+	:defined_facilities_by_pt_name,
+	## Dual key association table of all defined records, keyed on
+	## partition name and table name.
+	dual_key_a_table.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_facility_definition.new(id, partition_name, table_name, attribute_names)
+	## 
+	## Return a new mss_cu_facility_definition record with the
+	## given attribute values.
+	## - ID is any integer value, which must be unique among
+	##   all defined mss_cu_facility_definition records.
+	## - PARTITION_NAME is a symbol representing the name of
+	##   the database partition that the table exists in.
+	## - TABLE_NAME is a symbol representing the name of the table.
+	## - ATTRIBUTE_NAMES is a vector of all attribute names which
+	##   can potentially be set based on the properties of a CU.
+	##
+
+	# Don't allow bignums.
+	_if _not id.is_class_of?(1)
+	_then
+		_self.user_error(:id_must_be_integer)
+	_endif
+
+	# Don't allow duplicates based on ID.
+	_if _self.defined_facilities_by_id[id] _isnt _unset
+	_then
+		_self.user_error(:id_value_already_used, id)
+	_endif
+
+	# Don't allow duplicates based on partition_name and table_name.
+	_if _self.defined_facilities_by_pt_name[partition_name, table_name] _isnt _unset
+	_then
+		_self.user_error(:pt_value_already_used, partition_name, table_name)
+	_endif
+
+	new_rec << _clone.init(id, partition_name, table_name, attribute_names)
+	_self.defined_facilities_by_id[id] << new_rec
+	_self.defined_facilities_by_pt_name[partition_name, table_name] << new_rec
+	
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_facility_definition.init(id, partition_name, table_name, attribute_names)
+	## 
+	## 
+
+	.id << id
+	.partition_name << partition_name
+	.table_name << table_name
+	.attribute_names << attribute_names
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_facility_definition.clear_cache()
+	## 
+	## Clear all cached information.
+	##
+
+	_self.defined_facilities_by_id.empty()
+	_self.defined_facilities_by_pt_name.empty()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_facility_definition.target_table
+	## 
+	## Return the database table associated with this facility
+	## definition record.
+	##
+
+	_if (dbv << gis_program_manager.cached_dataset(.partition_name)) _isnt _unset
+	_then
+		_return dbv.collections[.table_name]
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_facility_definition.get_for_id(id)
+	## 
+	## Returns the instance of self for the given ID value.
+	##
+
+	_return _self.defined_facilities_by_id[id]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_facility_definition.get_for_target_table(tbl)
+	## 
+	## Return the instance of self which maps to the given target
+	## table TBL.  N.B.: does not work if TBL is from a replica view.
+	##
+
+	_return _self.get_for_partition_and_table_name(tbl.source_view.name, tbl.name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_facility_definition.get_for_partition_and_table_name(p_name, t_name)
+	## 
+	## Return the instance of self for the given partition and
+	## table names P_NAME and T_NAME.
+	##
+
+	_return _self.defined_facilities_by_pt_name[p_name, t_name]
+	
+_endmethod
+$

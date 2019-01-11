@@ -1,0 +1,27 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method sector_rope.transform_in_situ(a_transform)
+	## Transform _self using A_TRANSFORM. The new transformed
+        ## values are stored within _self, i.e the old definition of
+        ## _self is lost.
+
+	# MSS START CHANGE
+	_dynamic !mss_transform_override!
+	_if !mss_transform_override! _is _unset
+	_then
+		_return _self.prim(11, a_transform)
+	_endif
+
+	_return _self.mss_transform_in_situ(a_transform)
+	# MSS END CHANGE
+	
+_endmethod
+$

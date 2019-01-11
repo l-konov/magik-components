@@ -1,0 +1,20 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+smallworld_product.register_application(
+	:mss_scheduler_application,
+	:mss_scheduler_application,
+	:soc_name, :mss_scheduler,
+	:resource_module_name, :mss_scheduler_application,
+	:description, "MSS Scheduled Task Processor",
+	:external_name, "MSS Scheduled Task Processor",
+	:config_definition_module_name, :mss_scheduler_processor_gui,
+	:gui_definition_module_name, :mss_scheduler_processor_gui
+		   )
+$

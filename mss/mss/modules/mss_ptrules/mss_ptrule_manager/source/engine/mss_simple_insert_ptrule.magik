@@ -1,0 +1,236 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_simple_insert_ptrule
+##
+## A simple insertion pointing rule which only requires one PDR
+## operation - intended for point and text features, or
+## features with no geometry at all.
+##
+
+def_slotted_exemplar(:mss_simple_insert_ptrule,
+{},
+{:mss_insert_ptrule})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.core_default_properties
+	## 
+	## 
+
+	_local pl << _super.core_default_properties.copy()
+	pl[:subrule_placement_location] << :last_coord
+	pl[:subrule_placement_loc_method] << _unset
+	pl[:subrule_placement_orientation] << :with_parent
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.core_property_types
+	## 
+	## 
+
+	_local pl << _super.core_property_types.copy()
+	pl[:subrule_placement_location] << {:symbol, {:midpoint, :first_coord, :last_coord, :bounds_center}}
+	pl[:subrule_placement_loc_method] << {:symbol}
+	pl[:subrule_placement_orientation] << {:symbol, {:with_parent, :with_parent_raw, :zero}}
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.int!release(a_window, pos)
+	## 
+	## 
+
+	_super.int!release(a_window, pos)
+
+	_if _self.insert_enabled?(:release)
+	_then
+		_self.perform_insert(:release, a_window, pos)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.int!post_release(a_window, pos)
+	## 
+	## Automatically restart, unless self is suspended.
+	##
+	
+	_super.int!post_release(a_window, pos)
+
+	_if _self.get_property(:suspended?) _is _true
+	_then
+		_return
+	_endif
+	
+	_self.int!restart()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.int!complete()
+	## 
+	## 
+
+	_super.int!complete()
+
+	_if _self.insert_enabled?(:complete)
+	_then
+		_self.perform_insert(:complete)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.perform_insert(mode, _optional a_window, pos)
+	## 
+	## 
+
+	_dynamic !current_world!
+	_dynamic !current_dsview!
+	
+	_if .detached_geometry _is _unset
+	_then
+		# Can't get world here, but should be able to get it from parent.
+		_if .parent_ptrule.responds_to?(:|geometry_sectors_for_relative_insert()|)
+		_then
+			(x, x, the_world) << .parent_ptrule.geometry_sectors_for_relative_insert()
+		_endif
+	_else 
+		the_world << .detached_geometry.world.world_for_dataset(.detached_record.source_view)
+	_endif
+	
+	_if the_world _is _unset _andif
+	    .geometry_name _isnt _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:cannot_determine_world))
+	_endif
+	!current_world! << the_world
+		
+	geom_fd << .detached_record.all_fields[.geometry_name]
+	
+	pdr << .pdr_data
+
+	# Special processing if subrule_placement_location property is
+	# specified.
+	geom_data << _unset 
+	_if geom_fd _isnt _unset _andif
+	    .parent_ptrule _isnt _unset
+	_then
+		geom_data << _self.figure_subrule_placement_location()
+	_endif
+
+	dataless? << .detached_record.is_rwo? _andif
+		     .detached_record.dataless?
+	_if _not dataless?
+	_then 
+		.detached_record.mss_ptrule_pre_insert_activity(_self)
+		cr << .current_record << _self.insert_detached_record()
+		_if cr _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:key_already_exists))
+		_endif
+		cr.mss_ptrule_post_insert_activity(_self)
+
+		_if geom_data _isnt _unset
+		_then
+			# Apply the special placement relative to parent.
+			_if geom_fd.geom_category _is :text
+			_then
+				new_geom << cr.make_geometry(.geometry_name, geom_data,
+							     cr.text_for(.geometry_name).default(""))
+				_if (just << _self.get_property(:text_justification)) _isnt _unset
+				_then
+					new_geom.justification << just
+				_endif 
+			_else 
+				new_geom << cr.make_geometry(.geometry_name, geom_data)
+			_endif
+		_elif .detached_geometry _isnt _unset
+		_then 
+			# Just manipulate the detached geometry.
+			wrk_geom << .detached_geometry.transformed(pdr[:transform])
+			
+			# For a text geometry, must re-get the string to reflect what
+			# the user has entered for attributes.
+			_if wrk_geom.geom_category _is :text
+			_then
+				wrk_geom.string << cr.text_for(.geometry_name).default("")
+			_endif 
+			new_geom << cr.make_geometry(.geometry_name, wrk_geom)
+		_endif 
+
+		cr.mss_ptrule_fire_post_insert_actions(_self)
+	_else
+		# Dataless RWO.
+		.detached_record.mss_ptrule_pre_insert_activity(_self)
+		!current_dsview! << .detached_record.source_view
+
+		_if geom_data _isnt _unset
+		_then
+			# Apply the special placement relative to parent.
+			_if geom_fd.geom_category _is :text
+			_then
+				_if (str << .detached_record.mss_ptrule_text_for(.geometry_name, _self)) _is _unset
+				_then 
+					str << .detached_record.text_for(.geometry_name)
+				_endif 
+				_if str _is _unset _orif str = ""
+				_then
+					str << "??"
+				_endif
+				new_geom << geom_fd.geom_exemplar.new(geom_fd, geom_data, str)
+				_if (just << _self.get_property(:text_justification)) _isnt _unset
+				_then
+					new_geom.justification << just
+				_endif 
+			_else
+				new_geom << geom_fd.geom_exemplar.new(geom_fd, geom_data)
+			_endif
+		_elif .detached_geometry _isnt _unset
+		_then 
+			# Just manipulate the detached geometry.
+			wrk_geom << .detached_geometry.transformed(pdr[:transform])
+			gf << .detached_record.all_fields[.geometry_name]
+			new_geom << gf.geom_exemplar.new(gf, wrk_geom)
+		_endif
+
+		_if new_geom _isnt _unset
+		_then 
+			cr << .current_record << new_geom.new_dataless_rwo()
+			cr.mss_ptrule_post_insert_activity(_self)
+			
+			# For a text geometry, must re-get the string to reflect what
+			# the user has entered for attributes.  For dataless RWOs, this
+			# is done after geometry creation (rather than before) so that
+			# the join to the parent exists.
+			_if new_geom _isnt _unset _andif
+			    new_geom.geom_category _is :text
+			_then
+				cr.update_text_fields_from(cr)
+			_endif
+			
+			cr.mss_ptrule_fire_post_insert_actions(_self)
+		_endif 
+	_endif 
+	
+_endmethod
+$

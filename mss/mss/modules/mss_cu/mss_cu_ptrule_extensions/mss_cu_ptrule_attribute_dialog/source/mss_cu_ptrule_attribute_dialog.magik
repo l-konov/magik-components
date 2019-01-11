@@ -1,0 +1,45 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu, mss_ptrule})
+##
+## mss_cu_ptrule_attribute_dialog
+##
+## Extension of mss_ptrule_attribute_dialog for editing
+## attributes and Compatible Units.
+##
+
+def_slotted_exemplar(:mss_cu_ptrule_attribute_dialog,
+{
+},
+{:mss_ptrule_attribute_dialog})
+$
+
+_pragma(classify_level=basic, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_attribute_dialog.update_current_detached_record()
+	##
+	## In addition to updating the detached record, update CU
+	## references.
+	##
+
+	_super.update_current_detached_record()
+
+	_if .current_ptrule _is _unset _orif
+	    _not .current_ptrule.responds_to?(:|set_cu_references()|)
+	_then
+		_return
+	_endif
+
+	_if (cu_list << _self.databus_request_data(:cu_list)) _isnt _unset
+	_then
+		.current_ptrule.set_cu_references(cu_list)
+	_endif 
+
+_endmethod
+$

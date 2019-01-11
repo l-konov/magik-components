@@ -1,0 +1,205 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+##
+## mss_user_editor_field_item_lister
+##
+## Subclass of field_item_lister for use with the
+## mss_user_object_editor class.
+##
+
+def_slotted_exemplar(:mss_user_editor_field_item_lister,
+{},
+{:field_item_lister})
+$
+
+_pragma(classify_level=restricted)
+mss_user_editor_field_item_lister.define_shared_variable(
+	:custom_group_expansion_data,
+	## Cached information about which groups have been expanded.
+	## Note that this is a shared variable so that it will apply
+	## across all editor instances.
+	equality_hash_table.new(),
+	:public)
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_field_item_lister.build_gui( a_container )
+	## 
+	## Builds the GUI in A_CONTAINER
+	## 
+
+	# 2006/03/23 TM  Add expand_notifier to tree_item.
+	# 2008/05/14 TM  Integrate with V4.1 changes.
+	# 2011/04/25 TM  Move here from obsolete mss_ipje_field_item_lister
+	#                class.
+	
+	rc << rowcol.new( a_container, _unset , 1 )
+	rc.row_resize_values << {100,0}
+	rc.resize_x? << _true
+	rc.resize_y? << _true
+
+	cols              << _self.column_names.size
+	col_headings      << simple_vector.new( cols )
+	col_headings_ss   << simple_vector.new( cols )
+	col_widths        << simple_vector.new( cols )
+	col_resize_values << simple_vector.new( cols )
+	_for i, col_name _over _self.column_names.fast_keys_and_elements()
+	_loop
+		col_headings[i]      << _self.column_headings[ col_name ]
+		col_headings_ss[i]   << _self.column_headings_ss[ col_name ]
+		col_widths[i]        << _self.column_widths[ col_name ]
+		col_resize_values[i] << _self.column_resize_values[ col_name ]
+	_endloop
+
+	height_in_chars << _self.tree_item_properties[:height_in_chars].default(15)
+	tv << tree_item.new( rc,
+			     :module_name,                     :ui_resources,
+			     :model,                           _self,
+			     :aspect,                          :field_item_list,
+			     :select_notifier,                 :|field_selected()|,
+			     :data_selector,                   :|field_item_list()|,
+			     # TM START CHANGE (relative to superclass)
+			     :expand_notifier,                 :|mss_field_expanded()|,
+			     # TM END CHANGE
+			     :editor_required_notifier,        :|editor_required()|,
+			     :value_formatters,                { {:current_value, handler.new(_self, :|field_value_display_item()|) },
+								 {:old_value,     handler.new(_self, :|field_value_display_item()|) } },
+			     :row_headings?,                   _false,
+			     :grid_lines?,                     _true,
+			     :show_focus?,                     _true,
+			     :move_down_on_return?,            _true,
+			     :enter_pressed_notifier,          handler.new( _self, :|tree_item_enter_pressed()|),
+			     :edit_always_on?,                 _self.edit_always_on?,
+			     :column_headings,                 col_headings,
+			     :column_headings_styled_strings,  col_headings_ss,
+			     :column_widths,                   col_widths,
+			     :col_resize_values,               col_resize_values,
+			     :column_allow_sort?,              _false,
+			     :column_allow_visibility_change?, _false,
+			     :column_allow_formatter_change?,  _false,
+			     :col_alignment,                   :fill,
+			     :row_alignment,                   :fill,
+			     :height_in_chars,                 height_in_chars,
+			     :resize_y?,                       _true,
+			     :resize_x?,                       _true,
+			     :row_height,                      20,
+			     :discrete_scrolling?,             _false,
+			     :identifier,                      :field_list_view
+			)
+	# No popup menus
+	tv.popup_menu << _unset
+	tv.headings_popup_menu << _unset
+	.gui_items[:field_list_view] << tv
+
+	# Set the expand notifier so that we can retain state
+	# TM START CHANGE (relative to superclass)
+	# The following processing introduced in V4.1 is not retained;
+	# keep the MSS custom logic in mss_field_expanded(), which
+	# effectively caches on the exemplar rather than the instance
+	# (more like what a user would expect).
+	#tv.agent.expand_notifier << :|tree_item_expansion_changed()|
+	# TM END CHANGE
+	
+	>> rc
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_field_item_lister.get_field_editor_name(a_field_item)
+	## 
+	## Allow a customization hook on the record exemplar to return
+	## an overriding field editor name.
+	##
+	## Note: this is retained for backwards compatibility with
+	## pre-V4.2 installations.  For V4.2, use the
+	## get_special_field_editor() protocol.
+	##
+	
+	fd << a_field_item.field_descriptor
+	_block
+		_handling warning _with procedure
+		rec_ex << fd.owner.record_exemplar
+	_endblock
+	_if rec_ex _isnt _unset _andif
+	    rec_ex.method_table[:|mss_custom_field_editor_name()|] _isnt _unset
+	_then
+		retval << rec_ex.mss_custom_field_editor_name(fd)
+		_if retval _isnt _unset
+		_then
+			_return retval
+		_endif
+	_endif 
+
+	_return _super.get_field_editor_name(a_field_item)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_field_item_lister.field_item_list()
+	## 
+	## Returns a rope of display_trees to be displayed in the tree_item.
+	##
+
+	data << rope.new()
+	_for item _over _self.visible_items()
+	_loop
+		# TM START CHANGE (relative to superclass)
+		data.add_last(x << item.as_display_tree( _self.column_names ) )
+		_if item.is_class_of?(group_editor_field_item)
+		_then
+			ht << _self.custom_group_expansion_data
+			_if (ht2 << ht[item.collection]) _isnt _unset _andif
+			    (ex_val << ht2[item.group_name]) _isnt _unset
+			_then
+				x.expanded? << ex_val
+			_endif
+		_endif
+		# TM END CHANGE
+	_endloop
+	_if _not data.empty?
+	_then
+		data[1].selected? << _true 
+	_endif
+	
+	>> data
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_field_item_lister.mss_field_expanded(p_tree, p_row_index, p_event)
+	## 
+	## When a group is expanded/contracted, save the settings for
+	## that group.
+	##
+
+	thing << p_tree.key
+	_if thing.is_class_of?(group_editor_field_item)
+	_then
+		ht << _self.custom_group_expansion_data
+		_if (ht2 << ht[thing.collection]) _is _unset
+		_then 
+			ht2 << ht[thing.collection] << equality_property_list.new()
+		_endif 
+		ht2[thing.group_name] << p_tree.expanded?
+	_endif
+
+	_if (flv << .gui_items[:field_list_view]) _isnt _unset
+	_then
+		flv.agent.default_handle_expand(p_tree, p_row_index, p_event)
+	_endif
+	
+	_return _false
+	
+_endmethod
+$

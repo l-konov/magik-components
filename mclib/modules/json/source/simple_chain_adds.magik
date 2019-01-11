@@ -1,0 +1,10 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	simple_chain.write_as_json(a_stream)
+	##
+	##
+	_super(chain_mixin).write_as_json(a_stream)
+_endmethod
+$

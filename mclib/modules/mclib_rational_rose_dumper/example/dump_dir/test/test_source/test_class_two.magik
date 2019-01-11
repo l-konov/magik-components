@@ -1,0 +1,13 @@
+# File Notice 1
+# File Notice 2
+# 
+_pragma(classify_level=basic, topic={topic1, topic2}, usage={redefinable})
+##
+## 
+##
+# Class Notice 1
+# Class Notice 2
+# 
+def_slotted_exemplar(:test_class_two,{})
+$
+

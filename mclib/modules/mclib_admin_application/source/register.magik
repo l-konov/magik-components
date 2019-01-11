@@ -1,0 +1,38 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-09 11:45:59 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 04-05-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+smallworld_product.register_application( :mclib_admin_application,
+					 :admin_application,
+					 :resource_module_name,  "mclib_admin_application",
+					 :description,           "Provides administration tools with mclib extensions",
+					 :external_name,         "Administration - Mclib Extensions",
+					 :icon_name,             "admin_main",
+					 :can_update_database?,  _false,
+					 :html_help_resource_module_name,  :admin_application, 
+					 :html_help_file_name,   "swAdmin" )
+$

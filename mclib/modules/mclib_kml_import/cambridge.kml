@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://earth.google.com/kml/2.1">
+<Document>
+	<name>cambridge</name>
+	<Style id="sh_ylw-pushpin_copy2">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<Style id="sn_icon56">
+		<IconStyle>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pal3/icon56.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="sn_icon30">
+		<IconStyle>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pal3/icon30.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<StyleMap id="msn_icon56">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sn_icon56</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sh_icon48</styleUrl>
+		</Pair>
+	</StyleMap>
+	<StyleMap id="msn_icon30">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sn_icon30</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sh_icon22</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="sn_ylw-pushpin_copy3">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff00aa55</color>
+		</LineStyle>
+		<PolyStyle>
+			<color>4c7f5500</color>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="msn_ylw-pushpin_copy3">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sn_ylw-pushpin_copy3</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sh_ylw-pushpin_copy3</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="sh_ylw-pushpin_copy1">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="sn_ylw-pushpin_copy2">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff0000ff</color>
+			<width>3</width>
+		</LineStyle>
+	</Style>
+	<Style id="sh_icon48">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pal3/icon48.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="sh_icon22">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pal3/icon22.png</href>
+			</Icon>
+		</IconStyle>
+	</Style>
+	<Style id="sh_ylw-pushpin_copy3">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+		<LineStyle>
+			<color>ff00aa55</color>
+		</LineStyle>
+		<PolyStyle>
+			<color>4c7f5500</color>
+		</PolyStyle>
+	</Style>
+	<StyleMap id="msn_ylw-pushpin_copy2">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sn_ylw-pushpin_copy2</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sh_ylw-pushpin_copy2</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="sn_ylw-pushpin_copy1">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<StyleMap id="msn_ylw-pushpin_copy1">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#sn_ylw-pushpin_copy1</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#sh_ylw-pushpin_copy1</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Folder>
+		<name>My Visit To Cambridge</name>
+		<open>1</open>
+		<Placemark>
+			<name>Baron Of Beef</name>
+			<LookAt>
+				<longitude>0.1188641998954752</longitude>
+				<latitude>52.2097326370634</latitude>
+				<altitude>0</altitude>
+				<range>254.9283383371439</range>
+				<tilt>79.11196241416454</tilt>
+				<heading>0.000476020304647106</heading>
+				<altitudeMode>relativeToGround</altitudeMode>
+			</LookAt>
+			<styleUrl>#msn_ylw-pushpin_copy1</styleUrl>
+			<Point>
+				<altitudeMode>relativeToGround</altitudeMode>
+				<coordinates>0.1186886960611702,52.20878311986402,5</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<name>Baron of Beef</name>
+			<description>A lovely pub with great food</description>
+			<styleUrl>#msn_ylw-pushpin_copy3</styleUrl>
+			<Polygon>
+				<extrude>1</extrude>
+				<tessellate>1</tessellate>
+				<altitudeMode>relativeToGround</altitudeMode>
+				<outerBoundaryIs>
+					<LinearRing>
+						<coordinates>
+0.1188443671687907,52.20900155695252,5 0.1183550740155113,52.20874478578889,5 0.1185716529760583,52.20861098841413,5 0.1187251670834115,52.20869065595323,5 0.1186914338976521,52.20872270591439,5 0.118840563582495,52.20878722922088,5 0.1188880235673935,52.2087690725776,5 0.1189565616409425,52.2087859172558,5 0.1190600060628668,52.20883919216646,5 0.1188443671687907,52.20900155695252,5 </coordinates>
+					</LinearRing>
+				</outerBoundaryIs>
+			</Polygon>
+		</Placemark>
+		<Placemark>
+			<name>Arundel House</name>
+			<description>A very lovely hotel which offers continental breakfast and high speed internet</description>
+			<LookAt>
+				<longitude>0.1195100808301883</longitude>
+				<latitude>52.21301803138594</latitude>
+				<altitude>0</altitude>
+				<range>136.3932589514814</range>
+				<tilt>6.172072965451901e-010</tilt>
+				<heading>5.442757067536352e-005</heading>
+			</LookAt>
+			<styleUrl>#msn_icon56</styleUrl>
+			<Point>
+				<coordinates>0.1195100808301883,52.21301803138594,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<name>To Office</name>
+			<styleUrl>#msn_ylw-pushpin_copy2</styleUrl>
+			<LineString>
+				<tessellate>1</tessellate>
+				<coordinates>
+0.1195571551035784,52.2130480590551,0 0.1209755045417467,52.21336629769114,0 0.1224854638015955,52.21362735965638,0 0.1246278230574092,52.21407191428607,0 0.1264630577383628,52.21451612901797,0 0.1272063454417776,52.21465840377711,0 0.1348501523802241,52.2162861633437,0 0.1349265474254509,52.21680577309223,0 0.1355141244425511,52.21702911326604,0 0.135947417891444,52.21690437888523,0 </coordinates>
+			</LineString>
+		</Placemark>
+		<Placemark>
+			<name>Smallworld Office</name>
+			<description>GE Smallworld Office</description>
+			<LookAt>
+				<longitude>0.1359386372089866</longitude>
+				<latitude>52.21686714355923</latitude>
+				<altitude>0</altitude>
+				<range>1378.087854388775</range>
+				<tilt>6.752144852990616e-011</tilt>
+				<heading>-1.105075052643883e-005</heading>
+			</LookAt>
+			<styleUrl>#msn_icon30</styleUrl>
+			<Point>
+				<coordinates>0.1359386372089866,52.21686714355924,0</coordinates>
+			</Point>
+		</Placemark>
+	</Folder>
+</Document>
+</kml>

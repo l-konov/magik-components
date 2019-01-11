@@ -1,0 +1,7 @@
+globals
+changes/
+additions/
+components/
+plugin/
+sf!method_analyzer_framework
+message_usages

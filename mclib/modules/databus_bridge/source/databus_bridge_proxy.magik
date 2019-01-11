@@ -1,0 +1,129 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-02-14 16:16:36 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-14-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:databus_bridge_proxy,
+                          {
+				  {:mappings, _unset}
+			  },
+			  {:sw_component})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.new(name,framework,a_bus,consumer_types, producer_types)
+	## Create a new instance of the proxy  
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _clone.init(name,framework,a_bus,consumer_types, producer_types)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.init(name,framework,a_bus,consumer_types, producer_types)
+	## setup this instance with A_BUS as the databus we listen to
+	## handling consumer and producer types, which are vectors of symbols.
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	_super.init(name,framework)
+	.mappings << property_list.new()
+	.mappings[:produce] << {}.new_from(producer_types)
+	.mappings[:consume] << {}.new_from(consumer_types)
+	_self.databus<< a_bus
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.databus_producer_data_types
+	## returns my producer values from my .mappings slot
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> .mappings[:produce]
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.databus_consumer_data_types
+	## Returns the values in my consume mappings
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> .mappings[:consume]
+_endmethod
+$
+			
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.sw_databus_data_available(data_type,data)
+	## Passd the data along to my framework
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	_self.framework.proxy_databus_data_available(data_type,data)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.sw_databus_data_requested(data_type)
+	## Pass the data along to my framework
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _self.framework.proxy_databus_data_requested(data_type)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.proxy_databus_make_data_available(data_type,data)
+	## handles calls from my framework to publish data on my databus
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _self.databus_make_data_available(data_type,data)
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method databus_bridge_proxy.proxy_databus_data_requested(data_type)
+	## handles requests for data form my databus from my
+	## framework.  data_type is sent to my databus and the results
+	## are returned.
+	## 
+	##
+
+	# (12-15-2004 Brad Sileo, TenSails): created.
+	>> _self.databus_request_data(data_type)
+_endmethod
+$

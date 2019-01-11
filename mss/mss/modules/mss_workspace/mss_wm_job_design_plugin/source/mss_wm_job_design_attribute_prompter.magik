@@ -1,0 +1,469 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_job_design_attribute_prompter.magik
+##
+## GUI framework for prompting for job and design attributes,
+## to create an initial job and design.
+##
+
+def_slotted_exemplar(:mss_wm_job_design_attribute_prompter,
+{
+	{:items, _unset, :readable},
+	{:mode, _unset, :readable},
+	{:parent_job, _unset, :readable},
+	{:parent_design, _unset, :readable},
+	{:attribute_list, _unset, :readable},
+	{:editor_cache, _unset, :readable},
+	{:wr_job, _unset, :readable},
+	{:wr_design, _unset, :readable},
+	{:status_string, _unset, :readable}
+},
+{:mss_application_databus_gui_framework})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_job_design_attribute_prompter.define_shared_constant(
+	:application_databus_consumer_data_types,
+	{:map_trail},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_wm_job_design_attribute_prompter.define_shared_constant(
+	:job_prompt_attributes,
+	## A vector of attributes to prompt for when inserting a new
+	## mss_job.
+	{:name, :title, :type, :start_date, :end_date, :singular_children?, :comments},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_wm_job_design_attribute_prompter.define_shared_constant(
+	:design_prompt_attributes,
+	## A vector of attributes to prompt for when inserting a new
+	## mss_design.
+	{:name, :owner, :comments},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.trail
+	##
+	## Request the trail from the application databus.
+	##
+
+	_for info _over _self.application_databus_request_all_data(:map_trail)
+	_loop
+		# Just in case there are any other (custom) things producing
+		# trails, specifically get one that is managed by an actual
+		# map. 
+		_if info[1].is_kind_of?(map)
+		_then 
+			_return info[2], info[1]
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.init(_gather args)
+	## 
+	##
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	.mode << _unset
+	.parent_job << _unset
+	.parent_design << _unset 
+	.editor_cache << equality_hash_table.new()
+	.attribute_list << rope.new() 
+	.wr_job << property_list.new()
+	.wr_design << property_list.new()
+	.status_string << ""
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.set_mode(mode, _optional parent_job, parent_design)
+	## 
+	## Set the prompting mode to MODE.  May be:
+	## :job - create a new job.
+	## :job_and_design - create a new job and design.
+	## :design - create a new design.  In this case,
+	##           PARENT_JOB is required.
+	## :sub_design - create a new sub design.  In this
+	##               case, PARENT_DESIGN is required.
+	##
+	## It is the callers responsibility to ensure that the
+	## necessary parent job/design is passed in where needed (data
+	## is not validated here).
+	##
+	
+	.mode << mode
+	.parent_job << parent_job
+	.parent_design << parent_design
+	
+	_self.init_attribute_list()
+	_return mode
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.status_string << x
+	## 
+	## Set the status string displayed on the status bar.
+	##
+
+	.status_string << x
+	_self.update_statusbar(:status_string, :text, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.init_attribute_list()
+	## 
+	## Initialize the display trees being displayed to prompt for
+	## attribute values.
+	##
+	
+	.attribute_list << rope.new()
+	.wr_job.empty()
+	.wr_design.empty()
+	_if .mode _is :job _orif
+	    .mode _is :job_and_design
+	_then
+		det_rec << mss_workspace_manager_engine.job_table.new_detached_record()
+		_self.init_default_attributes(det_rec, .wr_job)
+		attr_names << _self.job_prompt_attributes
+		_self.init_attribute_list_for_record(det_rec, .wr_job, attr_names)
+	_endif
+	_if .mode _is :design _orif
+	    .mode _is :job_and_design _orif
+	    .mode _is :sub_design
+	_then
+		det_rec << mss_workspace_manager_engine.design_table.new_detached_record()
+		_self.init_default_attributes(det_rec, .wr_design)
+		attr_names << _self.design_prompt_attributes
+		_self.init_attribute_list_for_record(det_rec, .wr_design, attr_names)
+	_endif
+
+	_self.changed(:attribute_list, :refresh)
+	_return .attribute_list
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.init_default_attributes(det_rec, attr_pl)
+	## 
+	## Initialize default values for attributes for the record
+	## DET_REC (a job or design), and store the results in ATTR_PL.
+	##
+
+	_for i _over det_rec.physical_fields.fast_elements()
+	_loop
+		_if {:ds!version, :rwo_id}.includes?(i.name)
+		_then
+			_continue
+		_endif 
+		_if (v << i.default_value) _isnt _unset
+		_then
+			attr_pl[i.name] << v
+		_endif
+	_endloop
+
+	det_rec.init_default_attributes(attr_pl, .mode)
+	_self.custom_init_default_attributes(det_rec, attr_pl)
+	_return attr_pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_job_design_attribute_prompter.custom_init_default_attributes(det_rec, attr_pl)
+	## 
+	## Customizable method to initialize default values for
+	## attributes for the record DET_REC (a job or design), and
+	## store the results in ATTR_PL. 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.init_attribute_list_for_record(det_rec, attr_pl, attr_names)
+	## 
+	## 
+
+	_for i _over attr_names.fast_elements()
+	_loop
+		fd << det_rec.all_fields[i]
+
+		# Use an overriding message if defined.
+		ext_key << write_string("ext_name_", det_rec.source_collection.name,
+					"_", fd.name).as_symbol()
+		_if _self.has_message?(ext_key)
+		_then
+			ext_name << _self.message(ext_key)
+		_else
+			ext_name << fd.external_name.as_charvec()
+		_endif 
+		dt << display_tree.new(fd, property_list.new_with(
+						   :det_rec, det_rec,
+						   :fd, fd,
+						   :attribute_pl, attr_pl,
+						   :attribute_name, ext_name,
+						   :attribute_value, attr_pl[i]))
+		dt.styled_string << {:value, :attribute_name, :tab, :value, :attribute_value}
+		.attribute_list.add_last(dt)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.build_framework_gui(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	
+	p.start_row()
+	.items[:attribute_list] <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :attribute_list,
+			      :data_selector, :attribute_list,
+			      :editor_required_notifier, :|editor_required()|,
+			      :value_changed_notifier, :|value_changed()|,
+			      :height_in_chars, _self.job_prompt_attributes.size +
+				      _self.design_prompt_attributes.size + 1,
+			      :column_widths, {200, 250},
+			      :column_headings, {_self.message(:ch_attribute_name),
+						 _self.message(:ch_attribute_value)},
+			      :column_allow_sort?, _false,
+			      :distribute_spare_width, :always,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+
+	p.start_row()
+	simple_panel.new(p).resize_x? << _true
+	button_item.new_safe(p, _self.message(:ok),
+			     _self, :|ok()|,
+			     :min_width, 75)
+	button_item.new_safe(p, _self.message(:cancel),
+			     _self, :|cancel()|,
+			     :min_width, 75)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.cancel()
+	## 
+	## 
+
+	_self.status_string << ""
+	_self.close()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## Allow in-place editing of attribute_value column.
+	##
+
+	_if value_id _isnt :attribute_value
+	_then
+		_return
+	_endif
+	
+	fd << a_tree.value[:fd]
+	_if (ed << .editor_cache[fd]) _isnt _unset
+	_then
+		_return ed
+	_endif
+
+	_if fd.is_join? _andif
+	    fd.join_type _is :text
+	_then
+		ed << in_place_multi_line_editor.new(an_agent)
+		.editor_cache[fd] << ed
+		_return ed
+	_endif
+	
+	_if _not fd.is_physical?
+	_then
+		_return _unset
+	_endif
+	
+	det_rec << a_tree.value[:det_rec]
+	fd_type << fd.type
+	phys_type << fd_type.phys_type
+
+	_if det_rec.can_match?(fd)
+	_then
+		items << det_rec.match_string(fd, "", det_rec)
+		ed << in_place_choice_editor.new(an_agent, :items, items)
+	_elif phys_type _is :ds_bool
+	_then
+		ed << in_place_boolean_editor.new(an_agent)
+	_elif phys_type _is :ds_kleene
+	_then
+		ed << in_place_kleenean_editor.new(an_agent)
+	_elif phys_type _is :ds_date
+	_then
+		ed << in_place_date_editor.new(an_agent)
+	_elif phys_type _is :ds_time
+	_then
+		ed << in_place_date_time_editor.new(an_agent)
+	_else
+		ed << in_place_value_editor.new(an_agent)
+	_endif 
+
+	.editor_cache[fd] << ed
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.value_changed(a_tree, value_id, new_value, old_value, an_ed)
+	## 
+	## Allow in-place editing of attribute_value column.
+	## 
+	
+	_if value_id _isnt :attribute_value
+	_then
+		_return
+	_endif
+	
+	fd << a_tree.value[:fd]
+	attr_pl << a_tree.value[:attribute_pl]
+	attr_pl[fd.name] << new_value
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_job_design_attribute_prompter.ok()
+	## 
+	## Create new job/design records.
+	##
+
+	# Check all mandatory attributes - only check the visible
+	# attributes (assume that the defaults for any non-visible
+	# attributes have been set appropriately).
+	_for i _over .attribute_list.fast_elements()
+	_loop
+		fd << i.value[:fd]
+		attr_pl << i.value[:attribute_pl]
+		_if fd.mandatory? _andif
+		    (attr_val << attr_pl[fd.name]) _is _unset _orif
+		    attr_val = ""
+		_then
+			condition.raise(:user_error, :string,
+					_self.message(:mandatory_attribute, i.value[:attribute_name]))
+		_endif
+	_endloop 
+	
+	_if .mode _is :design _orif
+	    .mode _is :job_and_design _orif
+	    .mode _is :sub_design
+	_then
+		# Require a trail to define the design boundary.
+		_if (tr << _self.trail) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_trail))
+		_endif
+		(sr_ok?, sr) << area.check_proposed_sectors(tr.sectors)
+		_if _not sr_ok?
+		_then
+			condition.raise(:user_error, :string, _self.message(:incomplete_trail))
+		_endif
+		_if (target_world << tr.world.world_for_dataset(mss_workspace_manager_engine.view)) _is _unset
+		_then
+			# Could explicitly raise error here - but I think that if this
+			# is the case, downstream processing is going to catch it
+			# appropriately.  This is more of a config-type error than a
+			# user error (configurer has not defined non-GIS universes).
+			target_world << tr.world
+		_endif 
+		pa << pseudo_area.new_for_world(sr, target_world)
+		.wr_design[:extent] << pa
+	_endif
+
+	engine << mss_workspace_manager_engine
+	_self.status_string << _self.message(:creating_data, _self.message(:mode_ + .mode))
+	ok? << _false 
+	_protect
+		_if .mode _is :job
+		_then
+			ret_job << engine.new_job(.wr_job)
+			
+		_elif .mode _is :job_and_design
+		_then
+			(ret_job, ret_design) << engine.new_job_and_design(.wr_job, .wr_design)
+		_elif .mode _is :design
+		_then
+			ret_design << engine.new_design(.parent_job, .wr_design)
+		_elif .mode _is :sub_design
+		_then
+			ret_design << engine.new_sub_design(.parent_design, .wr_design)
+		_endif
+		ok? << _true 
+	_protection
+		_if _not ok?
+		_then
+			_self.status_string << _self.message(:failed)
+		_else
+			_self.status_string << ""
+		_endif
+	_endprotect
+
+	_if .mode _is :design _orif
+	    .mode _is :job_and_design _orif
+	    .mode _is :sub_design
+	_then
+		# Note that TR must exist, and has been set in code above.
+		tr.clear()
+		_if ret_design _isnt _unset
+		_then
+			_self.changed(:new_design, ret_design)
+		_endif
+	_elif .mode _is :job
+	_then
+		_if ret_job _isnt _unset
+		_then
+			_self.changed(:new_job, ret_job)
+		_endif
+	_endif
+	
+	_if ok?
+	_then
+		_self.cancel()
+	_endif
+	
+_endmethod
+$

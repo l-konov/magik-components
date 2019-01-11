@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<case_template_info>
+    <template name="default" module="mclib_xslt_reports" file_name="template.xml">
+    </template>
+</case_template_info>

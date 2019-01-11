@@ -1,0 +1,50 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method interaction_mode.mss_int!end_interaction()
+	## 
+	## Expose this private method for the mss_ptrule_manager class.
+	##
+
+	_return _self.int!end_interaction()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method interaction_mode.mss_trail_enabled?()
+	## 
+	## If self's handling mss_ptrule_manager is expecting a trail,
+	## return true.
+	##
+
+	_if _self.name _isnt :mss_ptrule
+	_then
+		_return _false
+	_endif
+	
+	# Rather ugly hack, but I don't know if there's a better way to
+	# dig this information out...
+	_if .event_handlers _isnt _unset _andif
+	    (action_handlers << .event_handlers[:action]) _isnt _unset
+	_then
+		_for i _over action_handlers.fast_elements()
+		_loop
+			_if i[1].is_class_of?(mss_ptrule_manager)
+			_then
+				_return i[1].trail_enabled_for_interaction_mode_change?()
+			_endif
+		_endloop
+	_endif
+
+	_return _false
+	
+_endmethod
+$

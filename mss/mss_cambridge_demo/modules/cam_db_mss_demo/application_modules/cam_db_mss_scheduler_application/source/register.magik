@@ -1,0 +1,42 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Brad Sileo.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# These applications serve as examples of how the mss_scheduler
+# set of GUI elements can be packaged as their own top-level application.
+
+# Example 1: auto-run mss_scheduler_processor_gui (using custom
+# XML configuration).
+smallworld_product.register_application(
+	:mss_task_processor_auto,
+	:mss_scheduler_application,
+	:soc_name, :mss_scheduler,
+	:resource_module_name, :mss_scheduler_application,
+	:description, "Starts the MSS Job processor and automatically starts processing.",
+	:external_name, "MSS Scheduled Task Processor (Auto Run)",
+	:config_definition_module_name, :cam_db_mss_scheduler_application,
+	:config_definition_file_name, "auto_run_config.xml",
+	:gui_definition_module_name, :mss_scheduler_processor_gui
+		   )
+$
+
+# Example 2: standalone reviewer application (using custom
+# XML configuration).
+smallworld_product.register_application(
+	:mss_task_reviewer,
+	:mss_scheduler_application,
+	:soc_name, :mss_scheduler,
+	:resource_module_name, :mss_scheduler_application,
+	:description, "Starts the MSS Scheduled Task Viewer.",
+	:external_name, "MSS Scheduled Task Viewer",
+	:config_definition_module_name, :cam_db_mss_scheduler_application,
+	:config_definition_file_name, "read_only_config.xml",
+	:gui_definition_module_name, :cam_db_mss_scheduler_application,
+	:gui_definition_file_name, "read_only_gui.xml"
+		   )
+$

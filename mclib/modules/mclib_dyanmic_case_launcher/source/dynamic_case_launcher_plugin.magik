@@ -1,0 +1,114 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-08-05 14:15:09 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-20-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:dynamic_case_launcher_plugin,
+                          {},
+			  {:plugin})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dynamic_case_launcher_plugin.init_actions()
+	## Creates my actions, which includes the pick_and_launch
+	## action to prompt the user to select a CASE soc then starts it.
+	## 
+	##
+
+	# (07-20-2005 Brad Sileo): created.
+	_self.add_action(sw_action.new(:pick_and_launch,
+				       :engine,_self,
+				       :action_message,:|pick_and_launch()|,
+				       :toolbar_control,:button_item ,
+				       :caption,_self.message(:pick_and_launch  ),
+				       :short_help_text,_self.message(:pick_and_launch_sh  ),
+				       :tooltip,_self.message(:pick_and_launch_tt)  )
+	      )
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dynamic_case_launcher_plugin.pick_and_launch()
+	## prompts the user to select a CASE soc, then creates a
+	## dyanmic application for it and starts it.
+	## 
+	##
+
+	# (07-20-2005 Brad Sileo): created.
+	cl << choice_lister.new(:one_shot,_true)
+	cl.setup(gis_program_manager.case_soc_names,_self,:start_case_for_soc|()|)
+	cl.activate()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dynamic_case_launcher_plugin.start_case_for_soc(a_soc_name)
+	## 
+	## 
+	##
+
+	# (07-20-2005 Brad Sileo): created.
+	_self.perform_safely(:|int!start_case_for_soc()|,a_soc_name)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dynamic_case_launcher_plugin.int!start_case_for_soc(a_soc_name)
+	## 
+	## 
+	##
+
+	# (07-20-2005 Brad Sileo): created.
+	_handling warning _with _proc(cond)
+					write(cond.report_contents_string)
+	_endproc 
+	app_name << :dynamic_ + a_soc_name + :_application
+	_if (app_def << smallworld_product.application_definition(app_name)) _is _unset 
+	_then
+		app_def << _self.create_case_application(app_name, a_soc_name)
+	_endif
+	app_def.start()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method dynamic_case_launcher_plugin.create_case_application(app_name, a_soc_name)
+	## 
+	## 
+	##
+
+	# (07-20-2005 Brad Sileo): created.
+	smallworld_product.register_application( app_name,
+					 "mclib:dynamic_application",
+					 :dynamic_application_class,"sw:case_graphics_system",
+					 :dynamic_module_name,:case_magik_gui,
+					 :ace_name, "case_220",
+					 :description, "Provides data modeling facilities for populating the CASE database",
+					 :soc_name, a_soc_name,
+					 :external_name, write_string("Dynamic CASE Tool for ",a_soc_name) )
+	>> smallworld_product.application_definition(app_name)
+_endmethod
+$

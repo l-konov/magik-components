@@ -1,0 +1,785 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+##
+##
+
+
+_pragma(classify_level=advanced, topic={editors})
+def_slotted_exemplar( :sf!table_inspector_options,
+{
+	{ :widgets,           _unset },
+	{ :xml_property_info, _unset },
+	{ :ed_mngr_options,   _unset },
+	{ :ed_field_options,  _unset }
+},
+{ :plugin } )
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+sf!table_inspector_options.define_slot_access( :widgets, :write, :private )
+$
+_pragma(classify_level=restricted, topic={editors})
+sf!table_inspector_options.define_slot_access( :ed_mngr_options, :write, :private )
+$
+_pragma(classify_level=restricted, topic={editors})
+sf!table_inspector_options.define_slot_access( :ed_field_options, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_options.define_shared_constant( :editor_field_types,
+	{ :dd_phys_field,
+	  :dd_geom_field,
+	  :dd_join_field,
+	  :dd_derived_field,
+	  :internal_field
+	},
+	:public )
+$
+
+
+##
+##	C R E A T E   C L A S S   P R O P E R T I E S
+##	_____________________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={editors})
+_iter _method sf!table_inspector_options.editor_field_option_name_and_value_keys()
+
+	_for i_field_type _over _self.editor_field_types.fast_elements()
+	_loop
+		_loopbody( i_field_type + :|?|,
+			   i_field_type + :|_pattern|,
+			   i_field_type )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_iter _method sf!table_inspector_options.editor_databus_option_name_and_value_keys()
+
+	_local l_list << sw:sorted_collection.new_from(
+			       sw:editor_manager.databus_consumer_data_types )
+
+	_for i_option _over l_list.fast_elements()
+	_loop
+		_loopbody( i_option + :|?|,
+			   i_option + :|?|,
+			   i_option )
+	_endloop
+_endmethod
+$
+
+
+_block
+    _local me << mclib:sf!table_inspector_options 
+
+    _for i_name_key,
+         i_value_key,
+	 i_field_type _over me.editor_field_option_name_and_value_keys()
+    _loop
+	    me.def_property( i_name_key,
+			     :type,	     :boolean,
+			     :readable?,     _true,
+			     :writabele?,    _true,
+			     :default_value, i_field_type <> :internal_field )
+
+	    me.def_property( i_value_key,
+			     :type,	     :string,
+			     :readable?,     _true,
+			     :writabele?,    _true,
+			     :default_value, "*" )
+    _endloop
+
+    _for i_name_key,
+         i_value_key,
+	 i_option_name _over me.editor_databus_option_name_and_value_keys()
+    _loop
+	    me.def_property( i_value_key,
+			     :type,		:boolean,
+			     :readable?,	_true,
+			     :writable?,	_true,
+			     :default_value,	_true )
+    _endloop
+_endblock
+$
+
+
+_pragma(classify_level=advanced, topic={database})
+##
+## This property defines how many records will be displayed
+## at once in the record lister. A small number (e.g. anything
+## below 100) will provide fast list refresh times, but will
+## fill up the record set cache quickly.
+## The value can be changed at run-time.
+##
+sf!table_inspector_options.def_property( :lister_bucket_size,
+	:type,		:integer,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, 500 )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_options.def_property( :local_editor_manager_name,
+	:type,		:symbol,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, :editor )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+##
+## One of these two values (symbols) are currently supported:
+## a) :all_fields
+## b) :visible_fields
+##
+sf!table_inspector_options.def_property( :field_collection_strategy,
+	:type,		:symbol,
+	:readable?,	_true,
+	:writable?,	_true,
+	:default_value, :all_fields )
+$
+
+
+##
+##	S U B C L A S S E D   M E T H O D S
+##	___________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_options.define_shared_constant(
+	:databus_producer_data_types,
+	{ :status,
+	  :editor_option_settings,
+	  :raw_editor_option_settings,
+	  :lister_bucket_size,
+	  :update_displayed_fields,
+	  :editor_manager_skip_databus_events
+	},
+	:public )
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.init(
+			 p_name, p_framework, _optional p_properties )
+
+	_super.init( p_name, p_framework, p_properties )
+
+	.widgets           << sw:hash_table.new()
+	.xml_property_info << sw:hash_table.new()
+	.ed_mngr_options   << sw:property_list.new()
+	.ed_field_options  << sw:property_list.new()
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.init_actions()
+
+	_local l_action_name << :apply_field_display_options
+
+	_super.init_actions()
+
+	_self.add_action(
+	    sw_action.new( l_action_name,
+		:engine,          _self,
+		:enabled?,        _false,
+		:action_message,  l_action_name.with_parentheses,
+		:tooltip,         _self.message( l_action_name + :|_tt| ),
+		:short_help_text, _self.message( l_action_name + :|_sh| ),
+		:image,           { :set_system_preferences,
+				    :admin_tools_plugin } ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.set_property_value_from_string(
+			 p_property_name, p_string_value )
+
+	_local l_value << _super.set_property_value_from_string(
+				  p_property_name, p_string_value )
+
+	.xml_property_info[ p_property_name.as_symbol() ] << l_value
+
+	>> l_value
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_method sf!table_inspector_options.post_init_plugins()
+
+	## Setup the in-memory data structures to be in-sync with
+	## that the GUI will display once it's built.
+
+	_super.post_init_plugins()
+
+	_for i_name_key,
+	     i_value_key,
+	     i_field_type _over _self.editor_field_option_name_and_value_keys()
+	_loop
+		_self.field_option_value_changed(
+			_false, i_name_key, _self.perform( i_name_key ) )
+		_self.field_option_value_changed(
+			_false, i_value_key, _self.perform( i_value_key ) )
+	_endloop
+
+	_for i_name_key,
+	     i_value_key,
+	     i_option_name _over _self.editor_databus_option_name_and_value_keys()
+	_loop
+		_self.databus_option_value_changed(
+			i_value_key, i_option_name,
+			_self.perform( i_value_key ) )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.build_gui(
+		p_container, _optional p_xml_element )
+
+	_local l_rc << sw:rowcol.new( p_container, _unset, 1, :pixel,
+				      :top_spacing, 5, :row_spacing, 5,
+				      :row_resize_values, { 0, 0, 0 },
+				      :default_col_alignment, :fill )
+
+	_self.build_option_guis( l_rc )
+
+	l_rc.tab_label << _self.message( :tab_label )
+
+	>> l_rc
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.sw_databus_data_requested(
+		p_data_type_name, _gather p_args )
+
+	_if p_data_type_name = :raw_editor_option_settings
+	_then
+		_return { _self.field_collection_strategy,
+			  _self.ed_field_options,
+			  _self.ed_mngr_options }
+
+	_elif p_data_type_name = :editor_option_settings
+	_then
+		_return { _self.field_collection_strategy,
+			  _self.processed_field_options,
+			  _self.ed_mngr_options }
+
+	_elif p_data_type_name = :lister_bucket_size
+	_then
+		_local l_val << .widgets[ :lister_bucket_size ].value
+
+		_if l_val _is _unset
+		_then
+			l_val << _self.get_property_signature(
+					 :lister_bucket_size ).default_value
+		_endif
+
+		_return l_val
+	_endif
+_endmethod
+$
+
+
+##
+##	N E W   F U N C T I O N A L I T Y
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.field_option_value_changed(
+		p_by_user?, p_option_name, p_value )
+
+	_self.action( :apply_field_display_options ).enabled? << p_by_user?
+
+	>> .ed_field_options[ p_option_name ] << p_value
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.databus_option_value_changed(
+		p_option_name, p_data_type_name, p_boolean )
+
+	_local l_ed_mngr << _self.framework.component(
+				    _self.local_editor_manager_name )
+	_local l_names   << {}
+	_local l_dbs
+
+	_if l_ed_mngr _isnt _unset _andif
+	    ( l_dbs << l_ed_mngr.databus ) _isnt _unset
+	_then
+		_local l_callback << _if p_boolean _is _true
+				     _then >> :|add_consumer()|
+				     _else >> :|remove_consumer()|
+				     _endif
+		l_dbs.perform( l_callback, l_ed_mngr, p_data_type_name )
+	_endif
+
+	.ed_mngr_options[ p_option_name ] << p_boolean
+
+	_for i_key,i_value _over .ed_mngr_options.fast_keys_and_elements()
+	_loop
+		_if i_value _isnt _true
+		_then
+			l_names << {}.concatenation(
+					 l_names,
+					 { i_key.slice( 1, i_key.size - 1 ) } )
+		_endif
+	_endloop
+
+	_self.databus_make_data_available(
+		:editor_manager_skip_databus_events, l_names )
+		
+	>> p_boolean
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_private _method sf!table_inspector_options.build_option_guis( p_container )
+
+	_self.build_record_lister_options_in( p_container )
+	_self.build_editor_field_data_options_in( p_container )
+	_self.build_editor_field_disp_options_in( p_container )
+	_self.build_editor_databus_options_in( p_container )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.build_record_lister_options_in(
+			 p_container )
+
+	_local gb << sw:group_box.new( p_container,
+				       _self.message( :record_data_options ),
+				       :resize?, _false )
+	_local mgr << sw:numeric_value_manager.new(
+			  :integer?,        _true,
+			  :value_required?, _true,
+			  :valid_interval,
+			      sw:interval.new( 10, 1000, _true, _true ) )
+
+	.widgets[ :lister_bucket_size ] <<
+		sw:managed_value_text_item.new(
+			   gb, _self.message( :record_list_size ),
+			   :display_length, 5,
+			   :incremental_change_selector, :|check_value()|,
+			   :value,   _self.lister_bucket_size,
+			   :model,   _self,
+			   :manager, mgr )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.build_editor_field_data_options_in(
+			 p_container )
+
+	_local gb << sw:group_box.new( p_container,
+				       _self.message( :editor_data_options ),
+				       :resize?, _false )
+
+	.widgets[ :field_collection_strategy ] <<
+		sw:choice_item.new( gb, "",
+			{ _self.message( :all_fields ),
+			  _self.message( :visible_fields ) },
+			{ :all_fields,
+			  :visible_fields },
+			:model,             _self,
+			:value,             _self.field_collection_strategy,
+			:groupbox?,         _false,
+			:display_all?,      _true,
+			:display_vertical?, _false,
+			:change_selector,   :|field_collection_strategy<<| )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.build_editor_field_disp_options_in(
+			 p_container )
+
+	_local gb << sw:group_box.new( p_container,
+				       _self.message( :editor_display_options ),
+				       :resize_x?, _true,
+				       :resize_y?, _false )
+	_local rc << sw:rowcol.new( gb, _unset, 2, :pixel,
+				    :style, :group_box,
+				    :resize_x?, _true,
+				    :resize_y?, _false,
+				    :default_col_alignment, :fill )
+	_local rc2
+	_local rc3
+
+	sw:label_item.new( rc, _self.message( :disp_field_types ) )
+
+	rc2 << sw:rowcol.new( rc, 1, _unset, :pixel, :style, :nested,
+			      :resize_x?, _true, :resize_y?, _false,
+			      :default_col_alignment, :fill )
+	sw:label_item.new( rc2, _self.message( :field_name_filter ),
+			   :col_alignment, :left )
+
+	rc3 << sw:rowcol.new( rc2, 1, _unset, :pixel, :style, :nested,
+			      :resize_x?, _true, :resize_y?, _false,
+			      :outer_spacing, 0,
+			      :col_alignment, :right )
+	.widgets[ :clear_field_disp_options ] <<
+		_self.create_clear_image_button(
+			rc3, :clear_field_disp_options )
+
+	.widgets[ :set_default_field_disp_options ] <<
+		_self.create_default_image_button(
+			rc3, :set_default_field_disp_options )	
+	_self.action( :apply_field_display_options ).
+		place_control_on( rc3, :dialog )
+
+	_for i_name_key,
+	     i_value_key,
+	     i_field_type _over _self.editor_field_option_name_and_value_keys()
+	_loop
+		.widgets[ i_name_key ] <<
+		    sw:toggle_item.new( rc, _self.message( i_field_type ),
+			:value,  _self.perform( i_name_key ),
+			:model,  _self,
+			:change_selector,
+			{ :|field_option_value_changed()|,
+			  _true, i_name_key } )
+
+		.widgets[ i_value_key ] <<
+		    sw:text_item.new( rc, "",
+			:value,  _self.perform( i_value_key ),
+			:model,  _self,
+			:incremental_change_selector,
+			    { :|field_option_value_changed()|,
+			      _true, i_value_key } )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.build_editor_databus_options_in(
+			 p_container )
+
+	_local gb << sw:group_box.new( p_container,
+				       _self.message( :editor_databus_events ),
+				       :resize_x?, _true,
+				       :resize_y?, _false )
+	_local rc << sw:rowcol.new( gb, _unset, 2, :pixel,
+				    :style, :group_box, :resize?, _true,
+				    :default_col_alignment, :fill )
+	_local lrc << sw:rowcol.new( rc, _unset, 1, :pixel,
+				     :row_spacing, 1,
+				     :resize_x?, _true,
+				     :resize_y?, _false,
+				     :default_col_alignment, :fill )
+	_local rrc << sw:rowcol.new( rc, 1, _unset, :pixel,
+				     :resize?, _false,
+				     :default_col_alignment, :right )
+	_local irc << sw:rowcol.new( rrc, 1, _unset, :pixel, :style, :nested,
+				     :resize?, _false )
+
+	_for i_name_key,
+	     i_value_key,
+	     i_option_name _over _self.editor_databus_option_name_and_value_keys()
+	_loop
+		.widgets[ i_option_name ] <<
+		    sw:toggle_item.new( lrc,
+			_self.message( :databus_event_name, i_option_name ),
+			:value, _self.perform( i_value_key ),
+			:model, _self,
+			:change_selector,
+			    { :|databus_option_value_changed()|, 
+			      i_value_key, i_option_name } )
+	_endloop
+
+	.widgets[ :clear_field_disp_options ] <<
+		_self.create_clear_image_button(
+			irc, :clear_databus_events )
+
+	.widgets[ :set_default_field_disp_options ] <<
+		_self.create_default_image_button(
+			irc, :set_default_databus_events )	
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_private _method sf!table_inspector_options.create_clear_image_button(
+			p_container, p_button_name,
+			_gather p_widget_properties )
+
+	>> sw:image_button_item.new( p_container,
+			sw:smallworld_product.get_raster_image(
+				   :clear, :ui_resources ),
+			_self, p_button_name.with_parentheses,
+			:balloon_help_text,
+			    _self.message( p_button_name + :|_tt| ),
+			:short_help_text,
+			    _self.message( p_button_name + :|_sh| ),
+			_scatter p_widget_properties )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_private _method sf!table_inspector_options.create_default_image_button(
+			 p_container, p_button_name,
+			 _gather p_widget_properties )
+
+	>> sw:image_button_item.new( p_container,
+			sw:smallworld_product.get_raster_image(
+				   :defaults, :ui_resources ),
+			_self, p_button_name.with_parentheses,
+			:balloon_help_text,
+			    _self.message( p_button_name + :|_tt| ),
+			:short_help_text,
+			    _self.message( p_button_name + :|_sh| ),
+			_scatter p_widget_properties )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.clear_field_disp_options()
+
+	_for i_name_key,
+	     i_value_key,
+	     i_field_type _over _self.editor_field_option_name_and_value_keys()
+	_loop
+		_self.perform( i_name_key.with_chevron, _false )
+		_self.perform( i_value_key.with_chevron, "" )
+		.widgets[ i_name_key ].value  << _false
+		.widgets[ i_value_key ].value << ""
+		_self.field_option_value_changed( _true, i_name_key, _false )
+		_self.field_option_value_changed( _true, i_value_key, "" )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.set_default_field_disp_options()
+
+	_local l_value
+
+	_for i_name_key,
+	     i_value_key,
+	     i_field_type _over _self.editor_field_option_name_and_value_keys()
+	_loop
+		l_value << .xml_property_info[ i_name_key ].default( _true )
+		_self.perform( i_name_key.with_chevron, l_value )
+		.widgets[ i_name_key ].value  << l_value
+		_self.field_option_value_changed( _true, i_name_key, l_value )
+
+		l_value << .xml_property_info[ i_value_key ].default( "*" )
+		_self.perform( i_value_key.with_chevron, l_value )
+		.widgets[ i_value_key ].value << l_value
+		_self.field_option_value_changed( _true, i_value_key, l_value )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.apply_field_display_options()
+
+	## Notify the object editor that field visibilties have changed...
+
+	_self.databus_make_data_available( :update_displayed_fields, {} )
+
+	_self.action( :apply_field_display_options ).enabled? << _false
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.clear_databus_events()
+
+	_for i_name_key,
+	     i_value_key,
+	     i_option_name _over _self.editor_databus_option_name_and_value_keys()
+	_loop
+		_self.perform( i_value_key.with_chevron, _false )
+		.widgets[ i_option_name ].value  << _false
+		_self.databus_option_value_changed(
+			i_value_key, i_option_name, _false )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_options.set_default_databus_events()
+
+	_local l_value
+
+	_for i_name_key,
+	     i_value_key,
+	     i_option_name _over _self.editor_databus_option_name_and_value_keys()
+	_loop
+		l_value << .xml_property_info[ i_value_key ].default( _true )
+
+		_self.perform( i_value_key.with_chevron, l_value )
+		.widgets[ i_option_name ].value  << l_value
+		_self.databus_option_value_changed(
+			i_value_key, i_option_name, l_value )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.processed_field_options
+
+	_local l_data   << _self.ed_field_options.copy()
+	_local l_normal
+	_local l_negated
+	_local l_pattern_list
+	_local l_first
+
+	_for i_key,i_value _over l_data.fast_keys_and_elements()
+	_loop
+		_if i_key.index_of_seq( :pattern ) _is _unset
+		_then
+			_continue
+		_endif
+
+		l_normal  << sw:rope.new()
+		l_negated << sw:rope.new()
+
+		l_pattern_list << _self.get_match_values( i_value )
+		_for i_pattern _over l_pattern_list.fast_elements()
+		_loop
+			_if ( l_first << i_pattern.first ) = %~ _orif
+			    l_first = %!
+			_then l_negated.add( i_pattern.subseq( 2 ) )
+			_else l_normal.add( i_pattern )
+			_endif
+		_endloop
+
+		_if l_normal.empty? _then l_normal.add( "*" ) _endif
+
+		l_data[ i_key ] << { l_normal, l_negated }
+	_endloop
+
+	>> l_data
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _method sf!table_inspector_options.get_match_values( p_string )
+
+	_local l_base_strings << p_string.trim_spaces().split_by( space_char )
+	_local l_patterns     << sw:sorted_collection.new()
+	_local l_negated?
+	_local l_first
+	_local l_str
+	_local l_len
+	_local l_pre_wild?
+	_local l_post_wild?
+
+	_for i_string _over l_base_strings.fast_elements()
+	_loop
+		_if i_string.empty? _then _continue _endif
+
+		( l_negated?, l_str ) <<
+			_if ( l_first << i_string.first ) = %~ _orif
+			    l_first = %!
+			_then >> _true, i_string.subseq( 2 )
+			_else >> _false, i_string
+			_endif
+		
+		l_len        << l_str.size
+		l_pre_wild?  << _not ( l_str.first = %^ )
+		l_post_wild? << _not ( l_str.last = %$ )
+		#
+		# If the string only consists of the characters ^ and/or $
+		# we ignore it; else remove those special characters
+		# from string...
+		#
+		l_str << _if ( l_len = 1 _andif
+			       ( l_pre_wild? _orif l_post_wild? ) ) _orif
+			     ( l_len = 2 _andif
+			       ( _not l_pre_wild? _andif _not l_post_wild? ) )
+		       _then
+			       >> ""
+		       _else
+			       >> l_str.slice( _if l_pre_wild?
+					       _then >> 1
+					       _else >> 2
+					       _endif,
+					       _if l_post_wild?
+					       _then >> l_len
+					       _else >> l_len - 1 
+					       _endif )
+		       _endif
+
+		l_patterns.add( 
+			write_string( _if l_negated?
+				      _then >> "!" _else >> ""
+				      _endif,
+				      _if l_pre_wild?
+				      _then >> "*" _else >> ""
+				      _endif,
+				      l_str,
+				      _if l_post_wild?
+				      _then >> "*" _else >> ""
+				      _endif ).
+				substitute_string( "**", "*" ) )
+	_endloop
+
+	_if l_patterns.empty? _then l_patterns.add( "*" ) _endif
+
+	>> l_patterns
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_method sf!table_inspector_options.check_value()
+
+	_handling information, warning, error, user_error _with
+	    _self.framework.warning_handler
+
+	.widgets[ :lister_bucket_size ].value
+_endmethod
+$

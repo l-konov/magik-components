@@ -1,0 +1,67 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_cu, mss_ptrule})
+_method mss_trail_insert_ptrule.mss_wp_multi_create(a_window, pos, mode)
+	##
+	## Perform multi-create of work points for the given MODE.
+	## Note that all work here (other than wrapping a transaction)
+	## is delegated to the mss_cu_engine - refer to the
+	## mss_wp_multi_create() method on that class for details.
+	##
+
+	_if (pi << _self.get_property(:gui_plugin)) _is _unset
+	_then
+		prefix << ""
+		number << 1
+	_else 
+		prefix << pi.input_value(:prefix).default("")
+		number << pi.get_next_available_number()
+	_endif 
+
+	# If self's sectors are unset, try for a single trail point.
+	tr << .manager.current_trail
+	_if (pc << _self.sectors) _is _unset
+	_then
+		_if tr _isnt _unset _andif
+		    tr.sectors.size >= 1
+		_then
+			pc << pseudo_chain.new(tr.sectors)
+			pc.world << tr.world
+		_else
+			condition.raise(:user_error, :string, _self.message(:no_sectors, _self.name))
+		_endif
+	_endif
+
+	dsg << dataset_group.new({mss_cu_engine.work_point_view})
+	trans << custom_record_transaction.new(
+			 dsg, mss_cu_engine, :|mss_wp_multi_create()|,
+			 {mode.as_symbol(), pc, prefix, number},
+			 .manager.message(:ptrule_transaction_description, _self.name))
+	all_wps << trans.run()
+
+	_if tr _isnt _unset _andif
+	    all_wps _isnt _unset 
+	_then
+		# Explicitly clear trail and draw things here.  Since we're
+		# managing our own transaction here, data will be drawn
+		# already, but trail isn't cleared until later by ptrule processing.
+		rset << rwo_set.new_from(all_wps)
+		gset << rset.geometry_set(tr.world)
+		tr.clear()
+		.manager.draw_geometry(gset, _unset)
+	_endif
+	
+	_if pi _isnt _unset
+	_then
+		pi.get_next_available_number(_true)
+	_endif
+	
+_endmethod
+$

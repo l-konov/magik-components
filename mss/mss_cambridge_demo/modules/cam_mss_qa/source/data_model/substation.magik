@@ -1,0 +1,48 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method substation.mss_qa_records_for(mode, qa_engine)
+	##
+	## Return all features in self's internal world.
+	##
+
+	_if mode _is :trail
+	_then
+		# Default this to true, since multiple geometries could be
+		# found in the spatial scan for a given RWO.
+		dbl_check? << _true
+	_else
+		dbl_check? << _false
+	_endif
+
+	r << rope.new()
+	r.add_last({_self, dbl_check?})
+	_if _self.substation_internals _isnt _unset
+	_then
+		_for int_rec _over _self.internals().fast_elements()
+		_loop
+			r.add_last({int_rec, dbl_check?})
+		_endloop 
+	_endif
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method substation.mss_qa_cable_connectivity(qa_engine, qa_check)
+	## 
+	## Nothing to QA here - this is just a placeholder for locating
+	## internal_cable object which are subject to this check.
+	##
+	
+_endmethod
+$

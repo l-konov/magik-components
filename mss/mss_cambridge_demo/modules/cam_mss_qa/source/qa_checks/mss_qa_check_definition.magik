@@ -1,0 +1,63 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+#
+# This file contains all defined QA checks for the Cambridge
+# example database
+#
+
+_block
+	_local qa
+
+	mss_qa_check_definition.remove_qa_check_definition(:mss_qa_roundabout_connectivity)
+	qa << mss_qa_check_definition.new(:mss_qa_roundabout_connectivity, :|mss_qa_roundabout_connectivity()|)
+	qa.add_table_info(:gis, :roundabout, {:location, :annotation})
+	qa.set_parameter(:tolerance, 20000.0)
+	
+	mss_qa_check_definition.remove_qa_check_definition(:mss_qa_cable_connectivity)
+	qa << mss_qa_check_definition.new(:mss_qa_cable_connectivity, :|mss_qa_cable_connectivity()|)
+	qa.add_table_info(:electricity, :cable, {:centreline})
+	qa.add_table_info(:electricity, :internal_cable, {:centreline})
+	qa.add_table_info(:electricity, :substation, {:location, :annotation})
+
+	mss_qa_check_definition.remove_qa_check_definition(:mss_qa_everythings_an_error)
+	qa << mss_qa_check_definition.new(:mss_qa_everythings_an_error, :|mss_qa_everythings_an_error()|)
+	qa.add_table_info(:gis, :beer)
+	qa.add_table_info(:gis, :cadastral_boundary, {:boundary_line})
+	qa.add_table_info(:gis, :car_park, {:location})
+	qa.add_table_info(:gis, :company)
+	qa.add_table_info(:gis, :footpath, {:centre_line, :annotation})
+	qa.add_table_info(:gis, :hotel, {:location, :annotation})
+	qa.add_table_info(:gis, :level_crossing, {:location, :annotation})
+	qa.add_table_info(:gis, :min_road, {:centre_line})
+	qa.add_table_info(:gis, :motorway, {:centre_line, :annotation})
+	qa.add_table_info(:gis, :office)
+	qa.add_table_info(:gis, :park, {:coverage, :annotation})
+	qa.add_table_info(:gis, :pl_of_interest, {:coverage, :location, :annotation})
+	qa.add_table_info(:gis, :pub_rest, {:location, :annotation})
+	qa.add_table_info(:gis, :rail_line, {:centre_line, :annotation})
+	qa.add_table_info(:gis, :road_annotation, {:annotation})
+	qa.add_table_info(:gis, :road_works, {:location, :annotation})
+	qa.add_table_info(:gis, :roundabout, {:location, :annotation})
+	qa.add_table_info(:gis, :shop, {:location})
+	qa.add_table_info(:gis, :slip_road, {:centre_line})
+	qa.add_table_info(:gis, :town, {:coverage, :location, :annotation})
+	qa.add_table_info(:gis, :trunk_road, {:centre_line, :annotation})
+	
+	qa.add_table_info(:electricity, :busbar, {:location})
+	qa.add_table_info(:electricity, :cable, {:centreline})
+	qa.add_table_info(:electricity, :customer)
+	qa.add_table_info(:electricity, :internal_cable, {:centreline})
+	qa.add_table_info(:electricity, :joint, {:location})
+	qa.add_table_info(:electricity, :substation, {:location, :annotation})
+	qa.add_table_info(:electricity, :supply_point, {:location, :label})
+	qa.add_table_info(:electricity, :switch, {:primary_connection, :secondary_connection, :annotation})
+	qa.add_table_info(:electricity, :transformer, {:primary_connection, :secondary_connection, :annotation})
+_endblock
+$

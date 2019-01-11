@@ -1,0 +1,6 @@
+<config>
+  <plugins>
+    <plugin name="mss_cu_report_plugin" class_name="mss_cu_report_plugin"/>
+    <plugin name="mss_cu_wp_assignment_plugin" class_name="mss_cu_wp_assignment_plugin"/>
+  </plugins>
+</config>

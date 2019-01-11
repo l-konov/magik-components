@@ -1,0 +1,9 @@
+mclib_style_images	4000
+
+description
+	Support for creating images such as PNG/JPEG from the style system
+end
+
+requires
+	mclib_package
+end

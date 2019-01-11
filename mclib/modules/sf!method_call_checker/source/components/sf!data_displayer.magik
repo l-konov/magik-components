@@ -1,0 +1,763 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## The main tasks of this class is to
+## - provide functionality to filter and format (previously parsed)
+##   Magik code for the user,
+## - allow the user to view code in an editor,
+## - export data in HTML format,
+## - export data to a text/CSV file.
+##
+def_slotted_exemplar( :sf!data_displayer,
+{
+	{ :gui_items,    _unset },
+	{ :display_data, _unset },
+	{ :raw_data,     _unset },
+	{ :selection?,   _unset }
+},
+{ :sw_component, :sf!component_mixin } )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_displayer.define_slot_access( :gui_items, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_displayer.define_slot_access( :display_data, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_displayer.define_slot_access( :raw_data, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_displayer.define_slot_access( :selection?, :write, :public )
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+sf!data_displayer.define_shared_constant( :call_count_options,
+	{}.concatenation( { 0 }, {}.new_as_index( 9 ) ),
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## The value defined by this constant must be a value that can
+## be found in class constant call_count_options.
+##
+sf!data_displayer.define_shared_constant( :default_call_count,
+	2,
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## Defines a Boolean value to determine if when data is displayed the
+## detailed method information should be displayed initially or not.
+##
+sf!data_displayer.define_shared_constant( :show_method_call_details?,
+	_true,
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## Defines a character (or string) that is used to separate column data
+## when information is written to a CSV file.
+##
+sf!data_displayer.define_shared_constant( :column_separator,
+	%tab,
+	:private )
+$
+
+
+##
+##	R E D E F I N E D   M E T H O D S
+##	_________________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_displayer.define_shared_constant( :databus_consumer_data_types,
+	{
+		:refresh,
+		:reset_statistics,
+		:display_data_gathered
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!data_displayer.define_shared_constant( :databus_producer_data_types,
+	{
+		:display_data_request,
+		:edit_file
+	},
+	:public )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.sw_databus_data_available( data_type_name, data )
+
+	## Listen on the databus for any information that might
+	## be of interest to us...
+
+	_if data_type_name _is :refresh
+	_then
+		_self.refresh()
+
+	_elif data_type_name _is :display_data_gathered _orif
+	      data_type_name _is :reset_statistics
+	_then
+		_if data _is _unset _then data << { {}, _false } _endif
+
+		_self.raw_data << data.first
+
+		_self.action( :expand_all ).enabled?   <<
+		_self.action( :compress_all ).enabled? <<
+		_self.action( :refresh ).enabled?      <<
+			_not _self.raw_data.empty? _orif
+			data.last _is _true
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.sw_databus_data_requested( data_type_name )
+
+	## React on requests for data from the databus...
+	
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.init_actions()
+
+	## Define self's actions...
+
+	_self.add_action(
+		_self.sf!create_standard_action_for( :refresh, _true,
+				:image, { :refresh, :ui_resources } ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :clear_options, _true,
+				:image,    { :clear, :ui_resources },
+				:enabled?, _true ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :default_options, _true,
+				:image,    { :defaults, :ui_resources },
+				:enabled?, _true ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :export_to_html, _false,
+				:image, { :export_to_html, :mclib_tree_item } ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :export_to_excel ) )
+
+	_self.add_action(
+		_self.sf!create_standard_action_for( :display_method, _true,
+				:image, { :edit_object, :ui_resources } ) )
+
+	_self.add_action(
+		_self.sf!create_standard_action_for( :expand_all ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :compress_all ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :expand_selection ) )
+	_self.add_action(
+		_self.sf!create_standard_action_for( :compress_selection ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.build_in_framework( a_container )
+
+	## Create the widgets in a GUI so a user can determine
+	## what is actually done...
+
+	_local values  << _self.call_count_options
+	_local strings << {}.new( values.size )
+	_local col     << 1
+	_local gi      << _self.gui_items
+	_local hdrs    << {}.new( 4 )
+	_local height  << _self.framework.gui_row_spacing()
+	_local gb
+	_local gb2
+	_local rc
+	_local rc2
+	_local pnl
+	_local ctl
+
+	#
+	# Collect all strings for the call count choice item...
+	#
+	_for idx,a_val _over values.fast_keys_and_elements()
+	_loop
+		strings[ idx ] <<
+			_self.message( :gt + a_val.write_string.as_symbol() )
+	_endloop
+	#
+	# Create a group box with filter options...
+	#
+	a_container.start_row( _unset, height )
+
+	gb << sw:group_box.new( a_container,
+				_self.message( :display_options ),
+				:resize_x?, _true, :resize_y?, _false )
+	rc << sw:rowcol.new( gb, 2, 7, :pixel,
+			     :resize_x?, _true, :resize_y?, _false,
+			     :tight_fit_x?, _false, :tight_fit_y?, _true,
+			     :default_row_alignment, :centre,
+			     :col_resize_values,
+			     { 0, 100, 0, 0, 0, 0, 0 } )
+	#
+	# Place the method/class filter widgets in the first
+	# two columns...
+	#
+	sw:label_item.new( rc, _self.message( :method_filter ),
+			   :row, 1, :col, col )
+	sw:label_item.new( rc, _self.message( :class_filter ),
+			   :row, 2, :col, col )
+	col +<< 1
+	gi[ :method_filter ] <<
+		sw:text_item.new( rc, "", :row, 1, :col, col,
+				  :col_alignment, :fill )
+	gi[ :class_filter ] <<
+		sw:text_item.new( rc, "", :row, 2, :col, col,
+				  :col_alignment, :fill )
+	col +<< 1
+	#
+	# Place an empty label_item to get some space...
+	#
+	sw:label_item.new( rc, " ", :row, 1, :col, col +^<< 1 )
+	#
+	# Place the call count choice item and the method sort widgets...
+	#
+	sw:label_item.new( rc, _self.message( :call_count ),
+			   :row, 1, :col, col )
+	sw:label_item.new( rc, _self.message( :sort_methods ),
+			   :row, 2, :col, col )
+	col +<< 1
+	gi[ :min_call_count ] <<
+		sw:choice_item.new( rc, "", strings, values,
+				    :model, _self,
+				    :value, _self.default_call_count,
+				    :change_selector, :|refresh()|,
+				    :display_all?,    _false,
+				    :row, 1, :col, col )
+
+	gi[ :sort_methods? ] <<
+		sw:toggle_item.new( rc, ".", :value, _false,
+				    :model, _self,
+				    :change_selector, :|refresh()|,
+				    :row, 2, :col, col )
+	col +<< 1
+	#
+	# Place an empty label_item to get some space...
+	#
+	sw:label_item.new( rc, " ", :row, 1, :col, col +^<< 1 )
+	#
+	# Place a toggle icon to filter out "unnecessary" methods/calls...
+	#
+	ign_act << _self.framework.component( :data_collector ).
+		   action( :use_ignore_list )
+	_if ign_act _isnt _unset
+	_then
+		ctl << ign_act.place_control_on( rc, :dialog )
+		ctl.row << 1 ; ctl.col << col
+		ctl.extra_space << { 5, 0, 0, 0 }
+	_endif
+	#
+	# Create a group box with action items...
+	#
+	gb2 << sw:group_box.new( a_container,
+				 _self.message( :action_selections ) )
+	gb2.set_right_of( gb, 10 )
+	rc2 << sw:rowcol.new( gb2, 2, 3, :pixel, :style, :nested,
+			      :col_spacing, 10, :row_spacing, 2 )
+
+	ctl << _self.action( :refresh ).place_control_on( rc2, :dialog )
+	ctl.row << 1 ; ctl.col << 1
+	ctl << _self.action( :clear_options ).place_control_on( rc2, :dialog )
+	ctl.row << 1 ; ctl.col << 2
+	ctl << _self.action( :default_options ).place_control_on( rc2, :dialog )
+	ctl.row << 2 ; ctl.col << 2
+	ctl << _self.action( :export_to_html ).place_control_on( rc2, :dialog )
+	ctl.row << 1 ; ctl.col << 3
+	ctl << _self.action( :export_to_excel ).place_control_on( rc2, :dialog )
+	ctl.row << 2 ; ctl.col << 3
+
+	a_container.start_row( gb, height )
+	pnl << sw:panel.new( a_container )
+	pnl.border_width  <<
+	pnl.width_spacing <<
+	pnl.left_offset   << 0
+	pnl.resize? << _true
+
+	_for pos _over hdrs.fast_keys()
+	_loop
+		hdrs[ pos ] <<
+			_self.message( :col + pos.write_string.as_symbol() )
+	_endloop
+
+	gi[ :tree ] << ctl <<
+		sw:tree_item.new( pnl,
+			:resize?, _true,
+			:model,   _self,
+			:aspect,  :display_data,
+			:mode,    :one,
+			:select_notifier,       :|list_selection()|,
+			:double_click_notifier, :|double_click()|,
+			:column_headings,       hdrs,
+			:column_alignments,     { :right, :right, :left, :left },
+			:column_headings_styled_strings,
+			    { { :align, :centre, :bold, hdrs[ 1 ] },
+			      { :align, :centre, :bold, hdrs[ 2 ] },
+			      { :align, :centre, :bold, hdrs[ 3 ] },
+			      { :align, :centre, :bold, hdrs[ 4 ] } } )
+	#
+	# Extend the default pop-up menu...
+	#
+	ctl << ctl.popup_menu
+	sw:separator_item.new( ctl )
+	_self.action( :display_method ).place_control_on( ctl, :menu )
+	sw:separator_item.new( ctl )
+	_self.action( :expand_all ).place_control_on( ctl, :menu )
+	_self.action( :compress_all ).place_control_on( ctl, :menu )
+	sw:separator_item.new( ctl )
+	_self.action( :expand_selection ).place_control_on( ctl, :menu )
+	_self.action( :compress_selection ).place_control_on( ctl, :menu )
+
+	>> ctl
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.message_accessor
+
+	## helper method for the tree_item so that the property
+	## :column_heading_ids will yield the right messages...
+
+	>> _self.local_message_handler
+_endmethod
+$
+
+
+##
+##	A C T I O N   C A L L B A C K S
+##	_______________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.refresh()
+
+	## Reqeust data to be displayed...
+
+	_local gi   << _self.gui_items
+	_local list << _self.display_tree_widget()
+	#
+	# Request the data;
+	# "during" this call we will receive a :display_data_gathered
+	# notification which will update/set the raw_data slot...
+	#
+	_self.busy? << _true
+	list.cursor << !window_system!.busy_cursor
+	_protect
+	    _self.databus_make_data_available(
+		    :display_data_request,
+		    { gi[ :class_filter ].value.split_by( %space ),
+		      gi[ :method_filter ].value.split_by( %space ),
+		      gi[ :min_call_count ].value,
+		      gi[ :sort_methods? ].value } )
+	    #
+	    # Process the received data and update the display...
+	    #
+	    _self.format_raw_data()
+	    
+	_protection
+	    _self.changed( :display_data, :renew )
+
+	    list.sf!adjust_column_widths()	    
+
+	    list.cursor << _unset
+	    _self.busy? << _false
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.clear_options()
+
+	## Clear all text-entry fields in the 'Display Options' area.
+
+	_local gi << .gui_items
+
+	gi[ :method_filter ].value << ""
+	gi[ :class_filter  ].value << ""
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.default_options()
+
+	## Set default values for all widgets in the 'Display Options' area.
+
+	_local gi << .gui_items
+
+	gi[ :method_filter  ].value << ""
+	gi[ :class_filter   ].value << ""
+	gi[ :min_call_count ].value << _self.default_call_count
+	gi[ :sort_methods?  ].value << _false
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.export_to_html()
+
+	## Action callback to create HTML output from the
+	## currently displayed data.
+
+	_self.process_with_file_path(
+		:|export_html()|, {},
+		{ "lpstrTitle", _self.message( :select_html_file_path ) } )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.export_to_excel()
+
+	## Action callback to create comma-separated text output
+	## from the currently displayed data.
+
+	_self.process_with_file_path(
+		:|export_text()|, {},
+		{ "lpstrTitle", _self.message( :select_csv_file_path ) } )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.display_method()
+
+	## Action callback to display the source code of the
+	## currently selected method. This class only determines
+	## what has to be displayed and delegates the task to
+	## actually display the data in an editor by putting
+	## an 'edit_file' request on the databus.
+
+	_local path
+	_local line_info
+
+	( path, line_info ) << _self.get_file_path_from_selection()
+	_if path _is _unset
+	_then
+		condition.raise( :user_error, :string,
+				 _self.message( :cant_determine_source_file ) )
+	_endif
+
+	_self.databus_make_data_available( :edit_file, { path, line_info } )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.expand_all()
+
+	## Callback to expand all trees in the display.
+
+	_self.modify_tree_status( _true, _false )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.compress_all()
+
+	## Callback to minimize all trees in the display.
+
+	_self.modify_tree_status( _false, _false )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.expand_selection()
+
+	## Callback to expand the selected trees in the display.
+
+	_self.modify_tree_status( _true, _true )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.compress_selection()
+
+	## Callback to minimize the selected trees in the display.
+
+	_self.modify_tree_status( _false, _true )
+_endmethod
+$
+
+
+##
+##	G U I   C A L L B A C K S
+##	_________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.list_selection( a_selection )
+
+	## This method gets called when the selection changes.
+
+	_self.action( :display_method ).enabled? <<
+		a_selection.size = 1
+
+	_self.action( :expand_selection ).enabled?   <<
+	_self.action( :compress_selection ).enabled? <<
+		_not a_selection.empty?
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!data_displayer.double_click( a_selection )
+
+	## This method gets called when the user double clicks
+	## an entry in the display.
+
+	_self.action( :display_method ).execute_action()
+_endmethod
+$
+
+
+##
+##	P R I V A T E   I N T E R F A C E
+##	_________________________________
+##
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.init( _gather args )
+
+	## Initialize and return _self.
+
+	.gui_items    << sw:property_list.new()
+	.display_data << sw:rope.new()
+	.raw_data     << {}
+
+	>> _super.init( _scatter args )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.display_tree_widget()
+
+	## Returns a handle on the tree_item that displays all data...
+
+	>> _self.gui_items[ :tree ]
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.format_raw_data()
+
+	## Convert each instance of sf!method_call_stats
+	## (the items in slot raw_data) to a display tree...
+
+	_local expand? << _self.show_method_call_details?
+	_local list    << _self.display_data
+	_local cnt     << 0
+	_local dt
+
+	list.empty()
+
+	_for info _over _self.raw_data.fast_elements()
+	_loop
+		dt << info[ :call_stats ].as_display_tree( expand? )
+		_if dt.children? _is _true
+		_then
+			list.add_last( dt )
+		_endif
+	_endloop
+
+	_self.action( :export_to_html ).enabled?  <<
+	_self.action( :export_to_excel ).enabled? << _not list.empty?
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.process_with_file_path( a_callback,
+				_optional callback_options, dialog_options )
+
+	## Launches a Windows file selector dialog to select the
+	## output file.
+
+	_local gi << _self.gui_items
+
+	_self.selection? << _false
+
+	#
+	# Create a new dialog - if none has been cached so far...
+	#
+	_if ( dlg << gi[ :file_selector ] ) _is _unset
+	_then
+		dlg << gi[ :file_selector ] <<
+			sw:win32_standard_dialog.new( :save_dialog )
+		dlg.model    << _self
+		dlg.selector << { :|selection?<<|, _true }
+	_endif
+
+	dlg.set_values( _scatter dialog_options.default( {}) )
+	dlg.activate()
+
+	_if _not _self.selection? _then _return _endif
+
+	_self.perform_private( a_callback, dlg.get_value( "lpstrFile" ),
+			       _scatter callback_options.default( {} ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.modify_tree_status( expand?, selection? )
+
+	## Helper method to either expand or compress displayed data.
+	##
+	## EXPAND?:
+	##	A Boolean that determines if a display_tree object
+	##	should be expanded or compressed.
+	##
+	## SELECTION?
+	##	A Boolean that determines if an expand or compress
+	##	operaion should be performed on all displayed
+	##	display_trees or only those that are selected.
+
+	_dynamic !updating_trees?! << _true
+
+	_local ti << _self.display_tree_widget()
+
+	_if selection?
+	_then
+		_for a_dt _over ti.selection.fast_elements()
+		_loop
+			a_dt.expanded? << expand?
+		_endloop
+	_else
+		_for a_dt _over ti.tree_manager.fast_children()
+		_loop
+			a_dt.expanded? << expand?
+		_endloop
+	_endif
+
+	!updating_trees?! << _false
+	ti.tree_manager.notify_changed()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.export_text( a_file_path )
+
+	## This method performs the actual task to create a
+	## tab-separated text file from the data that is currently
+	## displayed in the GUI...
+
+	_self.display_tree_widget().sf!export_to_csv(
+			a_file_path, _self.column_separator )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.export_html( a_file_path )
+
+	## This method performs the actual task to create a
+	## HTML text file from the data that is currently
+	## displayed in the GUI...
+
+	_self.display_tree_widget().sf!export_to_html( a_file_path )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!data_displayer.get_file_path_from_selection()
+
+	## This callback will determine the source file path for
+	## the selected list entry and also the line in the file
+	## where the call occured.
+	## Returns a file path and the first line number that was
+	## associated with the selection.
+
+	_local tree << _self.display_tree_widget()
+	_local item << tree.selection.an_element()
+	_local path
+	_local line_info
+
+	#
+	# Try to extract the line number where the call occurred...
+	#
+	_try
+		line_info << item.key.line_info.an_element()
+	_when error
+	_endtry
+
+	#
+	# Walk up the tree to figure out in which file the call
+	# occurred. This information is only stored in the root
+	# of a tree (e.g. the method definition level)...
+	#
+	_loop
+		_if item _is _unset _then _leave _endif
+
+		_try
+			path << item.key.file_path
+			_if path _isnt _unset _then _leave _endif
+		_when error
+			_leave
+		_endtry
+		item << item.parent
+	_endloop
+
+	>> path, line_info
+_endmethod
+$

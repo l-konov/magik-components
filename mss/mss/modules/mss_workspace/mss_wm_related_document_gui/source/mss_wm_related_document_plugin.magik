@@ -1,0 +1,729 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_related_document_plugin
+##
+## Plugin for providing main GUI for
+## mss_wm_related_document_framework.
+##
+
+def_slotted_exemplar(:mss_wm_related_document_plugin,
+{
+	{:items, _unset, :readable},
+	{:sorter, _unset, :readable},
+	{:current_object, _unset},
+	{:selected_related_document, _unset},
+	{:attribute_list, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+mss_wm_related_document_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:current_object},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+mss_wm_related_document_plugin.define_shared_constant(
+	:result_list_column_widths,
+	## Column widths to use for result list.
+	{350, 120},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_related_document_plugin.result_list_column_headings
+	## 
+	## Column headings to use for result list.
+	## 
+
+	_return {_self.message(:rch_full_filename),
+		 _self.message(:rch_usage_string)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_related_document_plugin.result_list_styled_string(disp_tree)
+	##
+	## The styled_string to use for displaying data in the result list.
+	##
+	
+	_return styled_string.new(:value, :full_filename, :tab,
+				  :value, :usage_string)
+
+_endmethod 
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+_method mss_wm_related_document_plugin.set_result_list_attributes(pl, rec)
+	##
+	## Set the attributes for displaying the description of 
+	## document record REC.  PL is the property list in which
+	## to store the attributes. 
+	##
+	## This may be redefined, in conjunction with result_list_styled_string(),
+	## result_list_column_widths, and result_list_column_headings.
+	##
+
+	pl[:full_filename] << rec.full_filename
+	pl[:usage_string] << rec.usage_string
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.init(_gather args)
+	## 
+	## 
+
+	_local me << _self 
+	_super.init(_scatter args)
+	.items << property_list.new()
+	sort_proc <<
+		_proc(a, b)
+			_return a.value[:full_filename] _cf b.value[:full_filename]
+		_endproc 
+	.sorter << sorted_collection.new(10, sort_proc)
+	_self.init_attribute_list(_unset)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.init_attribute_list(rec)
+	## 
+	## 
+
+	r << .attribute_list << rope.new()
+	sstr << styled_string.new(:value, :attribute_name, :tab,
+				  :value, :attribute_value)
+
+	_for key _over {:full_filename, :usage_string, :comments}.fast_elements()
+	_loop
+		_if rec _is _unset
+		_then
+			val << ""
+		_else
+			val << rec.perform(key).default("")
+		_endif
+		
+		pl << property_list.new_with(:attribute_name, _self.message(:attr_name_ + key),
+					     :attribute_value, val)
+		dt << display_tree.new(key, pl)
+		dt.styled_string << sstr
+		r.add_last(dt)
+	_endloop 
+
+	_self.changed(:attribute_list, :renew)
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.pre_activation()
+	## 
+	## 
+
+	mss_workspace_manager_engine.view.add_dependent(_self, :view, :commit)
+	_self.set_selected_related_document(_self.selected_related_document, _true)
+	_self.refresh_result_list()
+	_super.pre_activation()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.terminate()
+	## 
+	## 
+
+	mss_workspace_manager_engine.view.remove_dependent(_self, :view, :commit)
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.note_change(who, what, _gather data)
+	## 
+	## 
+
+	_dynamic !mss_workspace_view_operation!
+	
+	_if who _is mss_workspace_manager_engine.view
+	_then
+		_if what _is :commit _andif
+		    data[1] _is :after
+		_then
+			_self.refresh_result_list()
+		_elif what _is :view
+		_then
+			_if !dsst_operation! _is :start_transaction _orif
+			    !mss_workspace_view_operation! _is :rollforward
+			_then
+				# Don't refresh during a planned rollforward operation.
+				_return
+			_endif
+			
+			_if data.size >= 3 _andif
+			    data[3].includes?(:mss_ws_related_document)
+			_then
+				_self.refresh_result_list()
+			_endif 
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:insert_related_document,
+				       :short_help_text, _self.message(:insert_related_document_sh),
+				       :image, {:insert_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|insert_related_document()|))
+	_self.add_action(sw_action.new(:update_selected_related_document,
+				       :short_help_text, _self.message(:update_selected_related_document_sh),
+				       :image, {:update_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|update_selected_related_document()|))
+	_self.add_action(sw_action.new(:delete_selected_related_document,
+				       :short_help_text, _self.message(:delete_selected_related_document_sh),
+				       :image, {:delete_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|delete_selected_related_document()|))
+	_self.add_action(sw_action.new(:display_selected_related_document,
+				       :short_help_text, _self.message(:display_selected_related_document_sh),
+				       :image, {:properties, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|display_selected_related_document()|))
+	_self.add_action(sw_action.new(:refresh_result_list,
+				       :short_help_text, _self.message(:refresh_result_list_sh),
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh_result_list()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.build_gui(container, _optional xml_element)
+	## 
+	## 
+
+	_if xml_element _is _unset
+	_then
+		gui_type << "result_list"
+	_else
+		gui_type << xml_element.attributes["gui_type"].default("result_list")
+	_endif
+
+	_if gui_type = "result_list"
+	_then
+		_return _self.build_gui_result_list(container, xml_element)
+	_elif gui_type = "attribute_list"
+	_then
+		_return _self.build_gui_attribute_list(container, xml_element)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.build_gui_result_list(container, _optional xml_element)
+	## 
+	## 
+	
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+
+	p.start_row()
+	label_item.new(p, _self.current_object_string,
+		       :model, _self,
+		       :aspect, :current_object_string)
+	
+	p.start_row()
+	.items[:result_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :result_list,
+			      :data_selector, :result_list,
+			      :select_notifier, :|related_document_selected()|,
+			      :double_click_notifier, {:|perform_safely()|, :|display_selected_related_document()|},
+			      :height_in_chars, 5,
+			      :column_widths, _self.result_list_column_widths.copy(),
+			      :column_headings, _self.result_list_column_headings.copy(),
+			      :distribute_spare_width, :always,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :related_document_result_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.build_gui_attribute_list(container, _optional xml_element)
+	## 
+	## 
+	
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+
+	p.start_row()
+	label_item.new(p, _self.message(:attribute_list_header))
+
+	p.start_row()
+	.items[:attribute_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :attribute_list,
+			      :data_selector, :attribute_list,
+			      :editor_required_notifier, :|editor_required()|,
+			      :height_in_chars, .attribute_list.size + 2,
+			      :column_widths, {150, 320},
+			      :column_headings, {_self.message(:ach_attribute_name),
+						 _self.message(:ach_attribute_value)},
+			      :distribute_spare_width, :always,
+			      :column_allow_sort?, _false,
+			      :mode, :one,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.editor_required(a_tree, row_index, value_id, an_agent)
+	## 
+	## Allow in-place editing of attribute_value column.
+	## 
+
+	_if value_id _isnt :attribute_value
+	_then
+		_return
+	_endif
+
+	attr_name << a_tree.key
+	ed << _unset 
+	_if attr_name _is :full_filename
+	_then
+		ed << in_place_file_editor.new(an_agent)
+	_elif attr_name _is :usage_string
+	_then
+		r << rope.new_from(mss_ws_related_document.all_usage_values())
+		r.add_first("")
+		ed << in_place_choice_editor.new(an_agent, :items, r)
+	_elif attr_name _is :comments
+	_then
+		ed << in_place_multi_line_editor.new(an_agent)
+	_endif
+
+	_return ed
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.manage_actions_for_selection()
+	## 
+	## 
+
+	sel << _self.selected_related_document
+	co << _self.current_object
+
+	has_sel? << sel _isnt _unset
+	has_co? << co _isnt _unset
+	has_auth? << mss_workspace_manager_engine.view.collections[:mss_ws_related_document].write_authorised?
+	
+	_self.action(:insert_related_document).enabled? << has_co? _andif has_auth?
+	_self.action(:update_selected_related_document).enabled? << has_co? _andif has_sel? _andif has_auth? 
+	_self.action(:delete_selected_related_document).enabled? << has_co? _andif has_sel? _andif has_auth? 
+	_self.action(:display_selected_related_document).enabled? << has_co? _andif has_sel?
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :current_object
+	_then
+		_self.current_object << data
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.current_object
+	## 
+	## 
+
+	_if (rec << .current_object) _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << .current_object << _unset
+	_endif
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.current_object << rec
+	## 
+	## 
+
+	_if rec _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << _unset
+	_endif
+	_if rec ~= _self.current_object
+	_then 
+		.current_object << rec
+		_self.changed(:current_object_string)
+		_self.refresh_result_list()
+	_endif
+	_self.manage_actions_for_selection()
+	
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.selected_related_document
+	## 
+	## 
+
+	_if (rec << .selected_related_document) _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << .selected_related_document << _unset
+	_endif
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.set_selected_related_document(rec, _optional force_update?)
+	## 
+	## 
+
+	_if rec _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << _unset
+	_endif
+	_if rec ~= _self.selected_related_document _orif
+	    force_update? _is _true 
+	_then 
+		.selected_related_document << rec
+		_self.init_attribute_list(rec)
+	_endif 
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.related_document_selected(tree_sel, by_user?)
+	## 
+	## 
+
+	single_sel << tree_sel.an_element()
+	_if single_sel _is _unset
+	_then
+		rec << _unset
+	_else
+		rec << single_sel.value[:mss_ws_related_document]
+		_if rec _is _unset _andif
+		    _not rec.is_valid?
+		_then
+			rec << _unset
+		_endif 
+	_endif 
+	_self.set_selected_related_document(rec)
+	_self.manage_actions_for_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.current_object_string
+	## 
+	## 
+
+	_if (rec << _self.current_object) _is _unset
+	_then
+		_return _self.message(:current_object_string_none)
+	_else
+		_return _self.message(:current_object_string, rec.short_description)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.result_list
+	## 
+	## Return all related documents for the current object.
+	## future.
+	##
+
+	cur_obj << _self.current_object
+	sc << .sorter
+	sc.empty()
+
+	_if cur_obj _is _unset _orif
+	    _not cur_obj.responds_to?(:mss_ws_related_documents)
+	_then
+		_return sc
+	_endif
+
+	_for i _over cur_obj.mss_ws_related_documents.fast_elements()
+	_loop 
+		pl << property_list.new_with(:mss_ws_related_document, i)
+		_self.set_result_list_attributes(pl, i)
+		dt << display_tree.new(i.id, pl)
+		dt.styled_string << _self.result_list_styled_string(dt)
+		sc.add(dt)
+	_endloop
+	
+	_return sc
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.refresh()
+	## 
+	## Synonymous with refresh_result_list()
+	##
+
+	_return _self.refresh_result_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_plugin.refresh_result_list()
+	## 
+	## 
+
+	_dynamic !mss_workspace_view_operation!
+
+	# Perform a rollforward to ensure the most recent available
+	# data is queried.
+	!mss_workspace_view_operation! << :rollforward
+	mss_workspace_manager_engine.view.rollforward()
+	!mss_workspace_view_operation! << _unset
+	
+	_self.changed(:result_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.insert_related_document()
+	## 
+	## 
+
+	co << _self.ensure_current_object()
+	tbl << mss_workspace_manager_engine.view.collections[:mss_ws_related_document]
+	pl << property_list.new_with(
+		      :record_tid, co.descriptor.tid,
+		      :record_id, co.id)
+	_self.set_attribute_values(pl)
+	
+	rt << record_transaction.new_insert(tbl, pl, "")
+	res << rt.run()
+
+	# Force the item that was just created to be the selected item
+	# in the result_list.
+	_if res _isnt _unset _andif
+	    (ti << .items[:result_list]) _isnt _unset
+	_then
+		res_id << res.id
+		_for i _over ti.tree_manager.fast_children()
+		_loop
+			_if i.key = res_id
+			_then
+				i.selected? << _true
+				_leave
+			_endif
+		_endloop
+	_endif 
+
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.set_attribute_values(pl)
+	## 
+	## Set attribute values in property list PL, based on the
+	## contents of the attribute field editors.
+	##
+
+	_for i _over .attribute_list.fast_elements()
+	_loop
+		val << i.value[:attribute_value]
+		_if (key << i.key) _is :full_filename
+		_then
+			pl[:filename] << val
+			_if val _is _unset _orif
+			    val = ""
+			_then
+				condition.raise(:user_error, :string, _self.message(:no_full_filename))
+			_endif 
+		_elif key _is :usage_string
+		_then
+			pl[:usage_id] << mss_ws_related_document.usage_id_for_string(val)
+		_elif key _is :comments
+		_then
+			pl[:comments] << val
+		_endif
+	_endloop
+
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.ensure_selected_related_document()
+	##
+	## Ensure that a related document has been selected.
+	##
+
+	_if (sel_rec << _self.selected_related_document) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_related_document))
+	_endif
+	_return sel_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.ensure_current_object()
+	##
+	## Ensure that a current object exists.
+	##
+
+	_if (sel_rec << _self.current_object) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_current_object))
+	_endif
+	_return sel_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.update_selected_related_document()
+	## 
+	## Update the related document currently selected in the result_list.
+	##
+
+	rec << _self.ensure_selected_related_document()
+	pl << property_list.new()
+	_self.set_attribute_values(pl)
+	
+	rt << record_transaction.new_update(rec, pl, "")
+	res << rt.run()
+
+	# Update the attribute list to account for possible drive
+	# mapping, so that the user can see this immediately.
+	_self.init_attribute_list(_self.selected_related_document)
+
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.delete_selected_related_document()
+	## 
+	## Delete the related document currently selected in the result_list.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	rec << _self.ensure_selected_related_document()
+	_if _self.show_question(_self.message(:ok), _self.message(:cancel),
+				_self.message(:confirm_delete, rec.full_filename)) _is _false
+	_then
+		_return
+	_endif
+	
+	trans << record_transaction.new_delete(rec)
+	trans.run()
+
+	_self.set_selected_related_document(_unset, _true)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_plugin.display_selected_related_document(_optional double_click_tree)
+	## 
+	## Display the related document currently selected in the result_list.
+	##
+
+	_if double_click_tree _is _unset
+	_then
+		# Invoked directly - require a selection, and error if nothing
+		# selected. 
+		rec << _self.ensure_selected_related_document()
+	_else
+		# Invoked via double click - in odd cases, there may be no
+		# selection.  So, don't error
+		_if (rec << _self.selected_related_document) _is _unset
+		_then
+			_return
+		_endif
+	_endif
+
+	rec.display_document(_self)
+	
+_endmethod
+$
+

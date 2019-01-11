@@ -1,0 +1,3 @@
+#% text_encoding = iso8859_1
+
+:activate_mss_http_server_framework	:en_gb	HTTP Server...

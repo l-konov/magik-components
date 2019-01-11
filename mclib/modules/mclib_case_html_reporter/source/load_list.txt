@@ -1,0 +1,5 @@
+case_html_report_plugin
+case_svg_map_generator
+case_html_report_application_plugin
+case_object
+message_usages

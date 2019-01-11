@@ -1,0 +1,630 @@
+#% text_encoding = cp1252
+########################################################################
+##
+##
+## Created By: Brad Sileo
+## Date: 07-14-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:case_html_report_plugin,
+                     {
+		     },
+		     {@mclib:xslt_reporter_plugin,@mclib:action_property_mixin})
+$
+
+case_html_report_plugin.define_property(:dump_xml_file_name,:string,
+				  "The name of my XML dump file.",
+				  _true,_true,"case_dump.xml")
+$
+
+case_html_report_plugin.define_property(:template_module_name,:symbol,
+				  "The name of the module with my template in it.",
+				  _true,_true,:mclib_case_html_reporter)
+$
+
+case_html_report_plugin.define_property(:default_soc_name,:symbol,
+				  "The name of the SOC to dump.",
+				  _true,_true,_unset)
+$
+case_html_report_plugin.define_property(:default_dataset_name,:symbol,
+				  "The name of the dataset to dump from.",
+				  _true,_true,_unset)
+$
+case_html_report_plugin.define_property(:style_category,:string,
+				  "The name of the style system to use.",
+				  _true,_true,"Default")
+$
+case_html_report_plugin.define_property(:style_directory,:string,
+				  "The subdirectory under dump path for styles.",
+				  _true,_true,"styles")
+$
+case_html_report_plugin.define_property(:ace_name,:string,
+				  "The name of the ACE to use for object ordering details.",
+				  _true,_true,"Default")
+$
+case_html_report_plugin.define_property(:ace_display_scale,:symbol,
+				  "The name of the ACE display scale to use.",
+				  _true,_true,:auto)
+$
+case_html_report_plugin.define_property(:user_soc_name,:symbol,
+				  "The name of the SOC which has the datasets included in the CASE SOC.",
+				  _true,_true,:gis)
+$
+case_html_report_plugin.define_property(:map_size,:object,
+				  "A vector of integers representing the resolution of the map output",
+				  _true,_true,{400,600})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.subclass_dump_xml(a_stream)
+	## Outputs my style data to the XML collection.
+	## 
+	##
+
+	# (07-09-2005 Brad Sileo): created.
+	_block 
+		_handling warning _with _proc(cond)
+						!output!.write("handling: ")
+						cond.report_contents_on(!output!)
+						!output!.write(newline_char)
+		                        _endproc 
+
+		#debug write("preparing to dump object styles")
+		_self.dump_object_styles(a_stream)
+		#debug write("preparing to dump dataset details")
+		_self.dump_dataset_details(a_stream)
+		#debug write("preparing to dump svg")
+		_self.dump_case_svg_map()
+		#debug write("preparing to dump field types")
+		_self.dump_extensible_enumerators(a_stream)
+		#debug write("done")
+	_endblock 
+
+	#debug write("really done")
+_endmethod
+$
+
+_pragma(classify_level=basic, usage={redefinable})
+_method case_html_report_plugin.build_gui(a_container)
+	## Creates the GUI for this reporter.
+	## 
+	##
+
+	# (07-15-2005 Brad Sileo): created.
+	rc << rowcol.new(a_container,_unset,2,_unset,:style,:top_level)
+	
+	label_item.new(rc,_self.action(:ace_name).caption)
+	_self.action(:ace_name).place_control_on(rc,:dialog)
+	
+	label_item.new(rc,_self.action(:user_soc_name).caption)
+	_self.action(:user_soc_name).place_control_on(rc,:dialog)
+	
+	label_item.new(rc,_self.action(:default_soc_name).caption)
+	_self.action(:default_soc_name).place_control_on(rc,:dialog)
+
+
+	label_item.new(rc,_self.action(:map_size).caption)
+	_self.action(:map_size).place_control_on(rc,:dialog)
+	
+	label_item.new(rc,_self.action(:template).caption)
+	_self.action(:template).place_control_on(rc,:dialog)
+	
+	label_item.new(rc,_self.action(:dump_path).caption)
+	rc2 << rowcol.new(rc,1,_unset,_unset,:style,:nexted)
+	
+	_self.action(:dump_path).place_control_on(rc2,:dialog)
+	_self.action(:dump_and_launch).place_control_on(rc,:dialog)
+	rc.tab_label << _self.message(:tab_label)
+	>> rc
+_endmethod
+$
+_pragma(classify_level=basic, usage={redefinable})
+_method case_html_report_plugin.init_actions()
+	## Setup my soc-selection action
+	## 
+	##
+
+	# (07-15-2005 Brad Sileo): created.
+	socs << _self.case_soc_items()
+	_if _self.default_soc_name _is _unset 
+	_then
+		_self.default_soc_name << socs.an_element()[1]
+	_endif 
+	_self.add_property_action(:default_soc_name,:items,socs)
+
+	(names,ids) << aces << gis_program_manager.ace_list()
+	_self.add_action(sw_action.new(:ace_name,
+				       :engine,_self,
+				       :value_change_message,:|ace_name<<| ,
+				       :items,names,
+				       :value,_self.ace_name,
+				       :toolbar_control,:choice_item ,
+				       :caption,_self.message(:ace_name  ),
+				       :short_help_text,_self.message(:ace_name_sh  ),
+				       :tooltip,_self.message(:ace_name_tt)  )
+	      )
+	_self.add_property_action(:user_soc_name,:items,_self.user_soc_items())
+
+
+	
+	_self.add_action(
+		sw_action.new(:map_size,
+			 :engine, _self,
+			 :value_change_message, :map_size|<<|,
+			 :toolbar_control, :choice_item,
+			 :caption, _self.message(:map_size),
+			 :short_help_text, _self.message(:map_size_sh),
+			 :tooltip, _self.message(:map_size_tt),
+			 :items,
+			 {
+				 {{400,300},"400x300"},
+				 {{640,480},"640x480"},
+				 {{800,600},"800x600"},
+				 {{1024,768},"1024x768"},
+				 {{1280,1024},"1280x1024"}
+			 }
+	      ))
+	_super.init_actions()
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.case_soc_items()
+	## Returns the list of CASE SOCS to choose from
+	## 
+	##
+
+	# (07-15-2005 Brad Sileo): created.
+	items << rope.new()
+	_for a_soc_name _over gis_program_manager.case_soc_names.fast_elements()
+	_loop
+		items.add({a_soc_name,a_soc_name})
+	_endloop
+	>> items
+
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.user_soc_items()
+	## returns the user SOCS to include in my action list.
+	## 
+	##
+
+	# (09-21-2005 Brad Sileo): created.
+	items << rope.new()
+	_for a_soc_name _over gis_program_manager.soc_definitions.fast_elements()
+	_loop
+		items.add({a_soc_name,a_soc_name})
+	_endloop
+	>> items
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.dump_object_styles(a_stream)
+	## Dump otu a set of styles for all of my objects, and include
+	## details about them in the XML on A_STREAM
+	## 
+	##
+
+	# (07-05-2005 Brad Sileo): created.
+	dir << system.pathname_down(_self.dump_path, _self.style_directory)
+	_if _not system.file_exists?(dir)
+	_then
+		system.mkdir(dir)
+	_endif
+	a_stream.start_element("swldy_case_styles",
+			       :relative_path,write_string("./",_self.style_directory),
+			       :directory,dir )
+	# cache to hold the reused memory_canvas.
+	a_window << _unset 
+	_for a_object _over _self.objects_to_process()
+	_loop
+		first? << _true 
+		#debug write("Processing ",a_object,%space,a_object.name)
+		_for a_field _over a_object.fields.fast_elements()
+		_loop
+			_if a_field.type _isnt :geometric _then _continue _endif 
+			(style_infos,a_window)  << _self.output_style_info_for(a_field, a_window)
+			_if style_infos.empty? _then continue _endif
+
+			_if first? _is _true 
+			_then
+				a_stream.start_element(:object_styles,
+						       :name,a_object.name.write_string)
+				first? << _false 
+			_endif
+			_for a_info _over style_infos.fast_elements()
+			_loop
+				a_stream.write_empty_element(:style_info,
+						       :field_name,a_field.name.write_string,
+						       :sub_code,a_info[:sub_code],
+						       :file_name,a_info[:file_name])
+			_endloop
+		_endloop
+		# If we output anything for the object, close its tag
+		_if first? _is _false
+		_then
+			a_stream.end_element()
+		_endif
+	_endloop
+	a_stream.end_element()
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.dump_case_svg_map()
+	## 
+	##
+
+	_local map_bounds << _unset
+	_local map_width << _self.map_size.first
+	_local map_height <<  _self.map_size.last
+
+	# This variable is used to "boost" the internal resolution of
+	# the map by setting the inner bounds to MAP_WIDTH *
+	# MAP_LEVELS. This is spotty and may need to be increased if
+	# the zoomed-in resolution is not clear.
+	_local map_levels << 3
+
+
+	map_generator << _self.databus.request_data(:map_generator)
+	_if map_generator _is _unset _then _return _endif 
+	
+	# Initialize the generator
+	map_generator.directory << _self.dump_path
+	map_generator.pixel_width << map_width
+	map_generator.pixel_height << map_height
+	map_generator.soc_name << _self.default_soc_name
+	
+			
+	_local objects_to_process << rwo_set.new()
+	
+	_for a_obj _over _self.objects_to_process()
+	_loop
+		# map_bounds << a_obj.outline.bounds.union( map_bounds)
+		objects_to_process.add( a_obj )
+		a_world << a_obj.outline.world
+	_endloop
+
+	# Since we must account for any extraneous geometries, use the
+	# application's world to locate all geometries
+	#_local a_world << _self.application.world
+	_for a_geom _over a_world.geometries()
+	_loop
+		map_bounds << a_geom.bounds.union( map_bounds)
+	_endloop
+
+	# This is obviously a fudge factor to ensure we can get a large
+	# enough map.
+	map_bounds << map_bounds.new_enlarging( 1.3 )
+
+	map_generator.rwo_set << objects_to_process
+	map_generator.generate_map( map_bounds, map_levels)
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_iter _method case_html_report_plugin.objects_to_process(_optional ordered?)
+	## yields each case object that should be included in the output
+	## If ORDERED?, they are returne din sorted order
+	##
+
+	# (07-05-2005 Brad Sileo): created.
+	a_soc << _self.get_soc()
+	coll << a_soc.collection(_self.get_dataset_name(a_soc),:sw_gis!case_object)
+	_if ordered? _is _true 
+	_then
+		sc << sorted_collection.new(coll.size,_proc(a,b) >> a.e_name _cf b.e_name _endproc )
+		sc.add_all(coll)
+		coll << sc
+	_endif
+	_for a_obj _over coll.fast_elements()
+	_loop
+		_loopbody(a_obj)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.output_style_info_for(a_field, _optional window)
+	## Generate a file to represent CASE field object A_FIELD
+	## 
+	##
+
+	# (07-05-2005 Brad Sileo): created.
+	_dynamic !output!
+	dir << system.pathname_down(_self.dump_path, _self.style_directory)
+	_local sv << gis_program_manager.style_view
+	tab << sv.collections[:sw_gis!rwo_style]
+	style_infos << property_list.new()
+	p << predicate.eq(:rwo_name,a_field.owner.name) _and
+	     predicate.eq(:app_name,a_field.name) _and 
+	     predicate.eq(:scale,"Auto") _and 
+	     predicate.eq(:style_name,_self.style_category) _and 
+	     predicate.eq(:style_type,"normal")
+	sel << tab.select(p)
+	_for an_rwo_style _over sel.fast_elements()
+	_loop
+		# Some styles may be corrupted, so just skip them
+		_if an_rwo_style _is _unset _then _continue _endif
+		
+		#debug show("Processing ",an_rwo_style," for ",a_field.name)
+		style_file_name << an_rwo_style.image_file_name()
+		rel_path << write_string("./",_self.style_directory,%/,style_file_name) #"
+		filename << write_string(dir,%\,style_file_name) #"
+		bmp_code << write_string("<IMG SRC=", %", rel_path, %", " BORDER=1>")
+		_try _with cond
+			(anything?, window) << an_rwo_style.as_image_file(filename, _unset,window)
+		_when error
+			!output!.write("couldn't output_style_info_for() ", an_rwo_style," for ",a_field.name, newline_char)
+			cond.report_contents_on(!output!)
+			!output!.write(newline_char)
+		_endtry 
+		_if anything? _is _true 
+		_then
+			style_infos[an_rwo_style] << property_list.new_with(
+							     :file_name,style_file_name,
+							     :full_path,filename,
+							     :relative_path,rel_path,
+							     :sub_code,an_rwo_style.sub_code,
+							     :bmp_code,bmp_code)
+		_endif 
+	_endloop
+	>> style_infos, window
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.dump_dataset_details(a_stream)
+	## Outputs the details of what dataset each CASE object is in
+	## to the XML document on A_STREAM
+	## 
+	##
+
+	# (08-01-2005 Brad Sileo): created.
+	data << property_list.new()
+	_if _self.ace_name _is _unset _orif
+	    (a_ace << gis_program_manager.ace(_self.ace_name)) _is _unset _orif
+	    (a_soc << gis_program_manager.spatial_object_controller(_self.user_soc_name)) _is _unset 
+	_then
+		_return
+	_endif 
+	ac << ace_control.new(a_ace,a_soc)
+	_for a_obj _over _self.objects_to_process()
+	_loop
+		_for a_dataset _over _self.datasets_for_case_object(a_obj).fast_elements()
+		_loop
+			_if (a_ds_pl << data[a_dataset.name]) _is _unset
+			_then
+				a_ds_pl << data[a_dataset.name] << property_list.new()
+			_endif
+			a_collection << a_dataset.collection(a_obj.name.as_symbol())
+			group_name << _self.group_name_for_object(ac, a_collection)
+			_if (a_set << a_ds_pl[group_name]) _is _unset
+			_then
+				a_set << a_ds_pl[group_name] << sorted_collection.new(_unset,
+										   _proc(a,b)
+											   >> a.external_name _cf b.external_name
+										   _endproc)
+			_endif
+			#debug show(a_dataset, group_name, a_collection)
+			a_set.add(a_collection)
+		_endloop
+	_endloop
+	#debug print(data)
+	a_stream.start_element(:dataset_object_details)
+	_for a_dataset, groups _over data.fast_keys_and_elements()
+	_loop
+		a_stream.start_element(:dataset_objects,
+				       :dataset_name,a_dataset.write_string)
+		_for a_group, cur_set _over groups.fast_keys_and_elements()
+		_loop
+			a_stream.start_element(:object_group,
+					       :name,a_group.write_string)
+			_for a_collection _over cur_set.fast_elements()
+			_loop
+				a_stream.write_empty_element(:case_object,
+							     :name,a_collection.name.write_string
+					 )
+			_endloop
+			a_stream.end_element()
+		_endloop 
+		a_stream.end_element()
+	_endloop
+	a_stream.end_element()
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.group_name_for_object(a_ace_control, a_collection)
+	## returns the name of the ACE group for A_COLLECTION in
+	## A_ACE_CONTROL and  A_DATASET_NAME
+	## 
+	##
+
+	# (08-02-2005 Brad Sileo): created.
+	trees << a_ace_control.rwo_status_for(_self.ace_display_scale)
+	_for dsm, a_tree _over trees.fast_keys_and_elements()
+	_loop
+		_if dsm.name ~= a_collection.source_view.name _then _continue _endif
+		_for a_group _over a_tree.children.fast_elements()
+		_loop
+			_if a_group.key = a_collection
+			_then
+				_return a_group.key.name
+			_endif
+			
+			_for a_coll _over a_group.children.fast_elements()
+			_loop
+				_if a_coll.key = a_collection
+				_then
+					_return a_group.key
+				_endif
+			_endloop
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.datasets_for_case_object(a_object)
+	## returns all of the datasets which contain the table for
+	## A_OBJECT. This is a failry dumb implementation which just
+	## looks at all user datasets for this table.
+	## 
+	##
+
+	# (08-01-2005 Brad Sileo): created.
+	res << set.new()
+	_for a_dataset _over gis_program_manager.cached_datasets()
+	_loop
+		_if a_dataset.collection(a_object.name.as_symbol()) _isnt _unset 
+		_then
+			res.add(a_dataset)
+		_endif
+	_endloop
+	>> res
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method case_html_report_plugin.dump_extensible_enumerators(a_stream)
+	## dump_extensible_enumerators() : _unset
+	## 
+	## writes extensible enumerator data to A_STREAM.
+	## this is in support of the requirement to also show the
+	## extensible enumerators for a given field type.  The CASE
+	## HTML Report looks only at CASE models.  The extensible
+	## enumerators are not stored in the CASE... they are unique
+	## for each dataset.  Therefore, there is no logical link
+	## between the CASE and dd_extension values.  So we will put an
+	## extra entry in the Mappings section to also list the
+	## possible extensible enumerator values of the current field
+	## type (i.e., LAST_Z_ELEMENT below) to make sure that no
+	## possible values are missed.
+
+	_local enum_value_key_string_to_dd_list_lookup << equality_hash_table.new()
+	_local dd_list
+	_local dd_name
+	_local enum_name,id,enum_value_key_string
+	_local enum_name_to_value_list_lookup << equality_hash_table.new()
+	_local value_list
+
+	# first, we group enumerator names, values and IDs together...
+	_for i_dd _over gis_program_manager.cached_datasets()
+	_loop
+		_if i_dd.supports_dd_extensions?
+		_then
+			_for i_enum _over i_dd.dd_enumerators.fast_elements()
+			_loop
+				_if i_enum.extensible?
+				_then
+					enum_name << i_enum.name
+					
+					_for i_value _over i_enum.sorted_values.fast_elements()
+					_loop
+						_if _not i_enum.data_from_dd?(i_value)
+						_then
+							id << i_enum.id_for(i_value)
+							enum_value_key_string << write_string(enum_name,"|||",id,"|||",i_value)
+
+							_if (dd_list << enum_value_key_string_to_dd_list_lookup[enum_value_key_string]) _is _unset 
+							_then
+								dd_list << enum_value_key_string_to_dd_list_lookup[enum_value_key_string] << sorted_set.new()
+							_endif
+
+							dd_list.add(i_dd.external_name)
+
+							_if (value_list << enum_name_to_value_list_lookup[enum_name]) _is _unset 
+							_then
+								value_list << enum_name_to_value_list_lookup[enum_name] << sorted_set.new(_unset,
+																	  _proc@value_list_sorter(a,b)
+																		  _local a_string << write_string(a[1],"|",a[2])
+																		  _local b_string << write_string(b[1],"|",b[2])
+
+																		  _if a_string = b_string
+																		  _then
+																			  _return _maybe 
+																		  _endif
+																		  
+																		  >> a[1].as_number() _cf b[1].as_number()
+																	  _endproc)
+							_endif
+
+							value_list.add({id,i_value})
+						_endif
+					_endloop
+				_endif
+			_endloop
+		_endif 
+ 	_endloop
+
+	# ... and then we output them to XML in a suitable order.
+	a_stream.start_element(:extensible_enumerator_details)
+	_for i_enum_name , i_value_list _over enum_name_to_value_list_lookup.fast_keys_and_elements()
+	_loop
+		a_stream.start_element(:enumerator,
+				       :name,i_enum_name)
+		_for i_value _over i_value_list.fast_elements()
+		_loop
+			enum_value_key_string << write_string(i_enum_name,"|||",i_value[1],"|||",i_value[2])
+			dd_list << enum_value_key_string_to_dd_list_lookup[enum_value_key_string]
+
+			_if dd_list _is _unset 
+			_then
+				condition.raise(:error,:string,"blah blah")
+			_endif
+			a_stream.write_empty_element(:enumerator_value,
+						     :map_val,i_value[1],
+						     :value,i_value[2],
+						     :datasets,write_string_with_separator(dd_list,%,))
+		_endloop
+		a_stream.end_element()
+	_endloop
+	a_stream.end_element()
+_endmethod
+$
+_method case_html_report_plugin.parse_xml_file_to(a_file, xsl_file, xml_file, _optional params)
+	## are subclassing this method specifically so that we can
+	## split the params[:identifier] by the "Z" character.  XSLT
+	## 1.0 doesn't handle string splitting, so we need to do this
+	## hack in Magik.
+	##
+	## this is in support of the requirement to also show the
+	## extensible enumerators for a given field type.  The CASE
+	## HTML Report looks only at CASE models.  The extensible
+	## enumerators are not stored in the CASE... they are unique
+	## for each dataset.  Therefore, there is no logical link
+	## between the CASE and dd_extension values.  So we will put an
+	## extra entry in the Mappings section to also list the
+	## possible extensible enumerator values of the current field
+	## type (i.e., LAST_Z_ELEMENT below) to make sure that no
+	## possible values are missed.
+	_local id 
+	_if params _isnt _unset _andif
+	    (id << params[:identifier]) _isnt _unset 
+	_then
+		params[:last_z_element] << id.split_by(%Z).last
+	_endif
+
+	_return _super.parse_xml_file_to(a_file,xsl_file,xml_file,params)
+_endmethod
+$
+

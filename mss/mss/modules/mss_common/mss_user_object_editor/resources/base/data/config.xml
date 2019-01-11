@@ -1,0 +1,7 @@
+<config>
+  <plugins>
+    <plugin name="field_lister" class_name="mss_user_editor_field_lister"/>
+    <plugin name="rwo_specials" class_name="mss_user_rwo_specials_plugin"/>
+    <plugin name="transaction_context" class_name="mss_editor_transaction_context_provider"/>
+  </plugins>
+</config>

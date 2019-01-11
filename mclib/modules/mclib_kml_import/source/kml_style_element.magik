@@ -1,0 +1,108 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:40:55 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+def_slotted_exemplar(:kml_style_element,{},:kml_element)
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_style_element.style_info
+	## 
+	##
+
+	_local styles << property_list.new()
+
+	
+	# This assumes each Style element contains one of the following keys.
+	_if (ps_element << _self.element_matching_name(:|PolyStyle|) ) _isnt _unset
+	_then
+		color_element << ps_element.element_matching_name(:|color|)
+		a_color << _self.color_from( color_element )
+		wash_pct << _self.wash_percentage_from( color_element  )
+		
+		a_style << fill_style.new_wash( a_color, wash_pct)
+		styles[:area] << a_style
+	_endif
+	
+	_if (ls_element << _self.element_matching_name(:|LineStyle|) ) _isnt _unset
+	_then
+		a_color << _self.color_from( ls_element.element_matching_name(:|color|) )
+		_if (width_ele  << ls_element.element_matching_name(:|width|)) _isnt _unset
+		_then
+			width << width_ele.elements.an_element().as_number()
+		_endif
+		
+		a_style << line_style.new( a_color, width.default(3))
+		
+		styles[:line] << a_style
+	_endif
+	
+	_if (ps_element <<  _self.element_matching_name(:|IconStyle|) )
+	_then
+		# Ah, what to do with point styles,,       
+		
+	_endif
+
+	>> _self.attribute(:id), styles
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_style_element.color_from( color_element )
+	## 
+	##
+
+	hex_value << color_element.elements.an_element()
+
+	# Slice off the first 2 bits since these represent opacity. We
+	# could probably use these for area styles..
+	hex_value << hex_value.slice_to_end(3)
+
+	# reverse the hex values as these are represented as BGR
+	# instead of RGB			   
+	>> colour.new_with_properties(:value, hex_value,
+				      :apply_gamma?, _false,
+				      :inverse?, _true )
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_style_element.wash_percentage_from( color_element )
+	## First 2 characters contain the encoded opacity. This can
+	## nominally be used to calculate a wash_percentage where 0 is
+	## transparent and 255 is opaque
+	##
+	
+	hex_value << color_element.elements.an_element()
+
+	opacity << hex_value.subseq(1,2).as_radix_integer(16)
+
+	# Calculate the percentage
+	>> ( ( opacity/255 ) * 100 ).as_float.ceiling
+	
+_endmethod
+$

@@ -1,0 +1,9 @@
+mss_scheduler_editor	1
+
+description
+	MSS scheduler editor
+end
+
+requires
+	mss_scheduler_data_model
+end

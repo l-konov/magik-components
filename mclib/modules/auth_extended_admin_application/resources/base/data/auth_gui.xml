@@ -1,0 +1,17 @@
+<gui base="authorisation_magik_gui.gui.xml">
+     <menu name="menubar" type="menubar">
+        <submenu name="file" mnemonic_id="file_m">
+            <action name="exit" mnemonic_id="exit_m"/>
+	    <action name="auth_dump.prompt_dump_and_launch"/>
+	    <action name="explorer.start_explorer"/>
+        </submenu>
+        <submenu name="action" mnemonic_id="action_m"/>
+    </menu>
+
+    <statusbar name="default">
+	    <pane id="status_info" style="innie" springy="true"/>
+	    <!-- added for dump progress -->
+ 	    <progress_bar id="progress" style="innie" width = "200"/>
+   </statusbar>
+
+</gui>

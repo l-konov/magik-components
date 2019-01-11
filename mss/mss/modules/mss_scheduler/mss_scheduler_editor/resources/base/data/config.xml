@@ -1,0 +1,6 @@
+<config>
+  <plugins>
+    <plugin name="field_lister" class_name="object_editor_field_lister"/>
+    <plugin name="task_properties" class_name="mss_scheduler_properties_plugin"/>
+  </plugins>
+</config>

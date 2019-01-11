@@ -1,0 +1,20 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_job_history
+##
+## Record the update history for an mss_job.
+##
+
+def_slotted_exemplar(:mss_job_history,
+{},
+{:mss_workspace_ds_record})
+$

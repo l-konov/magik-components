@@ -1,0 +1,270 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_recent_designs_plugin.magik
+##
+## GUI plugin for accessing recently used designs.
+##
+
+def_slotted_exemplar(:mss_wm_recent_designs_plugin,
+{
+	{:recent_designs, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_recent_designs_plugin.def_property(
+	:max_to_display, :type, :integer,
+	:default_value, 4, :description, "Maximum number of designs to display")
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_wm_recent_designs_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:set_active_design},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.init(_gather args)
+	##
+	##
+
+	_super.init(_scatter args)
+	.recent_designs << rope.new()
+	_return _self
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.pre_activation()
+	## 
+	## 
+
+	mss_workspace_manager_engine.add_dependent(_self, :active_design)
+	mss_workspace_manager_engine.view.add_observer(_self, {:post_delete}, {:mss_design})
+	_self.load_recent_designs()
+	_self.rebuild_menus()
+	_super.pre_activation()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.terminate()
+	## 
+	## 
+
+	mss_workspace_manager_engine.remove_dependent(_self, :active_design)
+	mss_workspace_manager_engine.view.remove_observer(_self, {:post_delete}, {:mss_design})
+	_self.save_recent_designs()
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.ace
+	## 
+	## 
+
+	_if (app << _self.application) _isnt _unset _andif
+	    app.responds_to?(:ace)
+	_then
+		_return app.ace
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.load_recent_designs()
+	## 
+	## 
+
+	_if (a << _self.ace) _isnt _unset _andif
+	    (r << a.get_user_data(:mss_recent_designs)) _isnt _unset
+	_then
+		tbl << mss_workspace_manager_engine.design_table
+		.recent_designs.empty()
+		_for i _over r.fast_elements()
+		_loop
+			_if (id_val << i.write_string.as_integer()) _isnt _unset _andif
+			    (rec << tbl.at(id_val)) _isnt _unset
+			_then
+				.recent_designs.add_last(rec)
+			_endif
+		_endloop
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.save_recent_designs()
+	## 
+	## Save recent designs to ACE.
+
+	_if (a << _self.ace) _isnt _unset
+	_then
+		r << rope.new()
+		_for i _over .recent_designs.fast_elements()
+		_loop
+			_if i.is_valid?
+			_then
+				r.add_last(i.id)
+			_endif
+		_endloop
+		a.set_user_data(:mss_recent_designs, r)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.note_change(who, what, data)
+	## 
+	## 
+
+	_if who _is mss_workspace_manager_engine
+	_then
+		_if what _is :active_design
+		_then
+			_self.add_active_design()
+		_endif
+	_elif who _is mss_workspace_manager_engine.view
+	_then
+		_if what _is :post_delete
+		_then
+			_self.ensure_valid_designs(_true)
+		_endif
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.add_active_design()
+	## 
+	## 
+
+	any_changes? << _self.ensure_valid_designs(_false)
+	_if (ad << mss_workspace_manager_engine.active_design) _isnt _unset
+	_then
+		# If this is in the recent design list already, then remove it.
+		_for i _over .recent_designs.size.downto(2)
+		_loop
+			rec << .recent_designs[i]
+			_if rec = ad
+			_then
+				.recent_designs.remove_nth(i)
+				any_changes? << _true 
+			_endif
+		_endloop
+
+		# If this is not already the first design in the list, then add it.
+		_if .recent_designs.size = 0 _orif
+		    .recent_designs[1] ~= ad
+		_then
+			.recent_designs.add_first(ad)
+			_if .recent_designs.size > (max_size << _self.max_to_display)
+			_then
+				.recent_designs << .recent_designs.slice(1, max_size)
+			_endif 
+			any_changes? << _true 
+		_endif
+	_endif
+	_if any_changes?
+	_then
+		_self.rebuild_menus()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.ensure_valid_designs(rebuild_when_done?)
+	## 
+	## Ensure that all cached design records are valid - if any are
+	## not, remove them.  If any are removed and REBUILD_WHEN_DONE?
+	## is true, then rebuild the menu also.
+	##
+
+	any_changes? << _false 
+	_for i _over .recent_designs.size.downto(1)
+	_loop
+		_if _not .recent_designs[i].is_valid?
+		_then
+			.recent_designs.remove_nth(i)
+			any_changes? << _true 
+		_endif
+	_endloop
+
+	_if any_changes? _andif
+	    rebuild_when_done?
+	_then
+		_self.rebuild_menus()
+	_endif
+	
+	_return any_changes?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.rebuild_menus()
+	## 
+	## Rebuild all menus displaying the recent design list.
+	##
+
+	all_menus << _self.framework.get_all_gui_elements_with_role(:mss_recent_designs)
+	_for a_menu _over all_menus.fast_elements()
+	_loop
+		a_menu.empty()
+		_if .recent_designs.size = 0
+		_then 
+			act << sw_action.new(:no_recent_designs,
+					     :engine, _self,
+					     :enabled?, _false)
+			act.place_control_on(a_menu, :menu)
+		_endif
+
+		_for rec _over .recent_designs.fast_elements()
+		_loop 
+			act << sw_action.new(write_string("rd_", rec.id).as_symbol(),
+					     :engine, _self,
+					     :caption, rec.job_and_design_full_name,
+					     :action_message, {:|open_design()|, rec})
+			act.place_control_on(a_menu, :menu)
+		_endloop 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_recent_designs_plugin.open_design(rec)
+	## 
+	## Open the design REC.
+	##
+
+	_if _not rec.is_valid?
+	_then
+		_self.ensure_valid_designs(_true)
+		condition.raise(:user_error, :string, _self.message(:invalid_design))
+	_endif
+	
+	_self.databus_make_data_available(:set_active_design, {rec})
+	
+_endmethod
+$

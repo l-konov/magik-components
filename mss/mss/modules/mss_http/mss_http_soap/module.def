@@ -1,0 +1,9 @@
+mss_http_soap	1
+
+description
+	Wrapper for SOAP over HTTP functionality
+end
+
+requires
+	mss_http_client
+end

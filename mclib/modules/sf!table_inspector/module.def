@@ -1,0 +1,12 @@
+mclib_table_inspector	1
+
+description
+	A tool that allows to look at (and potentially modify) any table in any database/view.
+end
+
+requires
+	editor_plugin
+	tree_item
+	mclib_package
+	mclib_tree_item
+end

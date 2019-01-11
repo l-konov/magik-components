@@ -1,0 +1,60 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_editor_transaction
+##
+## A custom_record_transaction that can work correctly when
+## run by an object_editor.  To use: create a new one using the
+## new() protocol inherited from custom_record_transaction, and
+## set the record_transaction slot to be the actual
+## record_transaction being run.
+##
+
+def_slotted_exemplar(:mss_cu_editor_transaction,
+{
+	{:record_transaction, _unset, :writable}
+},
+{:custom_record_transaction})
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_editor_transaction.operation
+	## 
+	## Use self's record_transaction.
+	##
+
+	_return .record_transaction.operation
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_iter _method mss_cu_editor_transaction.record_transactions()
+	## 
+	## Use self's record_transaction.
+	##
+
+	_loopbody(.record_transaction)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_editor_transaction.set_transaction_context(a_context)
+	## 
+	## Pass the transaction context to self's record transaction.
+	##
+
+	_super.set_transaction_context(a_context)
+	.record_transaction.set_transaction_context(a_context)
+	
+_endmethod
+$

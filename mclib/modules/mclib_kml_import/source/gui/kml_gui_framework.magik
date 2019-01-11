@@ -1,0 +1,9 @@
+#% text_encoding = iso8859_1
+_package mclib
+
+def_slotted_exemplar(:kml_gui_framework, {}, :gui_framework)
+$
+kml_gui_framework.define_shared_constant(:terminate_on_close?,
+					 _true,
+					 :public)
+$

@@ -1,0 +1,95 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={geometry, topology}, usage={external})   # restr_subclass
+_method link_mixin.transform(a_transform)
+
+	## Transforms _self's sectors by A_TRANSFORM.
+
+	_dynamic !shared_nodes!,!shared_links!
+
+	# MSS START CHANGE
+	_dynamic !mss_transform_override!
+	# MSS END CHANGE
+	
+	_if   !shared_nodes! _is _unset
+	_then !shared_nodes! << equality_set.new()
+	_endif
+
+	n1 << _self.first_node
+	n2 << _self.last_node
+
+	_if _self.type = 0 _orif
+	    _self.type = 2
+	_then
+		ms << _self.sectors[1].transform(a_transform)
+
+		_self.init_coords(ms)
+
+		_if _self.type = 2
+		_then
+			_self.calculate_bounds(_true)
+		_endif
+
+	_else
+		i << 0
+		n << _self.n_sectors
+		
+		_for s _over _self.int!sectors()
+		_loop
+			new_s << s.as_magik_sector().transform(a_transform)
+			
+			s.init_coords(new_s, s.hole_start?)
+		_endloop
+
+		_self.calculate_bounds(_true)
+
+		_self.coord_1 << _self[1].first
+		_self.coord_2 << _self[n].last
+
+	_endif
+
+	_if _not !shared_nodes!.includes?(n1)
+	_then 
+		# MSS START CHANGE
+		_if !mss_transform_override! _is _unset 
+		_then 
+			n1.coordinate << a_transform.convert(n1.coordinate)
+		_else
+			n1.mss_transform_in_situ(a_transform)
+		_endif
+		# MSS END CHANGE
+		!shared_nodes!.add(n1.detached())
+	_else 
+		_if _self.coord_1 ~= n1.coordinate
+		_then n1.coordinate << n1.coordinate
+		_endif 
+	_endif
+
+	_if _not !shared_nodes!.includes?(n2)
+	_then 
+		# MSS START CHANGE
+		_if !mss_transform_override! _is _unset 
+		_then 
+			n2.coordinate << a_transform.convert(n2.coordinate)
+		_else
+			n2.mss_transform_in_situ(a_transform)
+		_endif
+		# MSS END CHANGE
+		!shared_nodes!.add(n2.detached())
+	_else 
+		_if _self.coord_2 ~= n2.coordinate
+		_then n2.coordinate << n2.coordinate
+		_endif 
+	_endif
+
+	>> _self
+	
+_endmethod
+$

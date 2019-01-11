@@ -1,0 +1,57 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_simple_insert_ptrule.mss_cu_work_point_candidate(mode)
+	##
+	## Try to locate a work point candidate based on geometry.
+	##
+
+	pdr << .pdr_data
+	prop_geoms << property_list.new()
+	_if .geometry_name _is _unset
+	_then
+		# No geometry field to use - no proposed geometry.
+
+	_elif .parent_ptrule _isnt _unset
+	_then
+		# Get proposed geometry from the subrule placement location.
+		(geom_data, parent_w) << _self.figure_subrule_placement_location()
+		_if geom_data _isnt _unset
+		_then
+			pp << pseudo_point.new(geom_data.first_coord)
+			pp.world << parent_w
+			prop_geoms[.geometry_name] << pp
+		_endif
+
+	_elif .current_record _isnt _unset _andif
+	      .current_record.is_valid? _andif
+	      .current_record.all_fields[.geometry_name] _isnt _unset _andif
+	      (cur_geom << .current_record.perform(.geometry_name)) _isnt _unset 
+	_then
+		# Get it from the actual record if it is set.
+		prop_geoms[.geometry_name] << cur_geom
+		
+	_elif .detached_geometry _isnt _unset
+	_then
+		# Get it from where the proposed geometry will be placed.
+		new_geom << .detached_geometry.transformed(pdr[:transform])
+		new_geom.world << .detached_geometry.world
+		prop_geoms[.geometry_name] << new_geom
+	_endif 
+	
+	_if (wp << .detached_record.mss_cu_work_point_candidate(prop_geoms)) _isnt _unset
+	_then
+		_return wp
+	_endif
+	
+	_return _super.mss_cu_work_point_candidate(mode)
+	
+_endmethod
+$

@@ -1,0 +1,10 @@
+<config>
+  <plugins>
+    <plugin name="kml_import" class_name="mclib:kml_import_plugin"/>
+
+    <plugin name="explorer" class_name="explorer_plugin">
+      <property name="embedded_gui_definition_module_name" value="mclib_kml_import"/>
+      <property name="embedded_gui_definition_file_name"   value="embedded_explorer_view_gui.xml"/>
+    </plugin>
+  </plugins>
+</config>

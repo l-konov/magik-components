@@ -1,0 +1,9 @@
+mclib_tree_item	1
+
+description
+	Core additions for the tree_item module to help to export data.
+end
+
+requires
+	tree
+end

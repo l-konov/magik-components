@@ -1,0 +1,179 @@
+#% text_encoding = iso8859_1
+
+_pragma(classify_level=restricted, topic={case}, usage={external})
+_method case_ds_view.archive_data_model( output, current_set, _optional info_output, datum_coord )
+	##
+	## Generates an archive of the datamodel to OUTPUT.
+	##
+	## If CURRENT_SET is specified archive the contents thereof
+	## otherwise archive the whole of the data model
+	##
+	## INFO_OUTPUT is the stream where info will be written to
+	## while the report is being made.
+	##
+	## DATUM_COORD specifies a point to be used as the datum for
+	## archiving the objects and relationships geometry.
+	##
+	## Returns sets of all the case entities archived.
+	## field_types, manifolds, text areas, objects, relationships
+	##
+
+	# 2011/04/25 TM  Integrated with V4.2 changes.
+	
+	_dynamic !print_float_precision! << 12
+
+	_self.output_text_encoding( output )
+	
+	_if current_set _is _unset
+	_then
+		(ft_set,man_set,ta_set,o_set,i_set,v_set,all_o_set,rel_set) <<
+			_self.set_up_global_sets_for_creation()
+	_else
+		(ft_set,man_set,ta_set,o_set,i_set,v_set,all_o_set,rel_set) <<
+			_self.set_up_consistent_sets_from_current_set( current_set, _true )
+	_endif
+
+	_if info_output _is _unset 
+	_then
+		info_output << !terminal!
+	_endif
+	
+	_if _not _self.case_definition_complete?( info_output, current_set,
+						  ft_set, man_set, ta_set, o_set, i_set, v_set,
+						  all_o_set, rel_set, _false )
+	_then
+		condition.raise(:case_dd_incomplete)
+	_endif
+
+	#
+	# Now I know that the data model is complete, so stick it out
+	#
+
+	# TM START CHANGE
+	sc_ft_set << sorted_collection.new(ft_set.size, _proc(a, b) _return a.name _cf b.name _endproc)
+	sc_ft_set.add_all(ft_set)
+	ft_set << sc_ft_set
+	# TM END CHANGE
+	
+	_for an_ft _over ft_set.fast_elements()
+	_loop
+		#
+		# It used to be possible to define field _types with names
+		# reserved for system types. This is no longer possible but it
+		# is possible that there may still be offending
+		# case_field_types which were inserted before it was prevented.
+		#
+		# These should not be archived and should be deleted so
+		# raise an error condition.
+		#
+		_if _self.defined_types[an_ft.name.as_symbol()] _isnt _unset 
+		_then
+			condition.raise( :case_archive_bad_ft_name, :ft_name, an_ft.name )
+		_endif 
+		_self.output_start_block(output)
+		an_ft.archive_text(output)
+		_self.output_end_block(output)
+	_endloop
+
+	_for a_man _over man_set.fast_elements()
+	_loop
+		_self.output_start_block(output)
+		a_man.archive_text(output)
+		_self.output_end_block(output)
+	_endloop
+
+	#
+	# set up a transform which is to be applied to the geometry
+	# of the objects and the relationships when they are output
+	#
+	trans << transform.new()
+	_if datum_coord _isnt _unset 
+	_then
+		trans << trans.translate(-datum_coord.x,-datum_coord.y)
+	_endif
+	#
+	# objects need to be ordered before they can be output, In inheritance
+	# structures, the parentr must be crated before the child, and views
+	# must be created after their defining tables and joins have been made
+	# Sort the object into two structures, on for view, and one for everything
+	# else
+	#
+
+	completed_object_id_set << set.new()
+	
+	# TM START CHANGE
+	sc_o_set << sorted_collection.new(all_o_set.size, _proc(a, b) _return a.name _cf b.name _endproc)
+	sc_o_set.add_all(all_o_set)
+	all_o_set << sc_o_set
+	# TM END CHANGE
+	
+	_for an_obj _over all_o_set.fast_elements()
+	_loop
+		an_obj.archive_text(output,trans)
+		completed_object_id_set.add(an_obj.id)
+	_endloop
+
+
+	#
+	# Now start the merry dance that goes on between relationships and
+	# views. First make all the possible relationships, then the possible views
+	# etc. Stop when no rels or views left to be made
+	#
+	completed_rel_id_set << set.new()
+	v_set << set.new()
+	i << 0
+	_loop
+		_if (i +<< 1) > 10
+		_then
+			_leave 
+		_endif
+		_if rel_set.size _is 0 _andif
+		    v_set.size _is 0
+		_then
+			_leave 
+		_endif
+		
+		_for a_rel _over rel_set.fast_elements()
+		_loop
+			_if a_rel.can_be_made?(completed_object_id_set,
+					       completed_rel_id_set,_true)
+			_then
+				_self.output_start_block(output)
+				a_rel.archive_text(output,trans)
+				_self.output_end_block(output)
+				completed_rel_id_set.add(a_rel.id)
+				rel_set.remove(a_rel)
+			_endif
+		_endloop
+
+	_endloop 
+
+	_for an_obj _over all_o_set.fast_elements()
+	_loop
+		#
+		# This is where the field's inheritance can be set up as now
+		# all of the relationships have been formed
+		#
+		_self.output_start_block(output)
+		an_obj.archive_field_inheritance(output)
+		_self.output_end_block(output)
+	_endloop
+	
+	_for an_obj _over all_o_set.fast_elements()
+	_loop
+		_self.output_start_block(output)
+		an_obj.archive_visible_fields_and_indices(output)
+		_self.output_end_block(output)
+	_endloop
+
+	
+	_for an_obj _over all_o_set.fast_elements()
+	_loop
+		an_obj.archive_methods(output,_self)
+		output.put_charvec(newline_char + %$ + newline_char)
+	_endloop
+	
+	>> ft_set,man_set,ta_set,all_o_set,rel_set
+	
+_endmethod
+$

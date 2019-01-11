@@ -1,0 +1,31 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=advanced, topic={JSON}, usage={redefinable, subclassable})
+_method rwo_record.convert_to_json()
+	## convert_to_json() : json_object
+	##
+	## returns a json_object
+
+	_local name
+	_local jo << _super.convert_to_json()
+	
+	_local geom_fields << equality_set.new()
+	
+	_for i_gd _over _self.geometry_fields()
+	_loop
+		geom_fields.add_all(i_gd.mapped_geometry_fields.default({}))
+	_endloop
+
+	_for i_gd _over geom_fields.fast_elements()
+	_loop
+		name << i_gd.name
+		jo[name] << _self.perform(name).convert_to_json()
+	_endloop
+	
+	_return jo
+
+_endmethod
+$
+
+

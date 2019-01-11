@@ -1,0 +1,8 @@
+mss_record_tracking	1
+
+description
+	Support for generically relating a record to any other record in the same partition.
+end
+
+requires
+end

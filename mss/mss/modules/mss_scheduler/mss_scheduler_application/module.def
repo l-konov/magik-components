@@ -1,0 +1,9 @@
+mss_scheduler_application	1
+
+description
+	Top level application for MSS scheduler processor GUI
+end
+
+requires
+	mss_scheduler_processor_gui
+end

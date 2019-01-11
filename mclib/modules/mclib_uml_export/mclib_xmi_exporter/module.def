@@ -1,0 +1,9 @@
+mclib_xmi_exporter 1 1
+
+description
+	Exports magik class model to XMI for import in to third party UML modeling tools
+end
+
+requires
+  mclib_uml_model
+end

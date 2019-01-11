@@ -1,0 +1,178 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+_pragma(classify_level=advanced)
+## Class which represents a XMI operation
+def_slotted_exemplar(:uml_operation,
+{
+   {:owner, _unset},
+   {:method, _unset},
+   {:parameters, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=advanced)
+## The magik method object self represents
+uml_operation.define_slot_access(:method, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## the owner of self
+uml_operation.define_slot_access(:owner, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## The parameters of this operation
+uml_operation.define_slot_access(:parameters, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_method uml_operation.new(owner, a_method)
+   ## Creates a new XMI operation
+   ##
+   ## owner : xmi... -- the xmi object which owns this one
+   ## a_method : method
+   ##
+   ## return : uml_operation
+
+   _return _clone.init(owner, a_method)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_private _method uml_operation.init(owner, a_method)
+   ## inits a new instance of uml_operation
+   ##
+   ## owner : xmi... -- the xmi object which owns this one
+   ## a_method : method
+   ##
+   ## return : uml_operation -- self, but inited
+
+
+   _self.owner << owner
+   _self.method << a_method
+   _self.parameters << property_list.new()
+   
+   _self.parameters[:return] << uml_parameter.new(_self, "Return", :return)
+
+   _if a_method.value.is_class_of?(sw:procedure)
+   _then
+      _for a_param _over a_method.value.basic_arglist.fast_elements()
+      _loop
+	 _self.parameters[a_param] << uml_parameter.new(_self, a_param, :inout)
+      _endloop
+   _endif
+   
+   _return _self
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_operation.model
+   ## the model of which self is a part
+   ## 
+
+   _return _self.owner.model
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_operation.name
+   ## Returns : string -- the name of the slot
+   ## 
+
+   _local m_name << _self.method.name
+   _if m_name.is_class_of?(:symbol) _then
+      m_name << m_name.as_charvec()
+
+#      _if m_name.rindex_of_seq("^<<") _is (m_name.size - 2)
+#      _then
+#	 m_name << char16_vector.concatenation(m_name.slice(1, m_name.size - 3),
+#					       "_boot")
+#      _elif m_name.rindex_of_seq("<<") _is (m_name.size - 1)
+#      _then
+#	 m_name << char16_vector.concatenation(m_name.slice(1, m_name.size - 2),
+#					       "_becomes")
+#      _endif
+      
+   _else
+      _if m_name.sort _is :get
+      _then
+	 m_name << m_name.slotd.slot_name
+      _elif m_name.sort _is :set
+      _then
+	 m_name << m_name.slotd.slot_name + "<<" #"_becomes"
+      _elif m_name.sort _is :boot
+      _then
+	 m_name << m_name.slotd.slot_name + "^<<" #"_boot"
+      _endif
+   _endif
+
+   _return m_name.as_charvec()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_operation.private?
+   ## returns : boolean -- is this operation private?
+   ## 
+
+   _return _self.method.private?
+
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_operation.abstract?
+   ## returns : boolean -- is this operation abstract?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_iter _method uml_operation.parameters()
+   ## iterates over all the parameters to this operation
+   ## 
+
+   _for a_param _over _self.parameters.fast_elements()
+   _loop
+      _loopbody(a_param)
+   _endloop
+   
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_operation.export_on(an_uml_output_stream)
+   ## exports self
+   ## 
+   an_uml_output_stream.write_uml_operation(_self)
+_endmethod
+$

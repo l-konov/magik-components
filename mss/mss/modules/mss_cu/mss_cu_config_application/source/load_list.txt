@@ -1,0 +1,5 @@
+message_usages.magik
+
+mss_cu_config_application.magik
+register.magik
+

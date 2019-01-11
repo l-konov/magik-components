@@ -1,0 +1,10 @@
+mss_cu_tracking	1
+
+description
+	Capabilities to track record-level changes that affect CUs
+end
+
+requires
+	mss_code_triggers
+	mss_record_tracking
+end

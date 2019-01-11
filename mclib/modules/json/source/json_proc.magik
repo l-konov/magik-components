@@ -1,0 +1,13 @@
+#% text_encoding = iso8859_1
+_package sw
+
+_pragma(classify_level=restricted, topic={streams})
+_global _constant write_as_json <<
+	_proc @write_as_json (p_object)
+		##
+		##
+		l_stream << internal_text_output_stream.new()
+		p_object.write_as_json(l_stream)
+		_return l_stream.string
+	_endproc
+$

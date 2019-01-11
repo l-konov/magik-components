@@ -1,0 +1,104 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-09-05 16:42:28 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+transient_dataset.define_shared_constant(:dataset_instance_metadata, 
+	property_list.new_with(
+	    :kml_samples, property_list.new_with(
+			       :collections, property_list.new_with(
+						     :placemark,
+						     property_list.new_with(
+							     :fields, property_list.new_with(
+									      :id, {:physical, :ds_int, :key, _unset,
+										    :external_name, "Object ID"},
+									      :name, {:physical, :extdb_string, :nonman, 32,
+										      :external_name, "Name"},
+									      :snippet,  {:physical, :extdb_string, :nonman, 32,
+											  :external_name, "Snippet"},
+									      :description, {:physical, :extdb_string, :nonman, 256,
+											     :external_name, "Description"},
+									      :point, {:geometry, :simple_point, :nonman,
+										       _unset, _unset, _unset, _unset,
+										       :external_name, "Point"},
+									      :line, {:geometry, :simple_chain,:nonman,
+										      _unset, _unset, _unset, _unset,
+										      :external_name, "Line"},
+									      :area, {:geometry, :simple_area,:nonman,
+										      _unset, _unset, _unset, _unset,
+										      :external_name, "Area"}
+										    ),
+							     :exemplar, kml_rwo_record
+								   ),
+						     :polygon,
+						     property_list.new_with(
+							     :fields, property_list.new_with(
+									      :id, {:physical, :ds_int, :key, _unset,
+										    :external_name, "Object ID"},
+									      :name, {:physical, :extdb_string, :nonman, 32,
+										      :external_name, "Name"},
+									      :snippet,  {:physical, :extdb_string, :nonman, 32,
+											  :external_name, "Snippet"},
+									      :description, {:physical, :extdb_string, :nonman, 256,
+											     :external_name, "Description"},
+									      :point, {:geometry, :simple_point, :nonman,
+										       _unset, _unset, _unset, _unset,
+										       :external_name, "Point"},
+									      :line, {:geometry, :simple_chain,:nonman,
+										      _unset, _unset, _unset, _unset,
+										      :external_name, "Line"},
+									      :area, {:geometry, :simple_area,:nonman,
+										      _unset, _unset, _unset, _unset,
+										      :external_name, "Area"}
+										    ),
+							     :exemplar, kml_rwo_record
+								   ),
+						     :paths,
+						     property_list.new_with(
+							     :fields, property_list.new_with(
+									      :id, {:physical, :ds_int, :key, _unset,
+										    :external_name, "Object ID"},
+									      :name, {:physical, :extdb_string, :nonman, 32,
+										      :external_name, "Name"},
+									      :snippet,  {:physical, :extdb_string, :nonman, 32,
+											  :external_name, "Snippet"},
+									      :description, {:physical, :extdb_string, :nonman, 256,
+											     :external_name, "Description"},
+									      :point, {:geometry, :simple_point, :nonman,
+										       _unset, _unset, _unset, _unset,
+										       :external_name, "Point"},
+									      :line, {:geometry, :simple_chain,:nonman,
+										      _unset, _unset, _unset, _unset,
+										      :external_name, "Line"},
+									      :area, {:geometry, :simple_area,:nonman,
+										      _unset, _unset, _unset, _unset,
+										      :external_name, "Area"}
+										    ),
+							     :exemplar, kml_rwo_record
+								   )
+							   ))),:private)
+$

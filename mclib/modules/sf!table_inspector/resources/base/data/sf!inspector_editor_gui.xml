@@ -1,0 +1,53 @@
+<gui>
+
+    <toolbar name="form">
+	<action name="clear" />
+	<action name="get" />
+	<action name="browse" />
+	<action name="previous" />
+	<action name="next" />
+	<action name="set_defaults" source="field_lister" />
+	<action name="clear_selected_proposed_values" source="field_lister" />
+    </toolbar>
+
+    <toolbar name="transaction">
+	<action name="insert" />
+	<action name="update" />
+	<action name="delete" />
+    </toolbar>
+
+    <toolbar name="other">
+	<action name="highlight_on_selection" source="field_lister" />
+	<pulldown mode="simple" execute="yes">
+	    <action name="select_geometry" source="field_lister" />
+	    <action name="add_geometry_to_selection" source="field_lister" />
+	    <action name="remove_geometry_from_selection" source="field_lister" />
+	</pulldown>
+	<pulldown mode="simple" execute="yes">
+	    <action name="goto" />
+	    <action name="goto_in_additional_view" />
+	</pulldown>
+	<action name="help" />
+    </toolbar>
+
+    <toolbar name="lock">
+	<action name="lock_to_collection" />
+	<action name="lock_to_record" />
+    </toolbar>
+
+    <dock name="top">
+	<toolbar name="lock" />
+	<toolbar name="transaction" />
+	<toolbar name="form" />
+	<section />
+	<toolbar name="other"/>
+    </dock>
+
+    <work_area>
+	<paned_window side_by_side="no" dynamic="no">
+	    <self stretch="0"/>
+	    <plugin plugin_name="field_lister" stretch="100"/>
+	</paned_window>
+    </work_area>
+
+</gui>

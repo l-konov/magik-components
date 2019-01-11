@@ -1,0 +1,110 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## STATUSBAR_PROGRESS_ELEMENT - object to hold statusbar progress element data.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:statusbar_progress_element,
+		     {
+			     {:max_count,_unset,:writable},
+			     {:indicator,_unset,:writable}
+		     },:statusbar_element)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+statusbar_progress_element.define_shared_constant(:dd_properties,
+	property_list.new_with(
+		:type,:string,
+		:indicator,{"bar_progress_indicator","busy_progress_indicator","simple_busy_progress_indicator"},
+		:id,:string,
+		:style,{"innie","flat","outie"},
+		:max_count,:integer,
+		:width,:integer),
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_progress_element.init(vals)
+	## 
+	## Initialise SELF from the property list VALS.
+
+	.type      << vals[:type]
+	.id        << vals[:id]
+	.style     << vals[:style]
+	.width     << vals[:width].default(100)
+	.max_count << vals[:max_count]
+	.indicator << vals[:indicator].default("bar_progress_indicator")
+
+	>> _self 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_progress_element.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over _self.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_progress_element.values
+	## 
+	## Return SELF's slot values as a property list.
+	
+	>> property_list.new_with(
+		   :type,.type,
+		   :id,.id,
+		   :style,.style,
+		   :width,.width,
+		   :max_count,.max_count,
+		   :indicator,.indicator)
+		   
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_progress_element.max_count << new_value
+	## 
+	## Set the max_count of SELF (must be > 0)
+	.max_count << max(new_value.as_number().default(100),1)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method statusbar_progress_element.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << property_list.new()
+
+	_for k,e _over statusbar_progress_element.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props	
+_endmethod
+$

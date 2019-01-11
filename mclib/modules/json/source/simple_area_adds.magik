@@ -1,0 +1,32 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	simple_area.write_as_json(a_stream)
+	##
+	##
+
+ _local s << a_stream
+
+    s.write("{", %", "type", %", ": ", %", "Polygon", %", ", ")
+    s.write(%", "coordinates", %", ": [")
+    
+    _local first_coord? << _true
+    
+    _for a_sector _over _self.sectors()
+    _loop 
+	_for a_coord _over a_sector.fast_elements()
+	_loop
+	    _if ~first_coord?
+	    _then s.write(", ")
+	    _else first_coord? << _false
+	    _endif
+	    
+	    a_coord.write_as_json(s)
+	_endloop
+    _endloop
+
+    s.write("]}")
+    
+_endmethod
+$

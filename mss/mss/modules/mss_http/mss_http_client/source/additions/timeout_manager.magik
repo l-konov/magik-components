@@ -1,0 +1,42 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method timeout_manager.mss_clear_earliest_timeout_with_tag(tag, _optional thread)
+	##
+	## Clear the earliest timeout specified using set_timeout(),
+	## where TAG is the first argument to the timeout proc. THREAD
+	## defaults to _thisthread.
+	##
+
+	# N.B.: this is functionally identical to clear_timeout(),
+	# except the elements are processed in reverse order.
+	
+	_if thread _is _unset _then thread << _thisthread _endif
+	done? << _false
+	_self.lock()
+	_protect
+		_for c _over .queue.elements_in_reverse()
+		_loop
+			_if c[2] _is thread _andif
+			    c[3].size > 0 _andif
+			    c[3][1] _is tag
+			_then
+				.queue.remove(c)
+				done? << _true
+				_leave
+			_endif
+		_endloop
+	_protection
+		_self.unlock()
+	_endprotect
+	_return done?
+	
+_endmethod
+$

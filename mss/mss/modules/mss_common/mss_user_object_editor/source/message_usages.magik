@@ -1,0 +1,11 @@
+$
+message_handler.new(:mss_user_editor_field_item_lister).set_uses_list({:field_item_lister})
+$
+message_handler.new(:mss_user_editor_field_lister).set_uses_list({:object_editor_field_lister})
+$
+message_handler.new(:mss_user_editor_plugin).set_uses_list({:editor_plugin})
+$
+message_handler.new(:mss_user_object_editor).set_uses_list({:object_editor})
+$
+message_handler.new(:mss_user_rwo_specials_plugin).set_uses_list({:rwo_specials_plugin})
+$

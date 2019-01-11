@@ -1,0 +1,75 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_plugin
+##
+## Additions to plugin class used by various MSS modules.
+##
+
+def_slotted_exemplar(:mss_plugin,
+{
+	{:options, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_plugin.init(name, a_framework, _gather properties)
+	## 
+	## In addition to standard initialization, also init the
+	## options slot.
+	##
+
+	_super.init(name, a_framework, _scatter properties)
+	.options << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_plugin.get_option(x)
+	## 
+	## Get the value of the option named X.
+	##
+
+	_return .options[x]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_plugin.set_option(x, val, _optional notify?)
+	## 
+	## Set the value of the option named X to be VAL.  If NOTIFY?
+	## is true, also broadcast a changed notification.
+	##
+
+	.options[x] << val
+	_if notify? _is _true
+	_then 
+		_self.changed(x)
+	_endif 
+	_return val
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_plugin.user_error(key, _gather args)
+	## 
+	## Shortcut for raising a user error condition.
+	##
+
+	condition.raise(:user_error, :string, _self.message(key, _scatter args))
+	
+_endmethod
+$

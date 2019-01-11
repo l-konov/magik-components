@@ -1,0 +1,56 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic)
+_method system.mss_convert_drive_letter_to_unc(id)
+	## 
+	## Convert the drive letter ID to a UNC equivalent.  For
+	## example, if the Z: drive is mapped to \\srv\share01, then
+	## calling this method with an argument of %z or "z" will
+	## return "\\srv\share01".  If there is no mapped drive, unset
+	## is returned.
+	##
+
+	# This only makes any sense on win32 platforms.
+	_if system.window_system _isnt :win32
+	_then
+		_return
+	_endif
+
+	key << write_string(id, %:).uppercase
+	_protect
+		_catch :spawn_error
+		       # Deal with failure to execute net command by carrying on.
+		       _handling spawn_failed _with _proc() _throw :spawn_error _endproc 
+		       
+		       _if (s << system.input_from_command("net use")) _is _unset
+		       _then
+			       _return
+		       _endif
+		       _loop
+			       _if (l << s.get_line()) _is _unset _then _leave _endif 
+			       _if (data << l.split_by(% )).size < 3 _then _continue _endif
+			       
+			       # Data is a rope containing status, local drive letter, remote
+			       # UNC pathname, and a network descriptor.  But, it can also
+			       # contain junk in the header rows, so require that data[2] be
+			       # in the form of "C:" (that is, just matching "C" isnt enough).
+			       _if data[2].uppercase.cf_subseq(key, 1, 1, 2) _is _maybe
+			       _then
+				       # Matched the local drive letter.
+				       _return data[3]
+			       _endif
+		       _endloop
+		_endcatch
+	_protection
+		_if s _isnt _unset _then s.close() _endif
+	_endprotect
+	
+_endmethod
+$

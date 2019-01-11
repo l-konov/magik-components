@@ -1,0 +1,152 @@
+<?xml version="1.0" standalone="yes"?>
+<gui>
+    <accelerators>
+	<accelerator id="refresh_a"         name="dialog_designer.refresh_view"/>
+	<accelerator id="copy_element_a"    name="dialog_designer.copy_element"/>
+	<accelerator id="paste_element_a"   name="dialog_designer.paste_element"/>
+	<accelerator id="cut_element_a"     name="dialog_designer.cut_element"/>
+	<accelerator id="new_dialog_a"      name="dialog_designer.new_dialog"/>
+	<accelerator id="load_from_file_a"  name="dialog_designer.load_from_file"/>
+	<accelerator id="save_to_file_a"    name="dialog_designer.save_to_file"/>
+	<accelerator id="delete_element_a"  name="dialog_designer.delete_element"/>
+    </accelerators>
+
+    <menu name="menubar" type="menubar">
+	<submenu name="dialog" mnemonic_id="dialog_m">		
+	    <action name="dialog_designer.new_dialog"         mnemonic_id="dialog_open_m"/>
+	    <separator/>
+	    <action name="dialog_designer.load_from_file"       mnemonic_id="dialog_open_m"/>
+	    <action name="dialog_designer.save_to_file"         mnemonic_id="dialog_save_to_file_m"/>
+	    <action name="dialog_designer.save_as"              mnemonic_id="dialog_save_as_m"/>
+	    <separator/>
+	    <action name="dialog_designer.delete_dialog"/>
+	    <separator/>
+	    <action name="dialog_designer.exit"/>
+	</submenu>
+	
+	<submenu name="element" mnemonic_id="element_m">
+	    <action name="dialog_designer.copy_element"  mnemonic_id="copy_element_m"/>
+	    <action name="dialog_designer.cut_element"  mnemonic_id="copy_element_m"/>
+	    <action name="dialog_designer.paste_element" mnemonic_id="paste_element_m"/>
+	    <action name="dialog_designer.delete_element" mnemonic_id="delete_element_m"/>
+	</submenu>
+
+	<submenu name="view" mnemonic_id="view_m">
+	    <action name="dialog_designer.refresh_view"           mnemonic_id="refresh_m"/>
+	    <action name="dialog_designer.show_rowcol_cells" />
+	    <separator/>
+	    <action name="dialog_designer.use_magik_xml"  />
+	    <action name="dialog_designer.use_module_properties" />
+	    <action name="dialog_designer.use_messages" />
+	</submenu>
+
+	<submenu name="include" mnemonic_id="include_m">
+	    <action name="dialog_designer.use_menubar" />
+	    <action name="dialog_designer.use_statusbar" />
+	    <action name="dialog_designer.use_docks" />
+	    <action name="dialog_designer.use_databus" />
+	</submenu>
+
+	<submenu name="insert" mnemonic_id="insert_m">
+	    <action name="dialog_designer.canvas" />
+	    <action name="dialog_designer.toggle_item" />
+	    <action name="dialog_designer.dd_date_time_item" />
+	    <action name="dialog_designer.open_file_dir" />
+	    <action name="dialog_designer.group_box" />
+	    <action name="dialog_designer.image_button_item" />
+	    <action name="dialog_designer.image_toggle_item" />
+	    <action name="dialog_designer.label_item" />
+	    <action name="dialog_designer.dd_number_input" />
+	    <action name="dialog_designer.dd_outlook_bar" />
+	    <action name="dialog_designer.paned_window" />
+	    <action name="dialog_designer.panel_separator" />
+	    <action name="dialog_designer.plugin_item" />
+	    <action name="dialog_designer.radio_item" />
+	    <action name="dialog_designer.radio_group" />
+	    <action name="dialog_designer.recordset" />
+	    <action name="dialog_designer.rowcol" />
+	    <action name="dialog_designer.rowcol_separator" />
+	    <action name="dialog_designer.simple_list_item" />
+	    <action name="dialog_designer.slider_item" />
+	    <action name="dialog_designer.style_choice_item" />
+	    <action name="dialog_designer.tab_box" />
+	    <action name="dialog_designer.tabular_list" />
+	    <action name="dialog_designer.button_item" />
+	    <action name="dialog_designer.text_choice_item" />
+	    <action name="dialog_designer.text_item" />
+	    <action name="dialog_designer.text_window" />
+	    <action name="dialog_designer.tree_item" />
+	    <action name="dialog_designer.unit_text_item" />
+	    <action name="dialog_designer.window_stack" />
+	</submenu>
+
+	<submenu name="help" mnemonic_id="help_m">
+	    <action name="dialog_designer.dd_documentation"/>
+	    <action name="dialog_designer.dd_release_notes"/>
+	    <action name="dialog_designer.about_dialog_designer"/>
+	</submenu>
+    </menu>
+
+    <toolbar name="dialog_toolbar">
+	<action name="dialog_designer.delete_dialog"/>
+	<action name="dialog_designer.dialog_list"/>
+	<action name="dialog_designer.new_dialog"/>
+	<action name="dialog_designer.load_from_file"/>
+	<action name="dialog_designer.save_to_file"/>
+	<action name="dialog_designer.snapshot"/>
+    </toolbar>
+
+    <toolbar name="refresh">
+	<action name="dialog_designer.refresh_view"/>
+	<action name="dialog_designer.select_mode" mnemonic_id="select_mode_m"/>
+	<action name="dialog_designer.show_rowcol_cells"/>
+    </toolbar>
+
+    <toolbar name="element">
+	<action name="dialog_designer.copy_element"/>
+	<action name="dialog_designer.paste_element"/>
+	<action name="dialog_designer.delete_element"/>
+    </toolbar>
+
+    <toolbar name="tab_toggles">
+	<action name="dialog_designer.use_menubar"/>
+	<action name="dialog_designer.use_statusbar"/>
+	<action name="dialog_designer.use_docks"/>
+	<action name="dialog_designer.use_databus"/>
+	<action name="dialog_designer.use_magik_xml"/>
+	<action name="dialog_designer.use_module_properties"/>
+	<action name="dialog_designer.use_messages"/>
+    </toolbar>
+
+    <toolbar name="module_generation">
+	<action name="dialog_designer.sort_messages"/>
+	<action name="dialog_designer.copy_image_files"/>
+	<action name="dialog_designer.build_module"/>
+	<action name="dialog_designer.build_and_activate"/>
+	<action name="dialog_designer.reactivate_dialog"/>
+    </toolbar>
+
+    <dock name="top">
+	<toolbar name="dialog_toolbar"/>
+	<toolbar name="tab_toggles"/>
+	<toolbar name="module_generation"/>
+    </dock>
+
+    <dock name="bottom">
+    </dock>
+
+    <dock name="right">
+    </dock>
+    
+    <dock name="left">
+    </dock>
+
+    <work_area>
+	<plugin plugin_name="dialog_designer"/>
+    </work_area>
+
+    <statusbar name="default">
+	<pane id="prompt" style="flat" width="50" springy="true"/>
+    </statusbar>
+</gui>
+

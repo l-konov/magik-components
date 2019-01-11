@@ -1,0 +1,9 @@
+select_path	1
+
+description
+	Select a system path.
+end
+
+requires
+end
+

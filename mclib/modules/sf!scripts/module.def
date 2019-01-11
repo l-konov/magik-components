@@ -1,0 +1,10 @@
+mclib_scripts	2
+
+description
+	A collection of scripts/tools, independent of the CST version.
+end
+
+requires
+	mclib_package
+	mclib_tree_item
+end

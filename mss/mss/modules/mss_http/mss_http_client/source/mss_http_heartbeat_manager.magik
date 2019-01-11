@@ -1,0 +1,141 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_common})
+##
+## mss_http_heartbeat_manager
+##
+## Helper for providing a heartbeat for threads that need
+## timeout support.
+##
+## These are relatively heavyweight things to set up, and so
+## should be reused if possible.
+
+def_slotted_exemplar(:mss_http_heartbeat_manager,
+{
+	{:thread, _unset, :readable},
+	{:timeout_manager, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_heartbeat_manager.new(_optional timeout_proc)
+	## 
+	##
+
+	_return _clone.init(timeout_proc)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_heartbeat_manager.init(timeout_proc)
+	## 
+	## 
+
+	_if timeout_proc _is _unset
+	_then
+		timeout_proc << _proc(tag)
+					condition.raise(:mss_timeout_expiry, :tag, tag)
+				_endproc
+	_endif 
+	.timeout_manager << timeout_manager.new(timeout_proc)
+	_self.have_post_mortem(_true)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_heartbeat_manager.post_mortem()
+	## 
+	## Stop self from running when it is no longer used.
+	##
+
+	_self.stop()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_heartbeat_manager.run(_optional prio, interval)
+	## 
+	## Start the heartbeat thread running at priority PRIO.
+	## INTERVAL is the heartbeat interval in milliseconds (default
+	## 1000). 
+	##
+
+	_self.stop()
+	prio << prio.default(_thisthread.maximum_priority - 1)
+	interval << interval.default(1000)
+	hb_proc <<
+		_proc(mgr, interval)
+			_local sfc << 0
+			old_time << system.elapsed_seconds()
+			_loop
+				_try _with cond
+				     _thisthread.sleep(interval)
+				#_when does_not_understand
+				      # There used to be a bug in spawner.kill(), which fails when the SAFE?
+				      # argument is unset instead of a boolean.  Unfortunately, this bug
+				      # came into play as sleeping threads get destroyed sometimes.
+				      # It appears to be fixed since V4.0, as that argument is now
+				      # optional.  Therefore, this broad "does_not_understand" handling
+				      # for the sleep process should not longer be needed.  I don't know
+				      # how to create a test case that would test this, though.
+				_when spawn_failed
+				      # This has the potential to be really, really bad.  If this
+				      # process can't sleep, it might be a transient thing, but if it
+				      # is a sticky thing then heartbeats can't be managed, which
+				      # means that there will be no control over timeouts.
+				      sfc +<< 1
+				      _if sfc <= 10 _then nmod << 1
+				      _elif sfc <= 100 _then nmod << 10
+				      _elif sfc <= 1000 _then nmod << 100
+				      _elif sfc <= 10000 _then nmod << 1000
+				      _elif sfc <= 100000 _then nmod << 10000
+				      _else nmod << 100000
+				      _endif
+				      _if sfc _mod nmod = 0
+				      _then
+					      write("WARNING: heartbeat spawn failed: count = ", sfc)
+				      _endif 
+				_endtry
+				
+				new_time << system.elapsed_seconds()
+				_if new_time > old_time + (interval - 500) / 1000 _andif
+				    (ticks << ((new_time - old_time) * 1000).rounded) > 0
+				_then
+					# Presumably this is true, but just in case
+					# system.elapsed_seconds() can wrap...
+					mgr.tick(ticks)
+				_endif
+				old_time << new_time
+			_endloop 
+		_endproc
+	.thread << hb_proc.fork_at(prio, .timeout_manager, interval)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_heartbeat_manager.stop()
+	## 
+	## Stop the heartbeat thread.
+	##
+
+	_if .thread _isnt _unset
+	_then 
+		.thread.kill()
+		.thread << _unset
+	_endif
+	
+_endmethod
+$

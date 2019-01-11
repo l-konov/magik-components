@@ -1,0 +1,72 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=debug, topic={mss_common})
+##
+## mss_http_example_file_service
+##
+## Example service class to return an HTML document containing
+## the current time.
+##
+
+def_slotted_exemplar(:mss_http_example_file_service,
+{},
+{:mss_http_service})
+$
+
+_pragma(classify_level=debug, topic={mss_common})
+_method mss_http_example_file_service.process_service_request(req)
+	## 
+	## Respond to the request by getting back the file identified
+	## by the leafname slot from the TEMP directory.
+	##
+
+	.request << req
+	resp << req.response
+
+	_if (dir << .init_properties[:file_root_directory]) _is _unset
+	_then 
+		dir << system.getenv("TEMP")
+	_endif 
+	leaf_name << .init_properties[:leaf_name].default("index.html")
+	fname << system.pathname_down(dir, leaf_name)
+	resp.response_filename << fname
+	_if (ridx << leaf_name.rindex_of(%.)) _is _unset
+	_then
+		filetype << ""
+	_else
+		filetype << leaf_name.slice_to_end(ridx + 1).lowercase
+	_endif
+	_if filetype = "htm" _orif
+	    filetype = "html"
+	_then
+		resp.set_header_field("Content-Type", "text/html")
+	_elif filetype = "xml"
+	_then
+		resp.set_header_field("Content-Type", "text/xml")
+	_else
+		resp.set_header_field("Content-Type", "text/plain")
+	_endif
+	
+	resp.set_header_field("Cache-Control", "private,max-age=0")
+	resp.set_header_field("Connection", "Close")
+
+	# Note: set the status code OK here.  If the file really cannot
+	# be found, then a 404 will be raised down the line.
+	# - c.f. mss_http_server_response.write_response_on(s), which calls
+	# -      mss_http_server_response.write_filename_response_on(s), which calls
+	# -      mss_http_server_response.default_not_found_response() if
+	#        the file is not found.
+	resp.set_status_code(200)
+
+	# Finally, ask the server to send this request.
+	_self.server.send_request_response(req)
+	
+_endmethod
+$

@@ -1,0 +1,81 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+#
+# Build and save the SWAF open image for the Minto Spatial Solutions
+# Demo application based on the Cambridge database.
+#
+
+_block
+	_local core_cam_product << "c:\sw420\cambridge_db"
+	_local cam_db_ace_dir << "c:\mss_420\mss_cambridge_demo\ds\ds_admin"
+	_local mss_cam_product << "c:\mss_420\mss_cambridge_demo"
+	_local mss_product << "c:\mss_420\mss"
+	
+	sw!update_image()
+	
+	system.putenv("CORE_CAMBRIDGE_DEMO_PRODUCT", core_cam_product)
+	system.putenv("CAM_DB_ACE_DIR", cam_db_ace_dir)
+	system.putenv("MSS_CAMBRIDGE_DEMO_PRODUCT", mss_cam_product)
+	system.putenv("MSS_PRODUCT", mss_product)
+
+	smallworld_product.add_product(mss_product)
+	smallworld_product.add_product(core_cam_product)
+	smallworld_product.add_product(mss_cam_product)
+
+	# FIXME: for Tim only...
+	load_file(system.pathname_down(mss_product, "source", "dev_tools.magik"))
+	
+	sw_module_manager.load_module("cam_db_image_mss_open_swaf")
+
+	# Optional modules (if you want these configuration
+	# applications to exist in the Smallworld Application Manager.
+	sw_module_manager.load_module("mss_ptdef_config_application")
+	sw_module_manager.load_module("mss_cu_config_application")
+	sw_module_manager.load_module("mss_scheduler_application")
+
+_endblock
+$
+
+_block
+	_local image_buildtime << date_time_now()
+	_local core_cam_product << system.getenv("CORE_CAMBRIDGE_DEMO_PRODUCT")
+	_local mss_cam_product << system.getenv("MSS_CAMBRIDGE_DEMO_PRODUCT")
+	_local mss_product << system.getenv("MSS_PRODUCT")
+	
+	_local images_dir << system.pathname_down(mss_cam_product, "images")
+	
+	# Define the image file that will be run - this is merely a
+	# redirction file which will point to the real image.
+	_local image_name << "mss_open_swaf.msf"
+
+	# Define the image file we actually want to save to.
+	_local internal_image_name << "mss_open_swaf_main.msf"
+	
+	# Call garbage collect a couple of times so we do not save more
+	# than is needed.
+	system.gc(_true )
+	system.gc(_true )
+
+	save_image_startup(system.pathname_from_components(internal_image_name,
+							   images_dir),
+				:redirection_file,
+				system.pathname_from_components(image_name,
+								images_dir),
+				:cache_pages, :calculate,
+				:quit?, _true)
+	
+	#
+	# This code will be run every time the image is opened
+	#
+	
+	write("Minto Spatial Solutions Demo Open Image. Built on ", image_buildtime)
+
+_endblock 
+$

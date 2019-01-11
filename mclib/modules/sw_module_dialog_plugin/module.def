@@ -1,0 +1,12 @@
+mclib_sw_module_dialog_plugin	4000
+
+description
+	Provides access to Module Manager Dialog for managing products and modules
+end
+
+requires
+	module_management_magik_gui
+	mclib_package
+end
+
+language en_gb

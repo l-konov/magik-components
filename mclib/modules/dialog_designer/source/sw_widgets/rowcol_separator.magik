@@ -1,0 +1,224 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## ROWCOL_SEPARATOR - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+rowcol_separator.define_shared_constant(:properties,
+				  property_list.new_with(
+					  :separator_colour,:colour,
+					  :highlight_colour,:colour,
+					  :default_colour,:colour,
+					  :side_by_side?,:boolean,
+					  :size,:integer,
+					  :minimise_direction,{:up,:down,:left,:right}),
+				  :public)
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << property_list.new() 
+
+	_for k,e _over rowcol_separator.properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	>> min(2,_self.size.default(0))
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.default_min_width
+	## 
+	##  Return the minimum default rendering width.
+	>> 20
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+
+	(sbs,md) << _if rc.nrows = 1
+		    _then
+			    >> _true,:right
+		    _else
+			    >> _false,:down
+		    _endif
+	>> _self.new(rc,sbs,:minimise_direction,md,:row,row,:col,col,:size,6)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.new_with_xml_properties(parent,props)
+	## 
+	## Return the default instance for SELF.
+
+	side_by_side? << props[:side_by_side?].default(_false)
+	props.remove_key(:side_by_side?)
+	>> _self.new(parent,side_by_side?,_scatter props)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.gui_code(txt)
+	## 
+	## Write interpretable code for SELF on the stream TXT.
+	
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id, "] << rowcol_separator.new(",parent_id)
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		( gui_name,gui_value)  << _self.gui_name_and_value(n,v)
+
+		_if gui_name _is _unset 
+		_then
+			_continue 
+		_endif
+
+		txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)
+	_endloop
+
+	txt.write(" )",%newline)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.render_on(canv,bb)
+	## 
+	##  Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	fs << fill_style.new_solid(_self.separator_colour)
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(bb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	!dialog_element_footprints![bb] << _self
+
+	c << bb.centre
+	h << 2
+	w << _if _self.side_by_side?.default(_false)
+	     _then
+		     >> min(30,bb.height _div 2)
+	     _else
+		     >> min(30,bb.width _div 2)
+	     _endif
+
+	s << sector.new()
+	_if _self.side_by_side?.default(_false)
+	_then
+		s.add(coordinate(c.x-h,c.y-w))
+		s.add(coordinate(c.x+h,c.y-w))
+		s.add(coordinate(c.x+h,c.y+w))
+		s.add(coordinate(c.x-h,c.y+w))
+		s.add(coordinate(c.x-h,c.y-w))
+	_else
+		s.add(coordinate(c.x-w,c.y-h))
+		s.add(coordinate(c.x+w,c.y-h))
+		s.add(coordinate(c.x+w,c.y+h))
+		s.add(coordinate(c.x-w,c.y+h))
+		s.add(coordinate(c.x-w,c.y-h))
+	_endif
+
+	canv.draw(s.sectors,line_style.new(_self.default_colour,1))
+
+	s.empty()
+	s.add(coordinate(c.x-3,c.y-h-1))
+	s.add(coordinate(c.x+4,c.y-h-1))
+	s.add(coordinate(c.x+8,c.y+h+1))
+	s.add(coordinate(c.x-7,c.y+h+1))
+	s.add(coordinate(c.x-3,c.y-h-1))
+
+	sa << sector.new()
+	sa.add(coordinate(c.x,c.y-h-1))
+	sa.add(coordinate(c.x+5,c.y+h+1))
+	sa.add(coordinate(c.x-5,c.y+h+1))
+	sa.add(coordinate(c.x,c.y-h-1))
+
+	_if (md << _self.minimise_direction) _is :down
+	_then
+		s << s.transformed(transform.rotate_about(c,float.pi))
+		sa << sa.transformed(transform.rotate_about(c,float.pi))
+	_elif md _is :right
+	_then
+		s << s.transformed(transform.rotate_about(c,float.pi/2.0))
+		sa << sa.transformed(transform.rotate_about(c,float.pi/2.0))		
+	_elif md _is :left
+	_then 
+		s << s.transformed(transform.rotate_about(c,-float.pi/2.0))
+		sa << sa.transformed(transform.rotate_about(c,-float.pi/2.0))		
+	_endif
+	
+	fs << fill_style.new_solid(_self.separator_colour)
+	pp << pseudo_polygon.new_with_sectors(s.sectors)
+	pp.draw_filled_on(canv,fs)
+	
+	fs << fill_style.new_solid(_self.default_colour)
+	pp << pseudo_polygon.new_with_sectors(sa.sectors)
+	pp.draw_filled_on(canv,fs)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method rowcol_separator.gui_code(txt)
+	## 
+	## Write SELF's gui_code for SELF to the text stream TXT
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	sbs << _if _self.side_by_side?
+	       _then
+		       >> "_true"
+	       _else
+		       >> "_false"
+	       _endif 
+
+	txt.write(%tab,".items[:",_self.dialog_element_id,
+		  "] << rowcol_separator.new(",parent_id,%,,sbs) 
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		_if n = "side_by_side?" _then _continue _endif
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	txt.write(" )",%newline)
+_endmethod
+$

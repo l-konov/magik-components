@@ -1,0 +1,6 @@
+<config>
+    <plugins>
+	<plugin name="dialog_designer" class_name="dialog_designer"/>
+    </plugins>
+</config>
+

@@ -1,0 +1,31 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	chain_mixin.write_as_json(a_stream)
+	##
+	##
+	 _local s << a_stream
+
+	 s.write("{", %", "type", %", ": ", %", "LineString", %", ", ")
+	 s.write(%", "coordinates", %", ": [")
+	 
+	 _local first? << _true
+	 
+	 _for a_sector _over _self.sectors()
+	 _loop
+		 _for a_coord _over a_sector.fast_elements()
+		 _loop
+			 _if _not first?
+			 _then s.write(", ")
+			 _else first? << _false
+			 _endif
+			 
+			 a_coord.write_as_json(s)
+		 _endloop
+	 _endloop
+	 
+	 s.write("]}")
+_endmethod
+$
+

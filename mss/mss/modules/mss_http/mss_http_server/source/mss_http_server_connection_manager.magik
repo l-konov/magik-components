@@ -1,0 +1,373 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_common})
+##
+## mss_http_server_connection_manager
+##
+## Class to handle a single connection received from a
+## mss_http_server_engine.
+##
+
+def_slotted_exemplar(:mss_http_server_connection_manager,
+{
+	{:id, _unset, :readable},
+	{:thread, _unset, :readable},
+	{:server, _unset, :readable},
+	{:service_provider, _unset, :readable},
+	{:connection, _unset, :readable},
+	{:request, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_connection_manager.define_shared_constant(
+	:default_timeout_period,
+	## The default timeout period (in milliseconds) for executing
+	## this connection.
+	45000,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.new(id, server, connection)
+	## 
+	## 
+
+	_return _clone.init(id, server, connection)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.init(id, server, connection)
+	## 
+	## 
+
+	.id << id
+	.thread << _thisthread 
+	.server << server
+	.connection << connection
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.response
+	## 
+	## Return the response for self's request.
+	##
+
+	_if .request _isnt _unset
+	_then
+		_return .request.response
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.timeout_manager_tag
+	## 
+	## A unique symbol identifying self to a timeout_manager.
+	##
+
+	# N.B.: the following is intentionally a symbol, and not a
+	# private object, so that the timeout can be cleared and
+	# extended in various methods.
+	_return write_string(:server_connection_manager_, .id).as_symbol()
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.start()
+	## 
+	## Start processing this connection.
+	##
+
+	_local tag << _self.timeout_manager_tag
+	_local me << _self
+	_local svr << .server
+	
+	# Note that the server has initially set this thread up on a
+	# relatively short connection timeout.  Get the initial header
+	# from the request, and if that times out, give up.
+	ok? << _false 
+	_catch :header_timeout
+	       _handling mss_timeout_expiry _with
+	       _proc(cond)
+		       _import me, svr, tag
+		       _if cond[:tag] _is tag
+		       _then
+			       # This is my timeout.
+			       condition.raise(:mss_http_information,
+					       :string, svr.message(:log_skip_timed_out_request),
+					       :sender, me,
+					       :priority, 4)
+			       me.send_client_timeout_response()
+			       _throw :header_timeout
+		       _else
+			       # This is a timeout placed on the heartbeat manager by
+			       # something else.
+			       cond.continue_handling()
+		       _endif 
+	       _endproc
+	       req << .request << mss_http_server_request.new(.connection, _self)
+	       req.process_request_header()
+	       ok? << _true
+	_endcatch
+	_if _not ok?
+	_then
+		_return
+	_endif
+
+	timeout << _self.default_timeout_period
+	provider_data << svr.service_provider_exemplar_for_url(req.url)
+
+	# Uli Naedelin
+	# Check if IP address has rights to use service 
+	_if (l_allowed_ip_vec << provider_data[:allowed_ip_vec]) _isnt _unset _andif
+	    _not l_allowed_ip_vec.empty?
+	_then
+		l_vec << .connection.remote_address
+		l_string << ""
+		_for i_el _over l_vec.fast_elements()
+		_loop
+			_if _not l_string.empty?
+			_then
+				l_string +<< "."
+			_endif
+			l_string +<< i_el.write_string
+		_endloop
+	
+		_for i_allowed_ip _over l_allowed_ip_vec.fast_elements()
+		_loop
+			_if i_allowed_ip = l_string
+			_then
+				_leave
+			_endif
+		_finally
+			resp << req.response
+			resp.set_header_field("Cache-Control", "private,max-age=0")
+			resp.set_header_field("Content-Type", "text/html")
+			resp.set_header_field("Connection", "Close")
+			resp.set_status_code(403)
+			.server.send_request_response(req)
+			_return 
+		_endloop 
+			
+	_endif 
+	_if provider_data _isnt _unset
+	_then
+		# Build a provider.
+		serv_provider_ex << provider_data[:exemplar]
+		provider_props << provider_data[:initialisation_properties]
+		serv_provider << serv_provider_ex.new(_self, provider_props)
+		serv_provider_name << serv_provider.class_name
+		_if (sp_timeout << serv_provider.default_timeout_period) _isnt _unset
+		_then 
+			timeout << sp_timeout
+		_endif 
+	_else 
+		serv_provider << _self
+		serv_provider_name << "(none)"
+	_endif
+	.service_provider << serv_provider
+	svr.request_timeout(timeout, _self)
+
+	condition.raise(:mss_http_information,
+			:string, svr.message(:log_about_to_process, req.url, serv_provider_name),
+			:sender, me,
+			:priority, 7)
+	serv_provider.process_service_request(req)
+	_self.close_connection()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_connection_manager.close_connection()
+	## 
+	## Close self's connection, if it exists.
+	##
+
+	_if (x << .connection) _isnt _unset
+	_then
+		.connection << _unset
+		_try
+			x.close()
+		_when error
+		      # Forcibly close it.
+		      _try
+			      x.close(_true)
+		      _when error
+		      _endtry
+		_endtry
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.process_service_request()
+	## 
+	## This class is effectively a backstop handler, and so it
+	## handles service requests with a 404 (file not found) response.
+	## REQ is the mss_http_server_request initiating the process.
+	##
+
+	req << .request
+	resp << req.response
+	resp.default_not_found_response(req.url)
+	.server.send_request_response(req)
+	_self.close_connection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.send_server_error_response(err_str)
+	## 
+	## Format a standard server error response to a request.
+	##
+
+	_if .connection _is _unset _orif .connection.output _is _unset
+	_then
+		# Dont try.
+		write(err_str)
+		!traceback!(!terminal!)
+		_return
+	_endif
+
+	_catch :im_bent
+	       # If errors raise here, I'm bent, so don't try re-raising.
+	       _handling error _with
+	       _proc(cond)
+		       write(cond.report_contents_string)
+		       !traceback!(!terminal!)
+		       _throw :im_bent
+	       _endproc 
+		
+	       nl << newline_char
+	       _if (req << .request) _is _unset
+	       _then
+		       # Create a dummy one.
+		       req << mss_http_server_request.new(.connection, _self)
+		       url << _unset
+	       _else
+		       url << req.url
+	       _endif 
+	       resp << req.response
+	       
+	       s2 << internal_text_output_stream.new()
+	       s2.write(.server.message(:log_standard_server_error), nl)
+	       _if url _isnt _unset
+	       _then
+		       s2.write(url, nl)
+	       _endif 
+	       s2.write(err_str, nl)
+	       !traceback!(s2)
+	       resp.default_server_error_response(s2.string)
+	       .server.send_request_response(req)
+	       _self.close_connection()
+	_endcatch
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.send_user_error_response(err_str)
+	## 
+	## Format a standard user error response to a request.
+	##
+
+	nl << newline_char
+	_if (req << .request) _is _unset
+	_then
+		# Create a dummy one.
+		req << mss_http_server_request.new(.connection, _self)
+		url << _unset
+	_else
+		url << req.url
+	_endif 
+	resp << req.response
+	
+	s2 << internal_text_output_stream.new()
+	s2.write(.server.message(:log_standard_user_error), nl)
+	_if url _isnt _unset
+	_then
+		s2.write(url, nl)
+	_endif 
+	s2.write(err_str, nl)
+	resp.default_server_error_response(s2.string)
+	.server.send_request_response(req)
+	_self.close_connection()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.send_client_timeout_response()
+	## 
+	## Format a standard client timeout response to a request.
+	##
+
+	nl << newline_char
+	_if (req << .request) _is _unset
+	_then
+		# Create a dummy one.
+		req << mss_http_server_request.new(.connection, _self)
+	_endif 
+	resp << req.response
+	
+	s2 << internal_text_output_stream.new()
+	s2.write(_self.connection_description(), " ", .server.message(:log_skip_timed_out_request), nl)
+	resp.default_client_timeout_response(s2.string)
+	.server.send_request_response(req)
+	_self.close_connection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_connection_manager.connection_description()
+	## 
+	## Return a description of self's connection.
+	##
+
+	s << internal_text_output_stream.new()
+	s.write(_self.id, %:)
+	_if (conn << .connection) _is _unset _orif
+	    (ra << conn.remote_address) _is _unset
+	_then
+		_if .server _isnt _unset
+		_then 
+			s.write(.server.message(:unknown_address))
+		_endif
+		_return s.string
+	_endif 
+	_if ra.is_class_of?("")
+	_then
+		s.write(ra)
+	_else
+		sep << ""
+		_for i _over ra.fast_elements()
+		_loop
+			s.write(sep, i)
+			sep << ","
+		_endloop
+	_endif
+	_return s.string
+	
+_endmethod
+$

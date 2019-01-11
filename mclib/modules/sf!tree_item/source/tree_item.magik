@@ -1,0 +1,275 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+_package sw
+
+##
+## Description:
+## This file contains an API that allows to export data that is
+## displayed in a sw:tree_item into HTML or a CSV format.
+## The goal of this code/API is *not* to create a screenshot-like
+## output. The focus is to export text information and - if possible -
+## icons (in the case of HTML output).
+## This means that for tree-structures the hierarchical lines and
+## the expand/collapse icons will not be created in the output
+## created by this API.
+## For HTML output column alignment and font color information
+## (but not actual fonts) will be preserved - if possible.
+## Gridlines/stripes however will be lost. Custom render data
+## will also not appear in the HTML output.
+##
+## It is fairly easy to test what this API can do. All you need is
+## to get a handle on an instance of a tree_item and execute
+## this statement:
+## MagikSF> <tree_item>.sf!export_to_html( "c:\temp\out.html" )
+##
+## The next step would be to display the data from the created file
+## in a program that can display HTML (Mozilla, Netscape, or IE Explorer).
+##
+## For example, in CST 4.0 these examples could be run:
+## *) Print the module information from the Module Manager:
+##    MagikSF> sw_module_dialog.sys!slot(:menu_items)[:list_view].
+##             sf!export_to_html( "c:\temp\smd.html" )
+##
+## *) Print the data that is displayed in the embedded editor from
+##    a SWAF application:
+##    MagikSF> smallworld_product.applications.an_element().
+##             plugin( :editor_manager).sys!slot( :embedded_editors ).
+##             an_element().component( :field_lister ).
+##             sys!slot( :gui_items )[ :field_list_view ].
+##             sf!export_to_html( "c:\temp\ed.html" )
+##
+##
+## Unresolved Issues:
+## * Most tree_items allow the user to change the order of the columns.
+##   If this did happen, the output created by this API will not reflect 
+##   the changed column order. 
+## * Some proper documentation would be nice.
+## * CSV output might need some more tweaking/correction;
+##   I focused mostly on the HTMl output.
+##
+
+
+_pragma(classify_level=advanced, topic={widgets}, usage={redefinable})
+##
+## By default header strings are bold and italic.
+##
+## Any number/sequence of HTML font style or phrase elements
+## can be specified here - just without the <> brackets; e.g.
+## TT   - teletype or monospaced text
+## I    - italic text style
+## B    - bold text style
+## U    - underlined text style
+## EM   - basic emphasis typically rendered in an italic font
+## CODE - used for extracts from program code
+##
+tree_item.define_shared_constant( :sf!html_header_font_style_elements,
+	{ "B", "I" },
+	:private )
+$
+
+
+_pragma(classify_level=restricted, topic={widgets})
+tree_item.define_shared_constant( :sf!message_accessor,
+	message_handler( :tree_item ),
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_method tree_item.sf!message( a_msg_id, _gather msg_args )
+
+	## Returns a message from the message system.
+	## It is not possible to provide a default text!
+
+	>> _self.sf!message_accessor.
+	human_string( a_msg_id, _unset, _scatter msg_args )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_method tree_item.sf!adjust_column_widths()
+
+	## Convenience method to adjust the column width for all data.
+
+	#_local hh << ti.headings_holder
+	_local hh << _self.headings_holder
+
+	_if hh _is _unset _then _return _endif
+
+	_for a_col_num _over range( 1, hh.number_of_columns )
+	_loop
+		hh.column_width( a_col_num ) <<
+			hh.optimal_column_width( a_col_num )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_method tree_item.sf!export_to_html( a_file_path,
+				     _optional column_alignments,
+				     _gather header_font_style_elements )
+
+	## API to export all data from _self in HTML-format to the file
+	## identified by A_FILE_PATH. If a file with the same name should
+	## already exist, it will be overwritten.
+	##
+	## A_FILE_PATH:
+	##	A string specifying a location in the file system.
+	## COLUMN_ALIGNMENTS:
+	##	A list of symbols, specifying the horizontal alignment of
+	##	data in columns. An entry in the list should be one of these
+	##	symbols: :left, :right, :center.
+	## HEADER_FONT_STYLE_ELEMENTS:
+	##	Any number/sequence of HTML font style or phrase elements
+	##	can be specified here. This information can be used to let
+	##	the table header look different from the text in the table.
+	##	For an example - how the style elements should be specified -
+	##	see tree_item.sf!html_header_font_style_elements.
+
+	_self.sf!export_data_on_stream( a_file_path, :|sf!export_as_html_on()|,
+					column_alignments,
+					_scatter header_font_style_elements )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_method tree_item.sf!export_as_html_on( a_stream,
+					_optional column_alignments,
+					_gather header_font_style_elements )
+
+	## API to export all data from _self on the text stream A_STREAM
+	## in HTML-format.
+	## For an explanation of the other parameters please see the method
+	## comment of sf!export_to_html().
+
+	_local col_alignments << _self.headings_holder.column_alignments
+	_local render_engine  << _self.heading_renderer
+
+	_if header_font_style_elements.empty?
+	_then
+		header_font_style_elements <<
+			_self.sf!html_header_font_style_elements
+	_endif
+
+	a_stream.write( _self.sf!message( :sf!html_table_start ) )
+	#
+	# Export the header...
+	#
+	_if render_engine.styled_string _isnt _unset
+	_then
+		a_stream.write( _self.sf!message( :sf!html_table_heading_start ) )
+		render_engine.sf!export_html_on( a_stream,
+				_unset, _scatter header_font_style_elements )
+		a_stream.write( _self.sf!message( :sf!html_table_heading_end ) )
+	_endif
+	#
+	# Each currently visible line will be part of a (gigantic) table...
+	#
+	render_engine << _self.tree_renderer
+	a_stream.write( _self.sf!message( :sf!html_table_body_start ) )
+	_for a_display_tree _over .tree_manager.fast_visible_trees()
+	_loop
+		render_engine.value_holder << a_display_tree
+		render_engine.sf!export_html_on(
+			a_stream,
+			_self.headings_holder.column_alignments )
+
+	_endloop
+	a_stream.write( _self.sf!message( :sf!html_table_body_end ) )
+
+	a_stream.write( _self.sf!message( :sf!html_table_end ) )
+	a_stream.flush()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_method tree_item.sf!export_to_csv( a_file_path, _optional a_separator )
+
+	## API to export all data from _self in CSV-format to the file
+	## identified by A_FILE_PATH. If a file with the same name should
+	## already exist, it will be overwritten.
+	##
+	## A_FILE_PATH:
+	##	A string specifying a location in the file system.
+	## A_SEPARATOR:
+	##	A character (or string) that will separate the data
+	##	in the columns; defaults to %tab.
+
+	_self.sf!export_data_on_stream( a_file_path, :|sf!export_as_csv_on()|,
+					a_separator )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_method tree_item.sf!export_as_csv_on( a_stream, _optional a_separator )
+
+	## API to export all data from _self on the text stream A_STREAM
+	## in CSV-format.
+	## For an explanation of the other parameters please see the method
+	## comment of sf!export_to_csv().
+
+	_local render_engine << _self.heading_renderer
+
+	_if a_separator _is _unset _then a_separator << %tab _endif
+	#
+	# Export the header...
+	#
+	_if render_engine.styled_string _isnt _unset
+	_then
+		render_engine.sf!export_text_on( a_stream, a_separator )
+	_endif
+	#
+	# Export the currently visible data...
+	#
+	render_engine << _self.tree_renderer
+	_for a_display_tree _over .tree_manager.fast_visible_trees()
+	_loop
+		render_engine.value_holder << a_display_tree
+		render_engine.sf!export_text_on( a_stream, a_separator )
+	_endloop
+
+	a_stream.flush()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={widgets})
+_private _method tree_item.sf!export_data_on_stream( a_file_path, a_callback,
+						     _gather callback_args )
+
+	## Helper callback to create an external text stream for the
+	## file referenced by A_FILE_PATH.
+	## Once this happened the method A_CALLBACk is executed and all
+	## data passed in CALLBACK_ARGS is passed as-is.
+
+	_local strm << external_text_output_stream.new( a_file_path )
+
+	_protect
+		_self.perform_private( a_callback, strm,
+				       _scatter callback_args )
+	_protection
+		_if strm _isnt _unset _then strm.close() _endif
+	_endprotect
+_endmethod
+$

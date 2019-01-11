@@ -1,0 +1,79 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-04-05 15:01:55 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-10-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:explorer_model_auth_plugin,
+                  {},
+		  {:explorer_model_datasets_plugin}
+)
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method explorer_model_auth_plugin.setup_data()
+	## 
+	## 
+	##
+
+	# (03-22-2005 Brad Sileo): created.
+	.data << rope.new()
+	dataset << gis_program_manager.authorisation_view
+	dataset_manager << gis_program_manager.authorisation_view
+	_local info << property_list.new_with( :name, dataset.view_name,
+					       :datasets, property_list.new_with( dataset_manager,
+										  dataset.rwo_set()),
+					       :aliases, property_list.new_with( dataset_manager,
+										 dataset.view_name ),
+					       :display_all?, _true,
+					       :ace_controls, rope.new() )
+	
+	.data.add_last( info )
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method explorer_model_auth_plugin.add_elements_for(name,auth_view, auth_views)
+	## Create the elements for me using auth_view to locate the collections
+	## 
+	##
+
+	# (03-22-2005 Brad Sileo): created.
+	_for a_collection _over auth_view.collections.fast_elements()
+	_loop
+		_if a_collection.name.write_string.index_of_seq("auth!") _is _unset 
+		_then
+			_continue 
+		_endif
+		explorer_collection_element.new_with( :owner, _self,
+						      :name, a_collection.external_name,
+						      :total_name, _self.message(:total_collection_name,
+										 name, a_collection.external_name ),
+						      :parent, .explorer_element,
+						      :rwo_set, a_collection ,
+						      :available_field_names, a_collection.physical_field_names,
+						      :visible_field_names, a_collection.physical_field_names)
+	_endloop 
+_endmethod
+$

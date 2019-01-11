@@ -1,0 +1,9 @@
+mss_wm_related_document_gui	1
+
+description
+	MSS workspace manager related document gui
+end
+
+requires
+	mss_workspace_data_model
+end

@@ -1,0 +1,272 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2010 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_geocode})
+##
+## mss_geocode_yahoo_request
+##
+## Class to invoke a geocode request using Yahoo REST Geocoding API V1.
+## (See http://developer.yahoo.com/maps/rest/V1/geocode.html
+## for details).
+##
+## This is intended as a demonstration of implementing Yahoo REST
+## Geocoding API V1 in Magik.  Users of this code are
+## responsible for complying with the Yahoo Maps API Terms of Use.
+##
+## Example usage:
+## - z99 << mss_geocode_yahoo_request.new(property_list.new_with(
+##          :location, "535 Nicola Street, Vancouver, BC"))
+## - z99.execute()
+##
+## After executing a request, results are as follows:
+## - The result_status slot will be OK if the request completes
+##   successfully, and may also be "ERROR" if a web service
+##   communication error occurs.  In that case, the
+##   result_error_string slot will provide additional details. 
+## - The results slot will be a rope of property_lists which contain
+##   data parsed from the web service results.  This may include
+##   the following keys: precision, :warning, :latitude, :longitude,
+##   :address, :city, :state, :zip, :country.
+##   Refer to the Yahoo Geocoding API V1 documentation for detauls.
+##
+
+def_slotted_exemplar(:mss_geocode_yahoo_request,
+{
+	{:query_parms, _unset, :readable},
+	{:http_request, _unset, :readable},
+	{:result_status, _unset, :readable},
+	{:result_error_string, _unset, :readable},
+	{:results, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_geocode}, usage={redefinable})
+mss_geocode_yahoo_request.define_shared_variable(
+	:default_appid,
+	## The default value for the Yahoo application ID.
+	"UNKNOWN",
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_geocode})
+_method mss_geocode_yahoo_request.new(query_parms)
+	## 
+	## Generate a new request using QUERY_PARMS, which is a property_list
+	## containing the following keys and values:
+	## - :appid (optional): the Yahoo application ID (defaults
+	##   to self.default_appid if not provided).
+	## - :street (optional): the street name (optionally including civic number).
+	## - :city (optional): the city name.
+	## - :state (optional): the United States state.
+	## - :zip (optional): the 5 digit zip code, or 5 digit-dash-4
+	##   digit zip code.
+	## - :location (optional): the free-form address to geocode.
+	##
+	## Refer to the Yahoo REST Geocoding API V1 for further details on
+	## these parameters.
+	##
+	
+	_return _clone.init(query_parms)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_yahoo_request.init(query_parms)
+	## 
+	## 
+
+	.query_parms << query_parms
+	.http_request << _unset
+	.result_status << ""
+	.result_error_string << ""
+	.results << rope.new()
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_geocode})
+_method mss_geocode_yahoo_request.execute()
+	## 
+	## Execute the given request.  Upon completion, the
+	## result_status slot will be set to the status returned
+	## by the web service, and the results slot will be a rope
+	## of property_lists that describe each result returned by the
+	## web service.
+	##
+
+	.result_status << ""
+	.result_error_string << ""
+	.results.empty()
+	
+	_self.set_http_request()
+	ok? << _false
+	_local error_cond << _unset 
+	_catch :any_error
+	       _handling error _with
+	       _proc(cond)
+		       _import error_cond
+		       error_cond << cond
+		       _throw :any_error
+	       _endproc 
+	       .http_request.execute(30000)
+	       ok? << _true
+	_endcatch
+
+	_if _not ok?
+	_then
+		_if error_cond _isnt _unset
+		_then
+			.result_status << "ERROR"
+			.result_error_string << error_cond.report_contents_string
+		_endif
+	_endif
+
+	_if ok?
+	_then
+		# If the HTTP status code is anything but 200, treat this as an
+		# error.
+		_if (resp << .http_request.response) _isnt _unset _andif
+		    resp.status_code ~= 200
+		_then
+			.result_status << "ERROR"
+			.result_error_string << write_string("HTTP CODE = ", resp.status_code,
+							     ", REASON = ", resp.reason_phrase)
+		_else 
+			_self.parse_response()
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_yahoo_request.set_http_request()
+	## 
+	## Build the http_request for the web service to be executed.
+	##
+
+	s << internal_text_output_stream.new()
+	s.write("http://local.yahooapis.com/MapsService/V1/geocode?")
+	sep << ""
+	
+	appid << .query_parms[:appid].default(_self.default_appid)
+	_if appid _isnt _unset
+	_then
+		s.write("appid=", appid)
+		sep << "&"
+	_endif
+	
+	_for pname _over {:street,
+			  :city,
+			  :state,
+			  :zip,
+			  :location}.fast_elements()
+	_loop
+		_if (pval << .query_parms[pname]) _isnt _unset
+		_then 
+			s.write(sep, pname, "=", mss_http_url_parser.uri_encode(pval))
+			sep << "&"
+		_endif
+	_endloop
+
+	.http_request << mss_http_client_request.new(:url, s.string)
+	_return .http_request
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_yahoo_request.parse_response()
+	## 
+	## Parse the response returned by the web service.
+	##
+
+	.result_status << "CANNOT PARSE RESPONSE"
+	.results.empty()
+
+	xml << _unset 
+	_try
+		xml << .http_request.response.response_body_as_xml()
+	_when error
+	_endtry
+	
+	_if xml _is _unset _orif
+	    xml.elements.size = 0
+	_then
+		_return .results
+	_endif
+
+	.result_status << "OK"
+	top_elem << xml.elements[1]
+	_for i _over top_elem.elements.fast_elements()
+	_loop
+		_if (t << i.type) = "Result"
+		_then
+			.results.add_last(_self.int!parse_single_result(i))
+		_endif 
+	_endloop
+
+	_return .results
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_geocode})
+_method mss_geocode_yahoo_request.int!parse_single_result(xml)
+	## 
+	## Parse a single result from simple_xml_thing XML.
+	##
+
+	res << property_list.new()
+	_for attr_key, attr_value _over xml.attributes.fast_keys_and_elements()
+	_loop
+		_if attr_key = "precision"
+		_then
+			res[:precision] << attr_value
+		_elif attr_key = "warning"
+		_then
+			res[:warning] << attr_value
+		_endif
+	_endloop 
+	
+	_for i _over xml.elements.fast_elements()
+	_loop
+		str << i.xml_contents
+		_if (t << i.type) = "Latitude"
+		_then
+			res[:latitude] << str
+		_elif t = "Longitude"
+		_then
+			res[:longitude] << str
+		_elif t = "Address"
+		_then
+			res[:address] << str
+		_elif t = "City"
+		_then
+			res[:city] << str
+		_elif t = "State"
+		_then
+			res[:state] << str
+		_elif t = "Zip"
+		_then
+			res[:zip] << str
+		_elif t = "Country"
+		_then
+			res[:country] << str
+		_endif
+	_endloop
+	
+	_return res
+	
+_endmethod
+$

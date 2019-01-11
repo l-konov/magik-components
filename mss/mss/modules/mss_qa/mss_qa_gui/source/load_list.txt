@@ -1,0 +1,3 @@
+mss_qa_processor_framework.magik
+mss_qa_processor_fw_pi.magik
+mss_qa_processor_plugin.magik

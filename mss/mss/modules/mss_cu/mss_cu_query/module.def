@@ -1,0 +1,11 @@
+mss_cu_query	1
+
+description
+	MSS Compatible Units query menu
+end
+
+requires
+	mss_component_framework
+	mss_cu_data_model
+	mss_cu_engine
+end

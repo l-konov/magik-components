@@ -1,0 +1,867 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+$
+remex(:mclib_jobs_list_gui_framework)
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+##
+## A subclass of jobs_list_gui_framework to add additional
+## functions to the GUI.
+##
+def_slotted_exemplar( :mclib_jobs_list_gui_framework,
+	{
+		# need these to be a slot because multiple instances need to set
+		# this separately
+		{:filter_by_start_date?, _unset},
+		{:available_statuses,_unset},
+		{:display_job_group,_unset},
+		{:display_status,_unset},
+		{:display_list_count?,_unset},
+		{:jobs_to_filter_out_vals, _unset},
+		{:search_default_text_id, _unset },
+		{:search_categories,  _unset },
+		{:search_default_category, _unset }
+	},
+	:jobs_list_gui_framework )
+$
+mclib_jobs_list_gui_framework.define_slot_access(:filter_by_start_date?, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:available_statuses, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:display_job_group, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:display_status, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:display_list_count?, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:jobs_to_filter_out_vals, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:search_default_text_id, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:search_categories, :writable, :read_only)
+$
+mclib_jobs_list_gui_framework.define_slot_access(:search_default_category, :writable, :read_only)
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.init(_gather args)
+	##
+	## Set the new slots before passing control to the parent
+	##
+	.display_job_group << :all_jobs
+	.display_status << :|All Statuses|
+	.display_list_count? << _false
+	.jobs_to_filter_out_vals << property_list.new()
+	.search_categories << rope.new()
+	
+	_return _super.init(_scatter args)
+_endmethod
+$
+
+_pragma(classify_level=restricted , topic={job_server})
+_method mclib_jobs_list_gui_framework.init_actions()
+	##
+	## Get the actions from the parent, correct where their images
+	## are found (if they are using them) and then generate the
+	## actions specific to this subclass.  Additionally, set the
+	## date preferences here (not the best place, but it works)
+	##
+
+	_super.init_actions()
+
+	# correct the image locators for those actions that have them
+	# so that they look in the parent module for their images
+	_for an_action _over _self.actions()
+	_loop
+		_if (il << an_action.image_locator) _isnt _unset _andif
+			il[2] _isnt _unset _andif
+			il[2] = _self.module_name
+		_then
+			an_action.image << {il[1], :job_server_plugin}
+		_endif
+	_endloop
+
+	# NOTE: the images referenced here are simply initial takes on
+	# appropriate images for these button - please feel free to
+	# replace as needed / desired.
+	
+	_self.add_action( sw_action.new( :display_job_group,
+					 :caption, _self.message(:display_job_group),
+					 #:image, {:refresh, _self.module_name},
+					 :toolbar_control, :choice_item,
+					 :menu_control, :radio_set,
+					 :items, _self.all_job_groups|()|,
+					 :short_help_text,  _self.message(:display_job_group_sh),
+					 #:tooltip, _self.message(:display_job_group_tt),
+					 :engine, _self,
+					 :value, _self.display_job_group, 
+					 :value_change_message, :show_job_group|()| ) )
+
+	_self.add_action( sw_action.new( :display_available_status,
+					 :caption, _self.message(:display_available_status),
+					 #:image, {:refresh, _self.module_name},
+					 :toolbar_control, :choice_item,
+					 :menu_control, :radio_set,
+					 :items, _self.all_available_statuses|()|,
+					 :short_help_text,  _self.message(:display_available_status_sh),
+					 #:tooltip, _self.message(:display_available_status_jobs_tt),
+					 :engine, _self,
+					 :value, :|All Statuses|, 
+					 :value_change_message, :show_available_status|()| ) )
+	
+	_self.add_action( sw_action.new( :push_to_explorer,
+					 :caption, _self.message(:push_to_explorer),
+					 :image, {:list, :ui_resources},
+					 :short_help_text,  _self.message(:push_to_explorer_sh),
+					 :tooltip, _self.message(:push_to_explorer_tt),
+					 :engine, _self,
+					 :action_message, :push_to_explorer|()| ) )
+
+	_self.add_action( sw_action.new( :push_all_to_explorer,
+					 :caption, _self.message(:push_all_to_explorer),
+					 :image, {:report, :ui_resources},
+					 :short_help_text,  _self.message(:push_all_to_explorer_sh),
+					 :tooltip, _self.message(:push_all_to_explorer_tt),
+					 :engine, _self,
+					 :action_message, :push_all_to_explorer|()| ) )
+
+	_self.add_action( sw_action.new( :edit_object,
+					 :caption, _self.message(:edit_object),
+					 :image, {:edit_object, :ui_resources},
+					 :short_help_text,  _self.message(:edit_object_sh),
+					 :tooltip, _self.message(:edit_object_tt),
+					 :engine, _self,
+					 :action_message, :edit_object|()| ) )
+	
+	_self.add_action( sw_action.new( :filter_by_start_date,
+					 :caption, _self.message(:filter_by_start_date),
+					 :image, {:my_filter_restrictions, :explorer_plugin},
+					 :menubar_control, :toggle_item,
+					 :toolbar_control, :image_toggle_item,
+					 :short_help_text,  _self.message(:filter_by_start_date_sh),
+					 :tooltip, _self.message(:filter_by_start_date_tt),
+					 :engine, _self,
+					 :value, _self.filter_by_start_date?.default(_false), 
+					 :value_change_message, :|filter_by_start_date?<<| ) )
+
+	_self.add_action( sw_action.new( :display_list_count,
+					 :caption, _self.message(:display_list_count),
+					 :image, {:display_list_count, _self.module_name},
+					 :menubar_control, :toggle_item,
+					 :toolbar_control, :image_toggle_item,
+					 :short_help_text,  _self.message(:display_list_count_sh),
+					 :tooltip, _self.message(:display_list_count_tt),
+					 :engine, _self,
+					 :value, _self.display_list_count?.default(_false), 
+					 :value_change_message, :|display_list_count?<<| ) )
+
+
+	_if (id << .search_default_text_id) _isnt _unset
+	_then
+		display_text_value << _self.application.message( id )
+	_else 
+		display_text_value << _self.message( :search_default_text_id )
+	_endif
+	
+	_self.add_action( sw_action.new( :display_text_input,
+					 :caption, _self.message( :display_text_input ),
+					 :tooltip, _self.message( :display_text_input_tt ),
+					 :short_help_text, _self.message( :display_text_input_sh ),
+					 :value_change_message, :show_display_text|()|,
+					 :value, display_text_value,
+					 :engine, _self,
+					 :toolbar_control, { :combo_box_item,
+										 :min_width, 100 }
+								))
+	
+	_self.add_action( sw_action.new( :display_text_field,
+					 :caption, _self.message( :display_text_field ),
+					 :tooltip, _self.message( :display_text_field_tt ),
+					 :short_help_text, _self.message( :display_text_field_sh ),
+					 :engine, _self,
+					 :toolbar_control, { :text_choice_item},
+					 :value_change_message, :show_display_field|()|,
+					 :items, _self.search_categories,
+					 :value, _self.search_default_category
+								))
+	
+	_self.add_filtering_out_actions()
+
+	_self.add_custom_actions()
+
+	# not the cleanest place to set this, but these values needed
+	# to a) be set before the user got access to the menu and b)
+	# only be set once per session / restart - setting them here
+	# satisfies both requirements
+	
+	# set this here and then after this it will be set by the
+	# options menu (including clearing the this value entirely)
+	_self.application.set_preference(:job_only_after_date, _self.default_filter_date())
+
+	# clear this value entirely by default when starting
+	_self.application.set_preference(:job_only_before_date, "")	
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+# lists the job_types to filter out of the job list and whether
+# or not that job type is being shown by default
+mclib_jobs_list_gui_framework.define_shared_constant(:jobs_to_filter_out,rope.new(),:public)
+$
+
+_pragma(classify_level=restricted , topic={job_server})
+_method mclib_jobs_list_gui_framework.add_filtering_out_actions()
+	## 
+	## extend the build_gui to allow the filtering out of certain
+	## job types which are ubiquitous across job_groups, etc.
+	##
+
+	_for itm _over _self.jobs_to_filter_out.fast_elements()
+	_loop
+		# create an action for this itm
+
+		base_name << :show_ + itm[1]
+		sh_name << base_name + :_sh
+		tt_name << base_name + :_TT
+
+		_self.add_action( sw_action.new( base_name,
+										 :caption, _self.message(base_name),
+										 # ideally, the image here should be replaced for each button
+										 # created
+										 :image, {:query, :ui_resources},
+										 :menubar_control, :toggle_item,
+										 :toolbar_control, :image_toggle_item,
+										 :short_help_text,  _self.message(sh_name),
+										 :tooltip, _self.message(tt_name),
+										 :engine, _self,
+										 :value, itm[2], 
+										 :value_change_message, :update_job_filtering|()| ) )
+		
+		# create a shared variable for this item
+		q_base_name << base_name + :?
+		.jobs_to_filter_out_vals[q_base_name] << itm[2]
+		
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted , topic={job_server})
+_method mclib_jobs_list_gui_framework.update_job_filtering()
+	##
+	## callback method for the 'filter out' actions
+	##
+
+	_for itm _over _self.jobs_to_filter_out.fast_elements()
+	_loop
+		base_name << :show_ + itm[1]
+		q_base_name << base_name + :?
+
+		_if ( the_action << _self.action(base_name) ) _isnt _unset
+		_then
+			.jobs_to_filter_out_vals[q_base_name] << the_action.value
+		_endif
+		
+	_endloop
+
+	_self.refresh_job_queue()
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted , topic={job_server})
+_method mclib_jobs_list_gui_framework.add_custom_actions()
+	##
+	## if any further custom actions are needed in (in another
+	## subclass of this module, for instance), they should be added
+	## here
+	##
+
+	# Stub method - to be customized by implementor
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.all_job_groups()
+	##
+	## generate key, string pairs for the job groups pulldown
+	##
+
+	jg_rope << rope.new()
+	
+	_for k _over sw:sw_job_engine.all_job_groups.keys.as_sorted_collection().fast_elements()
+	_loop
+		# adds a vector containing the key, and the message
+		# corresponding to that key, defaulting back to the key
+		# itself.
+		_if _self.has_message?(k)
+		_then
+			# use a nice name if we have one.
+			jg_rope.add({k,_self.message(k)})
+		_else
+			# just use the internal name
+			jg_rope.add({k,k})
+		_endif
+	_endloop
+	
+	_return jg_rope
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.all_available_statuses()
+	##
+	## generate a key list for the available statuses
+	##
+	_return rope.new_with(:|All Statuses|,_scatter _self.available_statuses)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.show_job_group(val)
+	## 
+	## allow filtering by job group
+	##
+	
+	_self.display_job_group << val
+	_self.refresh_job_queue()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.show_available_status(val)
+	## 
+	## allow persistent filtering on status
+	##
+	
+	_self.display_status << val
+	_self.refresh_job_queue()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.show_display_text()
+	## call back off the lost focus or selection of the combo box...
+	## typically users will type something in, then hit tab and
+	## want a refresh..
+	## 
+	_self.refresh_job_queue()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.show_display_field()
+	## call back off the selection of the field to search
+	##
+	# to refresh off of this alone is likely a bit much
+	#	_self.refresh_job_queue()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.filter_by_start_date?<< val
+	##
+	## call back off the 'filter by start date' toggle
+	## 
+	.filter_by_start_date? << val
+	_self.refresh_job_queue()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.display_list_count?<< val
+	##
+	## call back off the 'display list count' toggle
+	## 
+	.display_list_count? << val
+	_self.refresh_job_queue()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={report})
+_method mclib_jobs_list_gui_framework.default_filter_date()
+	##
+	## generate the appropriate default date
+	##
+	
+	# can't use date_time, due to using a calendar field in the pop-up...
+	_return date.now() - _self.default_filter_days()
+_endmethod
+$
+_pragma(classify_level=restricted, topic={report})
+_method mclib_jobs_list_gui_framework.default_filter_days()
+	##
+	## for a default, only look at the jobs in the last week
+	##
+	
+	days << system.getenv("MCLIB_JOB_SERVER_DEFAULT_FILTER_DAYS").default("7")
+	
+	_return  time_interval.new(days.as_number(),0)
+_endmethod 
+$
+_pragma(classify_level=restricted, topic={report})
+_method mclib_jobs_list_gui_framework.get_predicates_for_job_list 
+	## 
+	## Returns the predicates for the job list
+	## 
+
+	# process the status predicates before core gets to it.
+
+	_if _self.display_status _is :|All Statuses|
+	_then
+		# let the super set back to default preds
+		.statuses << .available_statuses.copy()
+	_else
+		# the user has selected a specific status predicate
+		.statuses << predicate.eq(:status, _self.display_status )
+	_endif 
+
+	pred << _super.get_predicates_for_job_list 
+
+	_if _not (_self.display_job_group _is :all_jobs) _andif
+		(cur_job_group << sw_job_engine.all_job_groups[_self.display_job_group]) _isnt _unset 
+	_then
+		# filter by job_group
+		# for performance, keep don't use "or" logic...
+		_for a_type _over sw_job_engine.all_job_groups[:all_jobs].fast_elements()
+		_loop
+			_for itm _over _self.jobs_to_filter_out.fast_elements()
+			_loop
+				_if a_type _is itm[1]
+				_then
+					q_base_name << :show_ + a_type + :?
+					_if _not .jobs_to_filter_out_vals[q_base_name]
+					_then
+						pred _and<< _not predicate.eq(:type,a_type)
+						_continue 
+					_endif
+				_endif
+			_endloop
+			
+			_if cur_job_group.includes?(a_type)
+			_then
+				# leave these jobs in
+				_continue 
+			_endif
+			
+			pred _and<< _not predicate.eq(:type,a_type)
+		_endloop
+	_else
+		_for itm _over _self.jobs_to_filter_out.fast_elements()
+		_loop
+			q_base_name << :show_ + itm[1] + :?
+			_if _not .jobs_to_filter_out_vals[q_base_name]
+			_then
+				pred _and<< _not predicate.eq(:type,itm[1])
+				_continue 
+			_endif
+		_endloop
+	_endif
+	
+	## ONLY USE THIS ON THE PROCESSED JOBS!!!
+	_if .filter_by_start_date?.default(_false)
+	_then
+		_if ( ignore_before_date_time << _self.application.get_preference(:job_only_after_date) ) _isnt _unset _andif
+			ignore_before_date_time.write_string.trim_spaces() <> ""
+		_then
+			pred _and<< predicate.ge(:started, ignore_before_date_time)
+		_endif
+		_if (ignore_after_date_time << _self.application.get_preference(:job_only_before_date) ) _isnt _unset _andif
+			ignore_after_date_time.write_string.trim_spaces() <> ""
+		_then
+			pred _and<< predicate.le(:started, ignore_after_date_time)
+		_endif
+	_endif
+
+	# first find the default text string, so we can ignore it
+	_if (id << .search_default_text_id) _isnt _unset
+	_then
+		display_text_value << _self.application.message( id )
+	_else 
+		display_text_value << _self.message( :search_default_text_id )
+	_endif
+	combo_action << _self.action(:display_text_input)
+	val << combo_action.value.default("").trim_spaces()
+	_if val ~= "" _andif
+		val ~= display_text_value
+	_then
+		fd_name << _self.action(:display_text_field).value
+		
+		# add a predicate for the display_text_input and dislay_text_field
+		pred _and<<predicate.wild(fd_name, val)
+
+		# now update the combo_box
+		# we have a new one to add to the list!
+		_local items << rope.new_from( combo_action.items )
+		
+		# If the find text is already used before, remove it from the 
+		# history. 
+		_for item _over items.elements()
+		_loop
+			_if item = val
+			_then
+				items.remove(item)
+			_endif
+		_endloop
+		
+		# Add the Find Text to the history
+		items.add_first( val )
+		
+		# Set the new history
+		combo_action.items << items 		
+	_endif
+	
+	#debug print(pred)
+	_return pred
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.push_to_explorer()
+	## 
+	## send the selected records to the explorer
+	##
+	
+	sr << _self.selected_records
+
+	the_set << rwo_set.new()
+
+	the_set.add_all(sr)
+
+	the_appl << _self.application 
+	the_appl.databus.make_data_available(:rwo_set,
+										 {_self, the_set,
+										  :name, _self.message(:explorer_selected_jobs),
+										  :set_current?, _true} )
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.push_all_to_explorer()
+	## 
+	## send the all of the listed records to the explorer
+	##
+	
+	sr << .rwo_set_item.record_set
+
+	the_set << rwo_set.new()
+
+	the_set.add_all(sr)
+
+	the_appl << _self.application 
+	the_appl.databus.make_data_available(:rwo_set,
+										 {_self, the_set,
+										  :name, _self.message(:explorer_selected_jobs),
+										  :set_current?, _true} )
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.options()
+	## Open the options dialog.
+
+	_if ( options_dialog << _self.get_dialog(:options) ) _is _unset
+	_then
+		# BEGIN MCLIB
+		options_dialog << mclib_job_list_options_dialog.new_dialog( _self, _self )
+		# END MCLIB
+		_self.cache_dialog(:options, options_dialog )
+	_endif
+
+	options_dialog.activate()
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.job_information()
+	## Display information about the currently selected job.
+	
+	selected_record << .rwo_set_item.selected_records
+	_if _not selected_record.empty?
+	_then
+		selected_record << selected_record.an_element()
+		# BEGIN MCLIB
+		jid << mclib_job_information_dialog.new_dialog( _self, selected_record )
+		# END MCLIB
+		jid.activate()
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={Exelon,cegis_core,ted_data_copier_dialog})
+_method mclib_jobs_list_gui_framework.edit_object()
+	## 
+	## Bring up an editor for the selected record
+	##
+	selected_record << .rwo_set_item.selected_records
+
+	_if _not selected_record.empty?
+	_then
+		selected_record << selected_record.an_element()
+		
+		editor_manager << _self.application.get_service_provider(:editor_manager)
+
+		_if editor_manager _isnt _unset 
+		_then
+			editor_manager.edit_object(selected_record)
+		_endif
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.process_framework_data( xml_element )
+	# Process the frameworks xml data which can define the visible
+	# fields and statuses for this view.
+
+	_super.process_framework_data(xml_element)
+	
+	.filter_by_start_date? << _false  
+	_for an_element _over xml_element.elements_of_type()
+	_loop
+		_if an_element.type = :filter_by_start_date 
+		_then
+			_if (a_value << an_element.attribute(:value)) _isnt _unset _andif
+			    a_value.canonical.trim_spaces() = "true"
+			_then
+				.filter_by_start_date? << _true 
+			_endif
+		_endif
+		_if an_element.type = :filter_out_types
+		_then
+			_for sub _over an_element.elements_of_type()
+			_loop
+				_if sub.type = :job_type
+				_then
+					_if _self.jobs_to_filter_out _is _unset
+					_then
+						_self.jobs_to_filter_out << rope.new()
+					_endif
+					_self.jobs_to_filter_out.add({sub.attribute(:type).as_symbol(),
+												  ( sub.attribute(:default).canonical.trim_spaces() = "true")})
+				_endif
+			_endloop
+		_endif
+		_if an_element.type = :text_find
+		_then
+			_for sub _over an_element.elements_of_type()
+			_loop
+				_if sub.type = :categories
+				_then
+					_for category _over sub.elements_of_type()
+					_loop
+						_if category.type = :category
+						_then
+							_local id << category.attribute(:name).as_symbol()
+							.search_categories.add_last( { id, sw_job_engine.job_collection.field(id).external_name } )
+							
+							_if category.attribute(:default) = "yes" _orif
+								.search_default_category _is _unset 
+							_then
+								.search_default_category << id
+							_endif
+						_endif
+					_endloop
+				_elif sub.type _is :default_text
+				_then
+					.search_default_text_id << sub.attribute(:id).as_symbol()
+				_endif
+			_endloop
+		_endif
+	_endloop
+	
+	# statuses was already processed by super, but grab it
+	# from the slot before it's turned into predicates!
+	.available_statuses << .statuses.copy()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.update_statusbar(_optional ensure_active?)
+	##
+	## update the 'displayed records' and 'filter dates' entries on
+	## this status bar
+	##
+	
+	# only update the status bar for the visible tab
+
+	_if _not ensure_active?.default(_true) _orif
+		_self.active?
+	_then
+		_if .display_list_count? _is _true
+		_then
+			displayed_jobs << .rwo_set_item.record_set.size			
+			_self.framework.update_statusbar(:displayed, :text,
+											 _self.message(:displayed_jobs, displayed_jobs))
+		_else
+			_self.framework.update_statusbar(:displayed, :text,
+											 _self.message(:displayed_jobs_not_counted))
+		_endif
+		_if .filter_by_start_date?.default(_false)
+		_then
+			after_date_filter << _self.application.get_preference(:job_only_after_date).default("").write_string.trim_spaces()
+			before_date_filter << _self.application.get_preference(:job_only_before_date).default("").write_string.trim_spaces()
+			_if after_date_filter <> "" _andif
+				before_date_filter = ""
+			_then
+				_self.framework.update_statusbar(:filter_date, :text, _self.message(:after_date_filter, after_date_filter))
+			_endif
+			_if after_date_filter = "" _andif
+				before_date_filter <> ""
+			_then
+				_self.framework.update_statusbar(:filter_date, :text, _self.message(:before_date_filter, before_date_filter))
+			_endif
+			_if after_date_filter <> "" _andif
+				before_date_filter <> ""
+			_then
+				_self.framework.update_statusbar(:filter_date, :text, write_string(after_date_filter," - ",before_date_filter))
+			_endif
+			_if after_date_filter = "" _andif
+				before_date_filter = ""
+			_then
+				_self.framework.update_statusbar(:filter_date, :text, _self.message(:no_filter_date))
+			_endif
+		_else
+			_self.framework.update_statusbar(:filter_date, :text, _self.message(:no_filter_date))
+		_endif
+	_endif 	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.remove_job()
+	##
+	## Callback method for the delete action
+	##
+
+	selected_records << .rwo_set_item.selected_records
+
+	_for i _over selected_records.fast_elements()
+	_loop
+		_if i.status = "Running"
+		_then
+			# don't ever let someone straight out delete a running job.
+			# if the job is hung or stranded, they likely want to resubmit
+			# it or suspend, then release.
+			
+			# at least force them to suspend it first
+			_self.show_alert(_self.message(:cannot_remove_running_jobs))
+			_return 
+		_endif
+	_endloop
+
+	# still here?
+	_super.remove_job()
+_endmethod
+$
+
+# modified method below from patch: P103490
+#sw!declare_patch(103490, "1","The Job Manager refereshes to reflect the changes to preferences in the job manager optons dialog.")
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.format_record( a_record, a_styled_string )
+	## Make any changes required to the record's styled string,
+	## sets colours for suepended and failed jobs.
+	_if .cached_style_strings _is _unset
+	_then
+		.cached_style_strings << hash_table.new()
+	_endif
+
+	_if a_styled_string _is .cached_style_strings[:base] _andif
+	    .cached_style_strings[a_record.status] _isnt _unset
+	_then
+		# Do Nothing
+	_elif a_styled_string _isnt .cached_style_strings[:base]
+	_then
+		.cached_style_strings.empty()
+		.cached_style_strings[:base] << a_styled_string
+	_endif
+
+	l_string << rope.new_from(a_styled_string.as_simple_vector())
+	# Deal with :tabs getting replaced by :tabs.
+	_for i _over 1.upto(l_string.size)
+	_loop
+		_if l_string[i] = %tab _then l_string[i] << :tab _endif
+	_endloop
+	
+	_if a_record.status_symbol _is :failed
+	_then
+		l_string.add_first(
+			_self.application.get_preference(
+				:job_failed_colour).default(:red) )
+	_elif a_record.status_symbol _is :suspended
+	_then 
+		l_string.add_first(
+			_self.application.get_preference(
+				:job_suspended_colour).default(:gray) )
+		# BEGIN MCLIB
+	_elif a_record.status_symbol _is :running
+	_then
+		l_string.add_first(
+			_self.application.get_preference(
+				:job_running_colour).default(:bold) )
+		#END MCLIB
+	_endif
+	l_string << styled_string.new_from(l_string)
+	_return .cached_style_strings[a_record.status] << l_string
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.refresh_job_queue()
+	##
+	## Refreshes the list
+	##
+	
+	_super.refresh_job_queue()
+
+	# our date filters don't really take place until the user
+	# manually refreshes.
+	_self.update_statusbar()
+
+_endmethod
+$
+_pragma(classify_level=restricted, topic={job_server})
+_method mclib_jobs_list_gui_framework.handle_visible_selector( visible? )
+	## 
+	## Update the statusbar for this list if we are now visible.
+	##
+
+	_if visible?
+	_then 
+		_self.update_statusbar(_false)
+	_endif
+    >> _super.handle_visible_selector(visible?)    
+_endmethod
+$

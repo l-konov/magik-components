@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mclib_xslt_report_templates>
+    <template name="default" module_name="mclib_auth_dump_report" directory="default"/>
+</mclib_xslt_report_templates>

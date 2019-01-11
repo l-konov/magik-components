@@ -1,0 +1,78 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_processor_fw_pi
+##
+## Plugin for providing access to the
+## mss_scheduler_processor_framework
+##
+
+def_slotted_exemplar(:mss_scheduler_processor_fw_pi,
+{
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_fw_pi.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:activate_mss_scheduler_processor_framework,
+				       :engine, _self,
+				       :action_message, :|activate_mss_scheduler_processor_framework()|))
+	_self.add_action(sw_action.new(:activate_mss_scheduler_review_framework,
+				       :engine, _self,
+				       :action_message, :|activate_mss_scheduler_review_framework()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_fw_pi.activate_mss_scheduler_processor_framework()
+	##
+	## Activate the mss_scheduler_processor_framework menu.
+	##
+
+	_if (m << _self.get_dialog(:mss_scheduler_processor_framework)) _is _unset
+	_then
+		m << mss_scheduler_processor_framework.new(:mss_scheduler_processor_framework, _self)
+		_self.cache_dialog(:mss_scheduler_processor_framework, m)
+		m.activate_relative_to(_unset, m.message(:title), _self.top_frame, 50, 50)
+	_else 
+		m.activate(_unset, m.message(:title))
+	_endif
+	m.top_frame.minimized? << _false
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_processor_fw_pi.activate_mss_scheduler_review_framework()
+	##
+	## Activate the mss_scheduler_processor_framework menu, in
+	## review mode.
+	##
+
+	_if (m << _self.get_dialog(:mss_scheduler_review_framework)) _is _unset
+	_then
+		m << mss_scheduler_processor_framework.new(:mss_scheduler_review_framework, _self,
+							   :config_definition_file_name, "review_config.xml",
+							   :gui_definition_file_name, "review_gui.xml")
+		_self.cache_dialog(:mss_scheduler_review_framework, m)
+		m.activate_relative_to(_unset, m.message(:review_title), _self.top_frame, 50, 50)
+	_else 
+		m.activate(_unset, m.message(:title))
+	_endif
+	m.top_frame.minimized? << _false
+
+_endmethod
+$

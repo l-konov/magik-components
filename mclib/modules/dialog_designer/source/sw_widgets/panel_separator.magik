@@ -1,0 +1,146 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## LABEL_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+panel_separator.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :min_width,:integer,
+					  :min_height,:integer,
+					  :vertical?,:boolean,
+					  :col_alignment,{:fill,:left,:centre,:right},
+					  :row_alignment,{:fill,:top,:centre,:bottom}),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.dd_properties()
+	## 
+	##  Return the editable properties for SELF.
+	>> _self.dd_properties
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.default_min_height
+	## 
+	##  Return the minimum default rendering height.
+	>> max(_self.min_height.default(0),2)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.default_min_width
+	## 
+	##  Return the minimum default rendering width.
+	>> max(_self.min_width.default(0),2)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	>> _self.new(rc,
+		     :vertical?,_false,
+		     :min_width,10,
+		     :min_height,10,
+		     :row,row,:col,col,
+		     :col_alignment,:fill,
+		     :row_alignment,:fill)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	>> _self.new(parent,_scatter props)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.gui_code(txt)
+	## 
+	## Write interpretable code for SELF on the stream TXT.
+	
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id, "] << panel_separator.new(",parent_id)
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		( gui_name,gui_value)  << _self.gui_name_and_value(n,v)
+
+		_if gui_name _is _unset 
+		_then
+			_continue 
+		_endif
+
+		txt.write(%,,%newline,%tab*3,%:,gui_name,%,,%tab,gui_value)
+	_endloop
+
+	txt.write(" )",%newline)
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_separator.render_on(canv,bb)
+	## 
+	## Render SELF onto the CANVas with bounding_box BB.
+
+	s << sector.new()
+	_if _self.vertical?.default(_false)
+	_then
+		s.add(coordinate(bb.xmin/2.0+bb.xmax/2.0,bb.ymin))
+		s.add(coordinate(bb.xmin/2.0+bb.xmax/2.0,bb.ymax))
+	_else
+		s.add(coordinate(bb.xmin,bb.ymin/2.0+bb.ymax/2.0))
+		s.add(coordinate(bb.xmax,bb.ymin/2.0+bb.ymax/2.0))
+	_endif
+
+	canv.draw(s.sectors,line_style.new(colour.called(:white),1))
+
+	d << _if _self.style _is :raised
+	     _then
+		     >> 1
+	     _else
+		     >> -1
+	     _endif
+
+	s << sector.new()
+	_if _self.vertical?.default(_false)
+	_then
+		s.add(coordinate(bb.xmin/2.0+bb.xmax/2.0+d,bb.ymin))
+		s.add(coordinate(bb.xmin/2.0+bb.xmax/2.0+d,bb.ymax))
+	_else
+		s.add(coordinate(bb.xmin,bb.ymin/2.0+bb.ymax/2.0+d))
+		s.add(coordinate(bb.xmax,bb.ymin/2.0+bb.ymax/2.0+d))
+	_endif
+	canv.draw(s.sectors,line_style.new(colour.called(:gray),1))
+
+	_dynamic !dialog_element_footprints!
+
+	!dialog_element_footprints![bb] << _self
+
+_endmethod
+$

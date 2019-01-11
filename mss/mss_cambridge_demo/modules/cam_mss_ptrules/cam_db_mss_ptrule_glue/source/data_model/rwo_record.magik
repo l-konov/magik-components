@@ -1,0 +1,66 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+rwo_record.define_shared_constant(
+	:mss_ptrule_pin_1_name,
+	## Name of first pin geometry (for two-pin RWOs such as switch
+	## or transformer).
+	:primary_connection,
+	:public)
+$
+				  
+_pragma(classify_level=advanced, topic={mss_ptrule})
+rwo_record.define_shared_constant(
+	:mss_ptrule_pin_2_name,
+	## Name of second pin geometry (for two-pin RWOs such as switch
+	## or transformer).
+	:secondary_connection,
+	:public)
+$
+				  
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method rwo_record.mss_set_substation_internals(ptrule, a_window, coord)
+	## 
+	## Generic superclass action method for any feature with a
+	## foreign key join to substation_internals: populate this join
+	## based on the internal world that the pointing has taken
+	## place within.
+	##
+
+	a_map_view << a_window.user_data
+	ds_world << a_map_view.world.world_for_dataset(_self.source_view)
+	_if ds_world _is _unset _orif
+	    ds_world.universe_id = 0
+	_then
+		_return
+	_endif
+
+	# Locate a substation_internals object in this world.
+	sc << _self.source_view.geometry_scanner(:general, _unset, ds_world)
+	_protect
+		gf << _self.source_view.collections[:substation_internals].all_fields[:boundary]
+		tc << _self.source_view.table_control_for({gf})
+		sc.start_scan(ds_world.max_possible_bounds, tc)
+		a_sub_int_geom << sc.get()
+	_protection
+		sc.return_to_scanner_pool()
+	_endprotect 
+
+	_if a_sub_int_geom _isnt _unset _andif
+	    (a_sub_int_rwo << a_sub_int_geom.rwo) _isnt _unset
+	_then
+		_self.substation_internals_id << a_sub_int_rwo.id
+	_else
+		condition.raise(:user_error, :string,
+				"Unable to locate a substation internals record.")
+	_endif 
+	
+_endmethod
+$

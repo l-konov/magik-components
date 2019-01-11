@@ -1,0 +1,52 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_process_cu_state_transition(cu_rec, a_transition)
+	## 
+	## Perform any processing required during the state transition
+	## given by A_TRANSITION, for the mss_cu_reference record CU_REC.
+	##
+	## This method has been overridden so that if CU_REC has a
+	## Remove operation, if it is a material-type CU, and if it has
+	## a facility relationship for self, then actually delete self.
+	##
+
+	cur_op << cu_rec.operation.default("")
+	_if cur_op = "Remove" _andif
+	    (cu_def << mss_cu_engine.cu_definition_for_code(cu_rec.cu_code)) _isnt _unset _andif
+	    cu_def.facility_relationships_for(_self) _isnt _unset
+	_then
+		# This is a removal that causes the permanent deletion of self.
+		_self.delete()
+		_return 
+	_endif 
+	
+	# The following is the original processing that is in the
+	# original version of this method in core product code.
+	_if cur_op = "" _andif
+	    cu_rec.work_point_number = ""
+	_then
+		# Already blanked out - no change needed.
+		_return
+	_endif
+	
+	_if cur_op = "" _orif
+	    cur_op = mss_cu_engine.default_install_operation
+	_then 
+		det_cu_rec << cu_rec.detached()
+		det_cu_rec.operation << ""
+		det_cu_rec.work_point_number << ""
+		det_cu_rec.source_collection.update(det_cu_rec)
+	_else
+		cu_rec.delete()
+	_endif
+	
+_endmethod
+$

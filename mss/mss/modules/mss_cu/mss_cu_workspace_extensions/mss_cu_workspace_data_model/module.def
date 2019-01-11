@@ -1,0 +1,10 @@
+mss_cu_workspace_data_model	1
+
+description
+	Additions/changes to mss_workspace_data_model module to enable Compatible Units
+end
+
+requires
+	mss_workspace_data_model
+	mss_workspace_manager
+end

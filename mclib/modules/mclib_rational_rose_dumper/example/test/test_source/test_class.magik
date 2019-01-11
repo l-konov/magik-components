@@ -1,0 +1,159 @@
+##-----------------------------------------------------------------------------
+##
+## FILE     : $Workfile: $
+##
+## DESCRIPTION  :
+##
+##
+##-----------------------------------------------------------------------------
+
+_package sw
+$
+
+_pragma(classify_level=basic, topic={ESKOM})
+##
+## Class comment 1
+## Class comment 2
+##
+#This is a test notice for the class
+
+def_slotted_exemplar(:test_class,{
+                                  {:public_slot,_unset},
+                                  {:private_slot,_unset}},
+                                 {:test_super_class,:test_super_class_two})
+$
+
+_pragma(classify_level=basic, topic={ESKOM})
+_method test_class.setter_method<<new_value
+##-----------------------------------------------------------------------------
+## DESCRIPTION: 
+## setter method doc1
+## setter method doc2
+## 
+## PARAMETERS: 
+## new_value - Boolean
+## 
+## 
+## RETURN VALUE(S): 
+## 
+##-----------------------------------------------------------------------------
+#This is a test notice for each method
+
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={ESKOM})
+_method test_class.getter_method
+##-----------------------------------------------------------------------------
+## DESCRIPTION: 
+## getter method doc1
+## getter method doc2
+## 
+## PARAMETERS: 
+## 
+## RETURN VALUE(S): Boolean
+## 
+##-----------------------------------------------------------------------------
+#This is a test notice for each method
+
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={ESKOM})
+_method test_class.param_method(param1,param2,param3)
+##-----------------------------------------------------------------------------
+## DESCRIPTION: 
+## param method doc1
+## param method doc2
+## param method doc3
+## 
+## PARAMETERS: 
+## param1 - Boolean
+##                    param1 doc1
+##                    param1 doc2
+## param2 - Integer
+##                    param2 doc1
+##                    param2 doc2
+## param3 - test_class_two
+##                           param3 doc1
+##                           param3 doc2
+## 
+## RETURN VALUE(S): Integer
+## 
+##-----------------------------------------------------------------------------
+#This is a test notice for each method
+
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={ESKOM})
+test_class.define_shared_variable(:shared_var1,
+##
+## shared var doc1
+## shared var doc2
+##
+#This is a test notice for each method
+
+:a_shared_item,
+:private)
+$
+
+
+_pragma(classify_level=basic, topic={ESKOM})
+test_class.define_shared_constant(:shared_const,
+##
+## shared const doc1
+## shared const doc2
+##
+#This is a test notice for each method
+
+:a_shared_item,
+:public)
+$
+
+
+_pragma(classify_level=basic, topic={ESKOM})
+_method test_class.bracket_only_method()
+##-----------------------------------------------------------------------------
+## DESCRIPTION: 
+## 
+## 
+## PARAMETERS: 
+## 
+## RETURN VALUE(S): 
+## 
+##-----------------------------------------------------------------------------
+#This is a test notice for each method
+
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={ESKOM})
+_method test_class.param_method2(a_param)
+##-----------------------------------------------------------------------------
+## DESCRIPTION: 
+## this method captured in rose with 1 parameter but no brackets in the name
+## 
+## PARAMETERS: 
+## a_param - 
+## 
+## 
+## RETURN VALUE(S): 
+## 
+##-----------------------------------------------------------------------------
+#This is a test notice for each method
+
+_endmethod
+$
+
+
+##-----------------------------------------------------------------------------
+##
+## HISTORY     : $History: $
+##
+##-----------------------------------------------------------------------------
+

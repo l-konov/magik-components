@@ -1,0 +1,101 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_design.cam_constructed_state_change(a_transition, parms)
+	## 
+	## Perform actions on all records associated with self as part
+	## of a state transition to the Constructed state.
+	##
+
+	# N.B.: In a more typical gas or electric data model, this
+	# would do things such as change Proposed facilities to
+	# Existing, delete Proposed Delete facilities, etc.  The
+	# Cambridge database only has limited examples where the data
+	# model is set up for this.  So, in most cases, this simply
+	# draws features in a highlight style.  The following simply
+	# gets a GUI handler to use for drawing this information - it
+	# is for example purposes only.
+	mm << _unset 
+	_if (gui_handler << parms[:gui_handler]) _isnt _unset
+	_then
+		app << gui_handler.application
+		hcolor << app.highlight_colour
+		mm << app.plugin(:maps)
+	_endif 
+	
+	# Self must be the active design to carry on.
+	_self.ensure_active_design()
+
+	# Get all datasets associated with self.
+	ds_rope << rope.new()
+	_for i _over mss_workspace_manager_engine.active_design_dataset_names.fast_elements()
+	_loop
+		ds_rope.add_last(gis_program_manager.cached_dataset(i))
+	_endloop
+
+	ok? << _false 
+	vmds_state << mss_workspace_manager_engine.save_vmds_state()
+	draw_rset << rwo_set.new()
+	_protect
+		# Force all datasets associated with self to be writable for
+		# the duration of this operation.
+		_for i _over ds_rope.fast_elements()
+		_loop
+			i.switch(:write)
+		_endloop
+
+		# Get all tracked records for self and all parent designs.
+		_for track_data _over _self.tracked_records(_true).fast_elements()
+		_loop
+			_if (track_rec << track_data[1]) _is _unset _orif
+			    _not track_rec.is_valid?
+			_then
+				_continue
+			_endif 
+
+			# The following is really just debugging information, so that a
+			# configurer working with this sample method can see what is
+			# going on.
+			write("Tracked record: ", track_rec)
+
+			_if track_rec.responds_to?(:|do_cam_constructed_state_change()|)
+			_then
+				track_rec.do_cam_constructed_state_change()
+			_endif
+			
+			# The following is really just debugging information, so that a
+			# configurer working with this sample method can see what is
+			# going on.
+			_if mm _isnt _unset _andif
+			    track_rec.is_valid?
+			_then
+				draw_rset.add(track_rec)
+				mm.draw_geometry(track_rec, hcolor)
+			_endif
+		_endloop
+
+		ok? << _true 
+	_protection
+		mss_workspace_manager_engine.restore_vmds_state(vmds_state, ok?)
+	_endprotect 
+
+	# The following is really just debugging information, so that a
+	# configurer working with this sample method can see what is
+	# going on.
+	_if mm _isnt _unset _andif 
+	    (cmap << mm.current_map) _isnt _unset
+	_then
+		draw_gset << draw_rset.geometry_set(cmap.world)
+		cmap.current_selection.empty()
+		cmap.add_geometry_to_selection(draw_gset)
+	_endif 
+	
+_endmethod
+$

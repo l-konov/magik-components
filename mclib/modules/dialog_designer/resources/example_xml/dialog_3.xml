@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="windows-1252" standalone="yes"?>
+<dialog class="third_dialog">
+	<module name="third_dialog">
+		<property name="version" value="1"/>
+		<property name="description" value="Third Dialog (Dialog Designer)"/>
+	</module>
+
+	<databus>
+	</databus>
+
+	<widget name="a_frame">
+		<property name="dd_class" value="frame"/>
+		<property name="maximizable?" value="True"/>
+		<property name="minimizable?" value="True"/>
+		<property name="resizable?" value="False"/>
+		<property name="title" value="Third Dialog"/>
+	</widget>
+
+	<widget name="rowcol_01">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="a_frame"/>
+		<property name="bottom_spacing" value="6"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="6"/>
+		<property name="right_spacing" value="6"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="top_level"/>
+		<property name="top_spacing" value="6"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="paned_window_01">
+		<property name="dd_class" value="dd_paned_window"/>
+		<property name="dd_parent" value="rowcol_01"/>
+		<property name="col" value="1"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="fill"/>
+		<property name="side_by_side?" value="True"/>
+		<property name="ncols" value="2"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="simple_list_item_01">
+		<property name="dd_class" value="simple_list_item"/>
+		<property name="dd_parent" value="paned_window_01"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="mode" value="one"/>
+		<property name="row_alignment" value="fill"/>
+		<property name="strings" value="Apple,Banana,23"/>
+		<property name="values" value="a,b,c"/>
+	</widget>
+
+	<widget name="paned_window_02">
+		<property name="dd_class" value="dd_paned_window"/>
+		<property name="dd_parent" value="paned_window_01"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="row_alignment" value="fill"/>
+		<property name="side_by_side?" value="False"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="2"/>
+	</widget>
+
+	<widget name="tree_list_01">
+		<property name="dd_class" value="dd_tree_list"/>
+		<property name="dd_parent" value="paned_window_02"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="height" value="50"/>
+		<property name="mode" value="one"/>
+		<property name="row_alignment" value="fill"/>
+		<property name="width" value="160"/>
+	</widget>
+
+	<widget name="group_box_01">
+		<property name="dd_class" value="dd_group_box"/>
+		<property name="dd_parent" value="paned_window_02"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="label" value="More widgets"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="2"/>
+	</widget>
+
+	<widget name="radio_group_01">
+		<property name="dd_class" value="dd_radio_group"/>
+		<property name="dd_parent" value="group_box_01"/>
+		<property name="bottom_spacing" value="0"/>
+		<property name="col" value="1"/>
+		<property name="col_spacing" value="5"/>
+		<property name="default_col_alignment" value="left"/>
+		<property name="default_row_alignment" value="top"/>
+		<property name="left_spacing" value="0"/>
+		<property name="right_spacing" value="0"/>
+		<property name="row" value="1"/>
+		<property name="row_spacing" value="5"/>
+		<property name="top_spacing" value="0"/>
+		<property name="ncols" value="4"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="rowcol_02">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="group_box_01"/>
+		<property name="bottom_spacing" value="0"/>
+		<property name="col" value="1"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="0"/>
+		<property name="right_spacing" value="0"/>
+		<property name="row" value="2"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="nested"/>
+		<property name="top_spacing" value="0"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="radio_item_01">
+		<property name="dd_class" value="radio_item"/>
+		<property name="dd_parent" value="radio_group_01"/>
+		<property name="col" value="1"/>
+		<property name="label" value="One"/>
+		<property name="row" value="1"/>
+	</widget>
+
+	<widget name="radio_item_02">
+		<property name="dd_class" value="radio_item"/>
+		<property name="dd_parent" value="radio_group_01"/>
+		<property name="col" value="2"/>
+		<property name="label" value="Two"/>
+		<property name="row" value="1"/>
+	</widget>
+
+	<widget name="image_toggle_item_01">
+		<property name="dd_class" value="image_toggle_item"/>
+		<property name="dd_parent" value="radio_group_01"/>
+		<property name="change_selector" value="image_toggle_item_01()"/>
+		<property name="col" value="3"/>
+		<property name="col_alignment" value="left"/>
+		<property name="has_border?" value="False"/>
+		<property name="image_file_name" value="show_hide"/>
+		<property name="image_module_name" value="outlook_bar_plugin"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+	</widget>
+
+	<widget name="choice_1">
+		<property name="dd_class" value="text_choice_item"/>
+		<property name="dd_parent" value="radio_group_01"/>
+		<property name="change_selector" value="choice_1_changed()"/>
+		<property name="col" value="4"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+		<property name="strings" value="Win 1,Win 2"/>
+		<property name="values" value="win_1,win_2"/>
+		<property name="driven_ws" value="ws1"/>
+	</widget>
+
+	<widget name="ws1">
+		<property name="dd_class" value="dd_window_stack"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="col" value="1"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="row" value="1"/>
+		<property name="text_choice_item_driver" value="choice_1"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="2"/>
+	</widget>
+
+	<widget name="rowcol_03">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="ws1"/>
+		<property name="bottom_spacing" value="0"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="0"/>
+		<property name="right_spacing" value="0"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="nested"/>
+		<property name="top_spacing" value="0"/>
+		<property name="window_name" value="win_1"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="rowcol_04">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="ws1"/>
+		<property name="bottom_spacing" value="0"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="0"/>
+		<property name="right_spacing" value="0"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="nested"/>
+		<property name="top_spacing" value="0"/>
+		<property name="window_name" value="win_2"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="slider_item_01">
+		<property name="dd_class" value="slider_item"/>
+		<property name="dd_parent" value="rowcol_03"/>
+		<property name="col" value="1"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="max_value" value="100"/>
+		<property name="min_value" value="0"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+		<property name="value" value="35"/>
+	</widget>
+
+	<widget name="text_window_01">
+		<property name="dd_class" value="text_window"/>
+		<property name="dd_parent" value="rowcol_04"/>
+		<property name="col" value="1"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="cols" value="20"/>
+		<property name="editable?" value="True"/>
+		<property name="horizontal_scrollbar?" value="False"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="fill"/>
+		<property name="rows" value="7"/>
+		<property name="vertical_scrollbar?" value="True"/>
+	</widget>
+</dialog>

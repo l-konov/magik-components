@@ -1,0 +1,250 @@
+#% text_encoding = cp1252
+########################################################################
+##
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+##
+def_slotted_exemplar(:http_service_plugin,
+                      {
+			      {:connection,_unset},
+			      {:reply_headers,_unset}
+		      },
+		      {:plugin})
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.do_run(a_connection, params, path)
+	## Process data in headers and off input_stream and write
+	## results for me to output_stream. 
+	## 
+	# (06-17-2006 Brad Sileo): created.
+	_protect _locking _self
+		 _thisthread.set_name(:http_process + :|[| + path.lowercase.as_symbol() + :|]|)
+		.connection << a_connection
+		_self.setup_reply_headers(a_connection)
+		headers << _self.get_headers(a_connection.input)
+		_self.run(params,a_connection.input,a_connection.output,headers,path)
+	_protection
+		_if .connection _isnt _unset _andif
+		    .connection.output _isnt _unset 
+		_then
+			.connection.output.close()
+		_endif 
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method http_service_plugin.get_headers(inp)
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	headers << equality_hash_table.new()
+	_loop
+		line << inp.get_line()
+		_if line _is _unset _orif
+		    line.size = 0
+		_then
+			_leave 
+		_endif
+		headers[line.slice(1,line.index_of(%:)-1)] << line.slice_to_end(line.index_of(%:)+1)
+	_endloop
+	#debug print(headers)
+	>> headers
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method http_service_plugin.run(params, input_stream, output_stream, headers, path)
+	## Process data in headers and off input_stream and write
+	## results for me to output_stream
+	## 
+	## THIS backstop does nothing
+
+	# (06-17-2006 Brad Sileo): created.
+	
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.get_plugin_for_path(_optional some_path_elements)
+	## returns self, as this implementation does not support nested cheildren
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	>> _self 
+_endmethod
+$
+_pragma(classify_level=basic)
+_method http_service_plugin.send_error(code, string)
+	## Send an error as a response
+	## 
+	##
+
+	# (06-19-2006 Brad Sileo): created.
+	_self.send_result(code,string)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.send_headers()
+	## Send all headers setup in me
+	## 
+	##
+
+	# (06-19-2006 Brad Sileo): created.
+	_for name,value _over .reply_headers.fast_keys_and_elements()
+	_loop
+		.connection.output.put_ascii_chars(name + ": " + value + %return.write_string + %newline.write_string)
+	_endloop
+	.connection.output.put_ascii_chars(%newline.write_string)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.init(name,framework, _optional properties)
+	## 
+	## 
+	##
+
+	# (06-19-2006 Brad Sileo): created.
+	.reply_headers << equality_hash_table.new()
+	>> _super.init(name,framework,_scatter properties)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.setup_reply_headers()
+	## 
+	## 
+	##
+
+	# (06-19-2006 Brad Sileo): created.
+	.reply_headers.empty()
+	_self.add_reply_header("Server","MCLIB HTTP 0.9")
+	_self.add_reply_header("Date",date_time_now().write_string)
+	>> .reply_headers
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.add_reply_header(name,value)
+	## Adds the prescribed header to me.
+	## 
+	##
+
+	# (08-17-2006 Brad Sileo): created.
+	.reply_headers[name] << value
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.send_result(code,string)
+	## 
+	## 
+	##
+
+	# (06-19-2006 Brad Sileo): created.
+	res << simple_xml_thing.new("html",
+				    rope.new_with(
+					    simple_xml_thing.new("head",
+								 rope.new_with(
+									 simple_xml_thing.new("title",
+											      write_string(code," ",string)
+											  )
+								      )
+							     ),
+					    simple_xml_thing.new("body",
+								 rope.new_with(
+									 simple_xml_thing.new("h1",
+											      write_string(code," ",string)
+											  ) 
+								      )
+							     )
+					 )
+				)
+									       
+	xs << xml_output_stream.new(text_to_binary_stream.new(.connection.output))
+	simple_xml.write_element(xs,res)
+	xs.close()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.mclib_df!children(_optional a_context)
+	## Returns the children for me, basedon my defined parameters
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	res << _super.mclib_df!children(a_context)
+	_for a_key, a_param _over _self.defined_parameters.fast_keys_and_elements()
+	_loop
+		res.add_last(dt << display_tree.new(a_key, a_param))
+		dt.styled_string << _self.mclib_df!parameter_styled_string(a_key,a_param)
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.mclib_df!parameter_styled_string(a_key, a_param)
+	## 
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> styled_string.new(:image,{:properties,:ui_resources},
+			     a_key.write_string,":",a_param[:name])
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.defined_parameters
+	## The set of parameters I understand
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> property_list.new()
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_service_plugin.mclib_df!styled_string()
+	## 
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> styled_string.new(_self.name.write_string)
+_endmethod
+$

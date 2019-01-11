@@ -1,0 +1,35 @@
+_package sw
+$
+_global graphviz_hello_world <<
+_proc@graphviz_hello_world(output_format,output_filename,_optional filter_type)
+
+	## Usage:
+	##
+	## graphviz_hello_world(:png,"c:\temp\graphviz_hello_world.png",:dot)
+	
+	_global dg
+
+	dg << dot_graph.new("HelloWorld")
+
+	dg.create_edge({"Hello","World"})
+	dg.create_edge({"Hello","Alfred"})
+	dg.create_edge({"Hello","Graham"})
+
+	_local a_node << dg.create_node("Hello")
+	a_node.set_attribute(:tooltip,'"This is the start"')
+	
+	
+	_local sg << dg.create_subgraph("cluster0")
+	sg.set_attribute(:style,"filled")
+	sg.set_attribute(:label,'"Cafe Sole"')
+	sg.set_attribute(:color,"red")
+	
+	a_node << sg.create_node("node")
+	a_node.set_attribute(:style,"filled")
+	a_node.set_attribute(:color,"white")
+	
+	sg.create_edge({"Graham","Alfred"})
+
+	graphviz_filter.run(filter_type.default(:dot),dg,output_format,output_filename)
+_endproc
+$

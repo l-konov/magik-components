@@ -1,0 +1,267 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## TEXT_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+text_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :value,:string,
+					  :activate_selector,:string,
+					  :change_selector,:string,
+					  :display_length,:integer,
+					  :incremental_change_selector,:string),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over text_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+text_item.define_shared_variable(:int!font_length, _unset, :public)
+$
+text_item.define_shared_variable(:int!font_height, _unset, :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.font_length
+	##
+	## Cache the font length and return it when needed.
+	## 
+	
+	_if _self.int!font_length _is _unset
+	_then
+		vts << vtext_style.new(_self.font)
+		_self.int!font_length << (vts.box_coordinates("X").bounds.width*0.7).rounded
+	_endif
+	
+	_return _self.int!font_length
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.font_height
+	##
+	## Cache the font height and return it when needed.
+	## 
+
+	_if _self.int!font_height _is _unset
+	_then
+		vts << vtext_style.new(_self.font)
+		_self.int!font_height << (vts.box_coordinates("X").bounds.height*0.8).rounded
+	_endif
+
+	_return _self.int!font_height
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.default_min_width
+	##
+	## Return the minimum default rendering width.
+
+	val << _self.message_from_keyed_message(_self.value)
+
+	field_length << _self.display_length.default(10)
+	display_length << _self.font_length * field_length
+	_return display_length + _self.label_width
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.default_min_height
+	##
+	## Return the minimum default rendering height.
+
+	_return MAX (15,_self.font_height)
+_endmethod
+$
+
+label_item.define_shared_variable(:int!font_length, _unset, :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.font_length
+	## Cache and return the font length as needed.
+
+	_if _self.int!font_length _is _unset
+	_then
+		vts << vtext_style.new(_self.font)
+		_self.int!font_length << (vts.box_coordinates("X").bounds.width*0.7).rounded
+	_endif
+
+	_return _self.int!font_length
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method label_item.default_min_width
+	##
+	## Return the minimum default rendering width.
+
+	val << _self.message_from_keyed_message(_self.value)
+	field_length << val.size
+	_return _self.font_length * field_length
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.id_changed()
+	## 
+	## Update .value when ID changes.
+	
+	n << _self.get_property(:dialog_element_id).write_string.split_by(%_).last.as_number()
+	.value << write_string("Text ",n)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	rec << _self.new(rc,_unset,
+			 :row,row,:col,col,
+			 :col_alignment,:fill,
+			 :display_length,10,
+			 :row_alignment,:top )
+	id << _self.get_property(:dialog_element_id).write_string.split_by(%_).last
+	rec.value << write_string("text ",id )
+	>> rec
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+
+	>> _self.new(parent,props[:label],_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	!dialog_element_footprints![pbb.deep_copy()] << _self
+
+	# Adjust when there's label 
+	lab_w << _self.label_width
+	pbb.xmin +<< lab_w
+	w -<< lab_w
+	
+	fs << fill_style.new_solid(colour.called(:white))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+	
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+	canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+	canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+	canv.draw_segment(ls,x0,y0,x0+w,y0)
+	canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+	ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+	canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+	canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	val << _self.message_from_keyed_message(_self.value)
+	canv.draw_text(ts,pbb.xmin+2,pbb.ymax-4,val)
+
+	lab << _self.message_from_keyed_message(_self.label)
+	canv.draw_text(ts,pbb.xmin+2-lab_w,pbb.ymax-4,lab)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id,
+		  "] << text_item.new(",parent_id,%,,"_unset,:model,_self")
+
+	_for n,v _over _self.valid_properties()
+	_loop		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, _self.message(",km[1],%))
+		_else
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, ",%",km[2],%")
+		_endif
+	_endif 
+		
+	txt.write(" )",%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+text_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_item.set_logical_properties(_optional all?)
+	##
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_if all?.default(_false)
+	_then
+		_self.activate_selector << _self.dialog_element_id + "_entered()"
+		_self.change_selector << _self.dialog_element_id + "_changed()"
+		_self.incremental_change_selector << _self.dialog_element_id + "_inc_change()"
+	_endif
+
+_endmethod
+$
+

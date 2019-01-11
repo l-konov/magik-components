@@ -1,0 +1,43 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+##
+## mss_user_editor_field_lister
+##
+## Subclass of object_editor_field_lister for use with the
+## mss_user_object_editor class.
+##
+
+def_slotted_exemplar(:mss_user_editor_field_lister,
+{},
+{:object_editor_field_lister})
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_field_lister.post_init_plugins()
+	##
+	## Do final initialisation of this plugin according to
+	## properties set from XML.
+	##
+
+	column_names << _self.column_names.split_by(%,).map( _proc(x) >> x.as_symbol() _endproc)
+	
+	# Add 1 for column headers
+	tree_item_properties << property_list.new_with( :height_in_chars, _self.rows + 1 )
+
+	_self.field_lister << mss_user_editor_field_item_lister.new( :field_lister, _self,
+								     :ace,          _self.editor.ace,
+								     :column_names, column_names,
+								     :tree_item_properties, tree_item_properties )
+	
+	_self.item_holder << field_item_holder.new( {} )
+	
+_endmethod
+$

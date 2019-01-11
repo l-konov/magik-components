@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  config.xml for the MSS Demo SWAF Application  -->
+<config base="cam_db_swaf_professional_application.config">
+    
+  <plugins>
+    <plugin name="maps" class_name="map_manager">
+      <interaction_modes>
+	<mode name="select"/>
+	<mode name="geometry"/>
+	<mode name="zoom_in"/>
+	<mode name="zoom_out"/>
+	<mode name="pan"/>
+	<mode name="mss_ptrule_manager.mss_ptrule"/>
+	<cycle_sequence modes="select, geometry"/>
+      </interaction_modes>
+      <special_actions ace_name="Electricity">
+	<action source="application" name="scrapbook.activate_scrapbook_dialog"/>
+	<action name="map_clear_selection"/>
+      </special_actions>
+      <special_actions ace_name="Substation Internals">
+	<action source="application" name="document_manager.activate_document_list"/>
+	<action name="detail_view"/>
+      </special_actions>
+      <keyboard_interaction>
+	<key id="delete_key" action="delete_selection_with_confirmation"/>
+      </keyboard_interaction>
+    </plugin>
+    
+    <plugin name="panes" class_name="pane_manager">
+      <properties>
+	<!-- list of role names which, when assigned to elements of the gui, 
+             will put them under the control of the pane_manager -->
+	<property name="role_names" value="object_control, editor_manager, themes, mss_ptrule_gui, viewers"/>
+      </properties> 
+    </plugin>
+
+    <plugin name="editor_manager" class_name="editor_manager" >
+      <properties>
+	<property name="configuration_file_name" value="cam_db_swaf_mss_demo.collection_config"/>
+	<property name="editor_config_definition_module_name" value="cam_db_swaf_mss_demo"/>
+	<property name="editor_config_definition_file_name" value="editor_config.xml"/>
+	<property name="editor_gui_definition_module_name" value="cam_db_swaf_mss_demo"/>
+	<property name="editor_gui_definition_file_name" value="editor_gui.xml"/>
+        <property name="default_editor_class" value="mss_user_object_editor"/>
+      </properties>
+    </plugin>
+
+    <plugin name="options" class_name="options_plugin">
+      <panels>
+        <panel name="maps.view_defaults"/>
+        <panel name="maps.view_interaction"/>
+        <panel name="maps.grid_and_snaps"/>
+        <panel name="maps.topology"/>
+        <panel name="maps.trail"/>
+        <panel name="constructions.constructions"/>
+        <panel name="drafting.drafting"/> 
+        <panel name="dimensioning.dimension"/>
+        <panel name="object_control.object_control"/>
+        <panel name="maps.geometry_calculations"/>
+        <panel name="versions.version_management"/>
+        <panel name="versions.datasets_status"/>
+        <panel name="plotting.layout"/> 
+        <panel name="mss_map_trail_addon.main_options"/> 
+      </panels>
+    </plugin>
+
+    <plugin name="plotting" class_name="layout_plugin">
+      <properties>
+        <property name="preview_config_definition_file_name" value="publish_config.xml"/>
+        <property name="preview_gui_definition_file_name" value="publish_gui.xml"/>
+      </properties>
+    </plugin>
+
+    <plugin name="mss_map_trail_addon" class_name="mss_map_trail_addon_plugin"/>
+    <plugin name="mss_ptrule_construction_manager" class_name="mss_ptrule_construction_manager"/>
+    <plugin name="mss_ptrule_manager" class_name="mss_ptrule_manager">
+      <properties>
+        <property name="enable_cus?" value="true"/>
+      </properties>
+    </plugin>
+    <plugin name="mss_ptrule_gui" class_name="mss_ptrule_framework_plugin">
+      <properties>
+        <property name="config_definition_file_name" value="config.xml"/>
+        <property name="config_definition_module_name" value="mss_ptrule_plugin"/>
+        <property name="gui_definition_file_name" value="gui.xml"/>
+        <property name="gui_definition_module_name" value="mss_ptrule_plugin"/>
+        <property name="root_ptdef_folder" value="cambridge_demo"/>
+      </properties>
+    </plugin>
+    <plugin name="mss_ptdef_config" class_name="mss_ptdef_config_framework_plugin"/>
+
+    <plugin name="mss_workspace_manager_plugin" class_name="mss_workspace_manager_plugin"/>
+    <plugin name="mss_wm_recent_designs_plugin" class_name="mss_wm_recent_designs_plugin">
+      <properties>
+        <property name="max_to_display" value="4"/>
+      </properties>
+    </plugin>
+    <plugin name="mss_wm_job_design_plugin" class_name="mss_wm_job_design_plugin"/>
+    <plugin name="mss_wm_state_transition_plugin" class_name="mss_wm_state_transition_plugin"/>
+
+    <plugin name="mss_cu_config_fw_pi" class_name="mss_cu_config_fw_pi"/>
+    <plugin name="mss_cu_report_fw_pi" class_name="mss_cu_report_fw_pi"/>
+
+    <plugin name="mss_scheduler_processor_fw_pi" class_name="mss_scheduler_processor_fw_pi"/>
+
+    <plugin name="mss_bulk_update_fw_pi" class_name="mss_bulk_update_fw_pi">
+      <properties>
+        <property name="config_definition_file_name" value="config.xml"/>
+        <property name="config_definition_module_name" value="mss_bulk_update"/>
+        <property name="gui_definition_file_name" value="gui.xml"/>
+        <property name="gui_definition_module_name" value="mss_bulk_update"/>
+      </properties>
+    </plugin>
+
+    <plugin name="mss_qa_processor_fw_pi" class_name="mss_qa_processor_fw_pi">
+      <properties>
+        <property name="config_definition_module_name" value="cam_mss_qa"/>
+      </properties>
+    </plugin>
+  </plugins>
+
+    <plugin name="mss_http_server_fw_pi" class_name="mss_http_server_fw_pi">
+      <properties>
+        <property name="config_definition_file_name" value="workspace_and_examples_config.xml"/>
+        <property name="config_definition_module_name" value="mss_ws_http_services"/>
+      </properties>
+    </plugin>
+</config>

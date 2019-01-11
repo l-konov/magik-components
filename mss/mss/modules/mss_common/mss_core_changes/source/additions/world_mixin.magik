@@ -1,0 +1,31 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2011 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method world_mixin.vmds_dataset_worlds
+	## 
+	## The set of dataset worlds making up _self, which are from a
+	## VMDS dataset.
+	##
+
+	# 2011/04/25 TM  Created.
+	
+	retval << rwo_set.new()
+	_for i _over _self.dataset_worlds.fast_elements()
+	_loop
+		_if i.is_a_datastore_object? _andif
+		    i.is_valid?
+		_then
+			retval.add(i)
+		_endif
+	_endloop
+	_return retval
+	      
+_endmethod
+$

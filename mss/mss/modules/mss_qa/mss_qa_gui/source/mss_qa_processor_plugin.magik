@@ -1,0 +1,1278 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_qa})
+##
+## mss_qa_processor_plugin
+##
+## Plugin for providing results reviewer GUI for
+## mss_qa_processor_framework.
+##
+
+def_slotted_exemplar(:mss_qa_processor_plugin,
+{
+	{:items, _unset, :readable},
+	{:sorter, _unset, :readable}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+mss_qa_processor_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+mss_qa_processor_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:raw_errors},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+mss_qa_processor_plugin.define_shared_constant(
+	:maximum_errors_to_report,
+	## The absolute maximum number of errors to report.
+
+	# N.B.: 8000 currently chosen, as performance of
+	# sorted_collections starts to fail badly at that limit.
+	
+	8000,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+mss_qa_processor_plugin.define_shared_constant(
+	:result_list_records_per_page,
+	## Number of records to display per page in the result list.
+	1000,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+mss_qa_processor_plugin.define_shared_constant(
+	:result_list_column_widths,
+	## Column widths to use for result list.
+	{100, 75, 75, 350, 60},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+_method mss_qa_processor_plugin.result_list_column_headings
+	## 
+	## Column headings to use for result list.
+	## 
+
+	_return {_self.message(:rch_table_name),
+		 _self.message(:rch_x_coordinate),
+		 _self.message(:rch_y_coordinate),
+		 _self.message(:rch_description),
+		 _self.message(:rch_auto_fix_available)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+_method mss_qa_processor_plugin.result_list_styled_string(disp_tree)
+	##
+	## The styled_string to use for displaying data in the result list.
+	##
+
+	v << disp_tree.value
+	sev << v[:severity]
+	_if v[:auto_fix_status] _is :ok
+	_then
+		c << :lightgreen
+	_elif sev _is :information
+	_then
+		c << :black
+	_elif sev _is :warning
+	_then
+		c << :orange
+	_else
+		c << :red
+	_endif 
+	_return styled_string.new(c, :value, :table_name, :tab,
+				  :value, :x_coordinate_string, :tab,
+				  :value, :y_coordinate_string, :tab,
+				  :value, :description, :tab,
+				  :value, :auto_fix_available)
+	
+_endmethod 
+$
+
+_pragma(classify_level=advanced, topic={mss_qa}, usage={redefinable})
+_method mss_qa_processor_plugin.set_result_list_coordinate(pl, cond)
+	##
+	## Set the coordinate parameters :x_coordinate and :y_coordinate
+	## in property list PL, based on the QA error condition COND.
+	##
+
+	loc_coord << _unset
+	loc_geom << pl[:locating_geometry]
+	rec << pl[:record]
+	_if loc_geom _isnt _unset
+	_then
+		loc_coord << loc_geom.bounds.centre
+	_elif rec _isnt _unset _andif
+	      rec.responds_to?(:bounds) _andif
+	      (bb << rec.bounds) _isnt _unset
+	_then
+		loc_coord << bb.centre
+	_endif
+
+	_if loc_coord _is _unset
+	_then
+		_return
+	_endif
+
+	_if (mm << _self.map_manager) _is _unset _orif
+	    (mv << mm.current_map_view) _is _unset _orif
+	    (disp_cs << mv.current_display_coordinate_system) _is _unset _orif
+	    (disp_fmt << mv.get_coordinate_display_format()) _is _unset 
+	_then
+		loc_x << loc_coord.x
+		loc_y << loc_coord.y
+		pl[:x_coordinate] << loc_x
+		pl[:y_coordinate] << loc_y
+		pl[:x_coordinate_string] << loc_x.rounded.write_string
+		pl[:y_coordinate_string] << loc_y.rounded.write_string
+		pl[:x_coordinate_excel] << loc_x
+		pl[:y_coordinate_excel] << loc_y
+	_else 
+		disp_cs << mm.current_map_view.current_display_coordinate_system
+		disp_fmt << mm.current_map_view.get_coordinate_display_format()
+		cs_unit << disp_fmt.unit
+		_if disp_cs.unit_name _isnt cs_unit.name
+		_then
+			disp_cs << coordinate_system.new_from(disp_cs, cs_unit.name)
+		_endif 
+		pp << pseudo_point.new_for_world(loc_coord, mv.world)
+		_block
+			_dynamic !current_coordinate_system!
+			!current_coordinate_system! << disp_cs
+			loc_coord << pp.as_coord()
+		_endblock
+		
+		loc_x << loc_coord.x
+		loc_y << loc_coord.y
+		unit_x << disp_fmt.unit.new_value_no_checks(loc_x)
+		unit_y << disp_fmt.unit.new_value_no_checks(loc_y)
+		pl[:x_coordinate] << loc_x
+		pl[:y_coordinate] << loc_y
+		pl[:x_coordinate_string] << disp_fmt.format(unit_x, _true)
+		pl[:y_coordinate_string] << disp_fmt.format(unit_y, _true)
+		_if cs_unit.is_dimensionality?(:angle) _is _true
+		_then
+			pl[:x_coordinate_excel] << pl[:x_coordinate_string]
+			pl[:y_coordinate_excel] << pl[:y_coordinate_string]
+		_else
+			pl[:x_coordinate_excel] << loc_x
+			pl[:y_coordinate_excel] << loc_y
+		_endif 
+	_endif
+	
+	_return loc_coord
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa}, usage={redefinable})
+_method mss_qa_processor_plugin.set_result_list_attributes(pl, cond)
+	##
+	## Set the attributes for displaying the QA result for
+	## the QA condition COND.  PL is the property list in which
+	## to store the attributes. 
+	##
+	## This may be redefined, in conjunction with result_list_styled_string(),
+	## result_list_column_widths, and result_list_column_headings.
+	##
+
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+mss_qa_processor_plugin.define_shared_constant(
+	:excel_field_formats,
+	## For each column in the Excel report, this is a property list
+	## of Excel properties to be set for that column.
+	property_list.new_with(
+		:table_name, property_list.new_with(:columnwidth, 20.0, :numberformat, "@"),
+		:x_coordinate_excel, property_list.new_with(:columnwidth, 12.0, :numberformat, "0.00"),
+		:y_coordinate_excel, property_list.new_with(:columnwidth, 12.0, :numberformat, "0.00"),
+		:description, property_list.new_with(:columnwidth, 65.0, :numberformat, "@")
+		      ),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_qa}, usage={redefinable})
+_method mss_qa_processor_plugin.excel_pagesetup_formats
+	##
+	## Hash table of Excel properties for page setup.
+	##
+
+	_local ht << hash_table.new()
+	ht[:printgridlines] << _true 
+	ht[:leftmargin] << 27
+	ht[:rightmargin] << 27
+	ht[:topmargin] << 54
+	ht[:bottommargin] << 36
+	ht[:headermargin] << 18
+	ht[:footermargin] << 18
+	ht[:orientation] << 2
+	ht[:centerhorizontally] << _true
+	ht[:fittopageswide] << 1
+	ht[:fittopagestall] << _false
+	ht[:zoom] << _false
+
+	ht[:printtitlerows] << "$1:$1"
+	
+	ht[:centerheader] << "&F"
+	
+	# Note: want footer to reflect the date that the report was
+	# created, not when it was printed - so, store the date value
+	# explicitly, rather than using an Excel function.
+	ht[:leftfooter] << date.now().write_string
+	ht[:centerfooter] << "Page &P of &N"
+	ht[:rightfooter] << "&A"
+
+	_return ht
+	
+_endmethod 
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	_local sev_lkp << property_list.new_with(:error, -2,
+						 :warning, -1)
+	sort_proc <<
+		_proc(a, b)
+			_import sev_lkp
+			_if (x << sev_lkp[a.value[:severity]].default(0) _cf
+				  sev_lkp[b.value[:severity]].default(0)) _isnt _maybe
+			_then
+				_return x
+			_endif 
+			_if (x << a.value[:table_name] _cf b.value[:table_name]) _isnt _maybe
+			_then
+				_return x
+			_endif
+			_return a.value[:description] _cf b.value[:description]
+		_endproc
+
+	# TODO: the sorter should be a class that better handles very
+	# large collections.  Until then, the maximum number of errors
+	# reported is limited by maximum_errors_to_report, since a
+	# sorted_collection is unsuitable for volumes greater than that.
+	.sorter << sorted_collection.new(10, sort_proc)
+
+	_self.set_option(:result_list_page_for_display, 1)
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_processor_plugin.full_result_list
+	## 
+	## The full list of display tree that represent all errors
+	## found.
+	##
+
+	_return .sorter
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_processor_plugin.result_list_for_display
+	## 
+	## The subset of the full result list that is currently being
+	## displayed. 
+	##
+
+	res_list << _self.full_result_list
+	res_list_size << res_list.size
+	
+	rpt_page_number << _self.get_option(:result_list_page_for_display).default(1)
+	recs_per_page << _self.result_list_records_per_page
+	d1 << ((rpt_page_number - 1) * recs_per_page + 1).max(1).min(res_list_size + 1)
+	d2 << (rpt_page_number * recs_per_page).min(res_list_size).max(0)
+
+	_if d2 < d1 _then _return {} _endif 
+	_return res_list.slice(d1, d2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:goto_object,
+				       :short_help_text, _self.message(:goto_object_sh),
+				       :image, {:goto_object, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|goto_object()|))
+	_self.add_action(sw_action.new(:highlight_object,
+				       :short_help_text, _self.message(:highlight_object_sh),
+				       :image, {:highlight_object, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|highlight_object()|))
+	_self.add_action(sw_action.new(:select_object,
+				       :short_help_text, _self.message(:select_object_sh),
+				       :image, {:select_geometry, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|select_object()|))
+	_self.add_action(sw_action.new(:edit_object,
+				       :short_help_text, _self.message(:edit_object_sh),
+				       :image, {:edit_object, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|edit_object()|))
+	_self.add_action(sw_action.new(:copy_to_scrapbook,
+				       :short_help_text, _self.message(:copy_to_scrapbook_sh),
+				       :image, {:copy, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|copy_to_scrapbook()|))
+	_self.add_action(sw_action.new(:auto_fix,
+				       :short_help_text, _self.message(:auto_fix_sh),
+				       :image, {:update_record, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|auto_fix()|))
+	_self.add_action(sw_action.new(:export_to_excel,
+				       :image, {:export_to_excel, :explorer_plugin},
+				       :engine, _self,
+				       :action_message, :|export_to_excel()|))
+
+	_self.add_action(sw_action.new(:display_first_result_page,
+				       :short_help_text, _self.message(:display_first_result_page_sh),
+				       :engine, _self,
+				       :image, {:first, :ui_resources},
+				       :action_message, :|display_first_result_page()|))
+	_self.add_action(sw_action.new(:display_prev_result_page,
+				       :short_help_text, _self.message(:display_prev_result_page_sh),
+				       :engine, _self,
+				       :image, {:previous_one, :ui_resources},
+				       :action_message, :|display_prev_result_page()|))
+	_self.add_action(sw_action.new(:display_next_result_page,
+				       :short_help_text, _self.message(:display_next_result_page_sh),
+				       :engine, _self,
+				       :image, {:next_one, :ui_resources},
+				       :action_message, :|display_next_result_page()|))
+	_self.add_action(sw_action.new(:display_last_result_page,
+				       :short_help_text, _self.message(:display_last_result_page_sh),
+				       :engine, _self,
+				       :image, {:last, :ui_resources},
+				       :action_message, :|display_last_result_page()|))
+	
+	_self.manage_prev_next_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.build_gui(container)
+	## 
+	## 
+
+	.items << property_list.new()
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label)
+	
+	p.start_row()
+	widths << _self.result_list_column_widths.copy()
+	total_w << 20
+	_for i _over widths.fast_elements()
+	_loop
+		total_w +<< i
+	_endloop
+	.items[:result_list] << ti << 
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :result_list,
+			      :data_selector, :result_list_for_display,
+			      :select_notifier, :|manage_actions_for_selection()|,
+			      :double_click_notifier, {:|perform_safely()|, :|goto_object()|},
+			      :height_in_chars, 10,
+			      :width, total_w,
+			      :column_widths, widths,
+			      :column_headings, _self.result_list_column_headings.copy(),
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :processor_result_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_processor_plugin.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.editor_manager
+	## 
+	## Return self's editor_manager component.
+	##
+
+	_if (app << _self.application) _is _unset _then _return _endif 
+	_return app.get_service_provider(:editor_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.map_manager
+	## 
+	## Return self's map_manager component.
+	##
+
+	_if (app << _self.application) _is _unset _then _return _endif 
+	_return app.get_service_provider(:map_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.selected_record
+	## 
+	## Return the record selected in the result_list, along with
+	## its display tree.
+	##
+
+	_if (ti << .items[:result_list]) _isnt _unset _andif
+	    (all_sel << ti.selection).size = 1
+	_then
+		sel << all_sel.an_element()
+		rec << sel.value[:record]
+		_if rec _isnt _unset _andif
+		    _not rec.is_valid?
+		_then
+			rec << _unset
+		_endif
+		_return rec, sel
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.any_selected_records?
+	##
+	## Return true if any records are selected.
+	##
+
+	_if (ti << .items[:result_list]) _isnt _unset _andif
+	    (all_sel << ti.selection).size > 0
+	_then
+		_return _true 
+	_endif 
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.all_selected_records
+	## 
+	## Return an rwo_set of all records selected in the result list.
+	##
+
+	s << rwo_set.new()
+	_for i _over _self.selected_records()
+	_loop
+		_if i _isnt _unset
+		_then
+			s.add(i)
+		_endif
+	_endloop
+	_return s
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_iter _method mss_qa_processor_plugin.selected_records()
+	## 
+	## 
+
+	_if (ti << .items[:result_list]) _isnt _unset
+	_then
+		_for sel _over ti.selection.fast_elements()
+		_loop
+			rec << sel.value[:record]
+			_if rec _isnt _unset _andif
+			    _not rec.is_valid?
+			_then
+				rec << _unset
+			_endif
+			_loopbody (rec, sel)
+		_endloop
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.manage_actions_for_selection()
+	## 
+	## 
+
+	sel << _self.selected_record
+	any_sel? << _self.any_selected_records?
+	
+	_self.action(:goto_object).enabled? << any_sel?
+	_self.action(:highlight_object).enabled? << any_sel?
+	_self.action(:select_object).enabled? << any_sel?
+	_self.action(:edit_object).enabled? << sel _isnt _unset 
+	_self.action(:copy_to_scrapbook).enabled? << any_sel?
+	_self.action(:auto_fix).enabled? << any_sel?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.manage_prev_next_actions()
+	## 
+	## 
+
+	rpt_page_number << _self.get_option(:result_list_page_for_display).default(1)
+	recs_per_page << _self.result_list_records_per_page
+
+	# D1 and D2 are the index of the first/last records that can
+	# be displayed on the current page.  S1 is the total number of
+	# records that can be displayed.  If D1 is <= 1 (at the start of
+	# the list), can't page back; if D2 is >= S1, can't page forward.
+	d1 << (rpt_page_number - 1) * recs_per_page + 1
+	d2 << rpt_page_number * recs_per_page
+	s1 << _self.full_result_list.size
+
+	_self.action(:display_first_result_page).enabled? << d1 > 1
+	_self.action(:display_prev_result_page).enabled? << d1 > 1
+	_self.action(:display_next_result_page).enabled? << d2 < s1
+	_self.action(:display_last_result_page).enabled? << d2 < s1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## If a raw_errors notification is received, update the errors
+	## displayed here.
+	##
+
+	_if data_type_name _is :raw_errors
+	_then
+		_self.update_from_raw_errors(data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_processor_plugin.update_from_raw_errors(data)
+	## 
+	## Use the raw errors in DATA (an equality_hash_table where
+	## each key is a record and each value is a rope of error
+	## conditions) to update the data displayed in the result_list.
+	##
+
+	_protect 
+		_self.status_string << _self.message(:updating_result_list)
+		
+		.sorter.empty()
+		_self.changed(:result_list, :renew)
+		_self.set_option(:result_list_page_for_display, 1)
+		_self.manage_prev_next_actions()
+		
+		rec_count << 0
+		max_count << _self.maximum_errors_to_report
+		_for error_rope _over data.fast_elements()
+		_loop @outer
+			_for cond _over error_rope.fast_elements()
+			_loop
+				record << cond[:record]
+				_if record _is _unset _orif
+				    _not record.is_valid?
+				_then
+					table_name << ""
+				_else
+					table_name << record.source_collection.external_name
+				_endif
+				_if (afd << cond[:auto_fix_data]) _isnt _unset
+				_then
+					afs << :pending
+					afa << _self.message(:auto_fix_pending)
+				_else
+					afs << _unset 
+					afa << ""
+				_endif 
+				pl << property_list.new_with(
+					      :condition, cond,
+					      :table_name, table_name,
+					      :description, cond[:string].default(""),
+					      :auto_fix_available, afa,
+					      :auto_fix_status, afs,
+					      :record, record,
+					      :severity, cond[:severity].default(:error),
+					      :error_code, cond[:error_code],
+					      :error_sub_code, cond[:error_sub_code],
+					      :locating_geometry, cond[:locating_geometry],
+					      :auto_fix_data, afd)
+				_self.set_result_list_coordinate(pl, cond)
+				_self.set_result_list_attributes(pl, cond)
+
+				rec_count +<< 1
+				_if rec_count > max_count
+				_then
+					condition.raise(:warning, :string,
+							_self.message(:maximum_error_count_exceeded, max_count))
+					_leave @outer
+				_endif
+
+				_if rec_count _mod 100 = 0
+				_then
+					_self.status_string << _self.message(:updating_result_list_progress, rec_count)
+				_endif
+				
+				dt << display_tree.new(rec_count, pl)
+				dt.styled_string << _self.result_list_styled_string(dt)
+				.sorter.add(dt)
+			_endloop
+		_endloop
+	_protection 
+		_self.changed(:result_list, :renew)
+		_self.status_string << ""
+		_self.manage_prev_next_actions()
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.ensure_selected_record()
+	##
+	## Ensure that a record has been selected.
+	##
+
+	(sel_rec, sel_ti) << _self.selected_record
+	_if sel_rec _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selected_record))
+	_endif
+	_return sel_rec, sel_ti
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.display_first_result_page()
+	## 
+	## Display the first page of results.
+	##
+
+	rpt_page_number << 1
+	max_page_number << (((_self.full_result_list.size - 1) _div _self.result_list_records_per_page) + 1).max(1)
+
+	_self.set_option(:result_list_page_for_display, rpt_page_number)
+	_self.manage_prev_next_actions()
+	_self.changed(:result_list, :renew)
+	_self.status_string << _self.message(:displaying_page, rpt_page_number, max_page_number)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.display_prev_result_page()
+	## 
+	## Display the previous page of results.
+	##
+
+	rpt_page_number << _self.get_option(:result_list_page_for_display).default(1)
+	min_page_number << 1
+	max_page_number << (((_self.full_result_list.size - 1) _div _self.result_list_records_per_page) + 1).max(1)
+	rpt_page_number << (rpt_page_number - 1).max(min_page_number)
+	
+	_self.set_option(:result_list_page_for_display, rpt_page_number)
+	_self.manage_prev_next_actions()
+	_self.changed(:result_list, :renew)
+	_self.status_string << _self.message(:displaying_page, rpt_page_number, max_page_number)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.display_next_result_page()
+	## 
+	## Display the next page of results.
+	##
+
+	rpt_page_number << _self.get_option(:result_list_page_for_display).default(1)
+	max_page_number << (((_self.full_result_list.size - 1) _div _self.result_list_records_per_page) + 1).max(1)
+	rpt_page_number << (rpt_page_number + 1).min(max_page_number)
+	
+	_self.set_option(:result_list_page_for_display, rpt_page_number)
+	_self.manage_prev_next_actions()
+	_self.changed(:result_list, :renew)
+	_self.status_string << _self.message(:displaying_page, rpt_page_number, max_page_number)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.display_last_result_page()
+	## 
+	## Display the last page of results.
+	##
+
+	rpt_page_number << (((_self.full_result_list.size - 1) _div _self.result_list_records_per_page) + 1).max(1)
+	_self.set_option(:result_list_page_for_display, rpt_page_number)
+	_self.manage_prev_next_actions()
+	_self.changed(:result_list, :renew)
+	_self.status_string << _self.message(:displaying_page, rpt_page_number, rpt_page_number)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.goto_object()
+	## 
+	## Goto the objects currently selected in the result_list.
+	##
+
+	(rec, sel_ti) << _self.selected_record
+	_if rec _is _unset
+	_then
+		_return _self.goto_object_multiple()
+	_endif 
+
+	app << _self.application
+	sc_name << app.get_primary_spatial_context_name_for(rec)
+	goto_data << _unset
+	
+	_if (loc_geom << sel_ti.value[:locating_geometry]) _isnt _unset
+	_then
+		# Use whatever has been specified explicitly.
+		_if sc_name _isnt _unset
+		_then
+			# Do spatial context handling, to allow records in non-GIS worlds.
+			goto_data << app.mss_get_spatial_context_for_record_and_geometry(rec, sc_name, {loc_geom})
+		_endif
+		_if goto_data _is _unset
+		_then 
+			goto_data << rec
+		_endif
+	_else
+		# Just do a goto on the record itself.
+		_if sc_name _isnt _unset
+		_then
+			# Do spatial context handling, to allow records in non-GIS worlds.
+			goto_data << app.get_spatial_context_for_record(rec, sc_name)
+		_endif
+		_if goto_data _is _unset
+		_then 
+			goto_data << rec
+		_endif
+	_endif 
+	_self.application.databus.make_data_available(:goto_request, {goto_data}, _self)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.goto_object_multiple()
+	##
+	## Perform a goto operation for multiple selected records.
+	## When processing multiple records, simpler goto protocols are
+	## used and the locating_geometry is ignored.
+	##
+
+	# Determine a world to use.
+	amv << _self.application.databus.request_data(:active_map_view)
+	_if amv _isnt _unset
+	_then
+		w << amv.world
+	_endif
+
+	_if w _isnt _unset
+	_then
+		rset << _self.all_selected_records
+		gset << rset.geometry_set(w)
+	_else
+		gset << {}
+	_endif
+
+	_if gset.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_bounds_for_goto))
+	_endif 
+	_self.application.databus.make_data_available(:goto_request, {gset}, _self)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.highlight_object()
+	## 
+	## Highlight the objects currently selected in the result_list.
+	##
+
+	recs << _self.all_selected_records
+	_self.application.databus.make_data_available(:geometry_to_highlight, recs, _self)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.select_object()
+	## 
+	## Set the map selection to the objects currently selected in
+	## the result_list. 
+	##
+
+	# Determine a world to use.
+	amv << _self.application.databus.request_data(:active_map_view)
+	_if amv _isnt _unset
+	_then
+		w << amv.world
+	_endif
+
+	_if w _isnt _unset
+	_then
+		rset << _self.all_selected_records
+		gset << rset.geometry_set(w)
+		_self.application.databus.make_data_available(:set_map_selection, {_self, gset})
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.edit_object()
+	## 
+	## Edit the object currently selected in the result_list.
+	##
+
+	rec << _self.ensure_selected_record()
+	_self.editor_manager.edit_object(rec)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.copy_to_scrapbook()
+	## 
+	## Copy all selected records to the scrapbook.
+	##
+
+	rset << rwo_set.new()
+	_for rec _over _self.selected_records()
+	_loop
+		_if rec _is _unset _orif
+		_not rec.is_valid?
+		_then
+			_continue
+		_endif 
+		rset.add(rec)
+	_endloop
+
+	_if rset.size = 0
+	_then
+		# No valid records - could be caused by errors getting cleaned
+		# up.  Raise an error (but don't try to detect this when
+		# enabling/disabling actions as selections are made, because it
+		# is expensive to evaluate).
+		condition.raise(:user_error, :string, _self.message(:no_selected_records))
+	_endif
+
+	sb << gis_program_manager.scrapbook()
+	sb.set_clipboard(_self.message(:qa_scrapbook), {rset})
+	_self.status_string << _self.message(:copied_to_scrapbook, rset.size)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.auto_fix()
+	## 
+	## Perform auto-fix processing for all records selected in the
+	## result_list.
+	##
+
+	# Get all selected records that have a pending auto-fix status.
+	r << rope.new()
+	dbviews << equality_set.new()
+	_for rec, sel _over _self.selected_records()
+	_loop
+		_if sel.value[:auto_fix_status] _is :pending
+		_then
+			r.add_last(sel)
+			_if (afd << sel.value[:auto_fix_data]) _isnt _unset _andif
+			    (af_target << afd[:record]) _isnt _unset _andif
+			    af_target.is_valid?
+			_then
+				dbviews.add(af_target.source_view)
+			_endif
+		_endif
+	_endloop
+	_if r.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_auto_fix_pending_selected))
+	_endif
+	_if dbviews.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_auto_fix_datasets_selected))
+	_endif
+	
+	# There are a few different approaches to handling transactions
+	# for performing auto-fixes.  The approach chosen here is to
+	# put the whole bunch of them in a single transaction, and if a
+	# single auto-fix fails it would cause the entire transaction
+	# to be undone.  There is also merit in running each individual
+	# auto-fix in its own transaction (possibly with continuable
+	# error handling on each one, and wrapping the whole thing in a
+	# big outer transaction).
+
+	dsg << dataset_group.new(dbviews)
+	trans << custom_record_transaction.new(dsg, _self, :|int!auto_fix()|, {r},
+					       _self.message(:auto_fix_transaction))
+	_protect
+		ok? << _false
+		_self.status_string << _self.message(:performing_auto_fix)
+		retval << trans.run()
+		ok? << _true
+	_protection
+		_if ok? _isnt _true
+		_then
+			_self.status_string << _self.message(:failed)
+		_endif
+	_endprotect
+	
+	# Update display trees after transaction is done.
+	c1 << 0
+	c2 << 0
+	_for sel, af_stat _over retval.fast_keys_and_elements()
+	_loop
+		c1 +<< 1
+		_if af_stat _is :ok
+		_then
+			c2 +<< 1
+		_endif
+		
+		sel.value[:auto_fix_status] << af_stat
+		sel.value[:auto_fix_available] << _self.message(:auto_fix_ + af_stat)
+		sel.styled_string << _self.result_list_styled_string(sel)
+	_endloop
+	_self.changed(:result_list, :refresh)
+	_self.status_string << _self.message(:auto_fix_performed, c1, c2)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.int!auto_fix(disp_trees)
+	## 
+	## 
+
+	retval << equality_hash_table.new()
+	_for sel _over disp_trees.fast_elements()
+	_loop
+		_if (afd << sel.value[:auto_fix_data]) _isnt _unset _andif
+		    (af_target << afd[:record]) _isnt _unset _andif
+		    af_target.is_valid?
+		_then
+			meth << afd[:method]
+			rv2 << af_target.perform(meth, afd)
+			_if rv2 _is _true
+			_then
+				retval[sel] << :ok
+			_else
+				retval[sel] << :failed
+			_endif 
+		_endif
+	_endloop
+	
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.export_to_excel()
+	## 
+	## Perform the work of exporting the current results to an
+	## Excel spreadsheet.
+	## 
+	## 
+
+	_self.status_string << ""
+	vis_col_names << {:table_name,
+			  :x_coordinate_excel,
+			  :y_coordinate_excel,
+			  :description}
+	batch_size << 50
+	res_list << _self.full_result_list
+	res_list_size << res_list.size
+	
+	ok? << _false 
+	_protect
+		_self.status_string << _self.message(:exporting_to_excel)
+		_if _not (excel_appl << ole_client.openobject("Excel.application")).is_class_of?(ole_controller)
+		_then
+			_self.user_error(:cannot_start_excel)
+		_endif
+
+		_try _with cond
+			# Turn off screenupdating
+			excel_appl.screenupdating << _false
+		_when ole_server_error
+			# Excel was in a mode that it couldn't accept input
+			_self.user_error(:excel_could_not_get_access)
+		_endtry
+
+		wbs << excel_appl.workbooks()
+		wb << wbs.add()
+		sheet << excel_appl.sheets(1)
+		sheet.activate()
+		sheet.name << _self.message(:excel_sheet_name).truncate(20)
+
+		# Set some overall default column properties.
+		x1 << sheet.range(_self.int!excel_range_string_for("", 1, vis_col_names.size))
+		x1.horizontalalignment << 1
+		x1.wraptext << _false
+		x1.release_object()
+
+		# Set properties on specific columns.
+		_for i, vcn _over vis_col_names.fast_keys_and_elements()
+		_loop
+			_if (fmt_info << _self.excel_field_formats[vcn]) _is _unset
+			_then
+				_continue
+			_endif
+			x1 << sheet.range(_self.int!excel_range_string_for("", i, 1))
+			_for fmt_key, fmt_data _over fmt_info.fast_keys_and_elements()
+			_loop
+				x1.perform(fmt_key.with_chevron, fmt_data)
+			_endloop
+			x1.release_object()
+		_endloop 
+
+		next_row << _self.create_excel_title_information(sheet)
+		idx << 1
+		_loop
+			_if idx + batch_size >= res_list_size
+			_then
+				next_row << _self.send_batch_to_excel(res_list.slice(idx, res_list_size), sheet,
+								      next_row, vis_col_names)
+				_leave
+			_endif
+			next_row << _self.send_batch_to_excel(res_list.slice(idx, idx + batch_size - 1), sheet,
+							      next_row, vis_col_names)
+			idx +<< batch_size
+		_endloop 
+		
+		# Select the first cell.
+		x1 << sheet.range(_self.int!excel_range_string_for(1, 1, 1))
+		x1.select()
+		x1.release_object()
+
+		ok? << _true 
+	_protection
+		_if x1 _isnt _unset _then x1.release_object() _endif 
+		_if sheet _isnt _unset _then sheet.release_object() _endif 
+		_if wb _isnt _unset _then wb.release_object() _endif 
+		_if wbs _isnt _unset _then wbs.release_object() _endif
+		
+		_if excel_appl _isnt _unset 
+		_then
+			_try _with cond 
+				# Turn screenupdating on, forcing a redraw
+				excel_appl.screenupdating << _true
+
+				# Make Excel visible on the desktop
+				excel_appl.visible << _true
+			_when ole_server_error
+			_endtry
+
+			excel_appl.release_object()
+		_endif
+		_if ok?
+		_then
+			_self.status_string << ""
+		_else
+			_self.status_string << _self.message(:failed)
+		_endif
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.int!excel_range_string_for(start_row, start_col, width)
+	##
+	## Returns a suitable range for START_ROW, START_COL and
+	## WIDTH. 
+	##
+
+	# N.B.: copied from private method on collection_export_engine.
+	
+	_local range_stream << internal_text_output_stream.new()
+	_local start_col_letter1 << ((start_col-1) _div 26) + 64
+	_local start_col_letter2 << ((start_col-1) _mod  26) + 65
+	_local end_col<< (start_col+width-1).min(256)
+	_local end_col_letter1 << ((end_col-1) _div 26) + 64
+	_local end_col_letter2 << ((end_col-1) _mod  26) + 65
+
+	# Write start element
+	_if start_col_letter1 > 64 
+	_then
+		range_stream.write(start_col_letter1.as_character())
+	_endif
+	range_stream.write(start_col_letter2.as_character(),start_row)
+
+	# Write separator
+	range_stream.write(":")
+
+	# Write end element
+	_if end_col_letter1 > 64 
+	_then
+		range_stream.write(end_col_letter1.as_character())
+	_endif
+	range_stream.write(end_col_letter2.as_character(),start_row)
+
+	# Return the string 
+	>> range_stream.string
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.create_excel_title_information(sheet)
+	## 
+	## Populate title block / header information in the given Excel
+	## SHEET.
+	##
+
+	vch << {_self.message(:rch_table_name),
+		 _self.message(:rch_x_coordinate),
+		 _self.message(:rch_y_coordinate),
+		 _self.message(:rch_description)}
+	
+	act_ref << _self.top_frame.actual
+	
+	_protect
+		# Page setup: note that this fails if no printer installed, so
+		# don't worry about that error.
+		_try
+			x1 << sheet.pagesetup
+			_for ps_key, ps_value _over _self.excel_pagesetup_formats.fast_keys_and_elements()
+			_loop
+				x1.perform(ps_key.with_chevron, ps_value)
+			_endloop 
+		_when ole_server_error
+		_endtry
+		_if x1 _isnt _unset _then x1.release_object() _endif
+
+		str << internal_text_output_stream.new()
+		field_sep << ""
+		_for i, header _over vch.fast_keys_and_elements()
+		_loop
+			str.write(field_sep, header)
+			field_sep << tab_char
+		_endloop
+		
+		act_ref.clipboard_text << str.string
+		x1 << sheet.range(_self.int!excel_range_string_for(1, 1, vch.size))
+		x1.select()
+		sheet.paste()
+		x1.horizontalalignment << 3
+		x2 << x1.font
+		x2.bold << _true
+		x2.release_object()
+		x1.release_object()
+	_protection 
+		_if x1 _isnt _unset _then x1.release_object() _endif 
+		_if x2 _isnt _unset _then x2.release_object() _endif 
+	_endprotect
+	
+	_return 2
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_processor_plugin.send_batch_to_excel(data_rope, sheet, line_num, vis_col_names)
+	## 
+	## Send all data in DATA_ROPE to the excel sheet SHEET,
+	## starting at line number LINE_NUM.  VIS_COL_NAMES is a list
+	## of visible column names to be exported.
+	##
+	
+	# Note that this is done using a paste operation to set several
+	# cells at once.
+
+	_dynamic !print_float_precision! << 12
+	
+	act_ref << _self.top_frame.actual
+	str << internal_text_output_stream.new()
+	line_sep << ""
+	_for data_item _over data_rope.fast_elements()
+	_loop
+		str.write(line_sep)
+		line_sep << newline_char
+
+		field_sep << ""
+		_for field_name _over vis_col_names.fast_elements()
+		_loop
+			str.write(field_sep, data_item.value[field_name].default(""))
+			field_sep << tab_char
+		_endloop
+	_endloop
+	
+	act_ref.clipboard_text << str.string
+	_protect
+		x1 << sheet.range(_self.int!excel_range_string_for(line_num, 1, 1))
+		x1.select()
+		sheet.paste()
+	_protection 
+		_if x1 _isnt _unset _then x1.release_object() _endif 
+	_endprotect
+	
+	_return line_num + data_rope.size
+	
+_endmethod
+$

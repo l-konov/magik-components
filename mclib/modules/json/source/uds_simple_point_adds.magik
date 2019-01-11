@@ -1,0 +1,11 @@
+#% text_encoding = iso8859_1
+_package sw 
+
+_pragma(classify_level=restricted)
+_method	uds_simple_point.write_as_json(a_stream)
+	##
+	##
+	_return _super(oriented_point_geometry_mixin).write_as_json(a_stream) 
+		
+_endmethod
+$

@@ -1,0 +1,10 @@
+mss_ptdef_config	1
+
+description
+	MSS pointing rule definition configuration menu
+end
+
+requires
+	mss_config_editor
+	mss_ptrule_manager
+end

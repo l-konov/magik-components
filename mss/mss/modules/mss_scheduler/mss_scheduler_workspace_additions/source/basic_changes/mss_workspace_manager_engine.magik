@@ -1,0 +1,19 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace}, usage={redefinable})
+mss_workspace_manager_engine.define_shared_constant(
+	:use_scheduler_for_post?,
+	## Set this to true if the mss_scheduler module should be used
+	## to perform post operations on designs.  This defaults to true
+	## when the mss_scheduler_workspace_additions module is loaded.
+	_true,
+	:public)
+$
+

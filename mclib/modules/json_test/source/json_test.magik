@@ -1,0 +1,61 @@
+#% text_encoding = iso8859_1
+_package sw
+$
+_pragma(classify_level=debug)
+## Tests json module for certain conditions
+def_slotted_exemplar(:json_test,
+                     {},
+		     {:munit_test_case})
+$
+_block @build_json_test_cases
+	_local dir , dc , json_file , test_type , method_name
+
+	_for assertion_type _over {:good,:bad}.fast_elements()
+	_loop
+		test_type << write_string("json_test_cases_",assertion_type)
+		dir << smallworld_product.get_data_file(test_type,:json_test)
+
+		dc << directory_channel.new(dir,"*.json")
+		
+		_protect
+			_loop
+				_if (json_file << dc.get_full()) _is _unset 
+				_then
+					_leave
+				_endif
+
+				
+
+				method_name << write_string("test_",
+							    system.pathname_components(system.split_filename(json_file)))
+
+				show(:method_name,method_name)
+
+				json_test.define_method(method_name.as_symbol(),
+							_proc()
+								_import json_file
+
+								_local jp << json_parser.parse_file(json_file)
+								>> jp
+							_endproc,
+							_false)
+
+			_endloop
+		_protection
+			dc.close()
+		_endprotect
+	_endloop
+	
+_endblock #@build_json_test_cases
+$
+
+_pragma(classify_level=debug)
+_method json_test.set_up()
+	## Signature:
+	##   set_up() : _unset
+	##
+	## Description:
+	##   
+	
+_endmethod
+$

@@ -1,0 +1,501 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-04-06 21:40:46 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-10-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+########################################################################
+# This must be in package sw for
+# authorisation_properties_dialog to find it - see authorisation_properties_dialog.activate_sub_dialog_in()
+_package sw
+
+_pragma(classify_level=basic)
+## provides a page for use in the auth table properties view
+## that supports copying attributes between many tables and
+## in-place editing of auth predicates.
+def_slotted_exemplar(:auth_table_access_clone_page,
+             {
+		     {:clone_display_trees,_unset}
+	     },
+	     {:authorisation_group_tables_properties_page}
+)
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method auth_table_access_clone_page.build_gui(container)
+	## Create my user interface. This uses the super to create the
+	## normal auth table access display, then adds in the copy
+	## button and the tree to display the list of tables to copy to.
+	## 
+    	##
+
+	# (03-28-2005 Brad Sileo): created.
+	rc << rowcol.new(container,1,_unset,:pixel,
+			 :row_alignment, :fill,
+			 :col_resize_values,{50,0,50},
+			 :default_col_alignment, :fill,
+			 :default_row_alignment, :fill)
+	_super.build_gui(rc)
+	# enable selecting rows in the main tree
+	.items[:tree].mode << :one
+	.items[:tree].select_notifier << handler.new(_self,:tree_select|()|)
+	butts << rowcol.new(rc,_unset,1,:pixel,
+			    :style,:button_box,
+			    :default_col_alignment, :fill,
+			    :default_row_alignment, :fill)
+	.items[:copy_button] << button_item.new(butts,_self.message(:clone),
+			_self,:|clone_table_attributes()|,
+			:enabled?,_false,
+			:col_alignment,:centre,
+			:row_alignment,:centre,
+			:identifier,:clone)
+
+	rc2 << rowcol.new(rc,_unset,1,:pixel,
+			  :style,:button_box,
+			  :default_col_alignment, :fill,
+			  :default_row_alignment, :fill)
+	label_item.new(rc2,_self.message(:clone_tables))
+	_local table_style_holder << string_styles_holder.new_with()
+	table_style_holder.add_image_scheme( :collection_state,
+					     handler.new(_self,:|clone_collection_state_image()|))
+	.items[:clone_tree] << tree_item.new( rc2,
+					:module_name, _self,
+					:model, _self,
+					:message_on_no_data?, _false,
+					:style_holder, table_style_holder,
+					:select_notifier,handler.new(_self,:clone_tree_select|()|),
+					:editor_required_notifier, :|clone_editor_required()|,
+					:value_changed_notifier, :|clone_predicate_changed()|,
+					:edit_on_click?,_true ,
+					:mode, :many,
+					:aspect, :clone_tables,
+					:column_allow_sort?, _false,
+					:data_selector, :clone_display_trees,
+					:column_headings, { _self.message(:element_header), _self.message(:collection_state), _self.message(:predicate)},
+					:column_widths, { 200,20,200 },
+					:column_alignments, { :left, :centre, :left},
+					:distribute_spare_width, :always,
+					:identifier, :clone_tree )
+
+	
+	>> rc
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method auth_table_access_clone_page.clone_display_trees
+	## Returns the currently cached rope of clone display trees, or
+	## creates a new set if one does not exist currently.
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	_local auth_view << gis_program_manager.authorisation_view
+	_if .clone_display_trees _is _unset 
+	_then
+		_self.setup_clone_display_trees()
+	_endif
+	>> .clone_display_trees
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method auth_table_access_clone_page.setup_clone_display_trees()
+	## Build the display trees for the clone list
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	_local sc << rope.new_from_iter( gis_program_manager, :cached_datasets|()|).as_sorted_collection(_self.view_name_sort_proc)
+	
+	.clone_display_trees << rope.new_for( 4 )
+
+	_for dataset _over sc.fast_elements()
+	_loop
+		_if dataset.is_kind_of?(gis_ds_view)
+		_then
+			_self.setup_clone_dataset_display_tree( dataset )
+		_endif 
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method auth_table_access_clone_page.setup_clone_dataset_display_tree( dataset )
+	##
+	## Sets up the display trees for DATASET
+	##
+	.clone_display_trees.add( dataset_display_tree << display_tree.new( dataset ) )
+	dataset_display_tree.styled_string<< { :image, :database, dataset.view_name }
+	_local user_tables << rope.new_from_iter( dataset, :user_tables|()| )
+	_local ordered_collections<< user_tables.as_sorted_collection( _self.external_name_sort_proc )
+	
+	_for table _over ordered_collections.fast_elements()
+	_loop
+		dataset_display_tree.add_child( _self.setup_clone_collection_display_tree( table ) )
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.setup_clone_collection_display_tree( collection)
+	## Calls the super to create the collection tree.  If fields?
+	## is false, then no fields are shown.
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	dt << _super.setup_collection_display_tree( collection)
+	dt.set_children_method( _self, :clone_children_for_collection|()|, dt.key )
+	ss << dt.styled_string.as_simple_vector()
+	_if ss.index_of(%tab) _isnt _unset 
+	_then
+		dt.styled_string << ss.slice(1,ss.index_of(%tab) -1 )
+	_endif
+	>> dt
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_children_for_collection(collection)
+	## Returns the children that should go with the clone display
+	## tree for COLLECTION
+	## 
+	##
+
+	# (03-29-2005 Brad Sileo): created.
+	_local children << rope.new()
+	_for a_level _over {:none,:select,:update}.fast_elements()
+	_loop
+		val << _self.collection_value_for(collection, a_level)
+		children.add( dt << display_tree.new( collection,
+						      property_list.new_with(:level,a_level) ))
+		_if a_level _is :select 
+		_then
+			icon_scheme << {:browse, :ui_resources}
+		_elif a_level _is :update
+		_then
+			icon_scheme << {:update, :ui_resources}
+		_else
+			icon_scheme << {:stop, :ui_resources}
+		_endif 
+		dt.set_value_method( _self,  {:get_value_for_access|()|,a_level},{:|set_value_for_access()|,a_level})
+		dt.styled_string<< { :image, icon_scheme, :value, a_level,
+				     :tab, :toggle,:collection_state,
+				     :tab, :value,:predicate }
+	_endloop
+	>> children
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_collection_state_image(a_tree)
+	## returns the image to use to show the state of the collection
+	## for A_TREE
+	## 
+	##
+
+	# (03-31-2005 Brad Sileo): created.
+	val << _self.collection_value_for(a_tree.key, a_tree.value(:level))[1]
+	choices << property_list.new_with(_true,  { :collection_true, _self.module_name},
+					  _false, { :collection_false, _self.module_name},
+					  _maybe, { :collection_maybe, _self.module_name}
+				 )
+	>> choices[val]
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.set_value_for_access(a_level, value, index, a_display_tree)
+	## Update the value of a toggle form the clone tree ion the
+	## system and refresh boths trees
+	## 
+	##
+
+	# (03-31-2005 Brad Sileo): created.
+	pass_index << :collection_ + a_level
+	_self.set_value_for_collection(value, pass_index, a_display_tree)
+	_self.changed(:tables)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.get_value_for_access(a_level, index, a_display_tree)
+	## returns the value to display in the clone tree for the
+	## column called INDEX on A_DISPLAY_TREE
+	## 
+	##
+
+	# (03-29-2005 Brad Sileo): created.
+	res <<  _if index _is :predicate
+		_then
+			>> _if a_level _is :none
+			_then
+				>> ""
+			_else
+				>> _self.collection_value_for(a_display_tree.key, a_level)[2]
+			_endif 
+		_elif index _is :collection_state
+		_then
+			>> _self.collection_value_for(a_display_tree.key, a_level)[1]
+		_elif index _is :level
+		_then
+			>> a_level
+		_elif index _isnt _unset
+		_then 
+			>> _self.message(index)
+		_endif
+	#debug show(index,res)
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.module_name
+	## returns :authorisation_magik_gui like my super class which is required to
+	## make access to resources work from authorisaqtion_group_tables_properties_page.build_gui()
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	>> :authorisation_magik_gui
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_table_attributes()
+	## Clone the auth settings for the selected table into the
+	## specified target tables in the clone_tree
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	.owner.busy? << _true
+	_protect
+		source_tree << .items[:tree].selection.an_element()
+		_if source_tree _is _unset 
+		_then
+			_return 
+		_endif
+		targets << .items[:clone_tree].selection
+		all_targets << equality_set.new()
+		_for a_target _over targets.fast_elements()
+		_loop
+			_if a_target.key.is_kind_of?(database_view)
+			_then
+				ok? << .owner.show_question(:ok,:cancel,_self.message(:proceed_with_dataset,_unset,a_target.key.name))
+				_if ok? _is _false _then _return _false _endif
+				all_targets.add_all(a_target.children)
+			_else
+				all_targets.add(a_target)
+			_endif
+		_endloop 
+		anything? << _false  
+		_for a_target _over all_targets.fast_elements()
+		_loop
+			anything? << anything? _or _self.clone_attributes(source_tree, a_target)
+		_endloop
+		_if anything? _is _true 
+		_then
+			_self.changed(:tables)
+			_self.changed(:clone_tables)
+			_self.element_changed()
+		_endif
+	_protection 
+		.owner.busy? << _false
+	_endprotect 
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_attributes(from_tree,to_tree)
+	## Clone the current attributes for access level and predicates
+	## FROM_TREE TO_TREE
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	values << property_list.new()
+	values[:collection] << to_tree.key
+	_for a_level _over {:none,:select,:update}.fast_elements()
+	_loop
+		value << _self.collection_value_for(from_tree.key,a_level)
+		_if value[1] _is _maybe 
+		_then
+			_try _with cond
+				_self.authorisation_view.parse_predicate( to_tree.key, value[2] )
+			_when browser_unknown_field
+				.owner.show_alert(_self.message(:missing_field_copy,_unset,to_tree.key.external_name,cond[:field_name]))
+				_return _false
+			_endtry
+		_endif 
+		values[a_level] << value
+	_endloop
+	# make sure there is a value setup to hold the changes to to_tree
+	junk << _self.collection_value_for(to_tree.key,:none)
+	_self.set_advanced_no_refresh(_scatter values)
+	>> _true 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.set_advanced_no_refresh( _gather keys_and_args )
+	##
+	## Callback method for the Advanced Settings dialog.
+	##
+	_local properties << property_list.new_from_gathered( keys_and_args )
+	_local collection << properties.remove_key(:collection)
+	
+	_if .new_collection_values[collection] _is _unset
+	_then
+		.new_collection_values[collection] << .stored_collection_values[collection].deep_copy()
+	_endif
+	
+	_local col_values << .new_collection_values[collection]
+
+	_for key, value _over properties.fast_keys_and_elements()
+	_loop
+		col_values[key] << value
+	_endloop
+
+_endmethod
+$
+
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.tree_select(selection)
+	## Handles a new selection and updates my display
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	_self.manage_buttons()
+_endmethod
+$
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_tree_select(selection)
+	## Handles a new selection and updates my display
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	_self.manage_buttons()
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.manage_buttons()
+	## Enable or disable the copy button
+	## 
+	##
+
+	# (03-28-2005 Brad Sileo): created.
+	.items[:copy_button].enabled? << _not ( (sel << .items[:tree].selection).empty?  _orif
+						 _not sel.an_element().key.is_kind_of?(ds_collection) _orif
+						 .items[:clone_tree].selection.empty?)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.set_advanced(_gather keys_and_args)
+	## 
+	## 
+	##
+
+	# (03-29-2005 Brad Sileo): created.
+	_super.set_advanced(_scatter keys_and_args)
+	_self.changed(:clone_tables)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.set_value_for_collection(value, index, display_tree)
+	## Calls the super then updates my clone tree in the background
+	## to show these changes
+	## 
+	##
+
+	# (03-29-2005 Brad Sileo): created.
+	_super.set_value_for_collection(value, index, display_tree)
+	_self.changed(:clone_tables)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_dataset_tree_for(a_dataset)
+	## Returns the current display_tree holding the info for A_DATASET
+	## 
+	##
+
+	# (03-29-2005 Brad Sileo): created.
+	_for a_tree _over .clone_display_trees.fast_elements()
+	_loop
+		_if a_tree.key _is a_dataset
+		_then
+			_return a_tree
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_editor_required(p_tree, p_index, p_value_id, p_agent)
+	## returns an in place editor for the predicate field if appropriate.
+	## 
+	##
+
+	# (03-31-2005 Brad Sileo): created.
+	_if p_value_id _is :predicate
+	_then
+		_if p_tree.value(:level) _isnt :none
+		_then
+			a_editor << in_place_value_editor.new(p_agent)
+		_endif 
+	_endif
+ 	>> a_editor
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method auth_table_access_clone_page.clone_predicate_changed(p_tree, p_value_id, p_new_value, p_undo_value, p_editor)
+	## Callback when an inline edit updates my predicate. this
+	## validates the predicate, then updates the state with this
+	## new value. If the value is invalid, the user is notified and
+	## returned to edit mode.
+	## 
+	##
+
+	# (03-31-2005 Brad Sileo): created.
+	_if p_value_id _is :predicate
+	_then
+		coll << p_tree.key
+		level << p_tree.value(:level)
+		_self.authorisation_view.parse_predicate( coll, p_new_value )
+		_self.set_advanced(_scatter property_list.new_with(:collection,coll,
+								   level,{_maybe,p_new_value}
+							  )
+		      )
+	_endif 
+_endmethod
+$

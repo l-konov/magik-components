@@ -1,0 +1,50 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## WINDOW_STACK - added functionality specific to the
+## dialog_designer.  Sets link between this class and the class
+## actually used by the dialog_designer (dd_window_stack).
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method window_stack.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	ddws << dd_window_stack.new(rc,1,1,:pixel,
+				    :style,:nested,
+				    :resize?,_true,
+				    :top_spacing,25,
+				    :left_spacing,5,
+				    :right_spacing,5,
+				    :bottom_spacing,5,
+				    :default_col_alignment,:fill,
+				    :default_row_alignment,:fill,
+				    :row,row,:col,col)
+
+	wsrc << rowcol.new_dialog_default(ddws,1,1,:pixel,:top_spacing,7)
+	wsrc.window_name << :win_1
+
+	pages << rope.new()
+	pages.add(wsrc)
+	
+	ddws.set_property(:pages,pages)
+	ddws.set_property(:active_page_n,1)
+
+	>> ddws
+_endmethod
+$
+

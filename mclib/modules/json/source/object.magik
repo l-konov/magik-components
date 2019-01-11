@@ -1,0 +1,18 @@
+#% text_encoding = cp1252
+# -*- magik-indent-level: 2 -*-
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method object.write_as_json( a_stream )
+	##
+	##
+	
+	_dynamic !print_float_precision! << 12
+	a_stream.write('{"',
+				_self.class_name.write_string.json_quote_for_string(),
+				'":"',
+				 _self.write_string.json_quote_for_string(),
+				 '"}')
+
+_endmethod
+$

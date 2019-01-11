@@ -1,0 +1,95 @@
+<!-- This file describes the GUI layout for the sf!table_lister framework -->
+
+<gui>
+    <menu name="menubar" type="menubar">
+        <submenu name="file">
+	    <action name="disable_authorization" />
+	    <action name="restore_authorization" />
+	    <separator/>
+	    <action name="export_to_html" />
+	    <action name="export_directory" />
+	    <separator/>
+	    <action name="suspend" />
+	</submenu>
+	<submenu name="database">
+	    <action name="databases.choose_database" />
+	    <separator/>
+	    <action name="databases.commit" />
+	    <action name="databases.rollback" />
+	    <action name="databases.rollforward" />
+	    <separator/>
+	    <action name="databases.alternative_up" />
+	    <action name="databases.select_alternative" />
+	    <separator/>
+	    <action name="databases.database_info" />
+	</submenu>
+	<submenu name="table">
+	    <action name="tables.describe_fields" />
+	    <action name="tables.describe_triggers" />
+	    <action name="tables.describe_phys_fields" />
+	    <separator/>
+	    <action name="tables.key_fields" />
+	    <action name="tables.physical_fields" />
+	    <action name="tables.join_fields" />
+	    <action name="tables.geometry_fields" />
+	    <action name="tables.derived_fields" />
+	</submenu>
+	<submenu name="display">
+	    <action name="tables.empty_tables?" />
+	    <action name="tables.system_tables?" />
+	    <action name="tables.table_size?" />
+	</submenu>
+    </menu>
+    
+    <toolbar name="db_selection">
+        <action name="databases.choose_database" />
+        <action name="databases.database_info" />
+    </toolbar>
+    <toolbar name="db_actions">
+        <action name="databases.toggle_access_mode" />
+        <action name="databases.commit" />
+        <action name="databases.rollback" />
+        <action name="databases.rollforward" />
+    </toolbar>
+    <toolbar name="db_alternatives">
+	<action name="databases.alternative_up" />
+	<action name="databases.select_alternative" />
+    </toolbar>
+    <toolbar name="list_actions">
+        <action name="tables.refresh" />
+	<action name="tables.list" />
+	<action name="edit_object" />
+	<action name="edit_object_floating" />
+    </toolbar>
+    <toolbar name="print">
+	<action name="export_to_html" />
+    </toolbar>
+
+    <dock name="top">
+	<toolbar name="db_selection" />
+        <toolbar name="db_actions" />
+        <toolbar name="db_alternatives" />
+        <toolbar name="list_actions" />
+        <toolbar name="print" />
+    </dock>
+
+    <work_area>
+        <tab_box>
+	    <paned_window side_by_side="no" tab_label_id="table_tab_label">
+	        <plugin plugin_name="databases" />
+	        <plugin plugin_name="tables" width="300" visible_rows="20" />
+	    </paned_window>
+	    <plugin plugin_name="records"/>
+            <plugin plugin_name="editor"/>
+            <plugin plugin_name="options"/>
+        </tab_box>
+    </work_area>
+
+    <statusbar name="default">
+        <pane id="status_info" style="innie" width="150" springy="true"/>
+        <pane id="alternative_info" style="innie" width="250" springy="true"/>
+    </statusbar>
+</gui>
+
+
+

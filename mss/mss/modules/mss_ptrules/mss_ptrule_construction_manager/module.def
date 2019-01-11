@@ -1,0 +1,10 @@
+mss_ptrule_construction_manager 1
+
+description
+	MSS pointing rule construction manager
+end
+
+requires
+	mss_application_databus
+	mss_core_changes
+end

@@ -1,0 +1,198 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_options_menu
+##
+## Menu to set options for pointing rules.
+##
+
+def_slotted_exemplar(:mss_ptrule_options_menu,
+{
+	{:engine, _unset, :readable},
+	{:items, _unset, :readable}
+},
+{:model})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_options_menu.new(a_mss_ptrule_manager)
+	## 
+	## 
+
+	_return _clone.init(a_mss_ptrule_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.init(a_mss_ptrule_manager)
+	## 
+	## 
+
+	_super.init()
+	.engine << a_mss_ptrule_manager
+	.engine.add_dependent(_self)
+	.items << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.activate_in(f)
+	## 
+	## 
+
+	p << panel.new(f)
+	p.border_width << p.border_height << 2
+	
+	tb << .items[:tab_box] << tab_box.new(p, :resize_x?, _true, :resize_y?, _true)
+	_self.define_placement_mode_page(tb)
+	_self.define_offset_page(tb)
+	_self.define_move_page(tb)
+
+	p.start_row()
+	simple_panel.new(p).resize_x? << _true
+	button_item.new_safe(p, _self.message(:close),
+			     _self, :|suspend()|,
+			     :min_width, 75)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.wm_close()
+	## 
+	## 
+
+	_self.suspend()
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.define_placement_mode_page(tb)
+	## 
+	## 
+
+	rc << rowcol.new(tb, _unset, 2, :pixel,
+			 :row_spacing, 2,
+			 :col_spacing, 2)
+	rc.tab_label << _self.message(:placement_mode_tab_label)
+
+	label_item.new(rc, _self.message(:placement_mode))
+	.items[:placement_mode] <<
+		text_choice_item.new(rc, "",
+				     :items, {{:design, _self.message(:pm_design)},
+					      {:data_maintenance, _self.message(:pm_data_maintenance)}},
+				     :model, _self,
+				     :aspect, :placement_mode,
+				     :change_selector, {:|perform_safely()|, :|set_option()|, :placement_mode},
+				     :value_selector, {:|get_option()|, :placement_mode})
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.define_offset_page(tb)
+	## 
+	## 
+
+	rc << rowcol.new(tb, _unset, 2, :pixel,
+			 :row_spacing, 2,
+			 :col_spacing, 2)
+	rc.tab_label << _self.message(:offset_tab_label)
+
+	ldf << .engine.get_length_display_format()
+	mgr << unit_value_manager.new_with_properties(:mm,
+						      :display_unit_format, ldf,
+						      :value_required?, _true,
+						      :output_value_with_unit?, _false)
+	
+	label_item.new(rc, _self.message(:offset_distance))
+	.items[:offset_distance] <<
+		managed_value_text_item.new(rc, "",
+					    :display_length, 10,
+					    :manager, mgr,
+					    :model, _self,
+					    :aspect, :offset_distance,
+					    :change_selector, {:|perform_safely()|, :|set_option()|, :offset_distance},
+					    :value_selector, {:|get_option()|, :offset_distance})
+	
+	label_item.new(rc, _self.message(:offset_direction))
+	.items[:offset_direction] <<
+		text_choice_item.new(rc, "",
+				     :items, {{:left, _self.message(:offset_direction_left)},
+					      {:right, _self.message(:offset_direction_right)}},
+				     :model, _self,
+				     :aspect, :offset_direction,
+				     :change_selector, {:|perform_safely()|, :|set_option()|, :offset_direction},
+				     :value_selector, {:|get_option()|, :offset_direction})
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.define_move_page(tb)
+	## 
+	## 
+
+	rc << rowcol.new(tb, _unset, 1, :pixel,
+			 :row_spacing, 2,
+			 :col_spacing, 2)
+	rc.tab_label << _self.message(:move_tab_label)
+
+	.items[:move_disconnect_before_transform?] <<
+		toggle_item.new(rc, _self.message(:move_disconnect_before_transform?),
+				:model, _self,
+				:aspect, :move_disconnect_before_transform?,
+				:change_selector, {:|perform_safely()|, :|set_option()|, :move_disconnect_before_transform?},
+				:value_selector, {:|get_option()|, :move_disconnect_before_transform?})
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.get_option(key)
+	## 
+	## 
+
+	_return .engine.get_option(key)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.set_option(key, value)
+	## 
+	## 
+
+	_return .engine.set_option(key, value)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_options_menu.note_change(who, what, data)
+	## 
+	## 
+
+	_if who _is .engine _andif
+	    what _is :set_option
+	_then
+		key << data[1]
+		value << data[2]
+		_self.changed(key, value)
+	_endif
+	
+_endmethod
+$

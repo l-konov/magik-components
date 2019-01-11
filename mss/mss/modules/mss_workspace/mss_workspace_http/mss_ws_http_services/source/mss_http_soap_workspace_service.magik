@@ -1,0 +1,387 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_soap_workspace_service
+##
+## Example service to create a new job and design.
+##
+## Refer to the readme.txt file in this module's directory for
+## additional information.
+##
+
+def_slotted_exemplar(:mss_http_soap_workspace_service,
+{
+	{:input_document, _unset},
+	{:soap_engine, _unset, :readable},
+	{:output_header, _unset, :readable},
+	{:output_body, _unset, :readable}
+},
+{:mss_http_service})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_soap_workspace_service.input_document
+	## 
+	## If not yet read, get it.
+	##
+
+	_if .input_document _is _unset
+	_then
+		body << _self.request_body
+		_if body _is _unset _orif
+		    body.size = 0
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_message_body))
+		_endif
+		.input_document << simple_xml.read_document_from(body.read_stream())
+	_endif
+
+	_return .input_document
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.process_service_request(req)
+	##
+	## Create a new job and design using the information encoded in
+	## the mss_http_server_request REQ.
+	##
+
+	se << .soap_engine << mss_http_soap_engine.new()
+	.request << req
+	resp << req.response
+
+	_local me << _self 
+	_catch :any_error
+		_handling error _with
+		_proc(cond)
+			_import me
+			_if _not cond.taxonomy.includes?(:user_error)
+			_then
+				# Also dump to terminal.
+				cond.report_on(!terminal!)
+				!traceback!(!terminal!)
+			_endif 
+			me.generate_soap_fault(cond)
+			_throw :any_error
+		_endproc
+
+		_if (log << _self.server.log_stream(10)) _isnt _unset
+		_then
+			# Debug mode - log all info about the request.
+			_self.debug_log_request(log)
+		_endif
+		
+		resp.set_header_field("Content-Type", "text/xml")
+		resp.set_header_field("Cache-Control", "private,max-age=0")
+		resp.set_header_field("Connection", "Close")
+
+		# Assume failure, until things are OK.
+		resp.set_status_code(500)
+
+		ln << .init_properties[:leaf_name].default("")
+		_if ln.size > 0 _andif ln.last _is %/
+		_then
+			ln << ln.slice(1, ln.size - 1)
+		_endif
+		lc_ln << ln.lowercase
+		
+		# Examine leafname to see which service to provide.
+		mss_workspace_manager_engine.init()
+		mss_workspace_manager_engine.view.rollforward()
+		
+		_if lc_ln = "newjobanddesign"
+		_then 
+			_self.new_job_and_design()
+		_else
+			condition.raise(:user_error, :string, _self.message(:unknown_service_type, ln))
+		_endif
+		
+	_endcatch 
+
+	# At this point, output_header contains the SOAP header, and
+	# output_body contains the SOAP body.
+	se.reset()
+	_if .output_header _isnt _unset
+	_then
+		se.add_to_header(.output_header)
+	_endif
+	_if .output_body _isnt _unset
+	_then
+		se.add_to_body(.output_body)
+	_endif 
+	xml_doc << se.document
+	resp.response_object << se.document_as_string()
+
+	_if (log << _self.server.log_stream(10)) _isnt _unset
+	_then
+		# Debug mode - log all info about the response.
+		_self.debug_log_response(log)
+	_endif
+	
+	# Finally, ask the server to send this request.
+	_self.server.send_request_response(req)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.generate_soap_fault(cond)
+	## 
+	## 
+
+	se << .soap_engine
+	se.reset()
+	ns << se.soap_envelope_namespace
+	x1 << simple_xml_thing.new(write_string(ns, ":Fault"))
+	_if cond.taxonomy.includes?(:user_error)
+	_then
+		fc << write_string(ns, ":Client")
+	_else
+		fc << write_string(ns, ":Server")
+	_endif
+	x2 << simple_xml_thing.new("faultcode", fc)
+	x1.elements.add(x2)
+	x2 << simple_xml_thing.new("faultstring", cond.report_contents_string)
+	x1.elements.add(x2)
+
+	.output_body << x1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.generate_ok_result(top_key, res_pl)
+	## 
+	## 
+
+	se << .soap_engine
+	se.reset()
+	ns << se.soap_envelope_namespace
+	x1 << simple_xml_thing.new(top_key)
+	_for i, j _over res_pl.fast_keys_and_elements()
+	_loop
+		x2 << simple_xml_thing.new(i, j.write_string)
+		x1.elements.add(x2)
+	_endloop 
+
+	.request.response.set_status_code(200)
+	.output_body << x1
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.new_job_and_design()
+	## 
+	## Create a new job and design from the input document.
+	##
+
+	_local res_pl
+	res_pl << equality_property_list.new_with("ProcessStatus", "OK")
+	_block
+		# If warnings are found while processing job and design
+		# attributes, log that information.
+		_handling warning _with
+		_proc(cond)
+			_import res_pl
+			res_pl["ProcessStatus"] << "WARNING"
+			_if (cur_text << res_pl["ProcessText"]) _is _unset
+			_then
+				new_text << cond.report_contents_string
+			_else
+				new_text << write_string(cur_text, newline_char,
+							 cond.report_contents_string)
+			_endif
+			res_pl["ProcessText"] << new_text
+		_endproc 
+		(job_pl, des_pl) << _self.parse_new_job_and_design_attributes()
+	_endblock
+
+	_if (log << _self.server.log_stream(10)) _isnt _unset
+	_then
+		# Log raw information about what is about to be processed.
+		log.write("DEBUG LOG: the following data will be used to create new job and design: ", newline_char)
+		log.write("DEBUG LOG: Job parameters", newline_char)
+		_for i, j _over job_pl.fast_keys_and_elements()
+		_loop
+			log.write(i, " : ", j, newline_char)
+		_endloop
+		log.write("DEBUG LOG: Design parameters", newline_char)
+		_for i, j _over des_pl.fast_keys_and_elements()
+		_loop
+			log.write(i, " : ", j, newline_char)
+		_endloop
+		log.write(newline_char)
+		log.flush()
+	_endif
+	
+	# Validate various mandatory attributes.
+	_if (jn << job_pl[:name].default("")) = ""
+	_then
+		condition.raise(:user_error, :string, _self.message(:mandatory_field, "JobName"))
+	_endif
+	_if (jt << job_pl[:type].default("")) = ""
+	_then
+		condition.raise(:user_error, :string, _self.message(:mandatory_field, "JobType"))
+	_endif
+	_if des_pl[:owner].default("") = ""
+	_then
+		condition.raise(:user_error, :string, _self.message(:mandatory_field, "DesignOwner"))
+	_endif
+
+	# Validate that name is unique.
+	job_tbl << mss_workspace_manager_engine.job_table
+	_if job_tbl.select(predicate.eq(:name, jn)).an_element() _isnt _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:duplicate_field, "JobName", jn))
+	_endif
+	_if mss_job_type.defined_job_types[jt] _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:invalid_job_type, jt))
+	_endif
+
+	svr << _self.server
+	(job_rec, des_rec) << svr.perform_with_singlethread_lock(
+				      _self, :|int!new_job_and_design()|,
+				      job_pl, des_pl)
+	
+	res_pl["JobID"] << job_rec.id
+	res_pl["DesignID"] << des_rec.id
+	_self.generate_ok_result("NewJobAndDesignResponse", res_pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.parse_new_job_and_design_attributes()
+	##
+	## Parse job and design attributes from input document.
+	##
+
+	se << .soap_engine
+	se.set_document(_self.input_document)
+	_if (b << se.body_element()) _is _unset 
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_message_body))
+	_endif
+
+	_if b.elements.size ~= 1 _orif
+	    (e1 << b.elements[1]).type.write_string.lowercase ~= "newjobanddesignrequest"
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_new_job_and_design_header))
+	_endif
+
+	job_pl << property_list.new()
+	des_pl << property_list.new_with(
+			  :name, "1")
+	_for e2 _over e1.xml_elements()
+	_loop
+		lct << e2.type.write_string.lowercase
+		str << e2.element_at_index(1, :text)
+		_if lct = "jobname"
+		_then
+			job_pl[:name] << str
+		_elif lct = "jobtitle"
+		_then
+			job_pl[:title] << str
+		_elif lct = "jobtype"
+		_then
+			job_pl[:type] << str
+		_elif lct = "jobstartdate"
+		_then
+			job_pl[:start_date] << date.new_from_string(str, "#Y-#m-#d")
+		_elif lct = "jobenddate"
+		_then
+			job_pl[:end_date] << date.new_from_string(str, "#Y-#m-#d")
+		_elif lct = "jobcomments"
+		_then
+			job_pl[:comments] << str
+		_elif lct = "designname"
+		_then
+			des_pl[:name] << str
+		_elif lct = "designowner"
+		_then
+			des_pl[:owner] << str
+		_elif lct = "designcomments"
+		_then
+			des_pl[:comments] << str
+		_elif lct = "georeference" _andif
+		      (gref << _self.design_extent_for_georeference(str)) _isnt _unset
+		_then
+			des_pl[:extent] << gref
+		_endif 
+	_endloop
+
+	_return job_pl, des_pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.design_extent_for_georeference(str)
+	## 
+	## If the geo-referencing string STR can be used to generate a
+	## proposed pseudo_area for the design boundary, return that.
+	## Otherwise, return unset.
+	##
+
+	# The following example code assumes that STR is the name of a
+	# unique min_road in the Cambridge DB.
+	_if (ws_v << mss_workspace_manager_engine.view) _is _unset _orif 
+	    (gis_v << gis_program_manager.cached_dataset(:gis)) _is _unset _orif
+	    (tbl << gis_v.collections[:min_road]) _is _unset
+	_then
+		# Not in a Cambridge DB.  Don't bother trying.
+		_return
+	_endif
+
+	_if (a_road << tbl.select(predicate.eq(:name, str)).an_element()) _is _unset _orif 
+	    (geom << a_road.centre_line) _is _unset
+	_then 
+		condition.raise(:warning, :string, write_string("Cannot determine georeference for: ", str))
+		_return 
+	_endif
+
+	# All geometry will be created in the main world.
+	w << ws_v.collections[:sw_gis!world].at(0, 0)
+	bb << bounding_box.new_enclosing(geom.bounds, 5000)
+	pa << pseudo_area.new(bb)
+	pa.world << w
+	_return pa
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_soap_workspace_service.int!new_job_and_design(job_pl, des_pl)
+	## 
+	## Perform the work of creating a new job and design - this is
+	## put into a separate method to facilitate single-threading
+	## requests.
+	##
+
+	# N.B.: strictly speaking, mss_workspace_manager_engine.new_job_and_design()
+	# should be multi-threadable, since perform_in_short_transaction()
+	# ought to be thread-safe and the alternatives that get spawned
+	# are done on replica views rather than the main database views
+	# of all managed partitions.  But, I'll single-thread this,
+	# because debugging obscure multi-thread problems would be a minor
+	# nightmare, and this is a good demonstration of how to use the
+	# single-threading protocol.
+	
+	(job_rec, des_rec) << mss_workspace_manager_engine.new_job_and_design(job_pl, des_pl)
+	
+	_return job_rec, des_rec
+	
+_endmethod
+$

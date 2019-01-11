@@ -1,0 +1,36 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_engine.mss_wp_auto_anno_offset(wp)
+	## 
+	## The distance to auto-offset annotation created by the
+	## mss_wp_multi_create() method.  This can either be unset
+	## (indicating no auto-generated anno), or a length_value.
+	##
+
+	# Note that this can also be redefined to consider
+	# !current_world!, and/or the work point WP being annotated.
+	
+	_dynamic !current_world!
+	_if !current_world! _isnt _unset _andif
+	    !current_world!.universe_name = "internals"
+	_then
+		# N.B.: in the Cambridge system, there is no public way
+		# to create an internal world in the gis dataset.  However,
+		# clever people will figure out how to do this from the command
+		# line for demonstration purposes...
+		l << 0.8
+	_else
+		l << 15.0
+	_endif 
+	_return length_value.new(l, :m)
+	
+_endmethod
+$

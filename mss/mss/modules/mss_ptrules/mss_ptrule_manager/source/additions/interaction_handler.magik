@@ -1,0 +1,49 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method interaction_handler.mss_current_persistent_mode
+	## 
+	## Return the current persistent mode - if a
+	## one-shot mode is active, it returns the name of the one on
+	## the top of the stack.
+	##
+
+	_if .current_mode _is _unset
+	_then
+		_return _unset
+	_endif
+	_if .current_mode.one_shot?
+	_then
+		_if (tos << .mode_stack.top_of_stack) _isnt _unset
+		_then
+			_return tos
+		_else
+			_return _unset
+		_endif
+	_else
+		_return .current_mode
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method interaction_handler.mss_current_persistent_mode_name
+	## 
+	## Return the name of self's mss_current_persistent_mode
+	##
+
+	_if (m << _self.mss_current_persistent_mode) _isnt _unset
+	_then
+		_return m.name
+	_endif
+	
+_endmethod
+$

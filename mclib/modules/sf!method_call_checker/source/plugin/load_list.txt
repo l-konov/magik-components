@@ -1,0 +1,1 @@
+sf!method_analyzer_plugin

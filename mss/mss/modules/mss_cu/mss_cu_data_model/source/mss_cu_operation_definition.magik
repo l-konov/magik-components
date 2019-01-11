@@ -1,0 +1,159 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_operation_definition
+##
+## Definition record for an operation for compatible unit (such
+## as Install, Remove, Abandon, or Transfer).
+##
+
+def_slotted_exemplar(:mss_cu_operation_definition,
+{},
+{:mss_cu_ds_record})
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_operation_definition.define_shared_constant(
+	:material_cost_decimal_places,
+	## Preferred number of decimal places for displaying material
+	## cost information.
+	5,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+mss_cu_operation_definition.define_shared_constant(
+	:labor_cost_decimal_places,
+	## Preferred number of decimal places for displaying labor
+	## cost information.
+	5,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_operation_definition.short_name_for(an_operation)
+	## 
+	## 
+
+	_if an_operation _is _unset
+	_then
+		_return ""
+	_endif 
+	mh << message_handler.new(:mss_cu_operation_definition)
+	op << :short_name_ + an_operation.as_symbol()
+	_if mh.has_message?(op)
+	_then
+		_return mh.human_string(op)
+	_else
+		_return an_operation
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_operation_definition.cu_code
+	## 
+	## Derive from parent mss_cu_definition.
+	##
+
+	_if (rec << _self.mss_cu_definition) _isnt _unset
+	_then 
+		_return rec.cu_code
+	_else
+		_return ""
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_operation_definition.description
+	## 
+	## Derive from parent mss_cu_definition.
+	##
+
+	_if (rec << _self.mss_cu_definition) _isnt _unset
+	_then 
+		_return rec.description
+	_else
+		_return ""
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_operation_definition.cu_code_and_operation
+	## 
+	## 
+
+	_return write_string(_self.cu_code, " ", _self.operation)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_operation_definition.cu_cost_group_item_for(a_cost_group_or_id)
+	## 
+	## Return the mss_cu_cost_group_item record that relates self
+	## to A_COST_GROUP_OR_ID - either a mss_cu_cost_group record,
+	## or the ID value of a record.
+	##
+
+	cgi_tbl << _self.source_view.collections[:mss_cu_cost_group_item]
+	_if a_cost_group_or_id.is_a_datastore_object?
+	_then
+		cg_id << a_cost_group_or_id.id
+	_else
+		cg_id << a_cost_group_or_id
+	_endif
+	pred << predicate.eq(:mss_cu_cost_group_id, cg_id) _and
+		predicate.eq(:mss_cu_operation_definition_id, _self.id)
+
+	_return cgi_tbl.select(pred).an_element()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_operation_definition.add_child_macro_units(op_recs)
+	## 
+	## Using data in the collection OP_RECS, create child macro
+	## unit references.  Each element in OP_RECS is a 3 item vector:
+	## - The child mss_cu_operation_definition
+	## - Quantity
+	## - Unit multiplier.
+	##
+
+	r << rope.new()
+	tbl << _self.source_view.collections[:mss_cu_mu_relationship]
+	dr << tbl.new_detached_record()
+	dr.p_mss_cu_operation_definition_id << _self.id
+	_for i _over op_recs.fast_elements()
+	_loop
+		# Check for duplicate - if so, don't create another.
+		dr.c_mss_cu_operation_definition_id << i[1].id
+		pred << predicate.eq(:c_mss_cu_operation_definition_id, dr.c_mss_cu_operation_definition_id) _and
+			predicate.eq(:p_mss_cu_operation_definition_id, dr.p_mss_cu_operation_definition_id)
+		_if (rec << tbl.select(pred).an_element()) _isnt _unset
+		_then
+			_continue
+		_endif
+		dr.quantity << i[2].default(1)
+		dr.unit_multiplier << i[3]
+		rec << tbl.insert(dr)
+		r.add_last(rec)
+	_endloop
+	_return r
+	
+_endmethod
+$

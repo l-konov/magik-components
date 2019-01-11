@@ -1,0 +1,4 @@
+sf!table_inspector_editor_manager
+sf!table_inspector_editor
+sf!table_inspector_field_lister
+message_usages

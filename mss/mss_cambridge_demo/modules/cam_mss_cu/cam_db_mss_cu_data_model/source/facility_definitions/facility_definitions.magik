@@ -1,0 +1,49 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+# The following code will define all facilities in the
+# Cambridge DB which can be subject to being associated with
+# Compatible Units.
+
+_block
+	_local mcfd
+	mcfd << mss_cu_facility_definition
+	mcfd.clear_cache()
+	
+	mcfd.new(100, :gis, :min_road,
+		 {:carriage_type,
+		  :road_type})
+	mcfd.new(101, :gis, :roundabout,
+		 {:cost_penalty})
+	mcfd.new(102, :gis, :road_works,
+		 {:duration,
+		  :delay,
+		  :cost_func})
+	mcfd.new(103, :gis, :pub_rest,
+		 {:type,
+		  :cuisine,
+		  :parking})
+	mcfd.new(104, :gis, :footpath,
+		 {:class})
+	mcfd.new(105, :gis, :hotel,
+		 {:type})
+	mcfd.new(106, :gis, :beer,
+		 {:brewery, :beer, :percent_by_vol})
+
+	mcfd.new(200, :electricity, :cable,
+		 {:voltage, :known_as})
+	mcfd.new(201, :electricity, :joint,
+		 {:voltage, :known_as})
+	mcfd.new(202, :electricity, :customer,
+		 {:usage, :sales})
+	mcfd.new(203, :electricity, :transformer,
+		 {:primary_voltage, :secondary_voltage, :known_as})
+	
+_endblock
+$

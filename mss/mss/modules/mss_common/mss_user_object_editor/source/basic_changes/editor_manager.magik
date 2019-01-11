@@ -1,0 +1,142 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method editor_manager.sw_databus_data_available(  data_type_name,  data )
+	## 
+	## Receives data from the application databus.
+	##
+
+	# 2006/03/23 TM  Set a dynamic to indicate that record_selection
+	#                is causing editors to be updated.
+	# 2011/04/25 TM  Updated for V4.2 compatibility.
+	
+	# TM START CHANGE
+	_dynamic !edit_from_map_selection?!
+	# TM END CHANGE
+	
+	#show( _self, "sw_databus_data_available", data_type_name, data )
+
+	_if data_type_name _is :record_selection
+	_then
+		( owner, an_rwo_set, a_geom_set ) << ( _scatter data )
+
+		_if a_geom_set _isnt _unset
+		_then
+			_self.changed( :map_selection, owner, a_geom_set )
+		_endif 
+
+		_if an_rwo_set.size = 1
+		_then 
+			# update editors
+			an_rwo << an_rwo_set.an_element()
+			_self.set_current_set( an_rwo )
+
+			# TM START CHANGE
+			!edit_from_map_selection?!  << a_geom_set _isnt _unset _andif
+						       a_geom_set.an_element() _isnt _unset
+			# TM END CHANGE
+			
+			# If the collection has it's own special editor we don't want
+			# to update any other editor 
+			_if .special_editor_managers[an_rwo.source_collection.name] _is _unset
+			_then 
+				_self.update_viewers( an_rwo )
+			_endif 
+
+		_else
+			_self.set_current_set( _unset )
+		_endif
+		
+		_self.changed(:record_selection, owner, an_rwo_set)
+		_self.manage_actions()
+
+	_elif data_type_name _is :map_trail
+	_then 
+		( owner, a_trail ) << ( _scatter data )
+		_if owner _isnt _self
+		_then 
+			_self.current_trail << a_trail
+		_endif
+
+	_elif data_type_name _is :application_coordinate_system
+	_then
+		_self.refresh_all_editors()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method editor_manager.update_viewers( an_rwo )
+	## 
+	## Update all my viewers, whether floating or embedded, to
+	## display AN_RWO
+	##
+
+	# 2006/03/23 TM  If record_selection is causing editors to be
+	#                updated, don't update editor if it isn't active.
+	# 2011/04/25 TM  Updated for V4.2 compatibility.
+	
+	# TM START CHANGE
+	_dynamic !edit_from_map_selection?!
+	# TM END CHANGE
+	
+	_if (object_for_edit << an_rwo.source_rwo_records().an_element()) _is _unset _orif 
+	     _not object_for_edit.read_authorised?
+	_then
+		_return
+	_endif
+
+	( can_activate_editor?, can_embed_editor? ) << _self.edit_status_for?( object_for_edit )
+
+	# If allowed, update the embedded viewer
+	_if can_embed_editor? _is _true
+	_then
+		# TM START CHANGE
+		# N.B.: Yes, this can be considered to be a controversial
+		# change, because if the embedded editor is behind another
+		# window in a tab box (such as Object Control), then it will
+		# not be refreshed on a record selection, and if the user
+		# then brings the editor tab forward, it will still be
+		# displaying the same record as it did before (i.e. not showing
+		# the current selection).  But, I deem this to be a small price
+		# to pay for the greatly improved performance that is gained.
+		# Also, note that if the user explicitly invokes an action to
+		# edit an object (c.f. editor_manager.edit_object()), then the
+		# desired editor is displayed - this change only affects the
+		# passive selection of records in a map.
+		_if !edit_from_map_selection?! _is _true _andif
+		    (.embedded_viewer _is _unset _orif
+		     _not .embedded_viewer.active?)
+		_then
+			# Bypass display if editing from map selection, and the
+			# embedded viewer is not the active tab.
+		_else 
+			_self.display_object_in_embedded_editor( object_for_edit )
+		_endif
+		# TM END CHANGE
+	_endif
+	
+	# If allowed, update any active floating editors.
+	_if can_activate_editor?
+	_then
+		a_collection   << object_for_edit.source_collection
+		_for a_viewer _over .floating_viewers.fast_elements()
+		_loop
+			_if a_viewer.active? _andif
+			    a_viewer.can_edit_collection?( a_collection )
+			_then
+				a_viewer.edit_record( object_for_edit )
+			_endif 
+		_endloop 
+	_endif
+	
+_endmethod
+$

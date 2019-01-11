@@ -1,0 +1,31 @@
+#% text_encoding = iso8859_1
+#
+#Patch-Number: 314006_1
+#Issuer: MSS
+#
+#Release-Note:
+# Implement missing method pseudo_link.object_for_geom_prim,
+# which is required for various linear geometry operations on
+# pseudo_link (such as the segpoint_location_near() method).
+# Without this fix, the "Add vertex" tool in the MSS Toolbox
+# cannot work on area geometries.
+
+sw!patch_software("geometry_vector", 1)
+$
+
+_pragma(classify_level=restricted, topic={geometry})
+_method pseudo_link.object_for_geom_prim
+	##
+	## Return the object to use as the receiver or argument of a
+	## geometry primitive call : the sector_rope that defines self.
+	##
+
+	# 2007/02/20 TM  Copied from pseudo_chain.
+	
+	_return _self.as_sector_rope()
+	
+_endmethod
+$
+
+sw!declare_patch(314006, "1", "MSS custom patch: Implement missing method pseudo_link.object_for_geom_prim.")
+$

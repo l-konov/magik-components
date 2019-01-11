@@ -1,0 +1,10 @@
+mss_ws_http_services	1
+
+description
+	HTTP services for mss_workspace
+end
+
+requires
+	mss_http_server
+	mss_http_soap
+end

@@ -1,0 +1,11 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+message_handler.new(:mss_cu_config_application).set_uses_list({:application, :mss_cu_config_framework})
+$

@@ -1,0 +1,26 @@
+<config>
+  <plugins>
+    <plugin name="versions" class_name="version_management_plugin">
+      <properties>
+        <property name="type" value="mss_scheduler"/>
+        <property name="conflict_viewer_name" value="conflict_viewer_dialog"/>
+      </properties>
+    </plugin>
+
+    <plugin name="editor_manager" class_name="editor_manager">
+      <properties>
+        <property name="editor_gui_definition_module_name" value="mss_scheduler_editor"/>
+        <property name="editor_config_definition_module_name" value="mss_scheduler_editor"/>
+        <property name="default_editor_class" value="mss_scheduler_object_editor"/>
+      </properties>
+    </plugin>
+
+    <plugin name="mss_scheduler_engine" class_name="mss_scheduler_engine">
+      <properties>
+        <property name="auto_run_scheduler_engine?" value="false"/>
+      </properties>
+    </plugin>
+    <plugin name="mss_scheduler_processor_plugin" class_name="mss_scheduler_processor_plugin"/>
+    <plugin name="mss_scheduler_results_plugin" class_name="mss_scheduler_results_plugin"/>
+  </plugins>
+</config>

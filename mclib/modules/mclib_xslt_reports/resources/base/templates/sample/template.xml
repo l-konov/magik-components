@@ -1,0 +1,27 @@
+<template name="default">
+   <files>
+      <file name="manifold">
+	   <stylesheet_name>sample_manifold.xsl</stylesheet_name>
+	   <collection name="sw_gis!case_manifold" prefix="manifold_" file_name_property="name" />
+         </file>
+	 <file name="sample_file">
+	   <stylesheet_name>sample_manifold.xsl</stylesheet_name>
+	   <collection name="sw_gis!case_manifold" prefix="manifold_" file_name_property="name" />
+         </file>
+    </files>
+<collections>
+          <!-- collection soc="soc_name" dataset="dataset_name" name="coll_name"/-->
+	  <!-- fields -->
+	     <!-- field name="field_name to include"-->
+    <collection name="sw_gis!node">
+	     <fields>
+	       <field name="node_id"/>
+	     </fields>
+	  </collection>
+	  <collection name="sw_gis!point">
+	     <fields>
+	       <field name="gis_id"/>
+	     </fields>
+	  </collection>
+       </collections>
+</template>

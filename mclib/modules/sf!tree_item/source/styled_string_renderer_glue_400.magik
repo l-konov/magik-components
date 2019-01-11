@@ -1,0 +1,74 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - March 2005
+##
+_package sw
+$
+
+
+_pragma(classify_level=restricted)
+##
+## Defines a mapping between images defined in !window_system!.images_data
+## and bitmaps defined in the core product.
+## The mapping is not necessarily 100% - e.g. size and colors
+## may be different.
+##
+styled_string_renderer.define_shared_constant( :sf!bitmap_to_image_locator,
+	_block
+	    _local cst_ui << :ui_resources
+	    _local loc_ui << :mclib_tree_item
+
+	>> hash_table.new_with(
+	    :alpha_field_icon,		{ :alpha_field,		   cst_ui },
+	    :boxes_icon,		{ :collection,		   cst_ui },
+	    :collection_name_icon,	{ :rwo_name,		   cst_ui },
+	    :coverage_icon,		{ :area,		   cst_ui },
+	    :database_icon,		{ :database,		   cst_ui },
+	    :dimension_icon,		{ :dimension,		   cst_ui },
+	    :domain_icon,		{ :domain_icon,		   cst_ui },
+	    :enumerator_icon,		{ :enumerator,		   cst_ui },
+	    :enumerator_value_icon,	{ :enumerator_value,	   cst_ui },
+	    :ext_enumerator_value_icon,	{ :ext_enumerator_value,   cst_ui },
+	    :extdb_database_icon,	{ :ext_database,	   cst_ui },
+	    :fx_icon,			{ :fx_icon,		   cst_ui },
+	    :line_icon,			{ :chain,		   cst_ui },
+	    :point_icon,		{ :point,		   cst_ui },
+	    :raster_icon,		{ :raster,		   cst_ui },
+	    :text_icon,			{ :text,		   cst_ui },
+	    :tin_icon,			{ :tin,			   cst_ui },
+
+	    :box_icon,			{ :box_icon,		loc_ui },
+	    :table_icon,		{ :table_icon,		loc_ui },
+	    :tables_icon,		{ :tables_icon,		loc_ui },
+	    :default,			{ :default,		loc_ui },
+	    :none,			{ :none,		loc_ui },
+	    :yellow_bullet,		{ :default,		loc_ui },
+	    :closed_folder,		{ :closed_folder,	loc_ui },
+	    :open_folder,		{ :open_folder,		loc_ui },
+	    :collapsable_icon,		{ :collapsable_icon,	loc_ui },
+	    :expandable_icon,		{ :expandable_icon,	loc_ui },
+	    :radio_false,		{ :radio_false,		loc_ui },
+	    :radio_true,		{ :radio_true,		loc_ui },
+	    :toggle_false,		{ :toggle_false,	loc_ui },
+	    :toggle_maybe,		{ :toggle_maybe,	loc_ui },
+	    :toggle_true,		{ :toggle_true,		loc_ui },
+	    :small_toggle_false,	{ :small_toggle_false,	loc_ui },
+	    :small_toggle_maybe,	{ :small_toggle_maybe,	loc_ui },
+	    :small_toggle_true,		{ :small_toggle_true,	loc_ui } )
+	_endblock,
+	:private )
+$

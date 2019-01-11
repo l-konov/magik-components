@@ -1,0 +1,10 @@
+mss_scheduler_cu_additions	1
+
+description
+	MSS scheduler Compatible Unit additions
+end
+
+requires
+	mss_cu
+	mss_scheduler
+end

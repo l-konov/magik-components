@@ -1,0 +1,4 @@
+message_usages.magik
+
+mss_ptdef_config_application.magik
+register.magik

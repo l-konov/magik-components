@@ -1,0 +1,13 @@
+mss_wm_job_design_plugin	1
+
+description
+	Plugin for managing data about jobs and designs
+end
+
+requires
+	mss_application_databus
+	mss_wm_overlay_view
+	mss_wm_overlay_view_copy_gui
+	mss_workspace_aggregator
+	mss_workspace_data_model
+end

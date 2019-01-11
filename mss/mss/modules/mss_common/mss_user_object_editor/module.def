@@ -1,0 +1,9 @@
+mss_user_object_editor	1
+
+description
+	General improvements to object_editor for editing standard user-defined records in a typical data model.
+end
+
+requires
+	editor_plugin
+end

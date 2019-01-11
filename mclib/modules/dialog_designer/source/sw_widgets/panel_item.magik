@@ -1,0 +1,43 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## PANEL_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+panel_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :row_alignment,  {:fill,:top,:centre,:bottom},
+					  :col_alignment,  {:fill,:left,:centre,:right},
+					  :label,:string),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method panel_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over panel_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$

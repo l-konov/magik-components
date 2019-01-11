@@ -1,0 +1,471 @@
+CU_EXPORT,1,13/08/2005 07:43:57
+CU,BACKHOE,Backhoe,Equipment,Per Hour,,
+CU,BEER_BL,Bud Light,Material,Each,,
+CU,BEER_G,Guinness,Material,Each,,
+CU,BEER_KG,Kokanee Gold,Material,Each,,
+CU,BEER_LB,Labatt's Blue,Material,Each,,
+CU,BEER_MGD,Miller Genuine Draft,Material,Each,,
+CU,BORE_CLAY,Additional effort to bore through clay,Labor,Per Meter,,
+CU,BORE_ROCK,Additional effort to bore through rock,Labor,Per Meter,,
+CU,BORE_SOIL,Additional effort to bore through soil,Labor,Per Meter,,
+CU,CABLE1,Cable LV,Material,Per Meter,04/01/2002,04/30/2009
+CU,CABLE2,Cable 11kV,Material,Per Meter,04/01/2002,04/30/2009
+CU,CABLE3,Cable HV,Material,Per Meter,04/01/2002,04/30/2009
+CU,CUST_COM,Typical commercial customer,Material,Each,,
+CU,CUST_IND,Typical industrial customer,Material,Each,,
+CU,CUST_RES,Typical residential customer,Material,Each,,
+CU,FLAG1,Flagperson - 1 person crew,Labor,Per Hour,,
+CU,FLAG2,Flagperson - 2 person crew,Labor,Per Hour,,
+CU,FP01,Footpath - cycle path,Material,Per Meter,,
+CU,FP02,Footpath - pedestrian surfaced,Material,Per Meter,,
+CU,FP03,Footpath - pedestrian unsurfaced,Material,Per Meter,,
+CU,FP99,Footpath - generic,Material,Per Meter,,
+CU,J1,Joint LV,Material,Each,,
+CU,J2A,Joint 11kV - OH usage,Material,Each,,
+CU,J2B,Joint 11kV - UG usage,Material,Each,,
+CU,J3,Joint HV,Material,Each,04/01/2002,04/30/2009
+CU,MU_ROAD02,ROAD02 + FLAG2,Macro Unit,Per Meter,,
+CU,MU_ROAD03A,ROAD03 + FLAG1,Macro Unit,Per Meter,,
+CU,MU_ROAD03B,ROAD03 + FLAG1 + TRENCH_SOIL,Macro Unit,Per Meter,,
+CU,PUB01,Pub - French,Material,Each,03/01/2005,
+CU,PUB02,Pub - Pub Grub,Material,Each,,
+CU,PUB03A,"Pub - British, easy parking",Material,Each,,
+CU,PUB03B,"Pub - British, difficult parking",Material,Each,,
+CU,PUBX,Pub - obsolete CU,Material,Each,01/01/1975,12/31/1999
+CU,RESTR01,Restaurant - French,Material,Each,,
+CU,RESTR02,Restaurant - Chinese,Material,Each,,
+CU,RESTR9999,Restaurant - no specific cuisine,Material,Each,,
+CU,ROAD01,"A-Road, Dual Carriage",Material,Per Meter,,
+CU,ROAD02,"A-Road, Single Carriage",Material,Per Meter,,
+CU,ROAD03,"B-Road, Single Carriage",Material,Per Meter,,
+CU,ROAD04,"Unclassified, Single Carriage",Material,Per Meter,,
+CU,ROAD21,"Unknown, Slip Road",Material,Per Meter,,
+CU,ROAD31,"Cycle Way, Single Carriage",Material,Per Meter,,
+CU,ROAD32,"Cycle Way, Single Track",Material,Per Meter,,
+CU,RW01,Road works - test 1,Material,Each,,
+CU,RW02,Road works - test 2,Material,Each,,
+CU,RW03,Road works - test 3,Material,Each,,
+CU,RW04,Road works - test 4,Material,Each,,
+CU,THINGY1,"Random thing 1 - 24"" size",Equipment,Each,,
+CU,THINGY2,"Random thing 2 - 36"" size",Equipment,Each,,
+CU,THINGY3,"Random thing 3 - 48""",Equipment,Each,,
+CU,THINGY4,Random thing 4,Equipment,Each,,
+CU,TRENCH_CLAY,Additional effort to trench through clay,Labor,Per Meter,,
+CU,TRENCH_ROCK,Additional effort to trench through rock,Labor,Per Meter,,
+CU,TRENCH_SOIL,Additional effort to trench through soil,Labor,Per Meter,,
+CU,XFM_D,Transformer - distribution,Material,Each,,
+CU,XFM_S,Transformer - subtransmission,Equipment,Per Hour,,
+CU,X_ROAD01,"A-Road, Dual Carriage - Extra Big!",Material,Per Meter,01/01/2001,
+CU,ZIP01,Roundabout - big,Material,Each,01/01/1994,
+CU,ZIP02,Roundabout - small,Material,Each,01/01/1994,
+CU,ZIP41,Roundabout - generic,Material,Each,01/01/1994,
+OP,BACKHOE,Abandon,0.00000,125.00000
+OP,BACKHOE,Install,0.00000,125.00000
+OP,BACKHOE,Remove,0.00000,125.00000
+OP,BACKHOE,Transfer,0.00000,125.00000
+OP,BEER_BL,Install,2.50000,0.00000
+OP,BEER_G,Install,5.50000,0.00000
+OP,BEER_KG,Install,4.25000,0.00000
+OP,BEER_LB,Install,4.00000,0.00000
+OP,BEER_MGD,Install,2.75000,0.00000
+OP,BORE_CLAY,Install,0.00000,1.50000
+OP,BORE_ROCK,Install,0.00000,4.50000
+OP,BORE_SOIL,Install,0.00000,2.35000
+OP,CABLE1,Abandon,0.00000,0.20000
+OP,CABLE1,Install,0.90000,0.30000
+OP,CABLE1,Remove,0.00000,0.40000
+OP,CABLE1,Transfer,0.00000,0.50000
+OP,CABLE2,Abandon,0.00000,0.20000
+OP,CABLE2,Install,1.30000,0.30000
+OP,CABLE2,Remove,0.00000,0.40000
+OP,CABLE2,Transfer,0.00000,0.50000
+OP,CABLE3,Abandon,0.00000,0.20000
+OP,CABLE3,Install,1.70000,0.30000
+OP,CABLE3,Remove,0.00000,0.40000
+OP,CABLE3,Transfer,0.00000,0.50000
+OP,CUST_COM,Install,125.00000,160.00000
+OP,CUST_IND,Install,450.00000,500.00000
+OP,CUST_RES,Install,75.00000,80.00000
+OP,FLAG1,Abandon,0.00000,25.00000
+OP,FLAG1,Install,0.00000,25.00000
+OP,FLAG1,Remove,0.00000,25.00000
+OP,FLAG1,Transfer,0.00000,25.00000
+OP,FLAG2,Abandon,0.00000,45.00000
+OP,FLAG2,Install,0.00000,45.00000
+OP,FLAG2,Remove,0.00000,45.00000
+OP,FLAG2,Transfer,0.00000,45.00000
+OP,FP01,Abandon,0.00000,0.25000
+OP,FP01,Install,1.00000,0.35000
+OP,FP01,Remove,0.00000,0.45000
+OP,FP01,Transfer,0.30000,0.55000
+OP,FP02,Abandon,0.00000,0.25000
+OP,FP02,Install,0.90000,0.35000
+OP,FP02,Remove,0.00000,0.45000
+OP,FP02,Transfer,0.30000,0.55000
+OP,FP03,Abandon,0.00000,0.25000
+OP,FP03,Install,0.80000,0.35000
+OP,FP03,Remove,0.00000,0.45000
+OP,FP03,Transfer,0.30000,0.55000
+OP,FP99,Abandon,0.00000,0.25000
+OP,FP99,Install,0.70000,0.35000
+OP,FP99,Remove,0.00000,0.45000
+OP,FP99,Transfer,0.30000,0.55000
+OP,J1,Abandon,0.00000,5.00000
+OP,J1,Install,30.75000,35.00000
+OP,J1,Remove,0.00000,10.50000
+OP,J1,Transfer,10.00000,12.50000
+OP,J2A,Abandon,0.00000,5.00000
+OP,J2A,Install,30.75000,35.00000
+OP,J2A,Remove,0.00000,10.50000
+OP,J2A,Transfer,10.00000,12.50000
+OP,J2B,Abandon,0.00000,5.00000
+OP,J2B,Install,30.75000,35.00000
+OP,J2B,Remove,0.00000,10.50000
+OP,J2B,Transfer,10.00000,12.50000
+OP,J3,Abandon,0.00000,5.00000
+OP,J3,Install,30.75000,35.00000
+OP,J3,Remove,0.00000,10.50000
+OP,J3,Transfer,10.00000,12.50000
+OP,MU_ROAD02,Install,0.00000,0.00000
+OP,MU_ROAD03A,Install,0.00000,0.00000
+OP,MU_ROAD03B,Install,0.00000,0.00000
+OP,PUB01,Abandon,0.00000,100.00000
+OP,PUB01,Install,800.00000,150.00000
+OP,PUB01,Remove,0.00000,650.00000
+OP,PUB02,Abandon,0.00000,100.00000
+OP,PUB02,Install,1200.00000,150.00000
+OP,PUB02,Remove,0.00000,650.00000
+OP,PUB03A,Abandon,0.00000,100.00000
+OP,PUB03A,Install,600.00000,150.00000
+OP,PUB03A,Remove,0.00000,650.00000
+OP,PUB03B,Abandon,0.00000,100.00000
+OP,PUB03B,Install,525.00000,150.00000
+OP,PUB03B,Remove,0.00000,650.00000
+OP,PUBX,Abandon,0.00000,99.00000
+OP,PUBX,Install,400.00000,149.00000
+OP,PUBX,Remove,0.00000,649.00000
+OP,RESTR01,Abandon,0.00000,200.00000
+OP,RESTR01,Install,2500.00000,900.00000
+OP,RESTR01,Remove,0.00000,880.00000
+OP,RESTR02,Abandon,0.00000,200.00000
+OP,RESTR02,Install,2500.00000,900.00000
+OP,RESTR02,Remove,0.00000,880.00000
+OP,RESTR9999,Abandon,0.00000,200.00000
+OP,RESTR9999,Install,1850.00000,900.00000
+OP,RESTR9999,Remove,0.00000,880.00000
+OP,ROAD01,Abandon,0.00000,1.00000
+OP,ROAD01,Install,7.00000,2.00000
+OP,ROAD01,Remove,0.00000,3.00000
+OP,ROAD01,Transfer,3.50000,4.00000
+OP,ROAD02,Abandon,0.00000,1.00000
+OP,ROAD02,Install,6.00000,2.00000
+OP,ROAD02,Remove,0.00000,3.00000
+OP,ROAD02,Transfer,3.00000,4.00000
+OP,ROAD03,Abandon,0.00000,0.80000
+OP,ROAD03,Install,4.80000,1.80000
+OP,ROAD03,Remove,0.00000,2.80000
+OP,ROAD03,Transfer,2.00000,3.50000
+OP,ROAD04,Abandon,0.00000,0.50000
+OP,ROAD04,Install,2.25000,1.50000
+OP,ROAD04,Remove,0.00000,2.50000
+OP,ROAD04,Transfer,1.00000,3.20000
+OP,ROAD21,Abandon,0.00000,0.50000
+OP,ROAD21,Install,2.75000,1.50000
+OP,ROAD21,Remove,0.00000,2.50000
+OP,ROAD21,Transfer,1.40000,3.20000
+OP,ROAD31,Abandon,0.00000,0.60000
+OP,ROAD31,Install,3.75000,1.60000
+OP,ROAD31,Remove,0.00000,2.60000
+OP,ROAD31,Transfer,1.20000,3.10000
+OP,ROAD32,Abandon,0.00000,0.50000
+OP,ROAD32,Install,2.95000,1.50000
+OP,ROAD32,Remove,0.00000,2.20000
+OP,ROAD32,Transfer,1.00000,2.60000
+OP,RW01,Abandon,0.00000,50.00000
+OP,RW01,Install,100.00000,250.00000
+OP,RW01,Remove,0.00000,100.00000
+OP,RW02,Abandon,0.00000,50.00000
+OP,RW02,Install,150.00000,450.00000
+OP,RW02,Remove,0.00000,100.00000
+OP,RW03,Abandon,0.00000,50.00000
+OP,RW03,Install,200.00000,250.00000
+OP,RW03,Remove,0.00000,100.00000
+OP,RW04,Abandon,0.00000,50.00000
+OP,RW04,Install,250.00000,450.00000
+OP,RW04,Remove,0.00000,100.00000
+OP,THINGY1,Abandon,0.00000,20.00000
+OP,THINGY1,Install,0.00000,30.00000
+OP,THINGY2,Abandon,0.00000,40.00000
+OP,THINGY3,Install,25.00000,0.00000
+OP,THINGY3,Remove,10.00000,0.00000
+OP,THINGY4,Abandon,0.00000,0.50000
+OP,THINGY4,Install,0.00000,1.00000
+OP,THINGY4,Remove,0.00000,2.00000
+OP,THINGY4,Transfer,0.00000,3.00000
+OP,TRENCH_CLAY,Install,0.00000,0.90000
+OP,TRENCH_ROCK,Install,0.00000,3.20000
+OP,TRENCH_SOIL,Install,0.00000,1.40000
+OP,XFM_D,Install,355.90000,123.40000
+OP,XFM_S,Install,840.75000,234.50000
+OP,X_ROAD01,Abandon,0.00000,1.50000
+OP,X_ROAD01,Install,9.00000,2.50000
+OP,X_ROAD01,Remove,0.00000,3.50000
+OP,X_ROAD01,Transfer,3.80000,4.50000
+OP,ZIP01,Install,1000.00000,200.00000
+OP,ZIP02,Install,500.00000,100.00000
+OP,ZIP41,Install,750.00000,150.00000
+FAC,BEER_BL,gis,beer,Install,ATTR,beer,Budweiser,ATTR,brewery,Busch,ATTR,percent_by_vol,4
+FAC,BEER_G,gis,beer,Install,ATTR,beer,Guinness,ATTR,brewery,Guinness,ATTR,percent_by_vol,5.5
+FAC,BEER_KG,gis,beer,Install,ATTR,beer,Kokanee Gold,ATTR,brewery,Labatt,ATTR,percent_by_vol,5
+FAC,BEER_LB,gis,beer,Install,ATTR,beer,Blue,ATTR,brewery,Labatt,ATTR,percent_by_vol,5
+FAC,BEER_MGD,gis,beer,Install,ATTR,beer,MGD,ATTR,brewery,Miller,ATTR,percent_by_vol,4.5
+FAC,CABLE1,electricity,cable,Abandon
+FAC,CABLE1,electricity,cable,Install,ATTR,voltage,LV
+FAC,CABLE1,electricity,cable,Remove
+FAC,CABLE1,electricity,cable,Transfer
+FAC,CABLE2,electricity,cable,Abandon
+FAC,CABLE2,electricity,cable,Install,ATTR,voltage,11kV
+FAC,CABLE2,electricity,cable,Remove
+FAC,CABLE2,electricity,cable,Transfer
+FAC,CABLE3,electricity,cable,Abandon
+FAC,CABLE3,electricity,cable,Install,ATTR,voltage,132kV
+FAC,CABLE3,electricity,cable,Remove
+FAC,CABLE3,electricity,cable,Transfer
+FAC,CUST_COM,electricity,customer,Install,ATTR,sales,150,ATTR,usage,900
+FAC,CUST_IND,electricity,customer,Install,ATTR,sales,500,ATTR,usage,3000
+FAC,CUST_RES,electricity,customer,Install,ATTR,sales,50,ATTR,usage,300
+FAC,FP01,gis,footpath,Install,ATTR,class,Cycle Path
+FAC,FP02,gis,footpath,Install,ATTR,class,Pedestrian Surfaced
+FAC,FP03,gis,footpath,Install,ATTR,class,Pedestrian Unsurfaced
+FAC,FP99,gis,footpath,Install
+FAC,J1,electricity,joint,Install,ATTR,voltage,LV
+FAC,J2A,electricity,joint,Install,ATTR,known_as,OH,ATTR,voltage,11kV
+FAC,J2B,electricity,joint,Install,ATTR,known_as,UG,ATTR,voltage,11kV
+FAC,J3,electricity,joint,Install,ATTR,voltage,132kV
+FAC,MU_ROAD02,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,A-Road
+FAC,MU_ROAD03A,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,B-Road
+FAC,MU_ROAD03B,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,B-Road
+FAC,PUB01,gis,pub_rest,Install,ATTR,cuisine,French,ATTR,parking,Easy,ATTR,type,Pub
+FAC,PUB02,gis,pub_rest,Install,ATTR,cuisine,Pub Grub,ATTR,parking,Easy,ATTR,type,Pub
+FAC,PUB03A,gis,pub_rest,Install,ATTR,cuisine,British,ATTR,parking,Easy,ATTR,type,Pub
+FAC,PUB03B,gis,pub_rest,Install,ATTR,cuisine,British,ATTR,parking,Difficult,ATTR,type,Pub
+FAC,RESTR01,gis,pub_rest,Install,ATTR,cuisine,French,ATTR,type,Restaurant
+FAC,RESTR02,gis,pub_rest,Install,ATTR,cuisine,Chinese,ATTR,type,Restaurant
+FAC,RESTR9999,gis,pub_rest,Install,ATTR,type,Restaurant
+FAC,ROAD01,gis,min_road,Install,ATTR,carriage_type,Dual Carriage,ATTR,road_type,A-Road
+FAC,ROAD02,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,A-Road
+FAC,ROAD03,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,B-Road
+FAC,ROAD04,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,Unclassified
+FAC,ROAD21,gis,min_road,Install,ATTR,carriage_type,Slip Road,ATTR,road_type,Unknown
+FAC,ROAD31,gis,min_road,Install,ATTR,carriage_type,Single Carriage,ATTR,road_type,Cycle Way
+FAC,ROAD32,gis,min_road,Install,ATTR,carriage_type,Single Track,ATTR,road_type,Cycle Way
+FAC,RW01,gis,road_works,Install,ATTR,cost_func,5,ATTR,delay,300 s,ATTR,duration,10 d
+FAC,RW02,gis,road_works,Install,ATTR,cost_func,10,ATTR,delay,600 s,ATTR,duration,15 d
+FAC,RW03,gis,road_works,Install,ATTR,cost_func,15,ATTR,delay,600 s,ATTR,duration,15 d
+FAC,RW04,gis,road_works,Install,ATTR,cost_func,15,ATTR,delay,600 s,ATTR,duration,20 d
+FAC,XFM_D,electricity,transformer,Install,ATTR,primary_voltage,11kV,ATTR,secondary_voltage,LV
+FAC,XFM_S,electricity,transformer,Install,ATTR,primary_voltage,132kV,ATTR,secondary_voltage,11kV
+FAC,X_ROAD01,gis,min_road,Install,ATTR,carriage_type,Dual Carriage,ATTR,road_type,A-Road
+FAC,ZIP01,gis,roundabout,Install,ATTR,cost_penalty,10
+FAC,ZIP02,gis,roundabout,Install,ATTR,cost_penalty,5
+FAC,ZIP41,gis,roundabout,Install
+CU_GROUP,Electric - High Voltage
+CU_GROUP_ITEM,CABLE3
+CU_GROUP_ITEM,J3
+CU_GROUP_ITEM,XFM_S
+CU_GROUP_END
+CU_GROUP,Electric - Medium/Low Voltage
+CU_GROUP_ITEM,CABLE1
+CU_GROUP_ITEM,CABLE2
+CU_GROUP_ITEM,J1
+CU_GROUP_ITEM,J2A
+CU_GROUP_ITEM,J2B
+CU_GROUP_ITEM,XFM_D
+CU_GROUP_END
+CU_GROUP,Misc Labor
+CU_GROUP_ITEM,BACKHOE
+CU_GROUP_ITEM,FLAG1
+CU_GROUP_ITEM,FLAG2
+CU_GROUP_END
+CU_GROUP,Pubs and Beer
+CU_GROUP_ITEM,BEER_BL
+CU_GROUP_ITEM,BEER_G
+CU_GROUP_ITEM,BEER_KG
+CU_GROUP_ITEM,BEER_LB
+CU_GROUP_ITEM,BEER_MGD
+CU_GROUP_ITEM,PUB01
+CU_GROUP_ITEM,PUB02
+CU_GROUP_ITEM,PUB03A
+CU_GROUP_ITEM,PUB03B
+CU_GROUP_END
+CU_GROUP,Random Stuff
+CU_GROUP_ITEM,BACKHOE
+CU_GROUP_ITEM,FLAG1
+CU_GROUP_ITEM,FLAG2
+CU_GROUP_ITEM,THINGY1
+CU_GROUP_ITEM,THINGY2
+CU_GROUP_ITEM,THINGY3
+CU_GROUP_ITEM,THINGY4
+CU_GROUP_END
+CU_GROUP,Restaurants
+CU_GROUP_ITEM,RESTR01
+CU_GROUP_ITEM,RESTR02
+CU_GROUP_ITEM,RESTR9999
+CU_GROUP_END
+CU_GROUP,Roads
+CU_GROUP_ITEM,MU_ROAD02
+CU_GROUP_ITEM,MU_ROAD03A
+CU_GROUP_ITEM,MU_ROAD03B
+CU_GROUP_ITEM,ROAD01
+CU_GROUP_ITEM,ROAD02
+CU_GROUP_ITEM,ROAD03
+CU_GROUP_ITEM,ROAD04
+CU_GROUP_ITEM,ROAD21
+CU_GROUP_ITEM,ROAD31
+CU_GROUP_ITEM,ROAD32
+CU_GROUP_ITEM,X_ROAD01
+CU_GROUP_END
+CU_JT,Simple job - gis and electricity,1.000000,0.900000
+CU_JT_ITEM,CABLE1
+CU_JT_ITEM,CABLE2
+CU_JT_ITEM,CUST_RES
+CU_JT_ITEM,FLAG1
+CU_JT_ITEM,FLAG2
+CU_JT_ITEM,J1
+CU_JT_ITEM,J2A
+CU_JT_ITEM,J2B
+CU_JT_ITEM,PUB03A
+CU_JT_ITEM,PUB03B
+CU_JT_ITEM,ROAD01
+CU_JT_ITEM,ROAD02
+CU_JT_ITEM,ROAD03
+CU_JT_ITEM,ROAD04
+CU_JT_ITEM,RW01
+CU_JT_ITEM,RW02
+CU_JT_ITEM,XFM_D
+CU_JT_ITEM,ZIP02
+CU_JT_END
+CU_JT,Simple job - gis only,1.000000,0.800000
+CU_JT_ITEM,FLAG1
+CU_JT_ITEM,FLAG2
+CU_JT_ITEM,PUB03A
+CU_JT_ITEM,PUB03B
+CU_JT_ITEM,ROAD01
+CU_JT_ITEM,ROAD02
+CU_JT_ITEM,ROAD03
+CU_JT_ITEM,ROAD04
+CU_JT_ITEM,RW01
+CU_JT_ITEM,RW02
+CU_JT_ITEM,ZIP02
+CU_JT_END
+CU_JT,Standard job - gis and electricity,1.000000,1.000000
+CU_JT_ITEM,BACKHOE
+CU_JT_ITEM,BEER_BL
+CU_JT_ITEM,BEER_G
+CU_JT_ITEM,BEER_KG
+CU_JT_ITEM,BEER_LB
+CU_JT_ITEM,BEER_MGD
+CU_JT_ITEM,BORE_CLAY
+CU_JT_ITEM,BORE_ROCK
+CU_JT_ITEM,BORE_SOIL
+CU_JT_ITEM,CABLE1
+CU_JT_ITEM,CABLE2
+CU_JT_ITEM,CABLE3
+CU_JT_ITEM,CUST_COM
+CU_JT_ITEM,CUST_IND
+CU_JT_ITEM,CUST_RES
+CU_JT_ITEM,FLAG1
+CU_JT_ITEM,FLAG2
+CU_JT_ITEM,FP01
+CU_JT_ITEM,FP02
+CU_JT_ITEM,FP03
+CU_JT_ITEM,FP99
+CU_JT_ITEM,J1
+CU_JT_ITEM,J2A
+CU_JT_ITEM,J2B
+CU_JT_ITEM,J3
+CU_JT_ITEM,MU_ROAD02
+CU_JT_ITEM,MU_ROAD03A
+CU_JT_ITEM,MU_ROAD03B
+CU_JT_ITEM,PUB01
+CU_JT_ITEM,PUB02
+CU_JT_ITEM,PUB03A
+CU_JT_ITEM,PUB03B
+CU_JT_ITEM,RESTR01
+CU_JT_ITEM,RESTR02
+CU_JT_ITEM,ROAD01
+CU_JT_ITEM,ROAD02
+CU_JT_ITEM,ROAD03
+CU_JT_ITEM,ROAD04
+CU_JT_ITEM,ROAD21
+CU_JT_ITEM,ROAD31
+CU_JT_ITEM,ROAD32
+CU_JT_ITEM,RW01
+CU_JT_ITEM,RW02
+CU_JT_ITEM,RW03
+CU_JT_ITEM,RW04
+CU_JT_ITEM,TRENCH_CLAY
+CU_JT_ITEM,TRENCH_ROCK
+CU_JT_ITEM,TRENCH_SOIL
+CU_JT_ITEM,XFM_D
+CU_JT_ITEM,XFM_S
+CU_JT_ITEM,ZIP01
+CU_JT_ITEM,ZIP02
+CU_JT_ITEM,ZIP41
+CU_JT_END
+CU_JT,Standard job - gis only,1.000000,1.000000
+CU_JT_ITEM,BACKHOE
+CU_JT_ITEM,BEER_BL
+CU_JT_ITEM,BEER_G
+CU_JT_ITEM,BEER_KG
+CU_JT_ITEM,BEER_LB
+CU_JT_ITEM,BEER_MGD
+CU_JT_ITEM,BORE_CLAY
+CU_JT_ITEM,BORE_ROCK
+CU_JT_ITEM,BORE_SOIL
+CU_JT_ITEM,FLAG1
+CU_JT_ITEM,FLAG2
+CU_JT_ITEM,FP01
+CU_JT_ITEM,FP02
+CU_JT_ITEM,FP03
+CU_JT_ITEM,FP99
+CU_JT_ITEM,MU_ROAD02
+CU_JT_ITEM,MU_ROAD03A
+CU_JT_ITEM,MU_ROAD03B
+CU_JT_ITEM,PUB01
+CU_JT_ITEM,PUB02
+CU_JT_ITEM,PUB03A
+CU_JT_ITEM,PUB03B
+CU_JT_ITEM,RESTR01
+CU_JT_ITEM,RESTR02
+CU_JT_ITEM,ROAD01
+CU_JT_ITEM,ROAD02
+CU_JT_ITEM,ROAD03
+CU_JT_ITEM,ROAD04
+CU_JT_ITEM,ROAD21
+CU_JT_ITEM,ROAD31
+CU_JT_ITEM,ROAD32
+CU_JT_ITEM,RW01
+CU_JT_ITEM,RW02
+CU_JT_ITEM,RW03
+CU_JT_ITEM,RW04
+CU_JT_ITEM,TRENCH_CLAY
+CU_JT_ITEM,TRENCH_ROCK
+CU_JT_ITEM,TRENCH_SOIL
+CU_JT_ITEM,ZIP01
+CU_JT_ITEM,ZIP02
+CU_JT_ITEM,ZIP41
+CU_JT_END
+CU_MU,MU_ROAD02,Install
+CU_MU_ITEM,FLAG2,Install,1,4.500000
+CU_MU_ITEM,ROAD02,Install,1,
+CU_MU_END
+CU_MU,MU_ROAD03A,Install
+CU_MU_ITEM,FLAG1,Install,1,2.500000
+CU_MU_ITEM,ROAD03,Install,1,
+CU_MU_END
+CU_MU,MU_ROAD03B,Install
+CU_MU_ITEM,FLAG1,Install,1,3.250000
+CU_MU_ITEM,ROAD03,Install,1,
+CU_MU_ITEM,TRENCH_SOIL,Install,1,
+CU_MU_END

@@ -1,0 +1,6 @@
+<config>
+  <plugins>
+    <plugin name="mss_cu_lister_plugin" class_name="mss_cu_lister_plugin"/>
+    <plugin name="mss_cu_query_plugin" class_name="mss_cu_query_plugin"/>
+  </plugins>
+</config>

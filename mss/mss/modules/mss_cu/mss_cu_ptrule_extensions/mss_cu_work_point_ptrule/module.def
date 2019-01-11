@@ -1,0 +1,10 @@
+mss_cu_work_point_ptrule	1
+
+description
+	Pointing rules to place work points
+end
+
+requires
+	mss_cu
+	mss_ptrules
+end

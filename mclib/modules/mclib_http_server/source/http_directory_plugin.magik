@@ -1,0 +1,111 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-10-09 16:56:17 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     This library is free software; you can redistribute it and/or
+##     modify it under the terms of the GNU Lesser General Public
+##     License as published by the Free Software Foundation; either
+##     version 2.1 of the License, or (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+##     Lesser General Public License for more details.
+##
+##     You should have received a copy of the GNU Lesser General Public
+##     License along with this library; if not, write to the Free Software
+##     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## Provides a directory container for the HTTP listener.  This
+## will hold  aplugin_framework with a collection of srevice or
+## directory plugins that live within this directory.
+def_slotted_exemplar(:http_directory_plugin,
+                      {
+			      {:plugin_holder,_unset}
+		      },
+		      {:plugin})
+$
+
+http_directory_plugin.define_property(:config_definition_module_name,:symbol,
+				   "Module name for building my child plugins",
+				   _true,_true,_unset)
+$
+http_directory_plugin.define_property(:config_definition_file_name,:string,
+				   "File name for building my child plugins",
+				   _true,_true,"config.xml")
+$
+
+
+_pragma(classify_level=restricted)
+_method http_directory_plugin.post_init_plugins()
+	## Create my plugin holder
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	.plugin_holder << plugin_framework.new(_self.name,_self,
+					       :config_definition_module_name,_self.config_definition_module_name,
+					       :config_definition_file_name,_self.config_definition_file_name)
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_directory_plugin.get_plugin_for_path(_optional some_path_elements)
+	## returns self, as this implementation does not support nested cheildren
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	elem << .plugin_holder.plugin(some_path_elements.first)
+	_if elem _is _unset 
+	_then
+		_return _unset 
+	_endif
+	>> elem.get_plugin_for_path(some_path_elements.slice_to_end(2))
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method http_directory_plugin.mclib_df!children()
+	## returns the items under me.
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> .plugin_holder.mclib_df!children()
+_endmethod
+$
+_pragma(classify_level=basic)
+_method http_directory_plugin.mclib_df!styled_string(_optional a_context)
+	## returns a string to show my name plus a / to denote the directory
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> styled_string.new(_self.name.write_string + "/")
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method http_directory_plugin.plugin(name)
+	## returns the item in me called NAME
+	## 
+	##
+
+	# (09-29-2006 Brad Sileo): created.
+	>> .plugin_holder.plugin(name)
+_endmethod
+$

@@ -1,0 +1,2 @@
+mss_wm_job_design_attribute_prompter.magik
+mss_wm_job_design_plugin.magik

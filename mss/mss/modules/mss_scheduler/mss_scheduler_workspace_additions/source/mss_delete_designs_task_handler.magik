@@ -1,0 +1,295 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_delete_designs_task_handler
+##
+## Task handler for deleting completed and/or cancelled jobs
+## and designs in the mss_workspace modules.
+##
+
+def_slotted_exemplar(:mss_delete_designs_task_handler,
+{
+	{:current_date_time, _unset, :readable},
+	{:delete_design_count, _unset, :readable},
+	{:delete_job_count, _unset, :readable}
+},
+{:mss_scheduled_task_handler})
+$
+
+mss_scheduler_engine.define_task_handler(:delete_designs, mss_delete_designs_task_handler)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+mss_delete_designs_task_handler.define_shared_constant(
+	:mss_delete_design_rules,
+	## An equality_hash_table, where each key is a state name, and
+	## each value is the number of days that designs with that
+	## state should be retained.
+	##
+	## N.B.: this must be redefined to suit your specific
+	## workflows.
+	equality_hash_table.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+_method mss_delete_designs_task_handler.mss_delete_job_rules
+	## 
+	## An equality_hash_table, where each key is a state name, and
+	## each value is the number of days that jobs with that
+	## state should be retained.  Standard behavior is to share the
+	## same lookup table as for designs, but this is redefinable.
+	## 
+
+	_return _self.mss_delete_design_rules
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+mss_delete_designs_task_handler.define_shared_constant(
+	:always_delete_job_with_last_design?,
+	## If this is true, then a job is always deleted when the last
+	## design of that job is deleted, even if the job status may
+	## not otherwise indicate so.
+	_true,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_delete_designs_task_handler.parameters_for_task_type(task_type)
+	## 
+	##
+
+	pl << property_list.new()
+
+	# Note: currently there are no parameters to this task type.
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_delete_designs_task_handler.int!run()
+	## 
+	## Perform the work required to complete the deletion of jobs
+	## and designs.
+	##
+
+	.current_date_time << date_time.now()
+	.delete_design_count << 0
+	.delete_job_count << 0
+	
+	mss_workspace_manager_engine.view.rollforward()
+	mss_workspace_manager_engine.open_design(_unset)
+	res1 << _self.delete_designs()
+	res2 << _self.delete_jobs()
+
+	.standard_output.write(newline_char)
+	.standard_output.write(_self.message(:delete_design_count, .delete_design_count), newline_char)
+	.standard_output.write(_self.message(:delete_job_count, .delete_job_count), newline_char)
+	
+	res << res1.default(_false) _and res2.default(_false)
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable})
+_method mss_delete_designs_task_handler.delete_designs()
+	## 
+	## Delete all designs that have reached a completed and/or
+	## cancelled state.
+	##
+
+	_handling information _with procedure
+	_handling mss_information _with procedure
+	_handling mss_question _with procedure
+
+	_local me << _self
+	
+	# The following processing only rounds to the nearest day,
+	# based on the starting date of execution of this task.
+	cur_date << date.new_from(.current_date_time)
+	
+	# N.B.: table is not indexed on status, so just loop over all
+	# records and process sequentially.
+	recs_to_do << mss_workspace_manager_engine.design_table
+	del_rules << _self.mss_delete_design_rules
+	adj? << _self.always_delete_job_with_last_design?
+
+	err_count << 0
+	iters << 0
+	retval << _true
+	
+	_loop @outer
+		any_changed? << _false
+		iters +<< 1
+		_for rec _over recs_to_do.fast_elements()
+		_loop
+			_if err_count >= 10
+			_then
+				.failure_code << _self.message(:too_many_errors)
+				_leave @outer
+			_endif
+			
+			_if (st << rec.status) _is _unset _orif
+			    (lut << rec.last_update_time) _is _unset 
+			_then
+				_continue
+			_endif
+
+			st << st.as_charvec()
+			lud << date.new_from(lut)
+			my_days << (cur_date - lud).days
+
+			_if (keep_days << del_rules[st]) _isnt _unset _andif
+			    my_days >= keep_days _andif
+			    rec.child_designs.size = 0
+			_then
+				.standard_output.write(_self.message(:deleting_design, rec.short_description))
+				ok? << _false 
+				_catch :any_error
+				       _handling error _with
+				       _proc(cond)
+					       _import me
+					       me.error_output.write(cond.report_contents_string)
+					       !traceback!(me.error_output)
+					       me.error_output.write(newline_char)
+					       me.error_output.flush()
+					       me.failure_code << cond.name.write_string
+					       _throw :any_error
+				       _endproc
+				       
+				       any_changed? << true 
+				       job_rec << rec.mss_job
+
+				       mss_workspace_manager_engine.delete_design(rec)
+				       .delete_design_count +<< 1
+				       _if adj? _is _true _andif
+					   job_rec.mss_designs.size = 0
+				       _then
+					       mss_workspace_manager_engine.delete_job(job_rec)
+					       .delete_job_count +<< 1
+				       _endif
+				       ok? << _true
+				_endcatch
+
+				_if ok?
+				_then
+					.standard_output.write(_self.message(:delete_ok), newline_char)
+				_else
+					.standard_output.write(_self.message(:delete_error), newline_char)
+					retval << _false 
+					err_count +<< 1
+				_endif 
+			_endif 
+		_endloop
+
+		# If nothing changed, or if more than 10 iterations, then exit
+		# the outer loop.  Note that this does multiple iterations to
+		# allow sub-designs to be cleaned out first, then parent
+		# designs on the next pass if this finds that all sub-designs
+		# have been tidied up.
+		_if any_changed? _is _false _orif
+		    iters >= 10
+		_then
+			_leave
+		_endif
+	_endloop
+	
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable})
+_method mss_delete_designs_task_handler.delete_jobs()
+	## 
+	## Delete all designs that have reached a completed and/or
+	## cancelled state.
+	##
+
+	_handling mss_information _with procedure
+	_handling mss_question _with procedure
+
+	_local me << _self
+	
+	# The following processing only rounds to the nearest day,
+	# based on the starting date of execution of this task.
+	cur_date << date.new_from(.current_date_time)
+	
+	# N.B.: table is not indexed on status, so just loop over all
+	# records and process sequentially.
+	recs_to_do << mss_workspace_manager_engine.job_table
+	del_rules << _self.mss_delete_job_rules
+
+	err_count << 0
+	retval << _true
+	
+	_for rec _over recs_to_do.fast_elements()
+	_loop @outer
+		_if err_count >= 10
+		_then
+			.failure_code << _self.message(:too_many_errors)
+			_leave @outer
+		_endif
+		
+		_if (st << rec.status) _is _unset _orif
+		    (lut << rec.last_update_time) _is _unset 
+		_then
+			_continue
+		_endif
+		
+		st << st.as_charvec()
+		lud << date.new_from(lut)
+		my_days << (cur_date - lud).days
+		
+		_if (keep_days << del_rules[st]) _isnt _unset _andif
+		    my_days >= keep_days _andif
+		    rec.mss_designs.size = 0
+		_then
+			.standard_output.write(_self.message(:deleting_job, rec.short_description))
+			ok? << _false 
+			_catch :any_error
+			       _handling error _with
+			       _proc(cond)
+				       _import me
+				       me.error_output.write(cond.report_contents_string)
+				       !traceback!(me.error_output)
+				       me.error_output.write(newline_char)
+				       me.error_output.flush()
+				       me.failure_code << cond.name.write_string
+				       _throw :any_error
+			       _endproc
+			       
+			       any_changed? << true 
+			       mss_workspace_manager_engine.delete_job(rec)
+			       .delete_job_count +<< 1
+			       ok? << _true 
+			_endcatch
+			
+			_if ok?
+			_then
+				.standard_output.write(_self.message(:delete_ok), newline_char)
+			_else
+				.standard_output.write(_self.message(:delete_error), newline_char)
+				retval << _false 
+				err_count +<< 1
+			_endif 
+		_endif 
+	_endloop
+	
+	_return retval
+	
+_endmethod
+$

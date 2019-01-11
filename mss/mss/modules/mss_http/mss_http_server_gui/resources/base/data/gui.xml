@@ -1,0 +1,31 @@
+<gui>
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="close"/>
+    </submenu>
+    <submenu name="control">
+      <action source="http_server" name="run"/>
+      <action source="http_server" name="interrupt"/>
+    </submenu>
+  </menu>
+  <toolbar name="control">
+    <action source="http_server" name="run"/>
+    <action source="http_server" name="interrupt"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="control"/>
+  </dock>
+ 
+  <work_area>
+    <tab_box>
+      <plugin plugin_name="http_server" gui_usage="configuration"/>
+      <plugin plugin_name="http_server" gui_usage="services"/>
+    </tab_box>
+  </work_area>
+
+  <statusbar name="default">
+    <pane id="run_status_string" style="innie" width="100"/>
+    <pane id="status_string" style="innie" width="200" springy="true"/>
+  </statusbar>
+</gui>

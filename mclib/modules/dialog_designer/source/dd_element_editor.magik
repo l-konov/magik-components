@@ -1,0 +1,1600 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## Element editor, the embedded editor used by the Dialog
+## Designer for modifying the attributes of dialog elements.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_element_editor,
+		     {
+			     {:element,_unset,:writable},
+			     {:element_type,_unset,:writable},
+			     {:element_choice,_unset,:writable},
+			     {:alpha,_unset,:writable},
+			     {:ws,_unset,:writable},
+			     {:editors,_unset,:writable},
+			     {:icon_product,_unset,:writable},
+			     {:icon_product_num,_unset,:writable},
+			     {:icon_module,_unset,:writable},
+			     {:icon_module_num,_unset,:writable},
+			     {:icon_name,_unset,:writable},
+			     {:icon_name_num,_unset,:writable},
+			     {:icon_list,_unset,:writable},
+			     {:icon_ok,_unset,:writable},			     
+			     {:large_image?,_unset,:writable},
+			     {:plugin_name,_unset,:writable},
+			     {:plugin_num,_unset,:writable},
+			     {:action_name,_unset,:writable},
+			     {:action_num,_unset,:writable},
+			     {:app_list,_unset,:writable},
+			     {:refresh_app_list,_unset,:writable},
+			     {:plugin_action_list,_unset,:writable},
+			     {:plugin_action_ok,_unset,:writable}		     
+		     },:plugin)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.new(type)
+	## 
+	## Return a new TYPE instance of _self.
+	
+	ddee << _super.new()
+	
+	ddee.element_type << type
+
+	>> ddee
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.build_gui(f, _optional xml_element )
+	## 
+	## Construct the GUI in frame F.
+	
+	.ws << window_stack.new(f)
+	.editors << property_list.new()
+
+	# Main DD element editor
+	rc << rowcol.new(.ws,_unset,1,:pixel,:style,:nested,
+		     :resize?,_true,
+		     :row_spacing,2,
+		     :default_col_alignment,:fill,
+		     :default_row_alignment,:fill)
+	
+	_self.element_choice(rc)
+	_self.alpha_panel(rc)
+	rc.name << :editor
+
+	# Icon Selector
+	rc << rowcol.new(.ws,_unset,1,:pixel,:style,:nested,
+		     :resize?,_true,
+		     :row_spacing,2,
+		     :default_col_alignment,:fill,
+		     :default_row_alignment,:fill)
+
+	_self.icon_search(rc)
+	rc.name << :set_image_resource
+
+	# Plugin Selector
+	rc << rowcol.new(.ws,_unset,1,:pixel,:style,:nested,
+		     :resize?,_true,
+		     :row_spacing,2,
+		     :default_col_alignment,:fill,
+		     :default_row_alignment,:fill)
+
+	_self.plugin_search(rc)
+	rc.name << :set_plugin_resource
+
+	.ws.value << :editor
+
+	>> .ws	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.element_choice(rc)
+	## 
+	## Create the element chooser in the rowcol RC.
+
+	.element_choice << text_choice_item.new(rc,_unset,
+						:items,rope.new(), 
+						:model,_self,
+						:change_selector,:|element_chosen()|)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_choice_items(els)
+	## 
+	## Set the items displayed by SELF's element chooser.
+	
+	sort_proc << _proc(a,b)
+			     >> a[2].default("") < b[2].default("")
+		     _endproc 
+	sc << sorted_collection.new(_unset,sort_proc)
+	sc.add({"",""})
+
+	_for el _over els.fast_elements()
+	_loop
+		_if _not el.responds_to?(:|dialog_description()|) _then _continue _endif 
+		sc.add({el,el.dialog_description().default(el.dialog_element_id)})
+	_endloop
+
+	.element_choice.items << sc
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.menubar_element_choices()
+	## 
+	## Return the list of Menubar elements for the current DIALOG.
+	
+	els << _self.databus_request_data(:menubar_elements)
+	els << els.default({})
+
+	sc << sorted_collection.new()
+	sc.add("")
+
+	es << equality_set.new()
+
+	_for el _over els.fast_elements()
+	_loop
+		name << el.name
+		
+		_if es.includes?(name)
+		_then
+			_continue 
+		_endif
+
+		es.add(name)
+		sc.add(name)
+	_endloop
+
+	>> sc
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.statusbar_element_choices()
+	## 
+	## Return the list of Statusbar elements for the current DIALOG.
+
+	els <<  _self.databus_request_data(:statusbar_elements)
+
+	rp << rope.new()
+	
+	_for el _over els.fast_elements()
+	_loop
+		rp.add(el.id)
+	_endloop
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.element_chosen(which)
+	## 
+	## React to and element being chosen in WHICH UI element.
+	## Which can be :gui_layout,:menubar or :statusbar
+
+	_if .element_type _is :gui_layout
+	_then
+		_self.edit(which)
+		el << _self.chosen_element(which)
+	
+		_self.databus_make_data_available(:current_gui_layout_element,which)
+	_elif .element_type _is :statusbar
+	_then
+		_self.edit(which)
+		_self.databus_make_data_available(:current_statusbar_element,which)
+	_elif .element_type _is :outlookbar
+	_then
+		_self.edit(which)
+		_self.databus_make_data_available(:current_outlookbar_element,which)
+	_elif .element_type _is :menubar
+	_then
+		_self.edit(which)
+		_self.databus_make_data_available(:current_menubar_element,which)
+	_else
+		_self.edit(which)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.choose_element(a_name)
+	## 
+	## Choose and edit the element called NAME.
+
+	_for el _over .element_choice.items.fast_elements()
+	_loop
+		_if el[1] <> "" _andif el[1].name = a_name
+		_then
+			_self.element_choice.value << el[1]
+			_self.element_chosen(el[1])
+
+			_return  el[1]
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.chosen_element(which)
+	## 
+	## Return the element whose dialog_element_id is WHICH.
+	
+	els << _self.databus_request_data(:elements)
+	els << els.default({})
+
+	_for e _over els.fast_elements()
+	_loop
+		_if e _isnt :resize_chevron _andif e.dialog_element_id _is which
+		_then
+			_return e
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.chosen_menubar_element(which)
+	## 
+	## Return the menubar element indexed by WHICH.
+	
+	els << _self.databus_request_data(:menubar_elements)
+	els << els.default({})
+
+	_for e _over els.fast_elements()
+	_loop
+		_if e.name = which
+		_then
+			_return e
+		_endif
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.alpha_panel(rc)
+	## 
+	## Construct the property editor.
+	
+	rc << rowcol.new(rc,_unset,1,:pixel,:style,:nested,
+		     :resize?,_true,
+		     :default_col_alignment,:fill,
+		     :default_row_alignment,:fill)
+
+	_local l_style_holder << string_styles_holder.new_with()
+	l_style_holder.add_text_style(:red_fancy, :red, _false, font.new_logical("fancy", 12))
+	
+	.alpha << tree_item.new(rc,
+				:resize_y?,         _true,
+				:resize_x?,         _true,
+				:column_headings,   {_self.message(:property),
+						     _self.message(:value)},
+				:column_alignments, {:left,:left},
+				:column_widths,     {100,200},
+				:aspect,            :alpha_list,
+				:mode,              :one,
+				:style_holder,      l_style_holder,
+				:grid_lines?,      _true,
+				:column_allow_groupby?, _false,
+				:distribute_spare_width, :initial,
+				:model,             _self,
+				:editor_required_notifier, :|editor_required()|,
+				:value_formatters,         {{:current_value,handler.new(_self, :|format_current_value()|)}},
+				:value_changed_notifier,   :|spec_value_changed()|,
+				:column_widths ,{100,150},
+				:col_alignment,:fill,
+				:row_alignment,:fill)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.init_actions()
+	## 
+	## Initialise the aciton for SELF.
+	
+	k << :refresh_app_list
+	
+	_self.add_action(sw_action.new(k,
+				       :toolbar_control,:image_button_item,
+				       :menubar_control,:button_item,
+				       :caption,_self.message(k),
+				       :engine,_self,
+				       :action_message,k.with_parentheses,
+				       :image,{k,_self.module_name}))
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_alpha_popup(image?,plugin?,large_image?,logical_properties?)
+	## 
+	## Return the popup for the element property list.  Include a
+	## button to activate the icon search dialog if ICON? is true.
+
+	_if .alpha _is _unset 
+	_then
+		_return 
+	_endif
+
+	pm << popup_menu.new(.alpha)
+
+	_if image?
+	_then
+		button_item.new_safe(pm,_self.message(:set_image_resource),_self,:|set_image_resource()|)
+	_endif
+	
+	_if large_image?
+	_then
+		button_item.new_safe(pm,_self.message(:set_large_image_resource),_self,{:|set_image_resource()|,:large})
+	_endif
+	
+	_if plugin?
+	_then
+		button_item.new_safe(pm,_self.message(:set_plugin_resource),_self,:|set_plugin_resource()|)
+	_endif
+
+	_if logical_properties?
+	_then
+		button_item.new_safe(pm,_self.message(:set_logical_values),_self,:|set_logical_properties()|)
+	_endif
+
+	.alpha.popup_menu << pm
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_logical_properties()
+	## 
+	## Set the logical properties of the current element and
+	## refresh SELF.
+	
+	.element.set_logical_properties(_true)
+	_self.changed(:alpha_list,:refresh)
+	_self.databus_make_data_available(:refresh_magik_xml,_unset)
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={tree_item})
+_method dd_element_editor.editor_required(p_tree, p_index, p_value_id, p_agent)
+	## P_TREE: Display tree that has been clicked on (unset
+	##    if it is in the column headings or below
+	##    the last one)
+	## P_ROW_INDEX: Index in the list of visible
+	##    display trees.
+	## P_VALUE_ID: Id following :value in the styled string,
+	##    identifying the value that we want to edit.
+	## P_AGENT: Tree agent (self) that should be made the agent of
+	##    any editor that will be returned by this notifier.
+
+	#show(p_tree, p_index, p_value_id, p_agent)
+
+	# Only edit second column
+	_if p_value_id _isnt 2
+	_then
+		_return 
+	_endif
+
+	_local l_id << .element.dd_properties()[p_tree.key]
+
+	_if l_id _is _unset 
+	_then
+		_return 
+	_endif
+
+	_if l_id.is_class_of?(simple_vector)
+	_then
+		l_data << l_id
+		l_id << p_tree.key+:_choice
+
+		str << l_id.write_string
+		force? << _true
+	_endif
+
+	_if (l_editor << .editors[l_id]) _is _unset _orif force?.default(_false)
+	_then
+		_if (l_id _is :colour)
+		_then
+			l_editor << in_place_colour_editor.new(p_agent)
+		_elif (l_data _isnt _unset)
+		_then
+			l_editor << in_place_choice_editor.new(p_agent, :items,l_data)
+		_elif (l_id _is :float)
+		_then
+			_local l_float_manager << numeric_value_manager.new(:precision, 4, :integer?, _false)
+			l_editor << in_place_value_editor.new(p_agent, :manager, l_float_manager)
+		_elif (l_id _is :integer)
+		_then
+			_local l_float_manager << numeric_value_manager.new(:precision, 0, :integer?, _true)
+			l_editor << in_place_value_editor.new(p_agent, :manager, l_float_manager)
+		_elif (l_id _is :boolean)
+		_then
+			l_editor << in_place_boolean_editor.new(p_agent)
+		_else
+			l_editor << in_place_value_editor.new(p_agent)			
+		_endif
+
+		.editors[l_id] << l_editor
+	_endif
+
+	>> l_editor
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={tree_item})
+_method dd_element_editor.validate_spec_change(fd,new,old,el)
+	## 
+	## Validate the value NEW for the field FD.
+	##
+	## - make sure 'selector' message ends with brackets.
+
+	_if _not new.write_string.default("").empty? _andif
+	    (fd.index_of_seq("selector") _isnt _unset _orif
+	     fd.index_of_seq("dragging_notifier") _isnt _unset _orif
+	     fd.index_of_seq("select_notifier") _isnt _unset)_andif
+	    new.index_of_seq("()") _is _unset 
+	_then
+		new << write_string(new,"()")
+	_elif fd = "dialog_element_id"
+	_then
+		all_ids << _self.databus_request_data(:all_element_ids)
+
+		new << new.lowercase.substitute_character(% ,%_).as_symbol()
+
+		_if new.empty?
+		_then
+			_return old
+		_endif
+		
+		_if new[1].digit? _then new << "n" + new _endif
+		
+		_if all_ids.index_of(new.as_symbol()) _isnt _unset
+		_then
+			condition.raise(:warning,:string,_self.message(:element_id_not_unique,new))
+			_return old
+		_endif
+	_elif fd = "window_name"
+	_then
+		w_stack << .element.parent
+		i << w_stack.items.index_equal_of(.element)
+		
+		_if new.default("") = ""
+		_then
+			new << write_string("win_",i)
+		_else
+			new << new.substitute_character(% ,%_)
+		_endif
+		
+		_for p _over w_stack.items.fast_elements()
+		_loop
+			_if new = p.window_name _andif p <> .element
+			_then
+				condition.raise(:warning,:string,_self.message(:window_id_not_unique,new))
+				_return old
+			_endif
+		_endloop
+	_elif fd = "min_value" 
+	_then
+		el.min_value << el.min_value.as_number().default(1)
+		el.max_value << el.max_value.as_number().default(100)
+		new << new.default(1)
+
+		_if el.max_value < new
+		_then
+			(el.max_value,new) << (new,el.max_value)			
+		_endif
+
+	_elif fd = "max_value" 
+	_then
+		el.min_value << el.min_value.as_number().default(1)
+		el.max_value << el.max_value.as_number().default(100)
+		new << new.default(1)
+
+		_if el.min_value > new
+		_then
+			(el.min_value,new) << (new,el.min_value)
+		_endif
+	_elif fd = "height" _orif fd = "width"
+	_then
+		new << max(1,new.default("100").as_number().default(100))
+	_elif fd = "row_spacing" _orif fd = "col_spacing"
+	_then
+		new << max(0,new.default("1").as_number().default(5))
+	_endif
+
+	>> new
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.spec_value_changed(dt,what,new,old)
+	##
+	## React when a spec is changed.
+
+	new << _self.validate_spec_change(dt.key.write_string,new,old,.element)
+
+	.element.cascading_changes(dt.key.write_string,new)
+
+	_if dt.key _is :dialog_description
+	_then
+		_if new = ""
+		_then
+			new << _unset 
+		_endif
+		
+		.element.set_property(:dialog_description,new)
+		_self.databus_make_data_available(:refresh,:wa_editor_choice_list)
+	_elif dt.key _is :text_choice_item_driver
+	_then
+		.element.text_choice_item_driver << new
+		_self.databus_make_data_available(:ws_driver,{.element,new,old})		
+	_elif dt.key _is :value_dimension
+	_then
+		.element.perform(dt.key.with_chevron,new)
+		.element.switch_dimension(new)
+	_elif dt.key _is :control_type
+	_then
+		.element.control_type << new 
+		.element.image_file_name << dialog_design.icon_name_for_dock_action_type[new].default(new)
+		.element.image_module_name << :dialog_designer
+	_elif dt.key _is :col_resize_values _orif dt.key _is :row_resize_values
+	_then
+		vals << new.split_by(%,)
+		_for i _over 1.upto(vals.size)
+		_loop
+			vals[i] << vals[i].as_number()
+		_endloop
+		.element.perform(dt.key.with_chevron,vals)	
+	_else
+		_if .element_type _is :menubar
+		_then
+			_self.databus_make_data_available(:menubar_spec_update,{.element,dt.key,new})
+		_elif .element_type _is :outlookbar
+		_then
+			_self.databus_make_data_available(:outlookbar_spec_update,{.element,dt.key,new})
+		_elif .element_type _is :docks
+		_then
+			.element.perform(dt.key.with_chevron,new)
+			_self.databus_make_data_available(:refresh,:docks) 
+		_else
+			.element.perform(dt.key.with_chevron,new)
+		_endif
+	_endif
+
+	_self.databus_make_data_available(:refresh,.element_type)
+
+	_self.changed(:alpha_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={tree_item})
+_method dd_element_editor.format_current_value(p_value, p_value_id, p_tree, p_style_holder)
+	## Parameters    : P_VALUE: An arbitrary value that come from
+	##                    the display_tree.value(), it may be
+	##                    _unset or a field value, or any other object
+	##                 P_VALUE_ID: name of the field
+	##                    or index to the display_tree.value() method.
+	##                    Will is normally used to retrieve a formatter.
+	##                 P_TREE: From which P_VALUE comes,
+	##                    e.g. a display_tree. This will be passed
+	##                    to formatters that are handlers.
+	##                 P_STYLE_HOLDER: Style holder that may be used to defer
+	##                    default formatting to (i.e. using class
+	##                    or value formatters).
+	# check if we have realised
+
+	_if (p_value_id _isnt :current_value) _orif (.alpha _is _unset)
+	_then
+		# use class formatters
+		_return p_style_holder.format(p_value)
+	_endif
+	
+	# we will use our editors to do the formatting
+	_local l_editor << _self.editor_required(p_tree, _unset, p_value_id, .alpha.agent)
+	>> l_editor.format(p_value, p_style_holder)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.alpha_list
+	## 
+	## Create the list of attributes for the editor.
+
+	_if .element.default("") = ""
+	_then
+		_self.set_alpha_popup(_false,_false,_false,_false)
+		_return rope.new()
+	_endif
+
+	(sl,props) << _self.sorted_properties()
+
+	prop_list << rope.new()
+
+	image?       << _false
+	large_image? << _false 
+	plugin?      << _false
+
+	button_fields << {:control_type,:plugin_name,:action_name,:action_message}
+
+	_for p _over sl.fast_elements()
+	_loop
+		_if p _is :type _orif (button_fields.includes?(p) _andif 
+				       .element.responds_to?(:type) _andif
+				       .element.type _isnt :button _andif .element.type _isnt :sub)
+		_then
+			_continue 
+		_endif
+
+		_if p _is :image_file_name 
+		_then
+			image? << _true
+			large_image? << .element.is_class_of?(outlookbar_element)
+		_elif p _is :plugin_name 
+		_then
+			plugin? << _true 
+		_endif
+
+		_if p _is :col_resize_values _orif p _is :row_resize_values
+		_then
+			resize_v << .element.perform(p).default({})
+
+			txt << ""
+			_for rv _over resize_v.fast_elements()
+			_loop
+				txt +<< rv.write_string + ","
+			_endloop
+
+			_if txt.size > 1
+			_then
+				txt << txt.slice(1,txt.size-1)
+			_endif
+
+			v << {p,txt}
+		_else
+			v << {p,.element.perform(p)}
+		_endif
+		
+		ds << display_tree.new(p,v)
+
+		_if v[2].is_class_of?(colour)
+		_then
+			_local l_lh << string_styles_holder.default_line_height
+			_local l_custom_drawer << custom_draw_renderer.new(l_lh, l_lh, _self, :|custom_draws()|)
+			ds.styled_string << {:value, 1,:tab,:custom_draw, l_custom_drawer,:value, 2}
+		_else 
+			ds.styled_string << {:value,1,:tab,:value,2}
+		_endif
+
+		_if (p _isnt :name _orif v[2] <> "-"*30) 
+		_then
+			prop_list.add_last(ds)		
+		_endif
+	_endloop
+
+	_self.set_alpha_popup(image?,plugin?,large_image?,.element.has_logical_properties?)
+
+	>> prop_list
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.custom_draws(p_canvas, p_x, p_y, p_text_style, p_cust_drw_rndr, p_display_tree)
+	##
+	## Render the colour swatch on canvas P_CANVAS.
+
+	col << p_display_tree.value(2)
+	st << fill_style.new_solid(col)
+
+	ra << st.as_raster_image(:width,15)
+	p_canvas.render_raster(ra,p_x,p_y,_true)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.optimise_column_widths()
+	## 
+	## Optimise the column widths.
+
+	# Dissable, flashes too much.
+	_return
+		
+	hh << .alpha.tree_manager.headings_holder
+	cw << {hh.optimal_column_width(1)+10,max(hh.optimal_column_width(2),80)}
+
+	hh.column_widths << cw
+
+	_self.changed(:alpha_list,:refresh)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.sorted_properties()
+	## 
+	## Return the sorted list of properties for the current element.
+
+	_if .element _is :_unset
+	_then
+		_return rope.new()
+	_endif
+
+	_if .element_type _is :statusbar _andif .element.type = "status"
+	_then
+		props << .element.values
+	_else
+		props << .element.dd_properties()
+	_endif
+
+	sc << sorted_collection.new()
+
+	_for k _over props.fast_keys()
+	_loop
+		sc.add(k)
+	_endloop
+
+	>> sc,props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.clear()
+	## 
+	## Clear the editor.
+	
+	.element << _unset
+	_self.changed(:alpha_list,:refresh)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.edit(element)
+	## 
+	## Edit ELEMENT.
+
+	_if element.is_class_of?(char16_vector)
+	_then
+		_self.clear()
+		_return
+	_endif
+
+	_if element _isnt .element
+	_then
+		.element << element
+		
+		_if element _isnt _unset _andif .element_type _is :gui_layout
+		_then
+			.element_choice.value << element
+		_endif
+
+		# Refresh the selection bounding box rendering.
+		_self.databus_make_data_available(:refresh_selection_bb,.element_type)
+
+		# Resize the columns ...
+		_self.changed(:alpha_list,:refresh)
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element_editor.define_shared_variable(:module_icons,_unset,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element_editor.define_shared_variable(:module_names,_unset,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element_editor.define_shared_variable(:product_names,_unset,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element_editor.define_shared_variable(:cache_thread,_unset,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element_editor.define_shared_variable(:max_icon_cnt,0,:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.recache_image_rasters()
+	## 
+	## Reload all the images known to the system, this catches
+	## newly loaded modules.
+	
+	_if _self.cache_thread _isnt _unset 
+	_then
+		_self.kill_cache_thread()
+	_endif
+
+	_self.cache_image_rasters()
+	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.cache_image_rasters()
+	## 
+	## Cache lists of defined modules and their icon files in a
+	## background thread so it does not stall the initial
+	## activation of the Dialog Designer.
+
+	_if _self.cache_thread _isnt _unset 
+	_then
+		_return 
+	_endif
+	
+	_local me << _self 
+	cache_icons << _proc()
+			       _import me
+			       me.int!cache_image_rasters()
+			       me.update_icon_list()
+		       _endproc
+
+	_self.cache_thread << cache_icons.fork_at(_thisthread.background_priority)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.kill_cache_thread()
+	## 
+	## Kill the thread after completion.
+	_self.cache_thread.kill()
+	_self.cache_thread << _unset 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.int!cache_image_rasters()
+	## 
+	## Populate lists of defined modules and their icon files.
+	
+	_self.product_names << set.new()
+	_self.module_names << sorted_collection.new()
+	_self.module_icons << equality_hash_table.new()
+
+	_for m _over sw_module_manager.defined_modules.fast_elements()
+	_loop
+		# precheck for resource directory to avoid lots of 'no resource
+		# directory' warnings being raised by the module.bitmaps method.
+		_try
+			res_path << system.pathname_down( m.full_directory, "resources" )
+			_if _not system.file_exists?(res_path)
+			_then
+				_continue 
+			_endif
+		_when error,warning
+			_continue 
+		_endtry
+		
+		_if m.name _isnt _unset 
+		_then
+			n << m.name.write_string
+			p << m.product.name
+
+			_self.product_names.add(p)
+
+			first? << _true
+			
+			_try
+				_for bm _over m.bitmaps.default({}).fast_elements()
+				_loop
+					
+					_if first?
+					_then
+						_self.module_names.add(n)
+						rp << _self.module_icons[n] << rope.new()
+						first? << _false 
+					_endif
+					
+					bmn << bm.write_string
+					rp.add(bmn)
+				_endloop
+			_when error,warning
+				_continue 
+			_endtry
+		_endif
+	_endloop
+
+	_self.product_names.remove(:sw_case)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.icon_search(rc)
+	## 
+	## GUI to set the image resource for the current element being edited.
+	
+	rowcol_01 << rowcol.new(rc,3,1,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	6,
+		:col_spacing,	7,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:row_resize_values, {0,100,0},
+		:left_spacing,	6,
+		:right_spacing,	6,
+		:row_spacing,	6,
+		:top_spacing,	6)
+
+	gb << group_box.new(rowcol_01,_self.message(:image_filtering),
+		:col_alignment,	:fill,
+		:row_alignment,	:fill,
+		:row,1,:col,1)
+
+	gb_rc << rowcol.new(gb,4,3,:pixel,
+				   :style,:group_box,
+				   :resize?,	_true,
+				   :bottom_spacing,	-15,
+				   :row_spacing,0,
+				   :col_spacing,2,
+				   :default_col_alignment,	:fill,
+				   :default_row_alignment,	:centre,
+				   :col_resize_values,{0,100,0})
+	
+	# Product
+	label_item.new(gb_rc,_self.message(:product) + " " + _self.message(:colon),
+			:col,	1,
+			:col_alignment,	:right,
+			:font_name,	:default,
+			:font_size,	14,
+			:row,	1)
+
+	.icon_product << text_item.new(gb_rc,_unset,:model,_self,
+			:col,	2,
+			:col_alignment,	:fill,
+			:display_length,	10,
+			:incremental_change_selector,{:|update_icon_list()|,_true},
+			:model,_self,
+			:row,	1)
+
+	.icon_product_num << label_item.new(gb_rc,"",
+			:col,	3,
+			:col_alignment,	:fill,
+			:font_name,	:default,
+			:font_size,	14,
+			:resize?,_true,
+			:row,	1,
+			:value,	" " )
+
+	# Module
+	label_item.new(gb_rc,_self.message(:module) + " " + _self.message(:colon),
+			:col,	1,
+			:col_alignment,	:right,
+			:font_name,	:default,
+			:font_size,	14,
+			:row,	2)
+
+	.icon_module << text_item.new(gb_rc,_unset,:model,_self,
+			:col,	2,
+			:col_alignment,	:fill,
+			:display_length,	10,
+			:incremental_change_selector,{:|update_icon_list()|,_true},
+			:model,_self,
+			:row,	2)
+
+	.icon_module_num << label_item.new(gb_rc,"",
+			:col,	3,
+			:col_alignment,	:fill,
+			:font_name,	:default,
+			:font_size,	14,
+			:resize?,_true,
+			:row,	2,
+			:value,	" " )
+
+	# Filename
+	label_item.new(gb_rc,_self.message(:filename) + " " + _self.message(:colon),
+			:col,	1,
+			:col_alignment,	:right,
+			:font_name,	:default,
+			:font_size,	14,
+			:row,	3)
+
+	.icon_name << text_item.new(gb_rc,_unset,:model,_self,
+			:col,	2,
+			:col_alignment,	:fill,
+			:display_length,	10,
+			:incremental_change_selector,{:|update_icon_list()|,_true},
+			:model,_self,
+			:row,	3)
+
+	.icon_name_num << label_item.new(gb_rc,"",
+			:col,	3,
+			:col_alignment,	:fill,
+			:font_name,	:default,
+			:font_size,	14,
+			:resize?,_true,
+			:row,	3,
+			:value,	" " )
+
+	.icon_list << tree_item.new(rowcol_01,
+				    :aspect,:icon_list_data,
+				    :model,	_self,
+				    :col,	1,
+				    :col_alignment,	:fill,
+				    :column_alignments,	{:left,:left,:left,:left},
+				    :column_widths,         {40,100,100,100},
+				    :column_headings,	{_self.message(:image),
+							 _self.message(:filename),
+							 _self.message(:module),
+							 _self.message(:product)},
+				    :grid_lines?,	_true,
+				    :mode,	:one,
+				    :select_notifier,    :icon_list_selection_changed|()|,
+				    :double_click_notifier, :|set_icon()|,
+				    :row,	2)
+	
+	rowcol_03 << rowcol.new(rowcol_01,1,3,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:col,	1,
+		:col,	1,
+		:col_resize_values,	{33,34,33},
+		:col_spacing,	7,
+		:col_alignment,	:fill,
+		:row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:row,	3,
+		:row,	3,
+		:row_spacing,	6,
+		:top_spacing,	0)
+
+	.icon_ok << button_item.new_safe(rowcol_03,_self.message(:ok),_self,:set_icon|()|,
+			     :min_width,50,
+			     :row,1,:col,1,
+			     :enabled?,_false)
+	button_item.new_safe(rowcol_03,_self.message(:update),_self,:recache_image_rasters|()|,
+			     :min_width,50,
+			     :col_alignment,:centre,
+			     :row,1,:col,2)
+	button_item.new_safe(rowcol_03,_self.message(:cancel),_self,{:switch_to|()|,:editor},
+			     :min_width,50,
+			     :col_alignment,:right,
+			     :row,1,:col,3)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_image_resource(_optional size)
+	## 
+	## Make the GUI for setting the image resource visible.
+
+	_if size _is :large
+	_then
+		.large_image? << _true 
+		.icon_module.value << ""
+		.icon_name.value   << "32x32"
+		_self.update_icon_list(_true)
+	_else
+		.large_image? << _false
+
+		_if .icon_name.value.default("").index_of_seq("32x32") _isnt _unset
+		_then
+			.icon_name.value << ""
+		_endif 
+		_self.update_icon_list()
+	_endif
+	
+	_self.switch_to(:set_image_resource)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.switch_to(which)
+	## 
+	## Switch to WHICH window of the stack.
+	.ws.value << which
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_icon()
+	## 
+	## Set the icon resource to those selected in the selection GUI.
+
+	value << .icon_list.selection.an_element().value
+
+	# Just in case the user deletes .element while choosing an icon
+	# for it.
+	_if .element.default("") <> ""
+	_then
+		# Force docks to refresh to show new image.
+		_if .large_image?
+		_then
+			.element.large_image_file_name   << value[2].as_symbol()
+			.element.large_image_module_name << value[3].as_symbol()	
+		_else
+			.element.image_file_name   << value[2].as_symbol()
+			.element.image_module_name << value[3].as_symbol()
+		_endif 
+	_endif
+
+	# Update the property list
+	_self.changed(:alpha_list,:refresh)
+	_self.optimise_column_widths()
+	
+	# Make the property list visible
+	_self.switch_to(:editor)
+	
+	# Refresh the design rendering.
+	_self.databus_make_data_available(:refresh,.element_type)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.update_icon_list(_optional force?)
+	## 
+	## Update the list of icons if out of date.
+	p_f << .icon_product.value.default("")
+	m_f << .icon_module.value.default("")
+	n_f << .icon_name.value.default("")
+
+	_if force?.default(_false) _orif
+	    .icon_list.tree_manager.data.empty? _orif 
+	    (m_f = "" _andif n_f = "" _andif
+	    _self.max_icon_cnt > .icon_list.tree_manager.data.size)
+	_then 
+		_self.changed(:icon_list_data,:refresh)
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.icon_list_selection_changed(what)
+	## 
+	## Make the OK button available only when a selection is current.
+	
+	.icon_ok.enabled? << _not what.empty?
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.icon_list_data
+	## 
+	## Return the list of icon images for the listing, wild
+	## filtered by the entries in the module and filename inputs.
+	
+	_if _self.module_names _is _unset 
+	_then
+		_self.cache_image_rasters()
+		_return rope.new()		
+	_endif
+	
+	m_f << .icon_module.value.default("")
+	n_f << .icon_name.value.default("")
+
+	not_m_f? << m_f.empty?
+	not_n_f? << n_f.empty?
+
+	the_icon_list << rope.new()
+
+	p_set << equality_set.new()
+	m_cnt << 0
+	f_cnt << 0
+	f_tot << 0
+
+	_for m,p _over _self.module_names()
+	_loop
+		f_tot +<< _self.module_icons[m].size
+		
+		_if not_m_f? _orif
+		    m.index_of_seq(m_f) _isnt _unset 
+		_then
+			m_cnt +<< 1
+			# Module passes filter, look for files.
+			_for f _over _self.module_icons[m].fast_elements()
+			_loop
+				_if not_n_f? _orif f.lowercase.index_of_seq(n_f) _isnt _unset 
+				_then
+					f_cnt +<< 1
+
+					p_set.add(p)
+					
+					v << {_unset,f,m,p}
+
+					ds << display_tree.new(m+f,v)
+					ds.styled_string << {:image,{f,m},:tab,:value,2,:tab,:value,3,:tab,:value,4}
+
+					the_icon_list.add_last(ds)
+				_endif
+			_endloop
+		_endif
+	_endloop
+
+	.icon_product_num.value << write_string(p_set.size,%/,_self.product_names.size)
+	.icon_module_num.value << write_string(m_cnt,%/,_self.module_names.size)
+	.icon_name_num.value << write_string(f_cnt,%/,f_tot)
+
+	_self.max_icon_cnt << max(_self.max_icon_cnt,f_tot)
+
+	>> the_icon_list
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_iter _method dd_element_editor.module_names()
+	## 
+	## Filter the module list by the product filter entered by the user.
+	
+	p_f << .icon_product.value.default("")
+
+	_for m _over _self.module_names.fast_elements()
+	_loop
+		p << sw_module_manager.module(m).product.name
+
+		_if p_f.empty? _orif
+		    p.write_string.index_of_seq(p_f) _isnt _unset 
+		_then
+			_loopbody(m,p)
+		_endif
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.plugin_search(rc)
+	## 
+	## GUI to set the image resource for the current element being edited.
+	
+	rowcol_01 << rowcol.new(rc,3,1,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	6,
+		:col_spacing,	7,
+		:default_col_alignment,	:fill,
+		:default_row_alignment,	:fill,
+		:row_resize_values, {0,100,0},
+		:left_spacing,	6,
+		:right_spacing,	6,
+		:row_spacing,	6,
+		:top_spacing,	6)
+
+	gb << group_box.new(rowcol_01,_self.message(:plugin_action_filtering),
+		:col_alignment,	:fill,
+		:row_alignment,	:fill,
+		:row,1,:col,1)
+
+	gb_rc << rowcol.new(gb,4,3,:pixel,
+				   :style,:group_box,
+				   :resize?,	_true,
+				   :bottom_spacing,	-15,
+				   :row_spacing,0,
+				   :col_spacing,2,
+				   :default_col_alignment,	:fill,
+				   :default_row_alignment,	:centre,
+				   :col_resize_values,{0,100,0})
+	
+	label_item.new(gb_rc,_self.message(:app) + " " + _self.message(:colon),
+		       :row,1,:col,1,
+		       :col_alignment,:right)
+	.app_list << text_choice_item.new(gb_rc,"",
+			:model,   _self,
+			:items,   _self.app_list,
+			:change_selector, :|update_plugin_action_list()|,
+			:col,	2,
+			:col_alignment,	:fill,
+			:row,	1,
+			:row_alignment,	:top )
+
+	_self.action(:refresh_app_list).place_control_on(gb_rc,:dialog,
+		:has_border?, _false,
+		:control_type, { :image_button_item,
+				 :col,	3,
+				 :col_alignment,	:left,
+				 :row,	1,
+				 :row_alignment,	:top } )
+
+	label_item.new(gb_rc,_self.message(:plugin) + " " + _self.message(:colon),
+			:col,	1,
+			:col_alignment,	:right,
+			:font_name,	:default,
+			:font_size,	14,
+			:row,	2)
+
+	.plugin_name << text_item.new(gb_rc,_unset,:model,_self,
+			:col,	2,
+			:col_alignment,	:fill,
+			:display_length,	10,
+			:incremental_change_selector,{:|update_plugin_list()|,_true},
+			:model,_self,
+			:row,	2)
+
+	.plugin_num << label_item.new(gb_rc,"",
+			:col,	3,
+			:col_alignment,	:fill,
+			:font_name,	:default,
+			:font_size,	14,
+			:resize?,_true,
+			:row,	2,
+			:value,	" " )
+
+	label_item.new(gb_rc,_self.message(:action) + " " + _self.message(:colon),
+			:col,	1,
+			:col_alignment,	:right,
+			:font_name,	:default,
+			:font_size,	14,
+			:row,	3)
+
+	.action_name << text_item.new(gb_rc,_unset,:model,_self,
+			:col,	2,
+			:col_alignment,	:fill,
+			:display_length,	10,
+			:incremental_change_selector,{:|update_plugin_list()|,_true},
+			:model,_self,
+			:row,	3)
+
+	.action_num << label_item.new(gb_rc,"",
+			:col,	3,
+			:col_alignment,	:fill,
+			:font_name,	:default,
+			:font_size,	14,
+			:resize?,_true,
+			:row,	3,
+			:value,	" " )
+
+	.plugin_action_list << tree_item.new(rowcol_01,
+				    :aspect,:plugin_action_list_data,
+				    :model,	_self,
+				    :col,	1,
+				    :col_alignment,	:fill,
+				    :column_alignments,	{:left,:left},
+				    :column_widths,         {100,100},
+				    :column_headings,	{_self.message(:plugin),
+							 _self.message(:action)},
+				    :grid_lines?,	_true,
+				    :mode,	:one,
+				    :select_notifier,    :plugin_action_list_selection_changed|()|,
+				    :double_click_notifier, :set_plugin_action|()|,
+				    :row,	2)
+	
+	rowcol_03 << rowcol.new(rowcol_01,1,2,:pixel,
+		:resize?,	_true,
+		:bottom_spacing,	0,
+		:col,	1,
+		:col,	1,
+		:col_resize_values,	{50,50},
+		:col_spacing,	7,
+		:col_alignment,	:fill,
+		:row_alignment,	:fill,
+		:left_spacing,	0,
+		:right_spacing,	0,
+		:row,	3,
+		:row,	3,
+		:row_spacing,	6,
+		:top_spacing,	0)
+
+	.plugin_action_ok << button_item.new_safe(rowcol_03,_self.message(:ok),_self,:set_plugin_action|()|,
+			     :min_width,50,
+			     :row,1,:col,1,
+				:enabled?,_false)
+	button_item.new_safe(rowcol_03,_self.message(:cancel),_self,{:switch_to|()|,:editor},
+			     :min_width,50,
+			     :col_alignment,:right,
+			     :row,1,:col,2)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_plugin_resource()
+	## 
+	## Make the GUI for setting the image resource visible.
+
+	_self.switch_to(:set_plugin_resource)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.refresh_app_list()
+	## 
+	## Refresh the list of applications, necessary as the user can
+	## open and close applications anytime.
+	
+	.app_list.items << _self.app_list
+	_self.update_plugin_action_list()
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.app_list
+	## 
+	## Return the list of currently running SW applications, if any.
+	
+	rp << rope.new()
+
+	_for a _over smallworld_product.applications.fast_elements()
+	_loop
+		rp.add({a.application_name,a.external_name})
+	_endloop
+
+	_if rp.empty?
+	_then
+		rp.add({:none,_self.message(:no_app_running)})
+	_endif
+
+	>> rp
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_element_editor.define_shared_variable(:max_plugin_action_cnt,0,:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.update_plugin_action_list()
+	## 
+	## Force the plugin action list to refresh.
+	
+	_self.max_plugin_action_cnt << 0
+	_self.update_plugin_list(_true)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.update_plugin_list(_optional force?)
+	## 
+	## Update the list of icons if out of date.
+	
+	m_f << .plugin_name.value.default("")
+	n_f << .action_name.value.default("")
+
+	_if force?.default(_false) _orif
+	    .plugin_action_list.tree_manager.data.empty? _orif 
+	    (m_f = "" _andif n_f = "" _andif
+	    _self.max_plugin_action_cnt > .plugin_action_list.tree_manager.data.size)
+	_then 
+		_self.changed(:plugin_action_list_data,:refresh)
+	_endif 
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.plugin_action_list_selection_changed(what)
+	## 
+	## Make the OK button available only when a selection is current.
+	
+	.plugin_action_ok.enabled? << _not what.empty?
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.plugin_action_list_data
+	## 
+	## Return the complete list of plugins and actions, generate it
+	## if necessary.
+	
+	p_f << .plugin_name.value.default("")
+	a_f << .action_name.value.default("")
+
+	not_p_f? << p_f.empty?
+	not_a_f? << a_f.empty?
+
+	the_action_plugin_list << rope.new()
+
+	_if .app_list.value _is :none
+	_then
+		_return the_action_plugin_list
+	_endif
+
+	app << smallworld_product.application(.app_list.value)
+
+	p_cnt << 0
+	a_cnt << 0
+	p_tot << 0
+	a_tot << 0
+
+	missing_image << smallworld_product.get_raster_image(:missing_image,:ui_resources)
+
+	toolbar_action? << .element.is_class_of?(toolbar_action_element)
+
+	_for p _over app.plugins()
+	_loop
+		p_tot +<< 1
+		
+		_if not_p_f? _orif p.name.write_string.index_of_seq(p_f) _isnt _unset 
+		_then
+			p_cnt +<< 1
+
+			# Add a list engry for the plugin itself.
+			v << {p.name,""}
+			
+			ds << display_tree.new(p.name,v)
+			ds.styled_string << {:value,1,:image,{:plugin_item,:dialog_designer},:tab,:value,2}
+
+			_if _not toolbar_action?
+			_then 
+				the_action_plugin_list.add_last(ds)
+			_endif 
+
+			# Plugin passes filter, look for actions.
+			_for a _over p.actions()
+			_loop
+				a_tot +<< 1
+				a_name << a.name.write_string.lowercase
+				
+				_if not_a_f? _orif a_name.index_of_seq(a_f) _isnt _unset 
+				_then
+					a_cnt +<< 1
+					
+					v << {p.name,a.name}
+
+					ds << display_tree.new(p.name+"."+a.name,v)
+
+					# Just in case an image is missing, use the :missing_image from CORE.
+					_try 
+						img << a.image
+					_when error,warning
+						img << missing_image
+					_endtry 
+			
+					_if img _isnt _unset 
+					_then
+						ds.styled_string << {:value,1,:tab,:image,a.image_locator,:value,2}
+					_else
+						ds.styled_string << {:value,1,:tab,:image,{:blank,:dialog_designer},:value,2}
+					_endif
+
+					the_action_plugin_list.add_last(ds)
+				_endif
+			_endloop
+		_endif
+	_endloop
+
+	_self.max_plugin_action_cnt << max(_self.max_plugin_action_cnt,a_cnt)
+
+	.plugin_num.value << write_string(p_cnt,%/,p_tot)
+	.action_num.value << write_string(a_cnt,%/,_self.max_plugin_action_cnt)
+
+	>> the_action_plugin_list
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_element_editor.set_plugin_action()
+	## 
+	## Set the action_name and plugin_name values of the current
+	## element to selected plugin/action.
+	
+	key << .plugin_action_list.selection.an_element().key
+	p_a << key.write_string.split_by(%.)
+
+	.element.plugin_name << p_a[1]
+
+	_if p_a.size > 1
+	_then
+		.element.action_name << p_a[2]
+		.element.insert << :action
+	_else
+		.element.action_name << _unset 
+		.element.insert << :plugin
+	_endif
+
+	# Update the property list
+	_self.changed(:alpha_list,:refresh)
+
+	# Switch back the element editor
+	_self.switch_to(:editor)
+	
+	# Refresh the design rendering.
+	_self.databus_make_data_available(:refresh,.element_type)
+_endmethod
+$

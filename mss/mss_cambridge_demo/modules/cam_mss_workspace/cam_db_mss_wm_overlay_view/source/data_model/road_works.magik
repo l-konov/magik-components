@@ -1,0 +1,39 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method road_works.mss_ovc_consistency_roots(mode, engine, target_dataset)
+	##
+	## If self has a parent road_works, then add the intermediate
+	## join record, and also add the parent record if it does not
+	## exist in the target dataset.
+	##
+	## Note that this does not automatically add child road_works,
+	## which are not defined as substructure in the data model.
+	##
+
+	r << _super.mss_ovc_consistency_roots(mode, engine, target_dataset)
+	_if (p << _self.road_works) _isnt _unset
+	_then
+		_if p.corresponding_record(target_dataset) _is _unset _andif
+		    _not engine.record_in_process_set?(p)
+		_then
+			engine.mark_as_pending_insert_update(p)
+			r.add_all_last(p.mss_ovc_consistency_roots(mode, engine, target_dataset))
+		_endif
+		int_join_name << _self.all_fields[:road_works].parameters[1]
+		_if (int_rec << _self.perform(int_join_name)) _isnt _unset
+		_then
+			r.add_last(int_rec)
+		_endif 
+	_endif
+	_return r
+	
+_endmethod
+$

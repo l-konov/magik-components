@@ -1,0 +1,27 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-02-27 21:08:20 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-25-2005
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+
+smallworld_product.register_application( :dynamic_case,
+					 "mclib:dynamic_application",
+					 :dynamic_application_class,"sw:case_graphics_system",
+					 :dynamic_module_name,:case_magik_gui,
+					 :ace_name, "case_220",
+					 :description, "Provides data modeling facilities for populating the CASE database",
+					 :soc_name, :case,
+					 :external_name, "Dynamic CASE Tool" )
+$
+

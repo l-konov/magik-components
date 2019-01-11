@@ -1,0 +1,220 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_workspace_record_mixin
+##
+## Generic superclass for mss_workspace datastore records.
+##
+
+def_mixin(:mss_workspace_record_mixin)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_record_mixin.message(message_id, _gather args)
+	## 
+	## 
+
+	_if _self.responds_to?(:source_collection) _andif
+	    (tbl << _self.source_collection) _isnt _unset
+	_then
+		mh_name << tbl.name
+	_else
+		mh_name << _self.class_name
+	_endif 
+	_return message_handler.new(mh_name).human_string(message_id, _unset, _scatter args)
+				    
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_record_mixin.insert_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_record_mixin.update_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_record_mixin.delete_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_record_mixin.general_validator()
+	## 
+	## 
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_record_mixin.get_property(prop_name)
+	## 
+	## Return the value for the property named PROP_NAME.  This is
+	## only valid for subclasses that respond to properties.
+	##
+
+	_return _self.properties[prop_name]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_record_mixin.user_error(_gather args)
+	## 
+	## Raise a user error condition with a message constructed from ARGS.
+	##
+
+	condition.raise(:user_error, :string, _self.message(_scatter args))
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_record_mixin.mss_ws_related_documents
+	## 
+	## Returns all mss_ws_related_document records that are related
+	## to self.
+	##
+
+	# This must be called on a valid datastore record.
+	_if (tbl << _self.source_collection) _is _unset
+	_then
+		_return {}
+	_endif
+	doc_tbl << tbl.source_view.collections[:mss_ws_related_document]
+	_return doc_tbl.select(predicate.eq(:record_tid, tbl.descriptor.tid) _and
+			       predicate.eq(:record_id, _self.id))
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_workspace})
+_method mss_workspace_record_mixin.add_related_document(pl, _optional allow_duplicate?)
+	##
+	## Add a mss_ws_related_document to self, using the attributes
+	## in PL.  This must include keys for :filename, :usage_id,
+	## and optionally :comments.
+	##
+	## Unless ALLOW_DUPLICATE? is true, this will return
+	## false if a document with the same name exists.
+	##
+
+	# This must be called on a valid datastore record.
+	_if (tbl << _self.source_collection) _is _unset
+	_then
+		_return _false
+	_endif
+	doc_tbl << tbl.source_view.collections[:mss_ws_related_document]
+
+	_if pl[:filename] _is _unset
+	_then
+		_return _false
+	_endif
+
+	_if allow_duplicate? _isnt _true
+	_then
+		# Pre-process this to look for duplicates.  Work on a copy of
+		# PL so that original values can be preserved for inserting later.
+		work_pl << pl.copy()
+		work_pl << doc_tbl.record_exemplar.prepare_filename(work_pl)
+		work_fname << work_pl[:filename].canonical
+		work_rootdir_id << work_pl[:rootdir_id].default(0)
+
+		_for i _over _self.mss_ws_related_documents.fast_elements()
+		_loop
+			_if i.filename.default("").canonical = work_fname _andif
+			    i.rootdir_id.default(0) = work_rootdir_id
+			_then
+				# Duplicate.
+				_return _false 
+			_endif
+		_endloop
+	_endif 
+
+	pl[:record_tid] << _self.descriptor.tid
+	pl[:record_id] << _self.id
+	rt << record_transaction.new_insert(doc_tbl, pl, "")
+	new_rec << rt.run()
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_workspace_record_mixin.delete_related_documents()
+	## 
+	## Delete all mss_ws_related_document records related to self.
+	##
+
+	_for i _over _self.mss_ws_related_documents.fast_elements()
+	_loop
+		i.delete()
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_workspace_record_mixin.create_archive_record(tbl_name)
+	## 
+	## Create an archive record in table TBL_NAME that contains a
+	## copy of self's physical and text join fields.
+	##
+
+	dr << _self.source_view.collections[tbl_name].new_detached_record()
+	_for fd _over _self.physical_fields.fast_elements()
+	_loop
+		_if (fd_name << fd.name) _is :ds!version _orif
+		    fd_name _is :rwo_id
+		_then
+			_continue
+		_endif
+
+		# In case fields exist on main record but not on archive:
+		_if dr.all_fields[fd_name] _is _unset
+		_then
+			_continue
+		_endif 
+		dr.perform(fd_name.with_chevron, _self.perform(fd_name))
+	_endloop
+	dr.last_delete_time << date_time.now()
+	dr.last_delete_user << gis_program_manager.login_name
+	
+	rec << dr.source_collection.insert(dr)
+
+	_for fd _over _self.join_fields.fast_elements()
+	_loop
+		fd_name << fd.name
+		_if fd.type _is :text _andif
+		    (val << _self.perform(fd_name).default("")) ~= ""
+		_then
+			rec.perform(fd_name.with_chevron, val)
+		_endif
+	_endloop
+
+	_return rec
+	
+_endmethod
+$

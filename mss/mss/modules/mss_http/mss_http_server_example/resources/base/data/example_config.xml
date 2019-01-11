@@ -1,0 +1,14 @@
+<config>
+  <plugins>
+    <plugin name="http_server" class_name="mss_http_server_engine">
+      <properties>
+         <property name="default_port" value="7314"/>
+         <property name="default_logfile_name" value="c:\temp\mss_http_log.txt"/>
+      </properties>
+      <service_managers>
+        <service class_name="mss_http_example_time_service" directory="/time"/>
+        <service class_name="mss_http_example_file_service" directory="/files" subdirectories="true"/>
+      </service_managers>
+    </plugin>
+  </plugins>
+</config>

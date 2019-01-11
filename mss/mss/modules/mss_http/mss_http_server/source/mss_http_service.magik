@@ -1,0 +1,254 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_service
+##
+## This is a template class for implementing service providers
+## in a mss_http_server_engine.
+##
+## There is no requirement that custom service provides must
+## subclass this (although it may be convenient to do so).
+## Service providers must implement the following:
+## - a new() method that receives these arguments:
+##   - the mss_http_server_connection_manager
+##   - a property list of data:
+##     - the :dir_name of the URL requested (i.e. "/web_services")
+##     - the :leaf_name of the URL requested (i.e. "index.html")
+## - a process_service_request() method that receives one argument
+##   (the mss_http_server_request initiating the process), and
+##   formats the response of that request - using the .response
+##   property of the request, and any or all of the following
+##   methods on that mss_http_server_response object:
+##  - set_status_code()
+##  - set_header_field()
+##  - .response_object << (a string)
+##  - .response_filename << (a filename to be served)
+## - default_timeout_period: the timeout in milliseconds that this
+##   service should initially use.
+##
+
+def_slotted_exemplar(:mss_http_service,
+{
+	{:connection_manager, _unset, :readable},
+	{:init_properties, _unset, :readable},
+	{:request, _unset, :readable},
+	{:request_body, _unset}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+mss_http_service.define_shared_constant(
+	:default_timeout_period,
+	## The default timeout period (in milliseconds) for executing
+	## this connection.  If not set, the mss_http_server_connection_manager
+	## is used as a backstop.
+	_unset,
+	:public)
+$
+	
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_service.new(conn_mgr, init_props)
+	## 
+	## 
+
+	_return _clone.init(conn_mgr, init_props)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_service.init(conn_mgr, init_props)
+	## 
+	## 
+
+	.connection_manager << conn_mgr
+	_if init_props _isnt _unset
+	_then 
+		.init_properties << init_props
+	_else
+		.init_properties << property_list.new()
+	_endif 
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_service.server
+	## 
+	## Return the mss_http_server_engine initiating this.
+	##
+
+	_if .connection_manager _isnt _unset
+	_then
+		_return .connection_manager.server
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_service.message_handler
+	##
+	## Returns self's message_handler.
+	##
+
+	# As for sw_component: each subclass gets its own message
+	# handler, which will use the top-level message handler on this
+	# class. 
+	
+	_if (meth << _self.method(:local_message_handler)) _is _unset _orif 
+	    meth.owner _isnt _self.method_table
+	_then
+		mh << message_handler.new(_self.class_name)
+		_if _self.class_name _isnt :mss_http_service _andif
+		    _not mh.uses?(:mss_http_response)
+		_then
+			mh.add_use(:mss_http_service)
+		_endif
+		_self.define_shared_constant(:local_message_handler, mh, :private)
+	_endif
+
+	_return _self.local_message_handler
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_service.message(message_id, _gather args)
+	## 
+	## Standard message accessor protocol.
+	##
+
+	_return _self.message_handler.human_string(message_id, _unset, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_abstract _method mss_http_service.process_service_request()
+	## 
+	## Respond to the request REQ.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_service.request_body
+	## 
+	## If not yet read, get it.
+	##
+
+	_if .request_body _is _unset
+	_then
+		_if .request.http_request_method = "POST"
+		_then 
+			.request_body << .request.get_safe_request_body()
+		_else
+			.request_body << ""
+		_endif 
+	_endif
+	_return .request_body
+
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={mss_common})
+_method mss_http_service.debug_log_request(s)
+	## 
+	## Log information about self's request to stream S.
+	##
+
+	s.write("DEBUG LOG: Request received for ",
+		.connection_manager.connection_description(), ", ",
+		_self.class_name, newline_char)
+	s.write("DEBUG LOG: URL: ", .request.url, newline_char)
+	s.write("DEBUG LOG: Request headers:", newline_char)
+	_for i, j _over .request.header_fields.fast_keys_and_elements()
+	_loop
+		s.write(i, " : ", j, newline_char)
+	_endloop
+	
+	_if (b << _self.debug_log_request_body) _isnt _unset _andif b.size > 0
+	_then
+		s.write("DEBUG LOG: Request body:", newline_char)
+		s.write(b, newline_char)
+	_endif
+	s.write(newline_char)
+	s.flush()
+	
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={mss_common}, usage={subclassable})
+_method mss_http_service.debug_log_request_body
+	## 
+	## String to display in a debug_log_request() call.
+	##
+
+	_return _self.request_body
+	
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={mss_common})
+_method mss_http_service.debug_log_response(s)
+	## 
+	## Log information about self's response to stream S.
+	##
+
+	s.write("DEBUG LOG: Response to be sent for ",
+		.connection_manager.connection_description(), ", ",
+		_self.class_name, newline_char)
+	s.write("DEBUG LOG: URL: ", .request.url, newline_char)
+	_if (resp << .request.response) _is _unset
+	_then
+		s.write("DEBUG LOG: no response generated", newline_char)
+	_else 
+		s.write("DEBUG LOG: Response headers:", newline_char)
+		_for i, j _over resp.header_fields.fast_keys_and_elements()
+		_loop
+			s.write(i, " : ", j, newline_char)
+		_endloop
+		
+		_if (b << _self.debug_log_response_body) _isnt _unset _andif b.size > 0
+		_then
+			s.write("DEBUG LOG: Response body:", newline_char)
+			s.write(b, newline_char)
+		_endif
+	_endif 
+	s.write(newline_char)
+	s.flush()
+	
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={mss_common}, usage={subclassable})
+_method mss_http_service.debug_log_response_body
+	## 
+	## String to display in a debug_log_response() call.
+	##
+
+	_if (resp << .request.response) _is _unset
+	_then
+		_return ""
+	_endif 
+	_if (fname << resp.response_filename) _isnt _unset _andif
+	    fname ~= ""
+	_then
+		_return write_string("Filename: ", fname)
+	_endif 
+	_return resp.response_object
+	
+_endmethod
+$

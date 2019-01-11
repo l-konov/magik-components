@@ -1,0 +1,8 @@
+mss_core_changes	1
+
+description
+	Additions and changes to sw_core
+end
+
+requires
+end

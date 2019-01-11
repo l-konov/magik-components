@@ -1,0 +1,7 @@
+basic_changes/
+
+message_usages.magik
+
+mss_wm_auth_engine.magik
+mss_workspace_manager_engine.magik
+mss_workspace_transaction.magik

@@ -1,0 +1,319 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## These procs help manage the growing number of languages DD
+## has messages for.
+##
+## For a given target language LANG a report of potential
+## message problems is sent to the Magik prompt:
+##    Missing      : messages that are defined for EN_US but not for LANG
+##    Extra (en_us): messages that are defined for LANG but not for EN_US 
+##    Extra (en_gb): messages that are defined for LANG but not for EN_GB 
+##    Untranslated : message(LANG) = message(EN_US)
+##
+## Usage : dd_check_language(LANG)     : check all the LANG messages.
+##    eg : dd_check_language(:fr_ca)   : check the FR_CA msg files.
+##    eg : dd_check_language(:all)     : check all the msg files.
+##
+## Usage : dd_sort_language(LANG)      : sort all the LANG messages
+##    eg : dd_sort_language(:fr_ca)    : sort the FR_CA msg files.
+##    eg : dd_sort_language(:all)      : sort all the msg files.
+##
+##########################################################################################
+_package user
+$
+
+_block
+	!global_auto_declare?! << _true 
+_endblock
+$
+
+# Return a list of languages defined for the Dialog Designer
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_languages <<
+_proc()
+	pth << sw_module_manager.module(:dialog_designer).safe_full_directory + "\resources"
+	
+	dc << directory_channel.new(pth)
+	
+	langs << rope.new()
+	
+	_loop
+		_if (lang << dc.get()) _is _unset 
+		_then
+			_leave 
+		_endif
+		
+		_if lang <> "base" _andif lang <> "example_xml"
+		_then
+			langs.add(lang)
+		_endif
+	_endloop
+	
+	>> langs
+_endproc
+$
+
+# Check WHICH language for missing or extra messages.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_check_language <<
+_proc(_optional which)
+	_if which _is _unset
+	_then
+		write("Usage example : dd_check_language(:de_de)")
+		_return
+	_endif 
+	which << which.write_string.lowercase
+	
+	langs << dd_languages()
+
+	_if langs.index_equal_of(which) _is _unset _andif which <> "all"
+	_then
+		write(which," language messages files do not exist.")
+		_return 
+	_endif
+
+	_if which = "all"
+	_then
+		_for lang _over langs.fast_elements()
+		_loop
+			dd_check_a_language(lang)
+		_endloop
+	_else
+		dd_check_a_language(which)
+	_endif
+
+_endproc
+$
+
+# Check language LANG msg files for missing/extra messages.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_check_a_language <<
+_proc(lang)
+	lang_txt << lang.write_string.uppercase
+	write(%newline*2,"="*40," Checking : ",lang_txt," ","="*40,%newline)
+	
+	write("##    Missing      : messages that are defined for EN_US but not for ",lang_txt)
+	_if lang_txt <> "EN_US" _then write("##    Extra (en_us): messages that are defined for ",lang_txt," but not for EN_US") _endif 
+	_if lang_txt <> "EN_GB" _then write("##    Extra (en_gb): messages that are defined for ",lang_txt," but not for EN_GB") _endif 
+	_if lang_txt <> "EN_US" _then write("##    Untranslated : message(",lang_txt,") = message(EN_US)") _endif
+	
+	_for fn _over {"dialog_designer","dialog_designer_plugin","dialog_designer_framework","dd_element_editor","select_path"}.fast_elements()
+	_loop
+		dd_check_a_file(fn,lang)
+	_endloop
+	write()
+_endproc
+$
+
+# Check a specific file FN for missing/extra messages for
+# language LANG.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_check_a_file <<
+_proc(fn,lang)
+	_if lang = "en_gb" _then _return _endif
+	
+	gb_msgs   << dd_file_messages(fn,"en_gb")
+	us_msgs   << dd_file_messages(fn,"en_us")
+	lang_msgs << dd_file_messages(fn,lang)
+
+	missing? << _false 
+	_for k,msg _over us_msgs.fast_keys_and_elements()
+	_loop
+		_if lang_msgs[k] _is _unset 
+		_then
+			_if _not missing?
+			_then
+				write(%newline,"----- Missing messages (vs en_us) --------- ",lang," : ",fn,".msg ---------")
+				missing? << _true 
+			_endif
+			
+			write(k,msg)
+		_endif
+	_endloop
+
+	extra? << _false 
+	_for k,msg _over lang_msgs.fast_keys_and_elements()
+	_loop
+		_if gb_msgs[k] _is _unset 
+		_then
+			_if _not extra?
+			_then
+				write(%newline,"----- Extra messages (vs en_gb) --------- ",lang," : ",fn,".msg ---------")
+				extra? << _true 
+			_endif
+			
+			write(k,msg)
+		_endif
+	_endloop
+
+	extra? << _false 
+	_for k,msg _over lang_msgs.fast_keys_and_elements()
+	_loop
+		_if us_msgs[k] _is _unset 
+		_then
+			_if _not extra?
+			_then
+				write(%newline,"----- Extra messages (vs en_us) --------- ",lang," : ",fn,".msg ---------")
+
+				extra? << _true 
+			_endif
+			
+			write(k,msg)
+		_endif
+	_endloop
+
+	_if lang <> "en_us"
+	_then 
+		untranslated? << _false 
+		_for k,msg _over lang_msgs.fast_keys_and_elements()
+		_loop
+			_if k _isnt _unset  _andif us_msgs[k] = msg
+			_then
+				_if _not untranslated?
+				_then
+					write(%newline,"----- Untranslated messages (vs en_us) --------- ",lang," : ",fn,".msg ---------")
+					
+					untranslated? << _true 
+				_endif
+				
+				write(k,msg)
+			_endif
+		_endloop
+	_endif 
+_endproc
+$
+
+# Return a hash_table of the messages in file FN for language LANG.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_file_messages <<
+_proc(fn,lang)
+	pth << sw_module_manager.module(:dialog_designer).safe_full_directory + "\resources\" + lang + "\messages\"  #"
+
+	_local ht << equality_hash_table.new()
+	
+	_if _not system.file_exists?(pth+fn+".msg")
+	_then
+		write(%newline,"*** MISSING FILE ***   ",pth+fn+".msg")
+		_return ht
+	_endif
+	in << external_text_input_stream.new(pth+fn+".msg")
+
+	msg << ""
+	key << _unset 
+
+	_protect
+		_loop
+			_if (lin << in.get_line()) _is _unset 
+			_then
+				_leave 
+			_endif
+			
+			_if _not lin.empty? _andif lin[1] _is %:
+			_then
+				ht[key] << msg
+				
+				key << lin.split_by(%tab).first.split_by(% ).first
+				len << key.size
+				msg << lin.slice_to_end(min(lin.size+1,len+1))
+			_else
+				msg +<< write_string(%newline,lin)
+			_endif
+		_endloop
+	_protection
+		in.close()		
+	_endprotect
+
+	ht[key] << msg
+
+	>> ht	
+_endproc
+$
+
+# Sort the messages for language LANG by the message indices.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_sort_message_files <<
+_proc (lang)
+	write(%newline,"="*40," Sorting : ",lang," ","="*40)
+	
+	_for fn _over {"dialog_designer","dialog_designer_plugin",
+		       "dialog_designer_framework","dd_element_editor","select_path"}.fast_elements()
+	_loop
+		dd_sort_message_file(fn,lang)
+	_endloop
+	
+_endproc
+$
+
+# Sort a specific language LANG message file by message indices.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_sort_message_file <<
+_proc(fn,lang)
+         lang_msgs << dd_file_messages(fn,lang)
+
+	 _protect
+		 
+		 pth << sw_module_manager.module(:dialog_designer).safe_full_directory + "\resources\" + lang + "\messages\"  #"
+		 out << external_text_output_stream.new(pth+fn+".msg")
+
+		 sorted_keys << sorted_collection.new()
+
+		 _for k _over lang_msgs.fast_keys()
+		 _loop
+			 _if k _isnt _unset _then sorted_keys.add(k) _endif 
+		 _endloop
+
+		 _for k _over sorted_keys.fast_elements()
+		 _loop
+			 out.write(k,lang_msgs[k],%newline)
+		 _endloop
+	 _protection
+		 out.close()
+	 _endprotect
+_endproc 
+$
+
+# Sort WHICH language entries alphabetically.
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_sort_language <<
+_proc(which)
+	which << which.write_string.lowercase
+	
+	langs << dd_languages()
+
+	_if langs.index_equal_of(which) _is _unset _andif which <> "all"
+	_then
+		write(which," language messages files do not exist.")
+		_return 
+	_endif
+
+	_if which = "all"
+	_then
+		_for lang _over langs.fast_elements()
+		_loop
+			dd_sort_message_files(lang)
+		_endloop
+	_else
+		dd_sort_message_files(which)
+	_endif
+
+_endproc
+$
+
+
+_block
+	!global_auto_declare?! << _maybe 
+_endblock
+$
+
+

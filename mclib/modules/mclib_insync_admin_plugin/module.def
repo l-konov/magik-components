@@ -1,0 +1,10 @@
+mclib_insync_admin_plugin	4000
+
+description
+	Simple amdin tool to give access to inync tools
+end
+
+requires
+	oracle_replicator
+	insync_magik_gui
+end

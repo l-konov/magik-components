@@ -1,0 +1,1367 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_server_engine
+##
+## Engine class for performing the central processing for an
+## HTTP server.  Also includes its own thread handling
+## actions that can be plugged in to any GUI.
+##
+## Key limitation: each request recieved will be handled as a
+## single request-and-response action: there is no support for
+## keeping a connection alive through multiple requests and
+## responses.
+##
+## Developer note: This tool is not HTTP/1.0 compliant.  It
+## includes minimal support for establishing a web services
+## architecture in Smallworld/Magik.
+##
+
+def_slotted_exemplar(:mss_http_server_engine,
+{
+	{:logfile, _unset, :readable},
+	{:trace_level, _unset, :writable},
+	{:thread, _unset, :readable},
+	{:run_status, _unset, :readable},
+	{:service_managers, _unset, :readable},
+	{:clients, _unset, :readable},
+	{:int!heartbeat_manager, _unset},
+	{:id_counter, _unset}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_property(
+	:default_port, :integer, "Default port number",
+	_false, _false, 80)
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_property(
+	:default_logfile_name, :string, "Default logfile name",
+	_false, _false, "")
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_property(
+	:default_log_level, :integer, "Default log level (1 min-10 max)",
+	_false, _false, 7)
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_property(
+	:default_max_allowable_clients, :integer, "Default max allowable clients",
+	_false, _false, 10)
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_property(
+	:server_restart_command, :string, "Command to issue to fully restart the server image",
+	_true, _false, "")
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_shared_constant(
+	:databus_producer_data_types,
+	{:run_status, :run_status_string},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+mss_http_server_engine.define_shared_constant(
+	:int!singlethread_lock,
+	## A construct used in the perform_with_singlethread_lock()
+	## method to provide single file locking.
+	value_holder.new(:int!singlethread_lock),
+	:private)
+$
+
+_pragma(classify_level=debug, topic={mss_common})
+mss_http_server_engine.define_shared_variable(
+	:debug_last_connection_manager,
+	## When running in debug mode (log_level >= 10), this will store
+	## this last mss_http_server_connection_manager processed.
+	_unset,
+	:public)
+$
+
+# Thread handling methods - copied from engine_model.
+#
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.run_status << status
+	## 
+	## Similar functionality as for engine_model.
+	##
+
+	_if (fw << _self.framework) _isnt _unset _andif
+	    (tf << fw.top_frame) _isnt _unset
+	_then
+		tf.busy? << status _is :running
+	_endif 
+	.run_status << status
+	_self.manage_actions()
+	_self.changed(:run_status)
+	_self.changed(:run_status_string)
+	_self.databus_make_data_available(:run_status, status)
+	_self.databus_make_data_available(:run_status_string, _self.run_status_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.run_status_string
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_return _self.message(.run_status)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.run_engine(priority, method_name, _gather args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		_self.user_error(:engine_running)
+	_endif
+	.thread << _proc(model, method, args)
+			   model.int!run_engine(method, args)
+		   _endproc.fork_at(priority, _self, method_name, args)
+	.thread.set_name(:http_engine)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.int!run_engine(method, _optional args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_protect
+		_handling user_error _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		_self.run_status << :running
+		_if method.is_class_of?({})
+		_then
+			method.new_appending(_scatter args).send_to(_self)
+		_else
+			_self.perform(method,_scatter args)
+		_endif
+	_protection
+		.thread << _unset
+		_self.run_status << :ready
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.interrupt()
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		.thread.kill_and_wait()
+	_endif
+	_self.run_status << :ready
+	_self.status_string << _self.message(:interrupted)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_engine.status_string << x
+	## 
+	## Broadcast status_string changes to anyone that cares.
+	##
+	
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.logfile << _unset 
+	.thread << _unset
+	.trace_level << 1
+	.run_status << :ready
+	.service_managers << rope.new()
+	.clients << equality_hash_table.new()
+	.id_counter << 0
+	
+	_self.have_post_mortem(_true)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:run,
+				       :short_help_text, _self.message(:run_sh),
+				       :engine, _self,
+				       :image, {:forward, :ui_resources},
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|run()|}))
+	_self.add_action(sw_action.new(:interrupt,
+				       :short_help_text, _self.message(:interrupt_sh),
+				       :enabled?, _false,
+				       :engine, _self,
+				       :image, {:stop, :ui_resources},
+				       :action_message, :|interrupt()|))
+	_self.add_action(sw_action.new(:port,
+				       :short_help_text, _self.message(:port_sh),
+				       :toolbar_control, :text_item,
+				       :value_mgr, numeric_value_manager.new(:integer?, _true),
+				       :engine, _self,
+				       :value, _self.default_port.as_integer()))
+	_self.add_action(sw_action.new(:logfile_name,
+				       :short_help_text, _self.message(:logfile_name_sh),
+				       :toolbar_control, :text_item,
+				       :engine, _self,
+				       :value, _self.default_logfile_name))
+	_self.add_action(sw_action.new(:logfile_file_selector,
+				       :short_help_text, _self.message(:logfile_file_selector_sh),
+				       :engine, _self,
+				       :action_message, :|logfile_file_selector()|))
+	_self.add_action(sw_action.new(:log_level,
+				       :short_help_text, _self.message(:log_level_sh),
+				       :toolbar_control, :text_item,
+				       :value_mgr, numeric_value_manager.new(:integer?, _true,
+									     :valid_interval, interval.new(1, 10)),
+				       :engine, _self,
+				       :value, _self.default_log_level.as_integer()))
+	_self.add_action(sw_action.new(:max_allowable_clients,
+				       :short_help_text, _self.message(:max_allowable_clients_sh),
+				       :toolbar_control, :text_item,
+				       :value_mgr, numeric_value_manager.new(:integer?, _true,
+									     :valid_interval, interval.new(0, 100)),
+				       :engine, _self,
+				       :value, _self.default_max_allowable_clients.as_integer()))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.manage_actions()
+	## 
+	## Manage actions for a change in run_status.
+	##
+
+	_if _self.action(:run) _is _unset
+	_then
+		# Actions not built yet - nothing to manage.
+		_return
+	_endif
+	status << .run_status
+	_self.action(:run).enabled? << status _isnt :running
+	_self.action(:interrupt).enabled? << status _is :running
+	_self.action(:port).enabled? << status _isnt :running
+	_self.action(:logfile_name).enabled? << status _isnt :running
+	_self.action(:logfile_file_selector).enabled? << status _isnt :running
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.build_gui(container, _optional xml_element)
+	## 
+	## Standard build_gui method.
+	## 
+
+	_if xml_element _is _unset _orif
+	    (usage << xml_element.attributes["gui_usage"]) _is _unset
+	_then
+		_return
+	_endif 
+	_if usage = "services"
+	_then
+		_return _self.build_services_gui(container, xml_element)
+	_elif usage = "configuration"
+	_then 
+		_return _self.build_configuration_gui(container, xml_element)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.build_services_gui(container, _optional xml_element)
+	## 
+	## Build configuration portion of GUI.
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label_services)
+
+	p.start_row()
+	tree_item.new(p,
+		      :grid_lines?, _true,
+		      :model, _self,
+		      :aspect, :service_managers_list,
+		      :data_selector, :service_managers_list,
+		      :column_widths, {130, 60, 250},
+		      :column_headings, {_self.message(:ch_directory),
+					 _self.message(:ch_subdirectories?),
+					 _self.message(:ch_exemplar)},
+		      :height_in_chars, 8,
+		      :width, 460,
+		      :mode, :none,
+		      :resize_x?, _true,
+		      :resize_y?, _true) 
+	
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.build_configuration_gui(container, _optional xml_element)
+	## 
+	## Build configuration portion of GUI.
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.tab_label << _self.message(:tab_label_configuration)
+	tabs << {100}
+	
+	p.start_row()
+	label_item.new(p, _self.message(:port))
+	act << _self.action(:port)
+	x << act.place_control_on(p, :dialog, :display_length, 8, :caption, "", :editable?, _true)
+	x.set_left(tabs[1])
+	
+	p.start_row()
+	label_item.new(p, _self.message(:logfile_name))
+	act << _self.action(:logfile_name)
+	x << act.place_control_on(p, :dialog, :display_length, 50, :caption, "", :editable?, _true)
+	x.set_left(tabs[1])
+	
+	act << _self.action(:logfile_file_selector)
+	act.place_control_on(p, :dialog, :min_width, 0)
+	
+	p.start_row()
+	label_item.new(p, _self.message(:log_level))
+	act << _self.action(:log_level)
+	x << act.place_control_on(p, :dialog, :display_length, 8, :caption, "", :editable?, _true)
+	x.set_left(tabs[1])
+	
+	p.start_row()
+	label_item.new(p, _self.message(:max_allowable_clients))
+	act << _self.action(:max_allowable_clients)
+	x << act.place_control_on(p, :dialog, :display_length, 8, :caption, "", :editable?, _true)
+	x.set_left(tabs[1])
+	
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.permission_to_terminate?()
+	## 
+	## Not allowed if the engine is running.
+	##
+
+	_if _self.run_status _is :running
+	_then
+		condition.raise(:termination_aborted, :object, _self,
+				:reason, _self.message(:server_running_termination))
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.process_initialisation_data_element(an_xml_element)
+	## 
+	## Parse the :service_managers XML element to install service
+	## managers.
+	##
+	_if an_xml_element.type _is :service_managers
+	_then
+		_for i _over an_xml_element.elements.fast_elements()
+		_loop
+			cl_name << i.attribute(:class_name)
+			dir << i.attribute(:directory)
+			# Uli Naedelin
+			# IP vec should be defined as {'110.10.2.2','110.10.2.15'} in
+			# xml file
+			allowed_ip_vec << i.attribute(:allowed_ip_vec)
+			_if allowed_ip_vec _isnt _unset _andif
+			    _not allowed_ip_vec.empty?
+			_then
+				allowed_ip_vec << allowed_ip_vec.evaluate()
+				l_res_allowed_ip_vec << rope.new()
+				_for i_ip _over allowed_ip_vec.fast_elements()
+				_loop
+					_if i_ip.first = %' _andif
+					    i_ip.last = %'
+					_then
+						l_res_allowed_ip_vec.add( i_ip.slice(2, i_ip.size - 1))
+					_else
+						l_res_allowed_ip_vec.add(i_ip)
+					_endif 
+				_endloop
+				allowed_ip_vec << l_res_allowed_ip_vec
+			_endif 
+			subdir_str << i.attribute(:subdirectories).default("").write_string
+			_if subdir_str.size > 0 _andif
+			    (subdir_str[1].lowercase _is %y _orif
+			     subdir_str[1].lowercase _is %t)
+			_then
+				subdirs? << _true
+			_else
+				subdirs? << _false
+			_endif
+
+			props << property_list.new()
+			_if (p_el << i.element_matching_name(:properties)) _isnt _unset
+			_then
+				_for j _over p_el.xml_elements()
+				_loop
+					_if (p_attr << j.attribute(:name)) _is _unset _orif
+					    (p_val << j.attribute(:value)) _is _unset
+					_then
+						_continue
+					_endif
+					props[p_attr.as_symbol()] << p_val
+				_endloop
+			_endif
+			_self.add_service_manager(cl_name, dir, subdirs?, allowed_ip_vec, props)
+		_endloop
+	_endif
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.add_service_manager(class_name, dir, subdirs?, allowed_ip_vec, props)
+	## 
+	## Register the class named CLASS_NAME as a service manager for
+	## request directory DIR.  If SUBDIRS? is true, then it will
+	## also manage all subdirectories thereof, unless another
+	## service claims any of those subdirectories.  PROPS is a
+	## property list of key/value pairs that will be used to
+	## initialize the service manager when it is instantiated.
+	##
+
+	_dynamic !global_auto_declare?! << _false
+	ex << _unset 
+	_try
+		ex << class_name.write_string.evaluate()
+	_when error
+	_endtry
+	_if ex _is _unset _orif
+	    dir _is _unset _orif
+	    dir = ""
+	_then
+		_self.write_log(1, _unset, _self.message(:log_bad_service_manager, class_name, dir))
+		_return
+	_endif
+
+	_if dir.first _isnt %/
+	_then
+		dir << write_string(%/, dir)
+	_endif
+	_if dir.size > 1 _andif
+	    dir.last _is %/
+	_then
+		dir << dir.slice(1, dir.size - 1)
+	_endif
+
+	# For display purposes, show the / at the start but not at the
+	# end.  But for searching purposes, add the / to the end.
+	disp_dir << dir.copy()
+	dir << dir.lowercase
+	_if dir.last _isnt %/
+	_then 
+		dir << write_string(dir, %/)
+	_endif
+	
+	pl << property_list.new_with(
+		      :directory, dir,
+		      :subdirectories?, subdirs?,
+		      :exemplar, ex,
+		      :allowed_ip_vec, allowed_ip_vec,
+		      :initialisation_properties, props,
+		      :display_directory, disp_dir,
+		      :display_exemplar, ex.class_name)
+	.service_managers.add(pl)
+	_self.changed(:service_managers_list, :refresh)
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.service_managers_list
+	## 
+	## List of service_managers formatted for a tree_item.
+	##
+
+	r << rope.new()
+	sstr << styled_string.new(:value, :display_directory, :tab,
+				  :value, :subdirectories?, :tab,
+				  :value, :display_exemplar)
+	_for i, j _over .service_managers.fast_keys_and_elements()
+	_loop
+		dt << display_tree.new(i, j)
+		dt.styled_string << sstr
+		r.add_last(dt)
+	_endloop 
+	
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_engine.date_time_string(_optional a_date_time)
+	## 
+	## Format A_DATE_TIME to HTTP standard format (defaults to
+	## current date_time).
+	##
+
+	_if a_date_time _is _unset
+	_then
+		a_date_time << date_time.now()
+	_endif 
+	s << internal_text_output_stream.new()
+	a_date_time.format_to(s, "#a, #e #b #Y #H:#M:#S GMT", date_time_environ.utc)
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_engine.server_identifier_string
+	## 
+	## 
+
+	_return "MSS-HTTP/1.0"
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_engine.port
+	## 
+	## The port that the server will run on.
+	##
+
+	_return _self.action(:port).value
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_engine.hostname_for_request(req)
+	## 
+	## Return a hostname string derived from request REQ.
+	##
+
+	_if (h << req.get_header_field("Host")) _isnt _unset
+	_then
+		_return h
+	_endif
+
+	# If the host was not provided in the request, try to parse
+	# from the full URL.
+	url_data << mss_http_url_parser.new().parse_url(req.url)
+	_if (h << url_data[:host].default("")) = ""
+	_then
+		h << system.host_name
+	_endif
+	_return write_string(h, ":", _self.port)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_server_engine.logfile_name
+	## 
+	## The logfile where server results will be logged.
+	##
+	
+	_return _self.action(:logfile_name).value
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.set_port(new_port)
+	## 
+	## Change the port to NEW_PORT.  If the server is running, this
+	## does not take effect until restart.
+	##
+
+	a << _self.action(:port)
+	a.value << new_port
+	_return new_port
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.set_log_level(new_val)
+	##
+	## Change the log level to NEW_VAL (must be between 1 and 10).
+	##
+
+	a << _self.action(:log_level)
+	_if new_val < 1 _orif new_val > 10
+	_then
+		condition.raise(:user_error, :string, _self.message(:log_level_out_of_range))
+	_endif 
+	a.value << new_val
+	_return new_val
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.set_logfile_name(new_name)
+	## 
+	## Change the logfile_name to NEW_NAME.  If the server is running, this
+	## does not take effect until restart.
+	##
+
+	new_name << new_name.default("")
+	a << _self.action(:logfile_name)
+	a.value << new_name
+	_return new_name
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.logfile_file_selector()
+	## 
+	## Activate a file_dialog to select a logfile name.
+	##
+	
+	fd << file_dialog.new(_self, {:|set_logfile_name()|}, _unset,
+			      :directory, "",
+			      :title, _self.message(:logfile_file_selector_title))
+	fd.selection << _self.logfile_name
+	fd.activate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.post_mortem()
+	## 
+	## If a shared heartbeat manager exists, clean it up.
+	##
+
+	_self.terminate_shared_heartbeat_manager()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.terminate_shared_heartbeat_manager()
+	##
+	## If a shared heartbeat manager is used, terminate it now.
+	##
+	
+	_if (x << .int!heartbeat_manager) _isnt _unset
+	_then
+		.int!heartbeat_manager << _unset
+		x.stop()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.shared_heartbeat_manager(_optional force_existence?)
+	## 
+	## A heartbeat manager that can be shared by self to manage
+	## self's connection timeouts, and also by individual
+	## connections to manage their own operations.
+	##
+	## If self's thread isnt running and if FORCE_EXISTENCE? is not
+	## set to true, then this will not create a new instance if one
+	## doesn't already exist.  So, this can return unset.
+	##
+
+	_if (x << .int!heartbeat_manager) _is _unset
+	_then
+		_if force_existence? _isnt _true _andif
+		    _self.run_status _isnt :running
+		_then
+			_return _unset
+		_endif 
+		x << .int!heartbeat_manager << mss_http_heartbeat_manager.new()
+	_endif
+	_if x.thread _is _unset
+	_then
+		x.run()
+		x.thread.set_name(:http_heartbeat)
+	_endif
+	
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.terminate_shared_heartbeat_manager()
+	##
+	## If a shared heartbeat manager is used, terminate it now.
+	##
+	
+	_if (x << .int!heartbeat_manager) _isnt _unset
+	_then
+		.int!heartbeat_manager << _unset
+		x.stop()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.run()
+	## 
+	## Initiate the server process.  N.B.: to run in a separate
+	## thread, execute the run action rather than performing this
+	## method directly.
+	##
+
+	_local me << _self 
+	.clients.empty()
+	_self.status_string << ""
+	process_proc <<
+		_proc(me, conn)
+			me.process_connection_request(conn)
+		_endproc
+
+	.logfile << !output!
+	lfn << _self.logfile_name
+	_if lfn ~= ""
+	_then
+		_try
+			.logfile << external_text_output_stream.new_appending(lfn)
+		_when error
+		      condition.raise(:warning, :string, _self.message(:cannot_open_logfile, lfn))
+		      .logfile << !output!
+		_endtry 
+	_endif
+
+	_protect 
+		_self.write_log(1, _unset, _self.message(:log_starting_server))
+
+		# Star the heartbeat thread.
+		_self.shared_heartbeat_manager(_true)
+
+		# N.B.: for generality (i.e. serving binary files, or receiving
+		# binary POST data), these are binary streams.
+		_block
+			_handling error _with
+			_proc(cond)
+				_import me
+				me.status_string << me.message(:cannot_bind_port, me.port)
+				cond.continue_handling()
+			_endproc 
+			s << tcpip_connection_stream.new(_self.port,
+							 :input_class, external_binary_input_stream,
+							 :output_class, external_binary_output_stream)
+		_endblock
+
+		_loop
+			# N.B.: getting the connection itself is not put in an error
+			# handling block, as it is effectively handled by the run()
+			# method that wraps this one.  If there is such an error, let
+			# the run() method re-initiate this after a few second delay.
+			conn << s.get()
+
+			_catch :any_error
+				_handling error _with
+				_proc(cond)
+					_import me
+					me.write_log(1, _unset, cond.report_contents_string)
+					cond.report_on(!terminal!)
+					!traceback!(!terminal!)
+					!terminal!.flush()
+					_throw :any_error
+				_endproc
+				_handling warning _with procedure
+
+				_if .clients.size >= (max_allowed <<_self.max_allowable_clients)
+				_then
+					# OK, this could be more graceful.
+					_self.write_log(2, _unset, _self.message(:max_allowable_clients_exceeded, max_allowed))
+					conn.close(_true)
+					conn << _unset
+					_continue
+				_endif
+				
+				t << process_proc.fork_at(_thisthread.vm_priority - 1, _self, conn)
+				t.set_name(:http_client_0)
+				conn << _unset 
+			_endcatch
+		_endloop
+		
+	_protection
+		# N.B.: all shutdown activities are done as bombproof as
+		# possible, in case the environment is bent (i.e. cant open I/O
+		# streams due to resource over-allocation).
+		
+		# Allow a little quiescent time for in-progress clients to
+		# finish if they can.
+		_try
+			_if .clients.size = 0
+			_then 
+				_thisthread.sleep(100)
+			_else 
+				_thisthread.sleep(1000)
+			_endif 
+		_when error
+		_endtry
+		
+		# Terminate all in-process clients (with a clean copy in case
+		# clients are terminating themselves in separate threads).
+		_lock _self 
+		      cl_copy << .clients.copy()
+		_endlock 
+		_for i _over cl_copy.fast_elements()
+		_loop
+			_if i.thread _isnt _thisthread
+			_then
+				# The above must be true, unless someone's done something stupid...
+				_try _with cond
+				     i.thread.kill_and_wait()
+				_when error
+				      write(cond.report_contents_string)
+				_endtry 
+			_endif
+
+			# This should be done by the killing of the thread, but ensure
+			# it is tidied up in any event.
+			i.close_connection()
+		_endloop
+		_lock _self 
+		      .clients.empty()
+		_endlock
+		
+		_if conn _isnt _unset
+		_then
+			# A connection was got, but never handled, so kill it.
+			_try
+				conn.close(_true)
+			_when error
+			_endtry
+		_endif
+
+		_self.terminate_shared_heartbeat_manager()
+		
+		# Finally, stop the listener.
+		_if s _isnt _unset
+		_then
+			# Why am I sleeping so much?  I'm finding that despite
+			# quadruple-checking that I'm closing all tcpip_connections and
+			# the tcpip_connection_stream itself, that inbound port is
+			# still often bound after this is done, so that I can't restart
+			# the server on the same port without quitting and restarting
+			# my session.  Maybe I'm missing something, but this is looking
+			# like a resource-handling problem in the core.  So, give it as
+			# much time as it needs to breathe and meditate.
+			#
+			# And note, the problem described above does seem to go away in
+			# V4.x.  Seems that something did get fixed in core and maybe it
+			# doesn't need to breathe and meditate so much, but we'll keep
+			# it in anyways.
+			_try 
+				_thisthread.sleep(100)
+			_when error
+			_endtry
+			
+			_try _with cond
+			     s.close(_true)
+			     # Why am I sleeping so much?  See above...
+			     _thisthread.sleep(100)
+			     _self.write_log(1, _unset, _self.message(:log_connection_stream_closed))
+			_when error
+			      _self.write_log(1, _unset, _self.message(:log_error_closing_stream, cond.report_contents_string))
+			_endtry
+		_endif
+
+		_if .logfile _isnt _unset _andif
+		    .logfile _isnt !output!
+		_then
+			.logfile.close()
+		_endif
+		.logfile << _unset
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.process_connection_request(conn)
+	## 
+	## Do the work of handling a single connection request.  CONN
+	## is the tcpip_connection that is initiating this.
+	##
+
+	_local me << _self
+	_local mgr
+	
+	ok? << _false 
+	_protect 
+		_catch :any_error
+		       _handling user_error _with
+		       _proc(cond)
+			       _import me, mgr
+
+			       _try _with c2
+				    me.write_log(1, mgr, cond.report_contents_string)
+				    _if mgr _isnt _unset
+				    _then 
+					    mgr.send_user_error_response(cond.report_contents_string)
+				    _endif
+			       _when error
+				     # This user error handling must not be allowed to fail under
+				     # any circumstance, but if the following write() can't be done,
+				     # we're bent anyways.
+				     write("ERROR LOGGING A USER ERROR: ", c2.report_contents_string)
+			       _endtry 
+			       _throw :any_error
+		       _endproc
+		       _handling error _with
+		       _proc(cond)
+			       _import me, mgr
+
+			       _try _with c2
+				    me.write_log(1, mgr, cond.report_contents_string)
+				    _if (log << me.log_stream(1)) _isnt _unset
+				    _then
+					    !traceback!(log)
+					    log.flush()
+				    _endif 
+				    _if mgr _isnt _unset
+				    _then 
+					    mgr.send_server_error_response(cond.report_contents_string)
+				    _endif
+			       _when error
+				     # This error handling must not be allowed to fail under
+				     # any circumstance, but if the following write() can't be done,
+				     # we're bent anyways.
+				     write("ERROR LOGGING AN ERROR: ", c2.report_contents_string)
+			       _endtry 
+			       _throw :any_error
+		       _endproc
+		       _handling mss_http_information _with
+		       _proc(cond)
+			       _import me, mgr
+			       _local sender
+			       _if (sender << cond[:sender]) _is _unset
+			       _then
+				       sender << mgr
+			       _endif 
+			       me.write_log(cond[:priority].default(7), sender, cond.report_contents_string)
+		       _endproc
+		       _handling mss_timeout_expiry _with
+		       _proc(cond)
+			       _import me, mgr
+			       me.write_log(4, mgr, me.message(:log_skip_timed_out_request))
+			       _throw :any_error
+		       _endproc
+		       _handling warning, information _with procedure
+
+		       .id_counter +<< 1
+		       _thisthread.set_name(write_string(:http_client_, .id_counter))
+
+		       # Start with a 5 second timeout.  The connection manager will
+		       # increase this, when it thinks it knows how much it needs.
+		       hbm << _self.shared_heartbeat_manager(_true)
+		       mgr << mss_http_server_connection_manager.new(.id_counter, _self, conn)
+
+		       _lock _self
+			     .clients[.id_counter] << mgr
+		       _endlock
+
+		       _if _self.log_level >= 10
+		       _then
+			       # As a debugging helper: store the last client processed.
+			       _lock _self 
+				     _self.debug_last_connection_manager << mgr
+			       _endlock 
+		       _endif
+		       
+		       _self.write_log(4, mgr, _self.message(:log_connection_received))
+		       hbm.timeout_manager.set_timeout(5000, _unset, mgr.timeout_manager_tag, mgr)
+		       mgr.start()
+		       ok? << _true 
+		_endcatch
+	_protection
+		me.close_connection(mgr)
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.close_connection(mgr)
+	## 
+	## 
+
+	_if mgr _isnt _unset
+	_then
+		mgr.close_connection()
+		_lock _self
+		      .clients.remove_key(mgr.id)
+		_endlock 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.request_timeout(timeout, mgr)
+	## 
+	## If there is an existing timeout on this thread for
+	## mss_http_server_connection_manager MGR, clear it.  Set a new
+	## timeout to TIMEOUT. 
+	##
+
+	_if (hbm << _self.shared_heartbeat_manager()) _is _unset
+	_then
+		_return
+	_endif
+	tag << mgr.timeout_manager_tag
+	hbm.timeout_manager.mss_clear_earliest_timeout_with_tag(tag)
+	hbm.timeout_manager.set_timeout(timeout, _unset, tag, mgr)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.service_provider_exemplar_for_url(a_url)
+	## 
+	## Determine the service provider to use for the given URL
+	## string.
+	##
+	
+	_if a_url _is _unset _then _return _unset _endif
+	
+	# If a fully-qualified URL is provided, break it down.
+	uprs << mss_http_url_parser.new()
+	url_parse_data << uprs.parse_url(a_url)
+	_if (path << url_parse_data[:path]) _is _unset
+	_then
+		_return
+	_endif
+
+	# Get the end of the directory path of the URL.
+	_if path = "" _orif
+	    path.first _isnt %/
+	_then
+		path << write_string(%/, path)
+	_endif
+
+	_if path = "/"
+	_then
+		# This can only be the root directory.
+		check_strs << {"/"}
+	_elif path.last _is %/
+	_then
+		# This is definitely a directory URL, with no leaf filename.
+		check_strs << {path.lowercase}
+	_else
+		# This could be a path with the trailing slash left out, or it
+		# could be a path and leafname.  Check each.
+		ridx << path.rindex_of(%/)
+		dir1 << write_string(path, %/).lowercase
+		dir2 << write_string(path.slice(1, ridx - 1), %/).lowercase
+		check_strs << {dir1, dir2}
+	_endif
+	
+	best_dir_data << _unset 
+	best_dir_size << -1
+	_for j _over check_strs.fast_elements()
+	_loop @outer
+		_for i _over .service_managers.fast_elements()
+		_loop
+			check_dir << i[:directory]
+			_if j = check_dir
+			_then
+				best_dir_data << i
+				best_dir_size << check_dir.size
+				_leave @outer
+			_endif
+			
+			_if i[:subdirectories?] _is _true _andif
+			    check_dir.size > best_dir_size _andif
+			    j.size > check_dir.size 
+			_then
+				# Try a substring match.
+				_if j.index_of_seq(check_dir) = 1
+				_then
+					best_dir_data << i
+					best_dir_size << check_dir.size
+				_endif
+			_endif 
+		_endloop
+	_endloop
+
+	_if best_dir_data _is _unset
+	_then
+		# No handlers for this directory.
+		_return _unset
+	_endif
+	allowed_ip_vec << best_dir_data[:allowed_ip_vec]
+	_if (init_props << best_dir_data[:initialisation_properties]) _isnt _unset
+	_then
+		init_props << init_props.copy()
+	_else
+		init_props << property_list.new()
+	_endif
+	_if best_dir_size > path.size
+	_then
+		# This can happen if the service provider match is due to a
+		# full path being entered, with no trailing slash or leafname.
+		init_props[:dir_name] << path
+		init_props[:leaf_name] << ""
+	_else 
+		init_props[:dir_name] << path.slice(1, best_dir_size - 1)
+		init_props[:leaf_name] << path.slice_to_end(best_dir_size + 1)
+	_endif 
+	init_props[:query] << url_parse_data[:query]
+	init_props[:fragment] << url_parse_data[:fragment]
+	_return property_list.new_with(
+			:exemplar, best_dir_data[:exemplar],
+			:initialisation_properties, init_props,
+			:allowed_ip_vec, allowed_ip_vec
+			      )
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.send_request_response(req)
+	## 
+	## Send the response to request REQ, and also log that it was
+	## sent.
+	##
+
+	ok? << _false
+	_protect 
+		req.send_response()
+		_if (resp << req.response) _isnt _unset
+		_then
+			st << resp.status_line()
+		_else
+			st << _self.message(:unknown_status)
+		_endif
+		ok? << _true
+	_protection
+		_self.write_log(4, req.connection_manager, _self.message(:log_response_sent, st))
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.perform_with_singlethread_lock(target, meth_name, _gather args)
+	## 
+	## Perform the method METH_NAME on TARGET, with the given
+	## ARGS.  Actions will be done in a single-threaded manner by
+	## locking self.  This is intended for use by service providers
+	## that MUST perform certain actions in single file, such as
+	## things which will be switching database alternatives.
+	##
+
+	_lock _self.int!singlethread_lock
+	      retvals << (_allresults target.perform(meth_name, _scatter args))
+	_endlock
+	_return _scatter retvals
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.log_level
+	## 
+	## Log level - all log messages with a priority >= this value
+	## will be reported.
+	##
+
+	_try 
+		_if (a << _self.action(:log_level)) _isnt _unset _andif
+		    (v << a.value) _isnt _unset
+		_then
+			_return v
+		_endif
+	_when action_managed_value_read_error
+	      # Entered value is out-of-range.
+	_endtry
+	
+	_return _self.default_log_level
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_server_engine.max_allowable_clients
+	##
+	## Maximum allowable concurrent client connections.
+	##
+
+	_try 
+		_if (a << _self.action(:max_allowable_clients)) _isnt _unset _andif
+		    (v << a.value) _isnt _unset
+		_then
+			_return v
+		_endif
+	_when action_managed_value_read_error
+	      # Entered value is out-of-range.
+	_endtry
+	
+	_return _self.default_max_allowable_clients
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.write_log(prio, mgr, string)
+	## 
+	## Write the given STRING to the log file, if its priority PRIO
+	## is <= self.log_level.  If MGR is provided, it is a
+	## connection manager.
+	##
+
+	# Do this in a bombproof manner.
+	_catch :any_error
+	       _handling error _with
+	       _proc(cond)
+		       _import string
+		       # If the following is not even possible, then this will
+		       # probably cause recursive grief followed shortly by breakdown.
+		       write("ERROR: Unable to perform mss_http_server_engine.write_log()")
+		       write("ORIGINAL LOG STRING: ", string)
+		       write("TRACEBACK")
+		       !traceback!(!terminal!)
+		       !terminal!.flush()
+		       _throw :any_error
+	       _endproc
+	       
+		_if prio > _self.log_level
+		_then
+			_return
+		_endif
+
+		# N.B.: don't need to lock anything here to ensure that data is
+		# streamed sequentially to the output stream, because the
+		# output stream itself does that.
+		_if (s << .logfile) _is _unset
+		_then
+			s << !output!
+		_endif
+		s.write(date_time.now(), " ")
+		_if mgr _isnt _unset
+		_then
+			s.write(mgr.connection_description(), " ")
+		_endif 
+		s.write(string, newline_char)
+		s.flush()
+	_endcatch 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.log_stream(prio)
+	## 
+	## Returns self's logfile stream, but only if PRIO is less
+	## than or equal to self's current log_level.  Otherwise, unset
+	## is retured.
+	##
+
+	_if prio <= _self.log_level
+	_then
+		_return .logfile
+	_else
+		_return _unset
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.perform_server_shutdown()
+	## 
+	## This not only interrupts self, but kills the entire Magik session.
+	##
+
+	xproc << _proc(me)
+			 _thisthread.sleep(1000)
+			 me.interrupt()
+			 _thisthread.sleep(5000)
+			 quit()
+		 _endproc 
+	xproc.fork_at(_thisthread.low_background_priority, _self)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_server_engine.perform_server_restart()
+	## 
+	## This not only interrupts self, but kills the entire Magik
+	## session and issues self's server_restart_command (which
+	## should be a batch file that can restart the service that
+	## self is running under.
+	##
+
+	_if (cmdstr << _self.server_restart_command.default("")) = ""
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_server_restart_command))
+	_endif 
+	xproc << _proc(me, cmdstr)
+			 _thisthread.sleep(1000)
+			 me.interrupt()
+			 _thisthread.sleep(5000)
+			 system.start_command(cmdstr)
+			 _thisthread.sleep(500)
+			 quit()
+		 _endproc 
+	xproc.fork_at(_thisthread.low_background_priority, _self, cmdstr)
+	
+_endmethod
+$

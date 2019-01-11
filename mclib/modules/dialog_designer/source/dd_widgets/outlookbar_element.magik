@@ -1,0 +1,217 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## OUTLOOKBAR_ELEMENT - object to hold outlookbar element data.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:outlookbar_element,
+		     {
+			     {:name,_unset,:writable},
+			     {:caption,_unset,:writable},
+			     {:type,_unset,:writable},
+			     {:selection_type,_unset,:writable},
+			     {:icon_size,_unset,:writable},
+			     {:move_sub_categories_allowed?,_unset,:writable},
+			     {:remove_sub_categories_allowed?,_unset,:writable},
+			     {:draw_selection?,_unset,:writable},
+			     {:image_file_name,_unset,:writable},
+			     {:image_module_name,_unset,:writable},
+			     {:large_image_file_name,_unset,:writable},
+			     {:large_image_module_name,_unset,:writable}    
+		     },:dd_element) 
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+outlookbar_element.define_shared_constant(
+	:dd_properties_by_type,
+	property_list.new_with(
+		:cat,property_list.new_with(
+			     :name,:string,
+			     :caption,:string,
+			     :selection_type,{:default,:one_shot,:always},
+			     :icon_size,{:small,:large},
+			     :move_sub_categories_allowed?,:boolean,
+			     :remove_sub_categories_allowed?,:boolean,
+			     :type,{:cat,:sub}),
+		:sub,property_list.new_with(
+			     :name,:string,
+			     :caption,:string,
+			     :image_file_name,:string,
+			     :image_module_name,:string,
+			     :large_image_file_name,:string,
+			     :large_image_module_name,:string,
+			     :draw_selection?,:boolean,
+			     :type,{:cat,:sub})
+		      ),
+		:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+outlookbar_element.define_shared_constant(
+	:initial_values_by_type,
+	property_list.new_with(
+		:cat,property_list.new_with(
+			     :selection_type,:default,
+			     :icon_size,:small,
+			     :image_file_name,"outlook_cat",
+			     :image_module_name,"dialog_designer",
+			     :large_image_file_name,_unset,
+			     :large_image_module_name,_unset,
+			     :move_sub_categories_allowed?,"No",
+			     :remove_sub_categories_allowed?,"No"),
+		:sub,property_list.new_with(
+			     :image_file_name,"outlook_sub",
+			     :image_module_name,"dialog_designer",
+			     :large_image_file_name,_unset,
+			     :large_image_module_name,_unset,
+			     :draw_selection?,"Yes")
+		      ),
+		:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+outlookbar_element.define_shared_constant(:has_logical_properties?,_false,:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.new(vals)
+	## 
+	## Return a new instance.
+	>> _clone.init(vals)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.init(vals)
+	## 
+	## Initialise SELF from the property list VALS.
+
+	_for s,v _over vals.keys_and_elements()
+	_loop
+		_self.perform(s.with_chevron,v)
+	_endloop
+	
+	>> _self 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	obp << outlookbar_element.dd_properties_by_type[_self.type.default(:cat).as_symbol()]
+
+	_for k,e _over obp.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.initial_values(caption,type,num)
+	## 
+	## Return inital values for a new instance of SELF, using the
+	## passed CAPTION and TYPE (:cat or :sub) values.
+
+	vals << _self.initial_values_by_type[type].deep_copy()
+
+	vals[:caption] << caption
+	vals[:type] << type
+	vals[:name] << write_string(type,%_,num)
+
+	>> vals
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.dialog_description()
+	## 
+	## Return descriptive text for SELF.
+
+	>> .caption
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.dialog_element_id
+	## 
+	## Return the :name slot value.
+	>> .name
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method outlookbar_element.gui_name_and_value(name,value)
+	## 
+	## Generate the appropriate text string for VALUE so that the
+	## Magik interpreter will interpret it correctly.
+
+	gui_name << name
+	gui_value << value
+
+	pv << _self.dd_properties()[name.as_symbol()]
+
+	_if gui_value _is _unset _orif
+	    {"name","type"}.index_equal_of(name) _isnt _unset
+	_then
+		_return 
+	_endif
+
+	_if value = "True" _orif gui_value = "Yes"
+	_then
+		_return gui_name,"_true"
+	_elif value = "False" _orif gui_value = "No"
+	_then 
+		_return gui_name,"_false"
+	_endif
+
+	_if gui_name.index_of_seq(:large_image_module) _isnt _unset 
+	_then
+		_return "large_image",write_string("{:",_self.large_image_file_name,",:",value,%})
+	_elif gui_name.index_of_seq(:image_module) _isnt _unset 
+	_then
+		_return "image",write_string("{:",_self.image_file_name,",:",value,%})
+	_elif gui_name.index_of_seq(:image_file) _isnt _unset 
+	_then
+		_return 
+	_endif
+
+	_if pv.class_name _is :simple_vector
+	_then
+		_return gui_name,write_string(%:,value)
+		
+	_elif pv _is :string _andif name = "caption"
+	_then
+		_return "caption",write_string(%",value,%")
+		
+	_elif pv _is :vector
+	_then
+		_return gui_name,write_string(%{,value,%})
+	_endif
+
+	>> gui_name,gui_value 
+_endmethod
+$
+

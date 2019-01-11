@@ -1,0 +1,107 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+## @version 1.2 (June 2007)
+##
+## SW_ACTION - added functionality for CORE object.
+##
+##########################################################################################
+_package user
+
+# Add label item to the list of GUI control a SW_ACTION can construct.
+
+_pragma(classify_level=restricted)
+sw_action.define_shared_constant( :gui_control_constructor,
+				  ##
+				  ## Property list mapping control type to construction method
+				  ##
+				  property_list.new_with(
+					  # Dialog Designer, additional action types ....
+					  :label_item,        :|add_label_item()|,
+					  # End additions.
+					  :image_button_item, :|add_image_button_item()|,
+					  :button_item,       :|add_button_item()|,
+					  :image_item,        :|add_image_item()|,
+					  :image_toggle_item, :|add_image_toggle_item()|,
+					  :toggle_item,       :|add_toggle_item()|,
+					  :text_toggle_item,  :|add_text_toggle_item()|,
+					  :combo_box_item,    :|add_combo_box_item()|,
+					  :text_item,         :|add_text_item()|,
+					  :choice_item,       :|add_text_choice_item()|,
+					  :text_choice_item,  :|add_text_choice_item()|,
+					  :image_radio_set,   :|add_image_radio_set()|,
+					  :radio_set,         :|add_radio_set()|,
+					  :text_display,      :|add_text_display()|,
+					  :image_choice_item, :|add_image_choice_item()|,
+					  :radio_item,        :|add_radio_item()|,
+					  
+					  :colour_choice_item,
+					  { :add_style_choice_item|()|, :colour_choice_item },
+					  :colour_choice_button_item,
+					  { :add_style_choice_button_item|()|, :colour_choice_button_item },
+
+					  
+					  :line_width_choice_item,
+					  { :add_style_choice_item|()|, :line_width_choice_item },
+					  :line_width_choice_button_item,
+					  { :add_style_choice_button_item|()|, :line_width_choice_button_item },
+					  
+					  :dash_pattern_choice_item,
+					  { :add_style_choice_item|()|, :dash_pattern_choice_item },
+					  :dash_pattern_choice_button_item,
+					  { :add_style_choice_button_item|()|, :dash_pattern_choice_button_item },
+
+					  :line_join_style_choice_item,
+					  { :add_style_choice_item|()|, :line_join_style_choice_item },
+					  :line_join_style_choice_button_item,
+					  { :add_style_choice_button_item|()|, :line_join_style_choice_button_item },
+					  
+					  :line_end_style_choice_item,
+					  { :add_style_choice_item|()|, :line_end_style_choice_item },
+					  :line_end_style_choice_button_item,
+					  { :add_style_choice_button_item|()|, :line_end_style_choice_button_item },
+					  
+					  :fill_percentage_choice_item,
+					  { :add_style_choice_item|()|, :fill_percentage_choice_item },
+					  :fill_percentage_choice_button_item,
+					  { :add_style_choice_button_item|()|, :fill_percentage_choice_button_item },
+
+					  :hatch_pattern_choice_item,
+					  { :add_style_choice_item|()|, :hatch_pattern_choice_item },
+					  :hatch_pattern_choice_button_item,
+					  { :add_style_choice_button_item|()|, :hatch_pattern_choice_button_item }
+					  
+						),
+				  :private)
+$
+
+_pragma(classify_level=restricted)
+_method sw_action.add_label_item(gui, control_props, override_properties)
+	## 
+	## Add a label item to the GUI
+	##
+	## CONTROL_PROPS is a vector of key/value pair properties which
+	## are specified by the action and passed directly to the
+	## control.
+	##
+	## OVERRIDE_PROPERTIES is a property list of properties 
+	## to be overridden. However some properties may be ignored
+	## if they can't be set.
+	##
+
+	caption << override_properties[:caption].default(_self.caption)
+	id << override_properties[:identifier]
+	>> label_item.new( gui, caption,
+			   :identifier, id,
+			   _scatter control_props)
+_endmethod
+$

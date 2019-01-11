@@ -1,0 +1,11 @@
+BODY, TH, TD, P {
+		color: Blue;
+	 }
+
+A           { color: Black; TEXT-DECORATION: underline; }
+A:visited   { color: Black; TEXT-DECORATION: underline; }
+A:active    { color: Black; TEXT-DECORATION: underline; }
+A:hover     { color: Blue;	}
+
+
+.big-bold  { color: Black; font-size: 20px; font-style: Bold; }

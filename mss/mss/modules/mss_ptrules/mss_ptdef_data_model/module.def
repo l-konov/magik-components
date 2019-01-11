@@ -1,0 +1,8 @@
+mss_ptdef_data_model	1
+
+description
+	MSS pointing definition data model
+end
+
+requires
+end

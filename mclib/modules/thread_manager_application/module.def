@@ -1,0 +1,9 @@
+mclib_thread_manager 4000
+
+description
+	Provides support for launching the thread manager as an application
+end
+
+requires
+	mclib_package
+end

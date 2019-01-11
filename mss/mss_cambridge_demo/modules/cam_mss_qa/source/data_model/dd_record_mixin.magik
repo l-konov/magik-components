@@ -1,0 +1,24 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2008 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_qa}, usage={subclassable})
+_method dd_record_mixin.mss_qa_everythings_an_error(qa_engine, qa_check)
+	## 
+	## Perform a QA check which reflexively reports everything
+	## it is run on as an error.  Used for testing / demo only.
+	##
+
+	condition.raise(:mss_qa_information,
+			:string, "Everything's an error!",
+			:record, _self,
+			:severity, :error,
+			:error_code, :everythings_an_error)
+	
+_endmethod
+$

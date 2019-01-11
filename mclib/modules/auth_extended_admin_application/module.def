@@ -1,0 +1,15 @@
+mclib_auth_extended_admin_application	4000
+
+description
+	Custom admin application to access extended authorisation functions
+end
+
+requires
+	admin_application
+	mclib_auth_dump_report
+	mclib_auth_update_enhancements
+	mclib_insync_admin_plugin
+	mclib_thread_manager
+	mclib_case_html_reporter
+	mclib_dynamic_case_launcher
+end

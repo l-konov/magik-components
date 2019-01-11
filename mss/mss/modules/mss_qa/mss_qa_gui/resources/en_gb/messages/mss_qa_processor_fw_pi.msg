@@ -1,0 +1,3 @@
+#% text_encoding = iso8859_1
+
+:activate_mss_qa_processor_framework	:en_gb	Quality Assurance Menu...

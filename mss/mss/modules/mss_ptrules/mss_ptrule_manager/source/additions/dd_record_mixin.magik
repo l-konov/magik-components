@@ -1,0 +1,228 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Return true if self (the detached subject of an insert pointing rule)
+	## can correlate to the geometry given by CORR_GEOM.  CAT is an
+	## identifier to allow different categories of correlation
+	## types for a given record class, and it defaults to :default.
+	## PTRULE is the pointing rule initiating this process.
+	## 
+	## This backstop method simply returns false.
+	##
+	
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_update_from_correlation(cat, corr_geom, ptrule)
+	## 
+	## Update the attributes of self (the detached subject of an insert
+	## pointing rule) after correlating to the geometry given by
+	## CORR_GEOM.  CAT is an identifier to allow different
+	## categories of correlation  types for a given record class,
+	## and it defaults to :default.
+	## PTRULE is the pointing rule initiating this process.
+	##
+	## This backstop method simply performs no updates.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_correlation_score(cat, corr_geom)
+	##
+	## A numeric value indicating a preference for which geometry
+	## to use for correlation purposes.  If is unlikely that this
+	## needs to be changed, except for system-related tables.
+	##
+
+	_return 0
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_pre_insert_activity(ptrule)
+	## 
+	## Called immediately before self (a detached record) is
+	## inserted, using pointing rule PTRULE.
+	##
+	## This backstop method looks for foreign key joins that could
+	## be forged to the record in the immediate parent pointing rule.
+	##
+	
+	_if (parent_ptrule << ptrule.parent_ptrule) _is _unset _orif
+	    _not parent_ptrule.responds_to?(:current_record) _orif
+	    (parent_cr << parent_ptrule.current_record) _is _unset
+	_then
+		_return
+	_endif
+
+	_for i _over _self.join_fields()
+	_loop
+		_if i.simple_result? _andif
+		    i.heterogeneous? _is _false _andif
+		    (rt << i.result_table) _isnt _unset _andif
+		    rt.name = parent_cr.source_collection.name _andif
+		    i.intermediate_table _is _unset
+		_then
+			_self.perform(i.chevronned_name, parent_cr)
+			_leave 
+		_endif
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_post_insert_activity(ptrule)
+	## 
+	## Called immediately after self (a database record) is
+	## inserted, using pointing rule PTRULE.
+	##
+	## This backstop method looks for intermediate table joins that
+	## could be forged to the record in the immediate parent
+	## pointing rule. 
+	##
+
+	_if (parent_ptrule << ptrule.parent_ptrule) _is _unset _orif
+	    _not parent_ptrule.responds_to?(:current_record) _orif
+	    (parent_cr << parent_ptrule.current_record) _is _unset
+	_then
+		_return
+	_endif
+
+	_for i _over _self.join_fields()
+	_loop
+		_if i.simple_result? _andif
+		    i.heterogeneous? _is _false _andif
+		    (rt << i.result_table) _isnt _unset _andif
+		    rt.name = parent_cr.source_collection.name _andif
+		    i.intermediate_table _isnt _unset
+		_then
+			_self.perform(i.chevronned_name, parent_cr)
+			_leave 
+		_endif
+	_endloop 
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_fire_pre_insert_actions(pl, ptrule)
+	## 
+	## Called immediately before the values in property_list PL
+	## are inserted, using pointing rule PTRULE.
+	##
+	## The intent of this method is to automatically mirror any
+	## data model level code in the fire_pre_insert_actions()
+	## method, and therefore that is automatically called as a
+	## backstop.  However, a key difference in the way that
+	## pointing rules handle these transactions is that PL may not
+	## have geometry fields or non-text type join fields populated
+	## at this stage.  Therefore, this may be subclassed to perform
+	## different processing if need be.
+	## 
+
+	_return _self.fire_pre_insert_actions(pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_fire_post_insert_actions(ptrule)
+	## 
+	## Called immediately after self (a database record) is
+	## inserted, using pointing rule PTRULE.
+	## 
+	## The intent of this method is to automatically mirror any
+	## data model level code in the fire_post_insert_actions()
+	## method, and therefore that is automatically called as a
+	## backstop.  However, a key difference in the way that
+	## pointing rules handle these transactions is that self may not
+	## have geometry fields or non-text type join fields populated
+	## at this stage.  Therefore, this may be subclassed to perform
+	## different processing if need be.
+	##
+
+	_return _self.fire_post_insert_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_validate(a_ptrule, _optional a_dialog)
+	## 
+	## Validate self (a detached record).  A_DIALOG is the
+	## prompting dialog used to  gather self's attributes, and
+	## A_PTRULE is the pointing rule that initiated this.
+	##
+
+	_if a_dialog _isnt _unset
+	_then
+		# Check to see if self is really going to be inserted - let
+		# suspended pointing rules avoid this check.
+		_if _not a_ptrule.insert_enabled?(a_dialog.activation_mode)
+		_then
+			_return
+		_endif
+	_endif
+	
+	_self.mss_ptrule_validate_mandatory_attributes(a_ptrule)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_validate_mandatory_attributes(a_ptrule)
+	## 
+	## Ensure that all mandatory fields that do not have a
+	## generated value are not unset.
+	##
+
+	_for fd _over _self.all_fields.fast_elements()
+	_loop
+		_if _not fd.is_join? _andif _not fd.is_physical? _orif 
+		    _not fd.mandatory? _orif
+		    fd.generator _isnt _unset
+		_then
+			_continue
+		_endif 
+		_if (val << _self.perform(fd.name)) _is _unset _orif
+		    val = ""
+		_then
+			condition.raise(:dd_mandatory_field,
+					:field_name, write_string(_self.source_collection.external_name, " ",
+								  fd.external_name),
+					:fd, fd)
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule}, usage={redefinable, subclassable})
+_method dd_record_mixin.mss_ptrule_text_for(fd, ptrule)
+	## 
+	## Return text to use for displaying the dragged version of
+	## self (before self is actually inserted).  Return unset to
+	## simply perform the standard text method.  This customization
+	## hook allows text to be set for child RWOs that depend on a
+	## parent that can be derived from the pointing rule (but before
+	## the join to that parent has been forged).
+	##
+	
+_endmethod
+$

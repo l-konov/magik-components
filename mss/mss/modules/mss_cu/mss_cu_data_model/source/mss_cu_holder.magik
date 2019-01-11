@@ -1,0 +1,1027 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_holder
+##
+## A records that serves as a holder for various aspects of a
+## CU that is being placed as part of a design.
+##
+
+def_slotted_exemplar(:mss_cu_holder,
+{
+	{:internal_usage, _unset, :writable, :read_only},
+	{:cu_job_type, _unset, :writable, :read_only},
+	{:cu_cost_group, _unset, :writable, :read_only},
+	{:cu_definition, _unset, :writable, :read_only},
+	{:cu_operation_definition, _unset, :writable, :read_only},
+	{:cu_reference, _unset, :writable, :read_only},
+	{:cu_code, _unset, :writable, :read_only},
+	{:operation, _unset, :writable, :read_only},
+	{:work_point_number, _unset, :writable, :read_only},
+	{:quantity, _unset, :writable, :read_only},
+	{:unit_multiplier, _unset, :writable, :read_only},
+	{:mu_parent, _unset, :writable, :read_only},
+	{:custom_data, _unset, :writable}
+},
+{:mss_cu_record_mixin})
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+mss_cu_holder.define_shared_constant(
+	:standard_sort_proc,
+	## A procedure suitable for sorting a collection of
+	## diaplay_trees representing mss_cu_holders.  Each
+	## display_tree will have a value key of :sorter, which is the
+	## report_sort_key() value of the corresponding mss_cu_holder.
+	_proc(a, b)
+		s1 << a.value[:sorter]
+		s2 << b.value[:sorter]
+		
+		# Note that S1 and S2 are each going to be a vector of vectors.
+		s1_size << s1.size
+		s2_size << s2.size
+		_for sort_idx _over 1.upto(min(s1_size, s2_size))
+		_loop
+			v1 << s1[sort_idx]
+			v1_size << v1.size
+			v2 << s2[sort_idx]
+			v2_size << v2.size
+			
+			# Compare individual elements of this inner vector.
+			_for i _over 1.upto(min(v1_size, v2_size))
+			_loop
+				_if (x << v1[i] _cf v2[i]) _isnt _maybe
+				_then
+					_return x
+				_endif
+			_endloop
+
+			# If one inner vector is shorter than the other, it wins.
+			_if (x << v1_size _cf v2_size) _isnt _maybe
+			_then
+				_return x
+			_endif
+		_endloop
+
+		# If one outer vector is shorter than the other, it wins.
+		_if (x << s1_size _cf s2_size) _isnt _maybe
+		_then
+			_return x
+		_endif
+
+		_return _maybe 
+	_endproc,
+	:public)
+$
+	
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.list_display_tree_column_widths()
+	## 
+	## Column widths to use for displaying self in a list-type tree
+	## item (such as a mss_cu_lister_plugin)
+	##
+
+	_return {70, 100, 55, 50, 35, 45, 28}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.list_display_tree_column_headings()
+	## 
+	## Column headings to use for displaying self in a list-type tree
+	## item (such as a mss_cu_lister_plugin)
+	##
+
+	_return {_self.message(:ch_cu_code),
+		 _self.message(:ch_description),
+		 _self.message(:ch_operation),
+		 _self.message(:ch_sh_work_point_number),
+		 _self.message(:ch_sh_quantity),
+		 _self.message(:ch_sh_unit_multiplier),
+		 _self.message(:ch_sh_valid_for_record?)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.list_sort_key()
+	## 
+	## A structure suitable for sorting self in a list.  If
+	## redefined, it must return a vector of vectors, and the
+	## individual elements of each vector must be comparable the
+	## corresponding element of the report_sort_key() of a
+	## different element (i.e. numbers-to-numbers,
+	## strings-to-strings, etc).
+	##
+
+	# Return a vector of vectors:
+	# - First item is vector of cu_code sorting information.
+	# - Second item is vector consisting of operation.
+	_return {_self.cu_code_sort_key(),
+		 {.operation.default("")}}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.report_display_tree_column_widths()
+	## 
+	## Column widths to use for displaying self in a report-type tree
+	## item.
+	##
+
+	_return {55, 100, 220, 60, 60, 60, 60, 60, 80, 80, 80}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.report_display_tree_column_headings()
+	## 
+	## Column headings to use for displaying self in a list-type tree
+	## item (such as a mss_cu_lister_plugin)
+	##
+
+	_return {_self.message(:ch_report_work_point_number),
+		 _self.message(:ch_cu_code),
+		 _self.message(:ch_description),
+		 _self.message(:ch_operation),
+		 _self.message(:ch_material_unit_cost),
+		 _self.message(:ch_labor_unit_cost),
+		 _self.message(:ch_dimensionality),
+		 _self.message(:ch_combined_quantity),
+		 _self.message(:ch_material_total_cost),
+		 _self.message(:ch_labor_total_cost),
+		 _self.message(:ch_total_cost)}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.report_sort_key()
+	## 
+	## A structure suitable for sorting self on a report.  If
+	## redefined, it must return a vector of vectors, and the
+	## individual elements of each vector must be comparable the
+	## corresponding element of the report_sort_key() of a
+	## different element (i.e. numbers-to-numbers,
+	## strings-to-strings, etc).
+	##
+
+	# Return a vector of vectors:
+	# - First item is report work point, distilled to letters and numbers.
+	# - Second item is vector of cu_code sorting information.
+	# - Third item is vector consisting of operation.
+	_return {_self.work_point_number_sort_key(_self.report_work_point_number),
+		 _self.cu_code_sort_key(),
+		 {.operation.default("")}}
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.work_point_number_sort_key(_optional val)
+	## 
+	## Return VAL (a work point number, defaults to self's
+	## work_point_number value) as a vector of data suitable for sorting.
+	##
+
+	_if val _is _unset
+	_then
+		val << _self.work_point_number.default("")
+	_endif 
+	v1 << val.numbers_and_strings
+	_if v1.size > 0 _andif
+	    _not (v1[1].species _is "".species)
+	_then
+		v1 << rope.new_with("", _scatter v1)
+	_endif
+	_return v1
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.cu_code_sort_key(_optional val)
+	## 
+	## Return VAL (a CU code, defaults to self's cu_code
+	## value) as a vector of data suitable for sorting.
+	##
+
+	_if val _is _unset
+	_then
+		val << _self.cu_code.default("")
+	_endif
+	_return {val}
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.new(pl, _optional copy_from)
+	##
+	## Create and return a new mss_cu_holder instance.  PL is a
+	## property list of slot values to be set.  If COPY_FROM is
+	## provided, its attributes will be copied before setting
+	## attributed from the data in PL.
+	##
+
+	_return _clone.init(pl, copy_from)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.new_from_cu_reference(cu_ref)
+	## 
+	## Return a new mss_cu_holder reference, populated from the
+	## mss_cu_reference record CU_REF.
+	##
+
+	pl << property_list.new_with(:cu_code, cu_ref.cu_code.as_charvec(),
+				     :cu_reference, cu_ref,
+				     :operation, cu_ref.operation.default(""),
+				     :work_point_number, cu_ref.work_point_number.default("").as_charvec(),
+				     :quantity, cu_ref.quantity,
+				     :unit_multiplier, cu_ref.unit_multiplier)
+	_return _self.new(pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_holder.init(pl, copy_from)
+	## 
+	##
+
+	_if copy_from _isnt _unset
+	_then
+		_for slot_name _over {:cu_job_type, :cu_cost_group, :cu_definition, :cu_operation_definition,
+				      :cu_reference, :cu_code, :operation, :work_point_number,
+				      :quantity, :unit_multiplier, :mu_parent, :custom_data}.fast_elements()
+		_loop
+			_self.perform_private(slot_name.with_chevron, copy_from.perform(slot_name))
+		_endloop
+	_endif 
+	
+	_self.update_attributes_from(pl)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.update_attributes_from(pl)
+	## 
+	## 
+
+	_for slot_name, slot_val _over pl.fast_keys_and_elements()
+	_loop
+		_self.perform_private(slot_name.with_chevron, slot_val)
+	_endloop
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_job_type << x
+	## 
+	## Change the CU job type associated with self.
+	##
+
+	.cu_job_type << x
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_cost_group << x
+	## 
+	## Change the CU cost group associated with self.
+	##
+
+	.cu_cost_group << x
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_private _method mss_cu_holder.cu_code << x
+	##
+	## Blank out .cu_definition.
+	##
+
+	_self.cu_definition << _unset
+	.cu_code << x
+	_return x
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_private _method mss_cu_holder.cu_definition << x
+	## 
+	## Set cu_code from cu_definition, and blank out
+	## .cu_operation_definition. 
+	##
+
+	.cu_definition << x
+	.cu_operation_definition << _unset 
+	_if x _is _unset _orif
+	    _not x.is_valid?
+	_then 
+		.cu_code << ""
+	_else
+		.cu_code << x.cu_code.as_charvec()
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_private _method mss_cu_holder.operation << x
+	## 
+	## Blank out .cu_operation_definition. 
+	##
+
+	.operation << x
+	.cu_operation_definition << _unset 
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.as_list_display_tree(_optional orig_dt)
+	## 
+	## Return a display_tree that is suitable for displaying self
+	## in a list-type tree item (such as a mss_cu_lister_plugin).
+	## If ORIG_DT is passed in, then it is updated - otherwise, a
+	## new one is returned.
+	##
+
+	_if orig_dt _isnt _unset _andif
+	    orig_dt.key _isnt _self
+	_then
+		_self.user_error(:as_display_tree_arg_not_self)
+	_endif
+	
+	pl << property_list.new_with(:sorter, _self.list_sort_key(),
+				     :cu_code, _self.cu_code,
+				     :description, _self.description,
+				     :operation, .operation,
+				     :work_point_number, .work_point_number,
+				     :quantity, .quantity,
+				     :unit_multiplier, .unit_multiplier)
+	sstr << _self.as_list_styled_string(pl)
+	_if orig_dt _isnt _unset
+	_then
+		dt << orig_dt
+		dt.value << pl
+	_else 
+		dt << display_tree.new(_self, pl)
+	_endif 
+	dt.styled_string << sstr
+	
+	_return dt
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.as_list_styled_string(pl)
+	## 
+	## Return a styled_string suitable for displaying self in a
+	## list-type tree item, with display values PL.
+	##
+
+	cu_code_style << :normal
+	_if (cu_ref << _self.cu_reference) _isnt _unset _andif
+	    (cur_design << mss_cu_engine.active_design) _isnt _unset _andif
+	    cur_design.id = cu_ref.mss_design_id
+	_then
+		cu_code_style << :bold
+	_endif
+
+	# N.B.: there is a reason for all of the apparently useless
+	# color-switching from red to black.  This works around a
+	# tree_item bug whereby the style chosen for in-line editing
+	# for a cell that does not have a specific style would
+	# incorrectly use the first text style in the string (which
+	# could be :bold, as per the processing above).  The
+	# color-switching works around that.
+	sstr << rope.new_with(cu_code_style, :value, :cu_code, :tab,
+			      :red, :black, :value, :description, :tab,
+			      :red, :black, :value, :operation, :tab,
+			      :red, :black, :value, :work_point_number, :tab,
+			      :red, :black, :value, :quantity, :tab,
+			      :red, :black, :value, :unit_multiplier)
+
+	_if pl[:valid_for_record?] _is _true
+	_then
+		sstr.add_all_last({:tab, :image, {:traffic_light_green, :ui_resources}})
+	_elif pl[:valid_for_record?] _is _false
+	_then
+		sstr.add_all_last({:tab, :image, {:traffic_light_red, :ui_resources}})
+	_endif 
+	_return sstr
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.as_report_display_tree(_optional orig_dt)
+	## 
+	## Return a display_tree that is suitable for displaying self
+	## in a report-type tree item.
+	## If ORIG_DT is passed in, then it is updated - otherwise, a
+	## new one is returned.
+	##
+
+	_if orig_dt _isnt _unset _andif
+	    orig_dt.key _isnt _self
+	_then
+		_self.user_error(:as_display_tree_arg_not_self)
+	_endif
+
+	pl << property_list.new_with(:sorter, _self.report_sort_key(),
+				     :work_point_number, _self.report_work_point_number,
+				     :cu_code, _self.cu_code,
+				     :description, _self.description,
+				     :operation, .operation,
+				     :material_unit_cost, _self.material_unit_cost,
+				     :labor_unit_cost, _self.labor_unit_cost,
+				     :dimensionality, _self.dimensionality,
+				     :combined_quantity, _self.combined_quantity,
+				     :material_total_cost, _self.material_total_cost,
+				     :labor_total_cost, _self.labor_total_cost,
+				     :total_cost, _self.total_cost)
+
+	sstr << {:value, :work_point_number, :tab,
+		 :value, :cu_code, :tab,
+		 :value, :description, :tab,
+		 :value, :operation, :tab,
+		 :align, :right, :value, :material_unit_cost, :tab,
+		 :align, :right, :value, :labor_unit_cost, :tab,
+		 :value, :dimensionality, :tab,
+		 :align, :right, :value, :combined_quantity, :tab,
+		 :align, :right, :value, :material_total_cost, :tab,
+		 :align, :right, :value, :labor_total_cost, :tab,
+		 :align, :right, :value, :total_cost}
+
+	_if orig_dt _isnt _unset
+	_then
+		dt << orig_dt
+		dt.value << pl
+	_else 
+		dt << display_tree.new(_self, pl)
+	_endif 
+	dt.styled_string << sstr
+
+	_return dt
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_job_type
+	## 
+	## Return the mss_cu_job_type record associated with self.
+	##
+
+	_if .cu_job_type _isnt _unset _andif
+	    _not .cu_job_type.is_valid?
+	_then
+		.cu_job_type << _unset
+	_endif
+	_return .cu_job_type
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_cost_group
+	## 
+	## Return the mss_cu_cost_group record associated with self.
+	##
+
+	_if .cu_cost_group _isnt _unset _andif
+	    _not .cu_cost_group.is_valid?
+	_then
+		.cu_cost_group << _unset
+	_endif
+	_return .cu_cost_group
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_definition
+	## 
+	## Return the mss_cu_definition record associated with self.
+	##
+
+	_if .cu_definition _isnt _unset _andif
+	    _not .cu_definition.is_valid?
+	_then
+		.cu_definition << _unset
+	_endif
+
+	_if .cu_definition _is _unset _andif
+	    .cu_code _isnt _unset _andif
+	    .cu_code ~= ""
+	_then
+		# Try to retrieve this based on cu_code.
+		.cu_definition << mss_cu_engine.cu_definition_for_code(.cu_code)
+	_endif 
+	
+	_return .cu_definition
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_operation_definition
+	## 
+	## Return the mss_cu_operation_definition record associated with self.
+	## 
+
+	_if (op_def << .cu_operation_definition) _isnt _unset _andif
+	    op_def.is_valid?
+	_then
+		_return op_def
+	_endif
+
+	.cu_operation_definition << _unset 
+	_if (cu_def << _self.cu_definition) _is _unset
+	_then
+		_return _unset
+	_endif
+	.cu_operation_definition << cu_def.operation_definition_for(_self.operation)
+	_return .cu_operation_definition
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.cu_reference
+	## 
+	## 
+
+	_if .cu_reference _isnt _unset _andif
+	    _not .cu_reference.is_valid?
+	_then
+		.cu_reference << _unset
+	_endif
+
+	_return .cu_reference
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.clear_cu_reference()
+	## 
+	## Clear the cu_reference slot, thus disassociating self from a
+	## mss_cu_reference database record.
+	##
+
+	_self.cu_reference << _unset
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.description
+	## 
+	## Return the description of the associated mss_cu_definition.
+	##
+
+	_if (cu_def << _self.cu_definition) _is _unset
+	_then
+		_return ""
+	_endif
+	_return cu_def.description.default("").as_charvec()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.raw_material_unit_cost
+	## 
+	## Return the material_cost of the associated
+	## mss_cu_operation_definition (default to 0)
+	##
+
+	_if (op_def << _self.cu_operation_definition) _is _unset
+	_then
+		_return 0.0
+	_endif
+	_if (cg << _self.cu_cost_group) _isnt _unset _andif
+	    (cgi << op_def.cu_cost_group_item_for(cg)) _isnt _unset _andif
+	    (override_value << cgi.material_cost) _isnt _unset
+	_then
+		_return override_value
+	_endif 
+	_return op_def.material_cost.default(0.0)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.raw_labor_unit_cost
+	## 
+	## Return the labor_cost of the associated
+	## mss_cu_operation_definition (default to 0)
+	##
+
+	_if (op_def << _self.cu_operation_definition) _is _unset
+	_then
+		_return 0.0
+	_endif
+	_if (cg << _self.cu_cost_group) _isnt _unset _andif
+	    (cgi << op_def.cu_cost_group_item_for(cg)) _isnt _unset _andif
+	    (override_value << cgi.labor_cost) _isnt _unset
+	_then
+		_return override_value
+	_endif 
+	_return op_def.labor_cost.default(0.0)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.material_unit_cost
+	## 
+	## Use self.raw_material_unit_cost, and modify based on job
+	## type if applicable.
+	##
+
+	x << _self.raw_material_unit_cost
+	_if (jt << _self.cu_job_type) _isnt _unset
+	_then
+		x *<< jt.material_cost_multiplier.default(1.0)
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.labor_unit_cost
+	## 
+	## Use self.raw_labor_unit_cost, and modify based on job
+	## type if applicable.
+	##
+
+	x << _self.raw_labor_unit_cost
+	_if (jt << _self.cu_job_type) _isnt _unset
+	_then
+		x *<< jt.labor_cost_multiplier.default(1.0)
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.total_unit_cost
+	## 
+	## Return the sum of material_unit_cost and labor_unit_cost.
+	##
+
+	_return _self.material_unit_cost + _self.labor_unit_cost
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.dimensionality
+	## 
+	## Return the dimensionality of self's mss_cu_definition.
+	##
+
+	_if (cu_def << _self.cu_definition) _isnt _unset
+	_then
+		_return cu_def.dimensionality
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.quantity
+	## 
+	## If this is unset for any reason, return a quantity of 1.
+	##
+
+	_return .quantity.default(1)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.true_or_calculated_unit_multiplier
+	## 
+	## Return two values:
+	## - The unit multiplier: either using the unit_multiplier
+	##   slot if that has been explicitly set, or by calculating
+	##   it from self's cu_reference.
+	## - True if using the unit_multiplier slot, or false if
+	##   using a calculated value.
+	##
+
+	_if (um << _self.unit_multiplier) _isnt _unset
+	_then
+		_return um, _true
+	_endif
+
+	_if (cu_ref << _self.cu_reference) _is _unset _orif
+	    (rec << cu_ref.tracked_record()) _is _unset
+	_then
+		_return _unset, _false
+	_endif
+	_return rec.mss_cu_unit_multiplier_for_definition(_self.cu_definition, _self), _false
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.combined_quantity
+	## 
+	## Return the product of self's quantity and self's
+	## true_or_calculated_unit_multiplier.
+	##
+
+	(um, override?) << _self.true_or_calculated_unit_multiplier
+	_return _self.quantity * um.default(1), override?
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.material_total_cost
+	## 
+	## Return material_unit_cost times combined_quantity.
+	##
+
+	_return ((_self.material_unit_cost * _self.combined_quantity) * 100).rounded / 100.0
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.labor_total_cost
+	## 
+	## Return labor_unit_cost times combined_quantity.
+	##
+
+	_return ((_self.labor_unit_cost * _self.combined_quantity) * 100).rounded / 100.0
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.total_cost
+	## 
+	## Return the material_total_cost plut labor_total_cost.
+	##
+
+	_return _self.material_total_cost + _self.labor_total_cost
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu}, usage={redefinable})
+_method mss_cu_holder.report_work_point_number
+	## 
+	## Return a work point number value to display on reports.  By
+	## default, this is simply self's work_point_number value, but
+	## this can be changed to use a derived value of some sort.
+	##
+
+	_return _self.work_point_number.default("")
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.can_aggregate_with?(another)
+	## 
+	## Return true if self's attributes indicate that it can be
+	## aggregated with ANOTHER.  This is true if the
+	## report_work_point_number, cu_code, and operation values are
+	## the same.
+	## 
+
+	_if _self.cu_code = another.cu_code _andif
+	    _self.operation = another.operation _andif
+	    _self.report_work_point_number = another.report_work_point_number
+	_then
+		_return _true
+	_else
+		_return _false
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_holder.tracked_record()
+	## 
+	## Return the actual database record associated with this CU.
+	##
+
+	_if (cu_ref << _self.cu_reference) _isnt _unset
+	_then
+		_return cu_ref.tracked_record()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.expand_for_macro_units()
+	##
+	## If self's cu_definition is not a Macro Unit usage, just
+	## return a rope containing self.  Otherwise, return a rope
+	## containing all results of expanding the MU into its
+	## individual CU references.
+	##
+	## Note: currently, multi-level MUs (that is, an MU which is
+	## the child of another MU) are not supported.
+	##
+
+	r << rope.new()
+	_if (cu_def << _self.cu_definition) _is _unset _orif
+	    cu_def.usage ~= mss_cu_engine.macro_unit_usage_value
+	_then
+		r.add_last(_self)
+		_return r
+	_endif
+
+	_if (p_op_def << _self.cu_operation_definition) _is _unset
+	_then
+		# Config error: cannot expand self.
+		_return r
+	_endif
+
+	_for mu_rel _over p_op_def.c_mss_cu_mu_relationships.fast_elements()
+	_loop
+		_if (c_op_def << mu_rel.c_mss_cu_operation_definition) _is _unset
+		_then
+			# Config error - broken join.
+			_continue
+		_endif
+
+		pl << property_list.new_with(:cu_code, c_op_def.cu_code,
+					     :operation, c_op_def.operation)
+
+		# Quantity is the product of self's quantity and the quantity
+		# configured in the relationship record.
+		pl[:quantity] << _self.quantity * mu_rel.quantity.default(1)
+
+		# Unit multiplier is always taken from the relationship record only.
+		pl[:unit_multiplier] << mu_rel.unit_multiplier
+
+		# Specify self as the mu_parent.
+		pl[:mu_parent] << _self
+		
+		new << mss_cu_holder.new(pl, _self)
+		new.clear_cu_reference()
+		r.add_last(new)
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_holder.validate_for_object(rec, _optional attr_pl, dt)
+	## 
+	## Validate that the attributes described by self's facility
+	## relationship data are consistent with the database record
+	## REC, with overriding attributes in ATTR_PL.  DT is the
+	## list-type display tree to be updated with validity information.
+	##
+
+	# If there are any errors, bail out with a false return value.
+	retval << _false
+	_try _with cond
+		retval << _self.int!validate_for_object(rec, attr_pl)
+	_when error
+		write("Error in mss_cu_holder.validate_for_object()")
+		write(cond.report_contents_string)
+	_endtry 
+	
+	_if dt _isnt _unset
+	_then
+		old_val << dt.value[:valid_for_record?]
+		_if old_val _isnt retval
+		_then 
+			dt.value[:valid_for_record?] << retval
+			dt.styled_string << _self.as_list_styled_string(dt.value)
+		_endif 
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_holder.int!validate_for_object(rec, _optional attr_pl)
+	## 
+	## Internal helper for validate_for_object() - do not call
+	## directly.
+	##
+	
+	# If there is no CU definition, or no facility relationships
+	# for that definition, then there is nothing to validate.
+	retval << _unset 
+	_if (cu_def << _self.cu_definition) _is _unset
+	_then
+		_return retval
+	_endif
+	_if (fac_rels << rec.mss_cu_facility_relationships_for_cu_definition(cu_def, _self.operation)).size = 0
+	_then
+		_return retval
+	_endif
+
+	retval << _true
+	pvals << rec.mss_proposed_values_for_cu_definition(cu_def, _self.operation, _true)
+	_for pkey, pval _over pvals.fast_keys_and_elements()
+	_loop
+		_if (fd << rec.all_fields[pkey]) _is _unset _then _continue _endif
+		_if pval _is _unset _orif
+		    pval = ""
+		_then
+			# I'm not sure about this, but if the configuration has a
+			# blank/unset attribute, then let's choose not to enforce it
+			# here (i.e. don't require the record to also have a
+			# blank/unset value.
+			_continue
+		_endif
+		
+		_if attr_pl _isnt _unset _andif
+		    attr_pl.includes_key?(pkey)
+		_then
+			comp_val << attr_pl[pkey]
+		_else
+			comp_val << rec.perform(pkey)
+		_endif
+
+		_if comp_val _is _unset _orif
+		    comp_val = ""
+		_then
+			retval << _false
+			_leave
+		_endif
+
+		_if fd.stored_unit _isnt _unset
+		_then
+			ep << pval.value / 1000000.0
+			_if pval.unit.dimensionality _isnt comp_val.unit.dimensionality
+			_then
+				retval << _false
+				_leave
+			_elif (pval.value - comp_val.value_in(pval.unit)).abs > ep
+			_then
+				retval << _false
+				_leave
+			_endif 
+		_elif fd.type.element_class.species _is 1.0.species
+		_then
+			ep << pval / 1000000.0
+			_if (pval - comp_val).abs > ep
+			_then
+				retval << _false
+				_leave
+			_endif 
+		_else
+			_if pval.write_string ~= comp_val.write_string
+			_then
+				retval << _false
+				_leave
+			_endif
+		_endif 
+	_endloop
+
+	_return retval
+	
+_endmethod
+$

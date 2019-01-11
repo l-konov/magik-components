@@ -1,0 +1,207 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu, mss_ptrule})
+##
+## mss_cu_ptrule_editor_plugin
+##
+## Extension of mss_cu_editor_plugin for editing Compatible
+## Units as part of pointing rule placement
+##
+
+def_slotted_exemplar(:mss_cu_ptrule_editor_plugin,
+{
+	{:current_ptrule, _unset, :readable}
+},
+{:mss_cu_editor_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_ptrule_editor_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:collection, :current_object, :current_ptrule, :proposed_value},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.current_object_for_cu_edit()
+	## 
+	## Use self's current_object, which will be the detached record
+	## of the current pointing rule.
+	##
+
+	_return _self.current_object
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.callback_object_identifier
+	## 
+	## Use the current pointing rule as the unique object
+	## identifying the thing that is subject to having its CUs
+	## edited. 
+	##
+
+	_return .current_ptrule
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.edit_cus()
+	## 
+	## Update detached record before editing CUs.
+	##
+
+	_self.framework.update_current_detached_record()
+	_return _super.edit_cus()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_ptrule_editor_plugin.set_cu_query_framework_properties(m, cur_obj)
+	## 
+	## Set properties on the newly-activated mss_cu_query_framework
+	## menu M, to edit CUs for object CUR_OBJ.
+	##
+
+	wp << _unset 
+	_if .current_ptrule _isnt _unset
+	_then
+		mode << _self.databus_request_data(:activation_mode)
+		wp << .current_ptrule.mss_cu_work_point_candidate(mode)
+	_endif
+	
+	_if wp _isnt _unset
+	_then
+		wp_number << wp.work_point_number.default("").as_charvec()
+	_else
+		wp_number << ""
+	_endif 
+	m.set_cu_lister_properties(property_list.new_with(
+					   :cu_code, "",
+					   :operation, "",
+					   :work_point_number, wp_number,
+					   :quantity, 1,
+					   :unit_multiplier, _unset))
+	m.set_cu_query_properties(property_list.new_with(
+					  :query_operation, mss_cu_engine.default_install_operation,
+					  :query_cu_code, "",
+					  :query_description, "",
+					  :by_group?, _false,
+					  :by_facility?, _true))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :collection _orif
+	    data_type_name _is :current_object
+	_then
+		_return _super.sw_databus_data_available(data_type_name, data)
+	_elif data_type_name _is :current_ptrule
+	_then
+		_self.handle_new_current_ptrule(data)
+	_elif data_type_name _is :proposed_value
+	_then
+		_if !mss_cu_editor_validate?! _isnt _false
+		_then 
+			_self.validate_cu_list()
+		_endif 
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.int!collection << a_collection
+	## 
+	## Unlike superclass, no dependencies are required.
+	##
+
+	.collection << a_collection
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.handle_new_current_object(cur_obj)
+	## 
+	## Update self for the new current object CUR_OBJ. 
+	## 
+
+	.current_object << cur_obj
+	_self.manage_actions()
+	_self.validate_cu_list()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.handle_new_current_ptrule(new_ptrule)
+	## 
+	## Update self for the new current pointing rule NEW_PTRULE.
+	##
+
+	old_ptrule << .current_ptrule
+	.current_ptrule << new_ptrule
+	_self.set_cu_list_from_ptrule(new_ptrule)
+	_self.validate_cu_list()
+	
+	_if old_ptrule _is new_ptrule
+	_then
+		_return
+	_endif
+
+	# If there is a dialog open to edit CUs for the old object,
+	# cancel it.
+	_if (d << _self.get_dialog(:mss_cu_query_framework)) _isnt _unset _andif
+	    (tf << d.top_frame) _isnt _unset _andif
+	    tf.active?
+	_then
+		d.cancel()
+	_endif
+
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu, mss_ptrule})
+_method mss_cu_ptrule_editor_plugin.set_cu_list_from_ptrule(cur_ptrule)
+	## 
+	## Update the contents of the cu_list to reflect the CUs
+	## associated with the pointing rule CUR_PTRULE.
+	##
+
+	.cu_list.empty()
+	_if _not cur_ptrule.responds_to?(:cu_references)
+	_then
+		_self.changed(:cu_list, :renew)
+		_return .cu_list
+	_endif
+
+	_for cu_holder _over cur_ptrule.cu_references.fast_elements()
+	_loop
+		dt << cu_holder.as_list_display_tree()
+		.cu_list.add(dt)
+	_endloop
+	_self.validate_cu_list()
+	
+	_self.changed(:cu_list, :renew)
+	_return .cu_list
+	
+_endmethod
+$

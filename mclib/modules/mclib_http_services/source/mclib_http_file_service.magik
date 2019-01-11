@@ -1,0 +1,102 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-09-29 19:52:13 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## Allows a call to return a file from me.  Theconfiguration
+## must set the directory to look in, the a call like this will work:
+##
+##   http://localhost:32457/file/name_of_file.jpg
+##
+##   Where file is the logical name used for this plugin, and
+## name_of_file.jpg is a file int he configured directory
+##
+def_slotted_exemplar(:mclib_http_file_service,
+                      {
+		      },
+		      {:http_service_plugin})
+$
+
+ mclib_http_file_service.define_property(:directory,
+					 :string,
+					 "The directory where my files are",
+					 _true,_true,_unset)
+$
+
+_pragma(classify_level=basic)
+_method mclib_http_file_service.run(params, input_stream, output_stream, headers, path)
+	## 
+	## 
+	##
+
+	# (06-17-2006 Brad Sileo): created.
+	fname << path.slice_to_end(path.rindex_of(%/)+1)
+	fpath << system.pathname_from_components(fname,_self.get_directory())
+	_if system.file_readable?(fpath)
+	_then
+		show(fpath)
+		(fname,ftype) << system.split_filename(fname)
+		fstatus << file_status.new(fpath)
+		fsize << fstatus.size
+		_self.add_reply_header("Content Type","image/"+ftype)
+		_self.add_reply_header("Content Size",fsize.write_string)
+		_self.send_result(200,"OK")
+		_self.send_headers()
+		st << external_binary_input_stream.new(fpath)
+		_protect
+			_loop
+				x << st.get()
+				_if x _is _unset _then _leave _endif 
+				output_stream.put(x)
+			_endloop						
+		_protection
+			st.close()
+		_endprotect
+	_else
+		_self.send_error(404,"File Not Found")
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mclib_http_file_service.get_directory()
+	## retuns the directory to use.  Processes special values in my
+	## property, including:
+	##  [temp] - system temp directory
+	## 
+	##
+
+	# (06-19-2006 Brad Sileo): created.
+	dir << _self.directory
+	>> _if dir = "[temp]"
+	_then
+		>> system.temp_directory_name
+	_else
+		>> dir
+	_endif
+_endmethod
+$

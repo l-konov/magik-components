@@ -1,0 +1,374 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_find_all_dialog
+##
+## Dialog to perform a "find all" operation for pointing rules.
+##
+
+def_slotted_exemplar(:mss_ptrule_find_all_dialog,
+{
+	{:owner, _unset, :readable},
+	{:items, _unset, :readable},
+	{:cached_owner_ptdef_list, _unset, :readable},
+	{:result_list, _unset, :readable}
+},
+{:model})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.new(owner)
+	## 
+	## 
+
+	_return _clone.init(owner)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.init(owner)
+	## 
+	## 
+
+	_super.init()
+	.owner << owner
+	.items << property_list.new()
+	.cached_owner_ptdef_list << _unset
+	.result_list << rope.new()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.on_activation()
+	## 
+	## 
+
+	_super.on_activation()
+	.cached_owner_ptdef_list << _unset 
+	_if .owner _isnt _unset
+	_then
+		.owner.add_dependent(_self, :ptdef_list)
+	_endif
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.on_deactivation()
+	## 
+	## 
+
+	_super.on_deactivation()
+	_if .owner _isnt _unset
+	_then
+		.owner.remove_dependent(_self, :ptdef_list)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.activate_in(f)
+	## 
+	## 
+
+	p << panel.new(f)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.start_row()
+	.items[:find_string] <<
+		text_item.new(p, _self.message(:find_string),
+			      :display_length, 16,
+			      :value, "",
+			      :model, _self,
+			      :incremental_change_selector, {:|perform_safely()|, :|find_string_changed()|})
+	.items[:perform_search] <<
+		image_button_item.new(p, smallworld_product.get_raster_image(:find, :ui_resources),
+				      _self, {:|perform_safely()|, :|perform_search()|})
+	
+	p.start_row()
+	.items[:result_list] <<
+		tree_item.new(p,
+			      :resize_x?, _true,
+			      :resize_y?, _true,
+			      :height_in_chars, 10,
+			      :model, _self,
+			      :aspect, :result_list,
+			      :mode, :one,
+			      :data_selector, :result_list,
+			      :column_widths, {150, 250},
+			      :column_headings, {_self.message(:ch_leafname),
+						 _self.message(:ch_pathname)},
+			      :select_notifier, {:|perform_safely()|, :|result_list_select()|},
+			      :double_click_notifier, {:|perform_safely()|, :|result_list_double_click()|})
+	
+	p.start_row()
+	simple_panel.new(p).resize_x? << _true
+	.items[:ok] <<
+		button_item.new_safe(p, _self.message(:ok),
+				     _self, :|ok()|,
+				     :min_width, 75)
+	button_item.new_safe(p, _self.message(:cancel),
+			     _self, :|cancel()|,
+			     :min_width, 75)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.manage_actions()
+	## 
+	## Enable the OK button when something is selected in the
+	## result_list. 
+	##
+
+	_if (ti << .items[:result_list]) _isnt _unset _andif
+	    ti.selection.size > 0
+	_then
+		ok? << _true
+	_else
+		ok? << _false
+	_endif
+	_if (mi << .items[:ok]) _isnt _unset
+	_then
+		mi.enabled? << ok?
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.ok(_optional dt)
+	## 
+	## Notify the owner that display_tree DT from self's
+	## result_list is chosen (defaults to the current selection).
+	##
+
+	_if dt _is _unset
+	_then
+		dt << .items[:result_list].selection.an_element()
+	_endif
+	
+	_if dt _isnt _unset _andif
+	    .owner _isnt _unset _andif 
+	    (owner_dt << dt.value[:owner_dt]) _isnt _unset _andif
+	    (ti << .owner.ptdef_list_tree_item) _isnt _unset
+	_then
+		ti.set_elements_current({owner_dt})
+	_endif 
+	_self.cancel()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.cancel()
+	## 
+	## Dismiss dialog with no changes.
+	##
+
+	_self.suspend()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.wm_close()
+	## 
+	## 
+
+	_self.cancel()
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.note_change(who, what, data)
+	## 
+	## 
+
+	_if who _is .owner _andif
+	    what _is :ptdef_list
+	_then
+		.cached_owner_ptdef_list << _unset 
+		_self.perform_search()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.cached_owner_ptdef_list
+	## 
+	## Return a parsed cache of the owner's ptdef_list.
+	##
+
+	_if .cached_owner_ptdef_list _isnt _unset
+	_then
+		_return .cached_owner_ptdef_list
+	_endif
+	r << .cached_owner_ptdef_list << rope.new()
+	_if .owner _is _unset
+	_then
+		_return r
+	_endif 
+	_for i _over .owner.ptdef_list.fast_elements()
+	_loop
+		_for j _over i.fast_depth_first()
+		_loop
+			r.add_last({j.as_charvec().canonical, j})
+		_endloop
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.set_find_string(val)
+	## 
+	## Set the find_string value to be VAL.
+	##
+
+	_if (mi << .items[:find_string]) _isnt _unset
+	_then
+		mi.value << val
+		_self.perform_search()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.find_string_changed(new_val)
+	## 
+	## When the find_string field changes, re-run the search if the
+	## input is at least 3 chars.
+	##
+
+	_if new_val _isnt _unset _andif
+	    new_val.size >= 3
+	_then 
+		_self.perform_search()
+	_else
+		.result_list.empty()
+		_self.changed(:result_list, :renew)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.perform_search()
+	## 
+	## 
+
+	.result_list.empty()
+	_if (mi << .items[:find_string]) _is _unset _orif
+	    (description << mi.value) = ""
+	_then
+		_self.changed(:result_list, :renew)
+		_return
+	_endif 
+
+	sstr1 << {:image, :folder, :value, :leafname, :tab, :value, :pathname}
+	sstr2 << {:image, :internal_table, :value, :leafname, :tab, :value, :pathname}
+
+	# Deal with "\" being an escape character.
+	description << description.substitute_string("\", "\\")
+	
+	# Automatically wildcard the search.
+	_if description.first _isnt %*
+	_then
+		description << write_string("*", description)
+	_endif 
+	_if description.last _isnt %*
+	_then
+		description << write_string(description, "*")
+	_endif
+	description << description.canonical
+
+	_for i _over _self.cached_owner_ptdef_list.fast_elements()
+	_loop
+		_if _not i[1].matches?(description)
+		_then
+			_continue
+		_endif
+		owner_dt << i[2]
+		owner_dt_val << owner_dt.value
+
+		# Build a full pathname leading up to OWNER_DT
+		pathname << ""
+		sep << ""
+		visited_dts << equality_set.new()
+		parent_dt << owner_dt
+		_loop
+			_if (parent_dt << parent_dt.parent) _is _unset _orif
+			    _not parent_dt.is_class_of?(display_tree) _orif 
+			    visited_dts.includes?(parent_dt)
+			_then
+				_leave
+			_endif
+			visited_dts.add(parent_dt)
+			pathname << write_string(parent_dt.value[:description], sep, pathname)
+			sep << " | "
+		_endloop
+		pl << property_list.new_with(
+			      :owner_dt, owner_dt,
+			      :leafname, owner_dt_val[:description],
+			      :pathname, pathname)
+		new_tree << display_tree.new(owner_dt.key, pl)
+		_if owner_dt_val[:folder] _isnt _unset
+		_then
+			new_tree.styled_string << sstr1
+		_elif owner_dt_val[:ptdef] _isnt _unset
+		_then
+			new_tree.styled_string << sstr2
+		_else
+			_continue
+		_endif 
+		.result_list.add_last(new_tree)
+	_endloop
+
+	_self.changed(:result_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.result_list_select()
+	## 
+	## When a selection is made, manage actions.
+	##
+
+	_self.manage_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_find_all_dialog.result_list_double_click(dt)
+	## 
+	## When a double-click is made, automatically select this
+	## display_tree, and dismiss the dialog.
+	##
+
+	_self.ok(dt)
+	
+_endmethod
+$

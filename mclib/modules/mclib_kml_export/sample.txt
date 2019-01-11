@@ -1,0 +1,15 @@
+# here is a bit of code which will output a KML file for a few tables
+
+_protect 
+_dynamic !style_system! << app.get_style_system_for(:default,"Auto")
+_dynamic !GEARTH_DIRECTORY! << "c:/temp/gearth"
+_dynamic !GEARTH_TARGET_DIRECTORY! << "c:\temp\gearth"
+str << external_text_output_stream.new("c:\temp\gearth\test.kml")
+rs << rwo_set.new_from(v.collections[:trunk_road])
+rs.add_all(v.collections[:pub_rest])
+rs.add_all(v.collections[:min_road])
+simple_xml.write_element_on(str,rs.as_kml())
+_protection 
+str.close()
+_endprotect 
+$

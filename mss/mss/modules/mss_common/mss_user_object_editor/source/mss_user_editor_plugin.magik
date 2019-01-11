@@ -1,0 +1,180 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic)
+##
+## mss_user_editor_plugin
+##
+## Subclass of editor_plugin with extensions useful for
+## interacting with a mss_user_rwo_specials_plugin.
+##
+
+def_slotted_exemplar(:mss_user_editor_plugin,
+{
+	{:prev_current_object, _unset},
+	{:current_collection, _unset, :readable}
+},
+{:editor_plugin})
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+mss_user_editor_plugin.define_shared_constant(
+	:databus_consumer_data_types,
+	{:current_object, :redisplay_current_object},
+	:public)
+$
+
+_pragma(classify_level=basic, usage={subclassable})
+_method mss_user_editor_plugin.databus << a_databus
+	## 
+	## When attaching to the databus, refresh current object information.
+	##
+
+	prev_databus << .databus
+	_super.databus << a_databus
+	_if a_databus _isnt _unset
+	_then
+		.current_collection << _self.editor.collection
+		_self.set_current_object(_self.editor.current_object)
+	_else
+		_if prev_databus _is _unset
+		_then
+			# Already unregistered - nothing else to do.
+			_return
+		_endif 
+		_self.set_current_object(_unset)
+		.current_collection << _unset
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method mss_user_editor_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## Keep self's current object up-to-date when notifications
+	## that affect it are placed on the databus.
+	##
+
+	_if data_type_name _is :current_object
+	_then
+		_self.set_current_object(data)
+	_elif data_type_name _is :redisplay_current_object
+	_then
+		_if data _is _true
+		_then
+			# Editor is being cleared.
+			_self.clear_current_object(_unset)
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_plugin.prev_current_object
+	## 
+	## Ensure that prev_current_object is valid before returning
+	## it.
+	##
+
+	_if (x << .prev_current_object) _isnt _unset _andif
+	    _not x.is_valid?
+	_then
+		x << .prev_current_object << _unset
+	_endif
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method mss_user_editor_plugin.set_current_object(cur_obj)
+	## 
+	## Take any action required on self when the current object
+	## changes to CUR_OBJ.  This method returns the resulting
+	## object (which can be unset if it is not suitable for self's
+	## current_collection), and a boolean flag to indicate whether
+	## or not this was different than the previous record.
+	##
+	## This is intended to be subclassed, so that any actions that
+	## care about the current record can be managed.
+	##
+
+	_if cur_obj _isnt _unset
+	_then 
+		_if .current_collection _is _unset _orif 
+		    cur_obj.source_collection _isnt .current_collection
+		_then
+			# Ignore - these are unwanted notifications that fire just
+			# before self is deactivated.
+			cur_obj << _unset 
+		_endif
+	_endif
+	
+	_if cur_obj ~= _self.prev_current_object
+	_then
+		.prev_current_object << cur_obj
+		_return cur_obj, _true 
+	_endif
+
+	_return cur_obj, _false
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method mss_user_editor_plugin.clear_current_object()
+	## 
+	## Note that editor is explicitly being cleared, which can have
+	## a different meaning to a subclass than
+	## set_current_object(_unset), which is a side-effect of
+	## deactivating this plugin.
+	##
+
+	_return _self.set_current_object(_unset)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method mss_user_editor_plugin.ensure_current_object()
+	## 
+	## Pass this request on to the owning editor.
+	##
+
+	_return _self.editor.ensure_current_object()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method mss_user_editor_plugin.perform_transaction(undo_desc, selector, _gather args)
+	## 
+	## Performs the method SELECTOR inside custom record
+	## transaction. 
+	##
+
+	dbv << _self.editor.collection.source_view
+	trans << custom_record_transaction.new(dbv, _self, selector, args, undo_desc)
+	trans.run()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_user_editor_plugin.user_error(key, _gather args)
+	## 
+	## Raise a standard user error.
+	##
+
+	condition.raise(:user_error, :string, _self.message(key, _scatter args))
+	
+_endmethod
+$

@@ -1,0 +1,1 @@
+sw_module_dialog_plugin

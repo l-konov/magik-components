@@ -1,0 +1,952 @@
+#% text_encoding = iso8859_1
+## File		: $Workfile:rr_dumper.magik $
+##
+## Copyright © 2001, Eskom. Proprietary and Confidential
+##
+## Description:
+##
+##
+## File Version	: 0 
+##
+## Date Created	: 2005/11/28 09:05:06
+## Created by	: andrew
+##
+## Last Updated	: 2005/11/28 09:05:06
+## Updated by	: andrew
+##
+## Classes :
+##!
+
+_pragma(classify_level=basic)
+## class for dumping rose designs to magik files
+##
+## usage:
+##        rd << rr_dumper.new() - create new controller AND
+##                                   open rose app
+##        (in rose open/create the class model)
+##        rd.set(:a_setting,a_value) - override initial_setting
+##        rd.find_category(..) - find the category/package to dump
+##        rd.dump_category(a_category,target_dir) - NB files will 
+##                                                  be overwritten!!!
+##        rd.quit() - otherwise you will not be able to close Rose
+##
+## notes:
+##     - on settings:
+##       the .settings slot is initially populated with the
+##       .initial_settings shared constant but may be changed using
+##       _self.set(..) or _self.reset(..)
+##       boolean items should remain boolean and not be unset
+##       other items may be unset
+##
+##     - on shared constants/variables:
+##       these are methods(operations) identified using a suitable stereotype string
+##             -settings[:shared_var_label]
+##             -settings[:shared_const_label]
+##
+##     - on file/class/method notices in settings:
+##       text messages to be inserted in each file/class/method
+##       useful for things like company/copyright/author/date
+##       type comments and will be created with a leading
+##       single #
+##       may be a string or rope of strings for multi-lines (or unset)
+##       
+##     - on slots
+##       these are dumped using the format {:slot_name,_unset}
+##       and :writable slot access is only done for slots that
+##       are "public" in rose
+##       This is easily customisable if this approach is too simplistic
+##       see _self.do_slt_access(..)
+##
+##     - on class stereotypes
+##       use .settings[:include_class_stereos] if you use class
+##       stereotypes and only want to dump certain ones (NB
+##       CASE SENSITIVE)
+##         - if unset then dumps all
+##         - default only classes with no stereotype ("")
+##
+##     - on method brackets ()
+##       creates brackets if:
+##        - method name includes brackets (method in class diagram
+##           probably shows double backets "()()")
+##        - method has parameters and not "<<" method ("<<" part of method name)
+##       no brackets if:
+##        - method identified as shared_constant\variable
+##        - method name has no brackets
+##
+##     - on load_lists
+##       some manual intervention may be necessary to ensure
+##       that the elements of the automatically created
+##       load_lists are in the correct order
+##
+def_slotted_exemplar(:rr_dumper,{{:settings,_unset},
+				 {:rose,_unset}})
+$
+
+rr_dumper.define_slot_access(:settings,:read)
+$
+
+rr_dumper.define_shared_constant(:initial_settings,
+				 ## hash table containing initial settings
+				 ## stored in settings slot of new dumper
+				 ## Use self.set(:<setting_name>,new_value) to change
+				 ## the values in the slot
+				 
+	property_list.new_with(
+		:make_load_lists?,      _true,                             #create a load list in each directory
+		:recursive?,            _true,                             #do all sub-categories of start category
+		:make_sub_dirs?,        _true,                             #make a sub dir per sub category
+		:make_pragmas?,         _true ,                            #add pragma statements
+		:pragma_classify_level, "basic",                           #classify level for pragmas
+		:pragma_topic,          {"topic1","topic2"},               #{} of topics for all pragmas
+		:pragma_usage,          {"redefinable"},                   #{} of usage for all pragmas
+		:package,               "sw",                              #_package sw added to each file (after header)
+		:file_header,           rope.new_with("File header Notice 1",     #notice at start of each file
+					              "File header Notice 2"),    # - one line per rope item
+		:file_footer,           rope.new_with("File footer Notice 1",     #notice at start of each file
+					              "File footer Notice 2"),    # - one line per rope item
+		:class_notice,          rope.new_with("Class Notice 1",    #notice after each class comment
+					              "Class Notice 2"),   # - one line per rope item
+		:method_notice,         rope.new_with("Method Notice 1",   #notice after each method comment
+						      "Method Notice 2"),  # - one line per rope item
+		:slot_access_mapping,   hash_table.new_with(0,":write"),   # - public in rose
+		:shared_const_label,    "Shared Constant",                 # string for shared constant stereotype
+		:shared_var_label,      "Shared Variable",                 # string for shared variable stereotype
+		:include_class_stereos, equality_set.new_with(""),         # class stereotypes to recognise as classes for dump
+		:show_param_types?,     _true),                            # list param names/types in method comments
+	_false)
+$
+
+
+
+rr_dumper.define_shared_constant(:app_name,"Rose.application",_false )
+$
+
+_method rr_dumper.set(a_key,a_value)
+	## 
+	## set the key and value in the .settings slot
+
+	_return .settings[a_key] << a_value
+	
+_endmethod
+$
+
+_method rr_dumper.reset()
+	## 
+	## reset the settings slot to the values in the
+	## initial_settings shared constant
+
+	.settings << _self.initial_settings.copy()
+	
+_endmethod
+$
+
+
+				  
+_method rr_dumper.new()
+	## 
+	##
+
+	_return _clone.init()
+	
+_endmethod
+$
+
+_method rr_dumper.init()
+
+	.rose << ole_client.getobject(_unset,_self.app_name)
+
+	_if .rose _isnt _unset _andif
+	    .rose.is_kind_of?(ole_controller)
+	_then
+		_self.reset()
+		.rose.visible << _true 
+		_return _self
+	_else
+		write("ERROR: Could not create Rose OLE Client")
+		_return _unset
+	_endif 
+
+_endmethod
+$
+
+
+_method rr_dumper.quit()
+
+	
+	.rose.release_object()
+	
+_endmethod
+$
+
+_method rr_dumper.logical_view
+
+	_return .rose.currentmodel.rootcategory
+
+_endmethod
+$
+
+_method rr_dumper.check_string(a_string)
+	## returns a string in the correct form for magik
+	## 
+	## i.e. trim_spaces,lowercase and replace " " with "_"
+	## also replaces "/" and "\" with "_"
+	##
+	## special case implemented when string starts with "_optional"
+	## for first optional parameter - works for parameters captured
+	## in rose as "_optional a_name"
+
+	return_string << a_string
+	
+	_if return_string _isnt _unset 
+	_then
+		
+		o_key << "_optional"
+		
+		return_string << return_string.trim_spaces().lowercase
+
+		#special case -
+		_if return_string.index_of_seq(o_key) = 1
+		_then
+			#_optional parameter keyword
+			rest_string << (return_string.slice_to_end(o_key.size + 1))
+			rest_string << rest_string.trim_spaces()
+
+			_if rest_string.index_of_seq("_") = 1
+			_then
+				#remove the leading _
+				rest_string << rest_string.slice_to_end(2)
+			_endif
+			
+			return_string << o_key + " " + rest_string
+		_else
+			return_string << return_string.substitute_character(% ,%_)
+		_endif
+		
+		return_string << return_string.substitute_character(%/,%_)
+		return_string << return_string.substitute_character(%\,%_)
+		
+	_endif
+
+	_return return_string
+_endmethod
+$
+
+_method rr_dumper.dump_category(a_category,target_dir)
+	##
+	## Dump all classes in a_category to a relevantly named magik
+	## file in the target directory.
+	##
+	## NB files will be overwritten!!!
+	##
+	## a_category - a rose category object
+	## target_dir - string - full path of target directory
+	##
+	## 
+
+	_if _not system.file_exists?(target_dir)
+	_then
+		system.do_command("mkdir " + target_dir)
+	_endif
+	
+	_if .settings[:make_sub_dirs?]
+	_then
+		#create sub dir for this category
+		target_dir << system.pathname_down(target_dir,_self.check_string(a_category.name))
+		system.do_command("mkdir " + target_dir)
+	_endif
+
+	#find the classes in this category
+	classes << a_category.getallclassesex(_false,_false)
+
+	_for i _over range(1,classes.count)
+	_loop
+		a_class << classes.getat(i)
+		
+		#test to ensure class is of required stereotype and not, for
+		# example, an "Actor"/"Table" etc
+		_if (include_classes << .settings[:include_class_stereos]) _is _unset _orif
+		    include_classes.includes?(a_class.stereotype)
+		_then
+			_self.do_class(a_class,target_dir)
+			a_class.release_object()
+		_endif 
+	_endloop
+
+	classes.release_object()
+
+	_if .settings[:recursive?]
+	_then
+		#process sub_categories
+		subs << a_category.categories
+
+		_for i _over range(1,subs.count)
+		_loop
+			a_sub << subs.GetAt(i)
+			_self.dump_category(a_sub,target_dir)
+		_endloop 
+	_endif
+
+	_if .settings[:make_load_lists?]
+	_then
+		#create a load_list for the target directory
+		_self.make_load_list(target_dir)
+	_endif
+_endmethod
+$
+
+
+_method rr_dumper.do_class(a_class,target_dir)
+	## 
+	## Create a file for the class and populate with the relevant
+	## items based on the rose class definition
+	## 
+	## a_class - rose class object
+	## target_dir - string - full path of target directory
+
+	file_name << system.pathname_down(target_dir,_self.check_string(a_class.name) + ".magik")
+
+	write("CREATING FILE: ",file_name)
+	file_stream << external_text_output_stream.new(file_name)
+
+	_protect
+		_if (f_notice << .settings[:file_header]) _isnt _unset 
+		_then
+			_self.do_notice(file_stream,f_notice)
+		_endif
+
+		_if (package_name << .settings[:package]) _isnt _unset
+		_then
+			_self.do_package(file_stream,package_name)
+		_endif 
+
+		_self.do_exemplar(file_stream,a_class)
+
+		
+		#process all methods on a_class
+		methods << a_class.operations
+
+		def_var_string << _self.initial_settings[:shared_var_label]
+		def_const_string << _self.initial_settings[:shared_const_label]
+	
+		_for i _over range(1,methods.count)
+		_loop
+			a_method << methods.getat(i)
+
+			#shared const/var check
+			_if a_method.stereotype.lowercase = .settings[:shared_const_label].default(def_const_string).lowercase
+			_then
+				_self.do_const_var(file_stream,a_class,a_method,:const)
+				
+			_elif a_method.stereotype.lowercase = .settings[:shared_var_label].default(def_var_string).lowercase
+			_then
+				_self.do_const_var(file_stream,a_class,a_method,:var)
+				
+			_else 
+				_self.do_method(file_stream,a_class,a_method)
+			_endif 
+			
+			a_method.release_object()
+		_endloop
+
+		methods.release_object()
+
+		_if (f_notice << .settings[:file_footer]) _isnt _unset 
+		_then
+			_self.do_notice(file_stream,f_notice)
+		_endif
+		
+	_protection
+		
+		file_stream.close()
+		
+	_endprotect
+	
+_endmethod
+$
+
+_method rr_dumper.do_method(a_stream, a_class, a_method)
+	## 
+	## Dump the relevant method onto the stream
+
+	_if .settings[:make_pragmas?]
+	_then
+		_self.do_pragma(a_stream)
+	_endif
+
+	class_name << _self.check_string(a_class.name)
+	
+	brackets? << _false 
+	temp_name << a_method.name.trim_spaces()
+	_if temp_name.slice_to_end(temp_name.size-1) = "()"
+	_then
+		#brackets in methodname
+		brackets? << _true 
+		method_name << _self.check_string(temp_name.slice(1,temp_name.size - 2))
+	_else
+		method_name << _self.check_string(a_method.name)
+	_endif 
+
+	
+	_if method_name.slice_to_end(method_name.size-1) = "<<"
+	_then
+		#chevron in method name
+		chevron? << _true
+	_else
+		chevron? << _false 
+	_endif
+
+	_if a_method.exportcontrol.value = 2
+	_then
+		a_stream.write("_private ")
+	_endif
+		
+	a_stream.write("_method ",class_name,".",method_name)
+
+	param_rope << rope.new()
+
+	params << a_method.parameters
+
+	_if _not chevron? _andif 
+	    (brackets? _orif 
+	     params.count > 0)
+	_then
+		a_stream.write("(")
+	_endif
+
+	_for i _over range(1,params.count)
+	_loop
+		a_param << params.getat(i)
+
+		param_rope.add_last({_self.check_string(a_param.name),a_param.type,a_param.documentation})
+		
+		a_param.release_object()
+	_endloop
+
+	
+	first? << _true
+		
+	_for a_param _over param_rope.elements()
+	_loop
+		_if _not first?
+		_then
+			a_stream.write(",")
+		_else
+			first? << _false
+		_endif
+			
+		a_stream.write(a_param[1])
+	_endloop
+
+	_if _not chevron? _andif 
+	    (brackets? _orif 
+	     params.count > 0)
+	_then
+		a_stream.write(")")
+	_endif
+
+	_if chevron? _andif
+	    params.count = 0
+	_then
+		#no params in design - create default
+		a_stream.write("a_value")
+	_endif
+
+	params.release_object()
+
+	a_stream.write(newline_char)
+
+	a_stream.write("##-----------------------------------------------------------------------------",newline_char)
+	a_stream.write("## DESCRIPTION: ",newline_char)
+		
+	_self.do_comments(a_stream,a_method.documentation,_unset,_true )
+
+	_if .settings[:show_param_types?]
+	_then
+		a_stream.write("## ",newline_char)
+		a_stream.write("## PARAMETERS: ",newline_char)
+		
+		#show the param name/type/comment in the method comment
+		_for p_item _over param_rope.elements()
+		_loop
+			(name,param_type,param_comment) << (_scatter p_item)
+			
+			param_desc << "## " + name + " - " + param_type 
+			a_stream.write(param_desc, newline_char)
+			
+			_self.do_comments(a_stream,param_comment,param_desc.size,_true)
+		_endloop
+		
+		
+	_endif
+
+	a_stream.write("## ",newline_char)
+	a_stream.write("## RETURN VALUE(S): ",a_method.returntype,newline_char)
+	a_stream.write("## ",newline_char)
+	a_stream.write("##-----------------------------------------------------------------------------",newline_char)
+	_if (m_notice << .settings[:method_notice]) _isnt _unset 
+	_then
+		_self.do_notice(a_stream,m_notice)
+	_endif
+	
+	a_stream.write("_endmethod",newline_char,"$")
+	a_stream.write(newline_char,newline_char,newline_char)
+	
+_endmethod
+$
+
+
+_method rr_dumper.do_const_var(a_stream, a_class, a_method,const_var)
+	## 
+	## Dump the relevant shared constant or variable onto the stream
+	##
+	## const_var is :const or :var
+
+	_if .settings[:make_pragmas?]
+	_then
+		_self.do_pragma(a_stream)
+	_endif
+	
+	method_name << _self.check_string(a_method.name)
+	class_name << _self.check_string(a_class.name)
+	
+
+	_if a_method.exportcontrol.value = 2
+	_then
+		private_str << ":private"
+	_else
+		private_str << ":public" 
+	_endif
+
+	_if const_var _is :const
+	_then
+		def_string << "define_shared_constant"
+	_else
+		def_string << "define_shared_variable"
+	_endif
+		
+	a_stream.write(class_name,".",def_string,"(:",method_name,",",newline_char)
+
+	_self.do_comments(a_stream,a_method.documentation)
+
+	_if (m_notice << .settings[:method_notice]) _isnt _unset 
+	_then
+		_self.do_notice(a_stream,m_notice)
+	_endif
+
+	a_stream.write(":a_shared_item,",newline_char,private_str,")",newline_char,"$")
+	a_stream.write(newline_char,newline_char,newline_char)
+	
+_endmethod
+$
+
+
+_method rr_dumper.do_pragma(a_stream)
+	## 
+	## dump a pragma statement onto the stream
+
+	c << .settings[:pragma_classify_level].default("basic")
+	t << .settings[:pragma_topic]
+	u << .settings[:pragma_usage]
+
+
+	a_stream.write("_pragma(classify_level=",c)
+
+	_if t _isnt _unset 
+	_then
+		a_stream.write(", topic={")
+
+		_if t.is_kind_of?("")
+		_then
+			a_stream.write(t)
+		_else 
+
+			first? << _true 
+			_for i _over t.elements()
+			_loop
+				_if first?
+				_then
+					first? << _false
+				_else
+					a_stream.write(", ")
+				_endif
+			
+				a_stream.write(i)
+			_endloop
+		_endif 
+
+		a_stream.write("}")
+	_endif
+
+	_if u _isnt _unset 
+	_then
+		a_stream.write(", usage={")
+
+		_if u.is_kind_of?("")
+		_then
+			a_stream.write(u)
+		_else 
+			first? << _true 
+			_for i _over u.elements()
+			_loop
+				_if first?
+				_then
+					first? << _false
+				_else
+					a_stream.write(", ")
+				_endif
+				
+				a_stream.write(i)
+			_endloop
+		_endif 
+
+		a_stream.write("}")
+	_endif
+
+	a_stream.write(")",newline_char)
+	
+_endmethod
+$
+
+_method rr_dumper.do_exemplar(a_stream,a_class)
+	## 
+	## Dump the exemplar definition onto the stream and create the
+	## slot access methods too
+	##
+
+	class_name << _self.check_string(a_class.name)
+
+	#cache slots
+	slot_list << equality_hash_table.new()
+	slot_order << rope.new()
+
+	slots << a_class.attributes
+	
+	_for i _over range(1,slots.count)
+	_loop
+		a_slot << slots.getat(i)
+
+		slot_name << _self.check_string(a_slot.name)
+		slot_access << a_slot.exportcontrol.value
+
+		slot_order.add(slot_name)
+		slot_list[slot_name] << slot_access
+		
+		a_slot.release_object()
+	_endloop
+
+	slots.release_object()
+	
+	_if .settings[:make_pragmas?]
+	_then
+		_self.do_pragma(a_stream)
+	_endif
+
+	_self.do_comments(a_stream, a_class.documentation)
+
+	_if (c_notice << .settings[:class_notice]) _isnt _unset 
+	_then
+		_self.do_notice(a_stream,c_notice)
+	_endif
+
+	def_str << "def_slotted_exemplar(:" + class_name + ","
+
+	a_stream.write(def_str)
+	
+	indent << def_str.size + 1
+
+	#write slots
+	a_stream.write("{")#.space_pad(indent - 1))
+
+	first? << _true
+
+	_for a_slot_name _over slot_order.elements()
+	_loop
+		_if _not first?
+		_then
+			a_stream.write(",")
+		_else
+			first? << _false 
+		_endif
+
+		a_stream.write(newline_char,"".space_pad(indent),"{:",a_slot_name,",_unset}")
+
+	_endloop
+
+	slots.release_object()
+
+	a_stream.write("}")
+	
+
+	#superclass
+	first_super? << _true
+
+	supers << a_class.getsuperclasses
+	
+	_for i _over range(1,supers.count)
+	_loop
+		a_super << supers.getat(i)
+		
+		_if _not first_super?
+		_then
+			a_stream.write(",")
+		_else
+			first_super? << _false
+			a_stream.write(",",newline_char,"{".space_pad(indent,_true))
+		_endif
+		
+		a_stream.write(":",_self.check_string(a_super.name))
+		
+		a_super.release_object()
+	_endloop
+	
+	_if _not first_super?
+	_then
+		#need to close brackets
+		a_stream.write("}")
+	_endif
+
+	a_stream.write(")",newline_char,"$",newline_char,newline_char)
+	
+	
+	_for i_slot_name,slot_access _over slot_list.fast_keys_and_elements()
+	_loop
+		_self.do_slot_access(a_stream,class_name, slot_name, slot_access)
+	_endloop
+
+_endmethod
+$
+
+_method rr_dumper.do_slot_access(a_stream,class_name, slot_name, slot_access)
+	## 
+	## Dump a slot access method onto the stream
+	##
+	## slot_access is an integer from rose - 0/1/2/3
+
+	_if (a_hash << .settings[:slot_access_mapping]) _isnt _unset _andif
+	    (access_str << a_hash[slot_access]) _isnt _unset
+	_then 
+	
+		a_stream.write(class_name,".define_slot_access(:",slot_name,",",access_str,")",newline_char,"$",
+			       newline_char,newline_char)
+	_endif 
+	
+_endmethod
+$
+
+_method rr_dumper.do_notice(a_stream,the_notice)
+	## 
+	## Dump a single/multiline single-hashed comment onto the stream
+	## the_notice - string OR
+	##            - rope of strings - Each item is treated as a new line
+
+	_if the_notice.is_kind_of?("")
+	_then
+		a_stream.write("#",the_notice,newline_char)
+	_else 
+	
+		_for a_str _over the_notice.fast_elements()
+		_loop
+			_if a_str = "<newline>"
+			_then
+				#leave blank line with no #
+				a_stream.write(newline_char)
+			_else 
+				a_stream.write("#",a_str,newline_char)
+			_endif 
+		_endloop
+	_endif 
+
+	a_stream.write(newline_char)
+
+_endmethod
+$
+
+_method rr_dumper.do_package(a_stream,package_name)
+	## 
+	## Dump a "_package package_name" line onto the stream
+	## package_name - string 
+	##         
+
+	_if _not package_name.empty?
+	_then
+		a_stream.write("_package ",package_name,newline_char,"$",newline_char,newline_char)
+	_endif 
+	
+_endmethod
+$
+
+
+_method rr_dumper.do_comments(a_stream,a_comment,_optional indent_size, no_extra_lines?)
+	## 
+	## Dump the double-hash comment onto a stream
+	##
+	## a_comment - a rose documentation object
+	## indent_size - integer - writes "## " + indent + string
+	## no_extra_lines? - boolean (default false) - do not add leading/following blank ## lines
+
+	indent_size << indent_size.default(0)
+	no_extra_lines? << no_extra_lines?.default(_false)
+	
+
+	indent << "".space_pad(indent_size)
+
+	_if _not no_extra_lines?
+	_then
+		a_stream.write("##",newline_char)
+	_endif
+
+	_if a_comment.empty?
+	_then
+		a_stream.write("## ")
+	_endif
+
+	_for i _over range(1,a_comment.size)
+	_loop
+		_if i = 1 
+		_then
+			a_stream.write("## ",indent)
+		_endif
+		
+		a_char << a_comment[i]
+		
+		_if a_char _is %newline
+		_then
+			a_stream.write(newline_char,"## ",indent)
+		_elif a_char _is %return
+		_then
+			#ignore
+		_else
+			a_stream.write(a_char)
+		_endif
+	_endloop
+
+	a_stream.write(newline_char)
+
+	_if _not no_extra_lines?
+	_then
+		a_stream.write("##",newline_char)
+	_endif 
+	
+_endmethod
+$
+
+
+_method rr_dumper.make_load_list(target_dir)
+	## 
+	## make a load_list.txt file in the target directory including
+	## 1) all magik files
+	## 2) all sub_dirs
+	##
+
+	
+	files << rope.new()
+	dirs << rope.new()
+
+	dir_channel << directory_channel.new(target_dir)
+
+	_loop
+		_if (a_file << dir_channel.get_status()) _is _unset 
+		_then
+			#end of directory
+			_leave 
+		_endif
+
+		name << system.pathname_components(a_file.name).lowercase
+		ext << ".magik"
+		
+		_if a_file.type = :file _andif
+		    name.size > ext.size _andif 
+		    name.slice_to_end(name.size - ext.size + 1) = ext 
+		_then
+			#write("magik file")
+			files.add(name)
+			
+		_elif a_file.type = :directory
+		_then
+			dirs.add(name)
+		_endif
+	_endloop
+
+	dir_channel.close()
+
+	
+	_protect
+		ll_file << external_text_output_stream.new(system.pathname_down(target_dir,"load_list.txt"))
+
+		_for i _over files.fast_elements()
+		_loop
+			ll_file.write(i,newline_char)
+		_endloop
+
+		_for i _over dirs.fast_elements()
+		_loop
+			ll_file.write(i,"/",newline_char)
+		_endloop
+	_protection
+		
+		ll_file.close()
+		
+	_endprotect
+						   
+	
+_endmethod
+$
+
+
+_method rr_dumper.find_category(name, _optional parent_category)
+	## find and return "name" in parent_category if it exists
+	##
+	## name - string
+	## parent_category - rose category object (default self.logical_view)
+	##
+	## e.g to find category/package:"Logical_view"/"Source"/"test" do:
+	##
+	##              source_cat << a_rr_dumper.find_category("source")
+	##              test_cat << a_rr_dumper.find_category("test",source_cat)
+	##
+
+	parent_category << parent_category.default(_self.logical_view)
+	
+	categories << parent_category.categories
+
+	the_category << _unset
+	
+	_for i _over range(1, categories.count)
+	_loop
+		_if (a_category << categories.GetAt(i)).name.lowercase = name.lowercase
+		_then
+			the_cat << a_category
+			_leave
+		_endif
+	_endloop
+
+	_return the_cat
+
+_endmethod
+$
+
+
+_method rr_dumper.classes_in_category(a_category)
+	##
+	## get all the classes immediatly within this category
+	## (i.e. not recursive)
+	##
+
+	class_rope << rope.new()
+
+	classes << a_category.getallclassesex(_false,_false)
+
+	_for i _over range(1,classes.count)
+	_loop
+		a_class << classes.getat(i)
+		
+		class_rope.add(a_class)
+		
+	_endloop
+
+	_return class_rope
+	
+_endmethod
+$
+
+

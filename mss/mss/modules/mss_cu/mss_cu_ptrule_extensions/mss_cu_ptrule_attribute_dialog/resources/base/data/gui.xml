@@ -1,0 +1,21 @@
+<gui>
+  <toolbar name="cu_editor">
+    <action name="cu_editor.edit_cus"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="cu_editor"/>
+  </dock>
+
+  <work_area>
+    <paned_window side_by_side="no" dynamic="no">
+      <plugin plugin_name="attribute_lister" stretch="70"/>
+      <plugin plugin_name="cu_editor" stretch="30"/>
+      <plugin plugin_name="hierarchy_display" stretch="0"/>
+      <self stretch="0"/>
+    </paned_window>
+  </work_area>
+</gui>
+
+
+

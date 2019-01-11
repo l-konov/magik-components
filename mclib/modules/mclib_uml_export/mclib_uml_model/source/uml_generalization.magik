@@ -1,0 +1,128 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+##
+## Created By: A non
+## Date: 02-14-2002
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+
+
+_pragma(classify_level=advanced)
+## Class which represents an inheritance association between
+## two classes
+def_slotted_exemplar(:uml_generalization,
+{
+   {:parent, _unset},
+   {:child, _unset},
+   {:owner, _unset}
+},
+{
+:xmi_exportable
+})
+$
+
+_pragma(classify_level=advanced)
+## The parent in the inheritance relationship
+uml_generalization.define_slot_access(:parent, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## The child in this inheritance relationship
+uml_generalization.define_slot_access(:child, :write, :readonly)
+$
+
+_pragma(classify_level=advanced)
+## The model element which owns this relationship
+uml_generalization.define_slot_access(:owner, :write, :readonly)
+$
+
+_pragma(classify_level=basic)
+_method uml_generalization.new(owner, parent, child)
+   ## Creates a new instance of uml_generalization
+   ##
+   ## owner : uml thing --
+   ## parent : uml_interface -- the superclass
+   ## child : uml_interface -- the subclass
+   ##
+   ## returns : uml_generalization -- a new instance of self
+   
+   _return _clone.init(owner, parent, child)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method uml_generalization.init(owner, parent, child)
+   ## Inits a new instance of uml_generalization
+   ##
+   ## owner : uml thing --
+   ## parent : uml_interface -- the superclass
+   ## child : uml_interface -- the subclass
+   ##
+   ## returns : uml_generalization -- self, but inited
+
+   _self.owner << owner
+   _self.parent << parent
+   _self.child << child
+
+   _self.parent.add_specialization(_self)
+   _self.child.add_generalization(_self)
+
+   _return _self 
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_generalization.xmi_id
+   ## returns : string -- a unique identifer this UML attribute
+
+   _return _self.safen_xmi_id(char16_vector.concatenation(_self.owner.xmi_id,
+							  "-generalization-",
+							  _self.parent.xmi_id,
+							  "-",
+							  _self.child.xmi_id))
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_generalization.abstract? 
+   ## returns : boolean -- is this generalization abstract?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_generalization.private?
+   ## return : boolean -- is this generalization private?
+   ## 
+
+   _return _false
+_endmethod
+$
+
+_pragma(classify_level=basic)
+_method uml_generalization.export_on(a_uml_output_stream)
+   ## exports self
+   ## 
+
+   a_uml_output_stream.write_uml_generalization(_self)
+   
+_endmethod
+$

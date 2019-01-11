@@ -1,0 +1,173 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_attribute_lister
+##
+## Subclass of object_editor_field_lister for editing fields displayed
+## by the mss_ptrule_attribute_dialog.
+##
+
+def_slotted_exemplar(:mss_ptrule_attribute_lister,
+{
+},
+{:object_editor_field_lister})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_attribute_lister.define_shared_constant(
+	:databus_consumer_data_types,
+	{:proposed_values,
+	 :current_object,
+	 :current_text_joins
+	},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_attribute_lister.define_shared_constant(
+	:databus_producer_data_types,
+	{:proposed_value, :proposed_values_for_update},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_lister.init_actions()
+	## 
+	## No actions required.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_lister.manage_actions()
+	## 
+	## No actions to manage.
+	##
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_lister.sw_databus_data_available(data_type_name,  data)
+	## 
+	## 
+
+	_if data_type_name _is :current_object
+	_then
+		_self.display_current_object(data)
+	_elif data_type_name _is :current_text_joins
+	_then
+		_self.populate_text_joins(data)
+	_elif data_type_name _is :proposed_values
+	_then
+		_self.set_proposed_values(data)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_lister.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_if data_type_name _is :proposed_values_for_update
+	_then 
+		_return _self.get_proposed_values(:update)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_lister.display_current_object()
+	## 
+	## 
+
+	_self.build_field_item_holder()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_attribute_lister.populate_text_joins(pl)
+	## 
+	## 
+
+	_for i _over .field_lister.field_items()
+	_loop
+		fd << i.field_descriptor
+		_if fd.is_join? _andif
+		    (val << pl[fd.name]) _isnt _unset _andif val ~= ""
+		_then
+			i.set_proposed_value(val)
+		_endif
+	_endloop
+
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method mss_ptrule_attribute_lister.terminate_editing(_optional allow_recovery?)
+	## 
+	##
+
+	allow_recovery? << allow_recovery?.default(_false)
+	_if .field_lister _isnt _unset _andif
+	    (gi << .field_lister.gui_items) _isnt _unset _andif
+	    (ti << gi[:field_list_view]) _isnt _unset
+	_then
+		ti.agent.stop_edit(allow_recovery?)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method mss_ptrule_attribute_lister.build_field_item_holder()
+	## 
+	## Rebuild my field items, based on the attributes configured
+	## for the current pointing rule.
+	##
+
+	ptrule << _self.framework.current_ptrule
+	_self.item_holder << field_item_holder.new()
+
+	_if (a_collection << _self.collection) _isnt _unset
+	_then
+		td << a_collection.descriptor
+		an_object << _self.current_object
+
+		vis_field_names << rope.new()
+		_for i _over ptrule.attributes.fast_elements()
+		_loop
+			_if i[:visible?] _is _true
+			_then 
+				vis_field_names.add_last(i[:name])
+			_endif 
+		_endloop
+
+		_for field_name _over vis_field_names.fast_elements()
+		_loop
+			fd << td.field(field_name)
+			_if fd _isnt _unset
+			_then
+				a_field_item << _self.build_field_item(fd, a_collection, an_object)
+				.item_holder.add_field_item(field_name, a_field_item)
+			_endif 
+		_endloop
+	_endif
+
+	.field_lister.item_holder << .item_holder
+	
+_endmethod
+$

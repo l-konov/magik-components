@@ -1,0 +1,23 @@
+<config base="explorer_plugin.explorer_model_config">
+  <plugins>
+
+    <plugin name="datasets_plugin"  class_name="explorer_model_datasets_plugin">
+       <plugin_data>
+          <elements>
+	     <element name="Mss_config">
+                <datasets display_all="yes">
+		   <dataset name="mss_config"/>
+	        </datasets>
+                <aces>
+		   <ace name="Default"/>
+	        </aces>
+             </element>
+          </elements>
+       </plugin_data>
+    </plugin>
+
+  </plugins>
+
+</config>
+
+

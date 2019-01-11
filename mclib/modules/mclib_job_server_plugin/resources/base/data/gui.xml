@@ -1,0 +1,14 @@
+<gui base="job_server_plugin.gui">
+    
+  <statusbar name="default">
+	<pane id="queued" style="innie" width="100" springy="true"/>
+	<pane id="displayed" style="innie" width="100" springy="true"/>
+	<pane id="completed" style="innie" width="100" springy="true"/>
+	<pane id="selected" style="innie" width="100" springy="true"/>
+	<pane id="filter_date" style="innie" width="100" springy="true"/>
+  </statusbar>
+  
+</gui>
+
+
+

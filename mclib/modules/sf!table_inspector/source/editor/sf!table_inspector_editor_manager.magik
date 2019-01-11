@@ -1,0 +1,315 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - September 2005
+##
+
+_package mclib
+$
+##
+## We use a subclass of the core editor_manager class so that we
+## can communicate a) with the application and b) with the options
+## dialog that drives field visibilties.
+## The icky part is that we introduce a second databus for "internal"
+## communication that is a tad cumbersome to maintain (e.g. each 
+## component needs now a public slot sf!ti_databus). The good news
+## is that all notifications still are processed via the standard
+## sw_databus_data_available() and sw_databus_data_requested() callbacks.
+##
+
+
+_pragma(classify_level=advanced, topic={editors})
+def_slotted_exemplar( :sf!table_inspector_editor_manager,
+{
+	{ :sf!on_tab_page, _unset },
+	{ :sf!ti_databus,  _unset },
+	{ :sf!skip_events, {}     }
+},
+{ :editor_manager } )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_editor_manager.define_slot_access( :sf!on_tab_page, :write, :public )
+$
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_editor_manager.define_slot_access( :sf!ti_databus, :write, :public )
+$
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_editor_manager.define_slot_access( :sf!skip_events, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+sf!table_inspector_editor_manager.def_property( :default_ace_name,
+	:type,		:string,
+	:default_value,	"Default" )
+$
+
+
+_pragma(classify_level=basic, topic={editors})
+_method sf!table_inspector_editor_manager.sf!ti_databus << p_databus
+
+	## Update the internal databus;
+	## also add _self as a consumer on that databus.
+
+	_local l_dbs << .sf!ti_databus
+
+	_if l_dbs _isnt _unset
+	_then
+		l_dbs.remove_member( _self )
+	_endif
+
+	.sf!ti_databus << p_databus
+	_if p_databus _isnt _unset
+	_then
+		p_databus.add_consumer( _self, :update_displayed_fields,
+					:editor_manager_skip_databus_events )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={editors})
+_method sf!table_inspector_editor_manager.application
+
+	## A hack to get past the initialization phase
+	## when a new table inspector is created without
+	## specifying a framework for it...
+
+	_local l_app << _super.application
+
+	>> _if l_app.is_kind_of?( sw:application )
+	   _then >> l_app
+	   _else >> sw:application
+	   _endif
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_editor_manager.ace
+
+	## Provide the ACE that should be used (for field visibilities).
+
+	_local l_ace
+
+	_try
+		l_ace << _super.ace
+	_when error
+		l_ace << sw:gis_program_manager.ace( _self.default_ace_name )
+	_endtry
+
+	>> l_ace
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_editor_manager.build_gui(
+		p_container, _optional p_xml_element )
+
+	## Build _self's GUI and remember on which tab page the GUI
+	## is placed.
+
+	_local l_data << _super.build_gui( p_container, p_xml_element )
+
+	_self.sf!on_tab_page << p_container.pages.size
+
+	>> l_data
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_editor_manager.sw_databus_data_requested(
+		p_data_type_name, _gather p_args )
+
+	## Provide data (if possible) for sibling components.
+
+	_if p_data_type_name _is :tree_item_for_html_export
+	_then
+		_local l_current_page << .embedded_editor_stack.parent.
+					 parent_window.current_page
+		_local l_ed
+		#
+		# If there should be any floating editors, it's hard to know
+		# the contents of which one should be exported; so we only
+		# offer to export the data of the embedded editor...
+		#
+		_if l_current_page = _self.sf!on_tab_page _andif
+		    ( l_ed << _self.current_embedded_editor ) _isnt _unset _andif
+		    l_ed.method( :sf!tree_item_for_html_export ) _isnt _unset
+		_then
+			_return l_ed.sf!tree_item_for_html_export
+		_endif
+	_endif
+
+	>> _super.sw_databus_data_requested( p_data_type_name, _scatter p_args )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_editor_manager.sw_databus_data_available(
+		p_data_type_name, _gather p_data )
+
+	## If field visibilities change, update the editor display(s)...
+
+	#
+	# The options plugin sent the notification that the field
+	# to be displayed have changed; notify all editors...
+	#
+	_if p_data_type_name _is :update_displayed_fields
+	_then
+		_local l_callback << :|sf!field_visibilities_changed()|
+		_local l_fl
+		_local l_co
+
+		_for i_ed _over _self.all_editors()
+		_loop
+			#
+			# Get the current object, rebuild the field list
+			# and re-assign the current object...
+			#
+			l_co << i_ed.current_object
+			l_fl << i_ed.component( :field_lister )
+
+			_if l_fl _isnt _unset _andif
+			    l_fl.responds_to?( l_callback )
+			_then
+				l_fl.perform( l_callback )
+			_endif
+
+			_if l_co _isnt _unset
+			_then
+				i_ed.current_object << _unset
+				i_ed.current_object << l_co
+			_endif
+		_endloop
+	#
+	# The options plugin might send this event to notify this
+	# class that data type that are supposed to be ignored from
+	# the databus have changed...
+	#
+	_elif p_data_type_name _is :editor_manager_skip_databus_events
+	_then
+		_self.sf!skip_events << p_data.first
+	#
+	# Check if the provided data should be processed or not...
+	#
+	_elif _self.sf!skip_events.includes?( p_data_type_name )
+	_then
+		;
+	#
+	# Let the super implementation handle the change...
+	#
+	_else
+		_super.sw_databus_data_available( p_data_type_name,
+						  _scatter p_data )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_method sf!table_inspector_editor_manager.activate_editor_for_collection(
+		p_collection )
+
+	## Does the same the super implementation does and also
+	## sets the internal databus connections by this editor subclass.
+
+	_local l_ed << _super.activate_editor_for_collection( p_collection )
+
+	_if l_ed _isnt _unset
+	_then
+		_self.setup_databus_for_field_lister( l_ed )
+	_endif
+
+	>> l_ed
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_method sf!table_inspector_editor_manager.display_embedded_editor_for_collection(
+		p_collection )
+
+	## Does the same the super implementation does and also
+	## sets the internal databus connections by this editor subclass.
+
+	_local l_ed << _super.display_embedded_editor_for_collection(
+			       p_collection )
+
+	_if l_ed _isnt _unset
+	_then
+		_self.setup_databus_for_field_lister( l_ed )
+	_endif
+
+	>> l_ed
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={editors})
+_method sf!table_inspector_editor_manager.set_object_in_embedded_editor(
+		p_object, _optional p_bring_to_front? )
+
+	## We needed this method to be public, so it's subclassed...
+
+	>> _super.set_object_in_embedded_editor( p_object, p_bring_to_front? )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_method sf!table_inspector_editor_manager.setup_databus_for_field_lister(
+			 p_editor )
+
+	## This methods sets/updates the sf!ti_databus slot on
+	## the field_lister component.
+
+	_local l_fl
+
+	_if p_editor _isnt _unset _andif
+	    ( l_fl << p_editor.component( :field_lister ) ) _isnt _unset _andif
+	    l_fl.sf!ti_databus <> _self.sf!ti_databus
+	_then
+		l_fl.sf!ti_databus << _self.sf!ti_databus
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={editors})
+_private _iter _method sf!table_inspector_editor_manager.all_editors()
+
+	## Provides all editors managed by _self.
+
+	_for i,i_eds _over .editor_pool.fast_keys_and_elements()
+	_loop
+		_for i_ed _over i_eds.fast_elements()
+		_loop
+			_loopbody( i_ed )
+		_endloop
+	_endloop
+
+	_for i,i_ed _over .embedded_editors.fast_keys_and_elements()
+	_loop
+		_loopbody( i_ed )
+	_endloop
+_endmethod
+$

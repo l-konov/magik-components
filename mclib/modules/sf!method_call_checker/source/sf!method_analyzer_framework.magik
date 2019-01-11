@@ -1,0 +1,265 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+def_slotted_exemplar( :sf!method_analyzer_framework,
+{
+	{ :gui_items, _unset }
+},
+{ :visual_framework, :sf!component_mixin } )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_analyzer_framework.define_shared_constant(
+	:databus_consumer_data_types,
+	{ :progress_string },
+	:public )
+$
+
+
+##
+##	R E D E F I N E D   C O D E
+##	___________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_analyzer_framework.define_shared_constant(
+	:component_installation_data,
+	sw:property_list.new_with(
+		:file_finder,     { :|mclib:sf!file_provider|  },
+		:file_analyzer,   { :|mclib:sf!token_analyzer| },
+		:data_collector,  { :|mclib:sf!data_gatherer|  },
+		:data_visualizer, { :|mclib:sf!data_displayer| }
+	),
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_analyzer_framework.init_actions()
+
+	## Define the global actions for the dialog.
+
+	_for an_action _over { :print, :export, :help, :quit
+			     }.fast_elements()
+	_loop
+		_self.add_action(
+			_self.sf!create_standard_action_for( an_action ) )
+	_endloop
+	
+	_self.action( :help ).enabled? << _true
+	_self.action( :quit ).enabled? << _true
+_endmethod
+$
+
+
+##
+##	S U B C L A S S E D   C O D E
+##	_____________________________
+##
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!method_analyzer_framework.init( a_name, a_framework )
+
+	## Initialize local slots and return _self.
+
+	_super.init( a_name, a_framework )
+
+	.gui_items << sw:property_list.new()
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={subclassable})
+_method sf!method_analyzer_framework.sw_databus_data_available(
+		a_data_type_name, data )
+
+	## Process data from the databus we are interested in...
+
+	_if a_data_type_name = :progress_string
+	_then
+		_self.changed( :progress_string, :text, data )
+	_endif
+
+	_super.sw_databus_data_available( a_data_type_name, data )
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA}, usage={subclassable})
+_method sf!method_analyzer_framework.add_component( a_key, a_class_name )
+
+	## Adds a component to the framework.
+	##
+	## If the component is databus aware, the component is
+	## connected to the framework's databus.
+
+	_local comp << _super.add_component( a_key, a_class_name )
+
+	_if comp _isnt _unset _andif comp.connect_to_databus?
+	_then
+		_self.connect_component_to_databus( comp )
+	_endif
+	
+	>> comp
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA}, usage={subclassable})
+_method sf!method_analyzer_framework.connect_component_to_databus( a_component )
+
+	## Add the component A_COMPONENT to the databus, first ensuring
+	## that the databus exists.
+
+	_local db
+
+	_if ( db << _self.databus ) _is _unset
+	_then
+		_self.databus << db << sw:sw_databus.new()
+	_endif
+	
+	a_component.databus << db
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA}, usage={subclassable})
+_method sf!method_analyzer_framework.activate(
+		_optional a_title, _gather args )
+
+	## Use a default title if none has been provided...
+
+	_if a_title _is _unset _orif
+	    a_title.empty?
+	_then
+		a_title << _self.message( _self.class_name )
+	_endif
+
+	>> _super.activate( a_title, _scatter args )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA}, usage={subclassable})
+_private _method sf!method_analyzer_framework.build_gui()
+
+	## Build the GUI interface.
+
+	_super.build_gui()
+	#
+	# Add a status bar to the frame.
+	#
+	_local pane_map << sw:property_list.new_with(
+			       :progress_string,
+			       sw:property_list.new_with(
+				    :text,     "",
+				    :style,    :innie,
+				    :springy?, _true,
+				    :width,    -1 ) )
+	.gui_items[ :status_bar ] <<
+		sw:status_bar.new( _self.top_frame, pane_map, _self )
+_endmethod
+$
+
+
+##
+##	A C T I O N   C A L L B A C K S
+##	_______________________________
+##
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_analyzer_framework.help()
+
+	## There is currently no HTML help - so we just launch
+	## the word document that comes with this module.
+
+	_local module   << sw:sw_module_manager.module(
+				   _self.module_name )
+	_local user_doc << sw:system.pathname_from_components(
+				      "UserGuide.doc",
+				      module.safe_full_directory )
+
+	_if _not sw:system.file_exists?( user_doc )
+	_then
+		_self.show_alert( _self.message( :no_help_yet ) )
+		_return
+	_endif
+	#
+	# Launch a low-priority thread that will launch MS Word - or
+	# whatever program is associated to .doc files...
+	# If we don't do this in a background thread, the GUI will
+	# display a busy-cursor and prevent the user from doing anything
+	# else until the launched executable is quit.
+	#
+	_proc @sf!method_analyzer_framework_help( a_path )
+
+		sw:system.do_command( a_path )
+	_endproc.fork_at( 2, _self.message( :launch_doc_file, user_doc ) )
+_endmethod
+$
+
+
+##
+##	N E W   F U N C T I O N A L I T Y
+##	_________________________________
+##
+
+
+_pragma(classify_level=basic, topic={Magik,QA}, usage={redefinable})
+_method sf!method_analyzer_framework.gui_row_spacing()
+
+	## Returns a number of pixels for vertical spacing for widgets.
+
+	>> 5
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_analyzer_framework.get_gui_container_for(
+		a_container_name, _optional a_caller )
+
+	## Helper call so that components can ask for created
+	## GUI containers from siblings...
+	## If a container with the specified name does exist
+	## it is returned (with the component that "owns" it).
+
+	_local a_container
+
+	_for a_comp _over _self.components()
+	_loop
+		a_container << a_comp.sf!gui_container_for(
+					   a_container_name, a_caller )
+		_if a_container _isnt _unset
+		_then
+			_return a_container, a_comp
+		_endif
+	_endloop
+_endmethod
+$

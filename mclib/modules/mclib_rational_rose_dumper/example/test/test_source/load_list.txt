@@ -1,0 +1,4 @@
+test_class.magik
+test_class_two.magik
+test_super_class.magik
+test_super_class_two.magik

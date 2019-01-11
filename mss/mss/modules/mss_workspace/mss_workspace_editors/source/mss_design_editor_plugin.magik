@@ -1,0 +1,34 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_design_editor_plugin.magik
+##
+## Editor plugin for mss_design object.
+##
+
+def_slotted_exemplar(:mss_design_editor_plugin,
+{},
+{:mss_job_editor_plugin})
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_design_editor_plugin.define_shared_constant(
+	:managed_table_name,
+	:mss_design,
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+mss_design_editor_plugin.define_shared_constant(
+	:history_menu_class_name,
+	:mss_design_history_viewer,
+	:public)
+$

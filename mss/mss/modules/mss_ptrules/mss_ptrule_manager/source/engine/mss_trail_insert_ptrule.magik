@@ -1,0 +1,579 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_trail_insert_ptrule
+##
+## A trail insertion pointing rule which accepts multiple PDR
+## operations, and which must be followed by a completion operation.
+##
+
+def_slotted_exemplar(:mss_trail_insert_ptrule,
+{
+	{:sectors, _unset, :readable},
+	{:offset_distance, _unset, :readable}
+},
+{:mss_insert_ptrule})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.core_default_properties
+	## 
+	## 
+
+	_local pl << _super.core_default_properties.copy()
+	pl[:prompt_on_release] << :never
+	pl[:prompt_on_complete] << :always
+	pl[:subrule_prompt_on_release] << :never
+	pl[:subrule_prompt_on_complete] << :always
+	pl[:insert_on_release] << :never
+	pl[:insert_on_complete] << :always
+	pl[:subrule_insert_on_release] << :never
+	pl[:subrule_insert_on_complete] << :always
+	pl[:fixed_offset_distance] << _unset
+	pl[:trail_clear_on_start?] << _false
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.core_property_types
+	## 
+	## 
+
+	_local pl << _super.core_property_types.copy()
+	pl[:fixed_offset_distance] << {:integer}
+	pl[:trail_clear_on_start?] << {:boolean}
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.trail_enabled?(_optional local_only?)
+	## 
+	## By default, the trail is enabled while processing a
+	## trail insert pointing rule.
+	##
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.int!start()
+	## 
+	## 
+
+	_super.int!start()
+	_if _self.get_property(:trail_clear_on_start?) _is _true
+	_then
+		_if (tr << .manager.current_trail) _isnt _unset
+		_then
+			tr.clear()
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.int!release(a_window, pos)
+	## 
+	## 
+
+	# Before calling super (which will prompt if necessary), ensure
+	# that sectors have been defined.
+	_if _self.insert_enabled?(:release)
+	_then
+		_self.validate_sectors()
+	_endif 
+	
+	_super.int!release(a_window, pos)
+
+	_if _self.insert_enabled?(:release)
+	_then
+		_self.perform_insert(:release, a_window, pos)
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.int!post_release(a_window, pos)
+	## 
+	## If self has inserted something during release, then call
+	## post-completion activity.
+	##
+
+	_super.int!post_release(a_window, pos)
+
+	_if .one_rule_properties.remove_key(:int!restart_in_post_release) _is _true
+	_then
+		_self.int!post_complete()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.int!complete()
+	## 
+	## 
+
+	# Before calling super (which will prompt if necessary), ensure
+	# that sectors have been defined.
+	_if _self.insert_enabled?(:complete)
+	_then
+		_self.validate_sectors()
+	_endif 
+	
+	_super.int!complete()
+
+	_if _self.insert_enabled?(:complete)
+	_then
+		_self.perform_insert(:complete)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.validate_sectors()
+	## 
+	## Ensure that self's sectors are legitimate for placing self's geometry.
+	##
+
+	_if (gf << .detached_record.all_fields[.geometry_name]) _is _unset
+	_then
+		_return
+	_endif 
+
+	sr << .sectors
+	_if gf.geom_category _is :linear _orif
+	    gf.geom_category _is :area
+	_then 
+		_if sr _is _unset _orif 
+		    sr.line_length = 0
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_sectors, _self.name))
+		_endif
+	_endif
+	
+	_if gf.geom_category _is :area
+	_then
+		temp_sr << sr.sectors
+		temp_sr.close()
+		sr << pseudo_area.new(temp_sr)
+		sr.world << .sectors.world
+		_if sr.area = 0.0
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_sectors_area, _self.name))
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.perform_insert(mode, _optional a_window, pos)
+	## 
+	## 
+
+	_dynamic !current_world!
+	_dynamic !current_dsview!
+
+	# The following has been validated already, but redo it in case
+	# some custom actions have broken it.
+	_if (sr << .sectors) _is _unset _orif 
+	    sr.line_length = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_sectors, _self.name))
+	_endif
+	gf << .detached_record.all_fields[.geometry_name]
+	_if gf.geom_category _is :area
+	_then
+		temp_sr << sr.sectors
+		temp_sr.close()
+		sr << pseudo_area.new(temp_sr)
+		sr.world << .sectors.world
+		_if sr.area = 0.0
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_sectors_area, _self.name))
+		_endif
+	_endif
+	
+	the_world << sr.world.world_for_dataset(.detached_record.source_view)
+	_if the_world _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:cannot_determine_world))
+	_endif
+	!current_world! << the_world
+	
+	dataless? << .detached_record.is_rwo? _andif
+		     .detached_record.dataless?
+	_if _not dataless?
+	_then 
+		.detached_record.mss_ptrule_pre_insert_activity(_self)
+		cr << .current_record << _self.insert_detached_record()
+		_if cr _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:key_already_exists))
+		_endif
+		cr.mss_ptrule_post_insert_activity(_self)
+		cr.make_geometry(.geometry_name, sr)
+		cr.mss_ptrule_fire_post_insert_actions(_self)
+	_else
+		!current_dsview! << .detached_record.source_view
+		!current_world! << sr.world.world_for_dataset(!current_dsview!)
+		
+		new_geom << gf.geom_exemplar.new(gf, sr)
+		cr << .current_record << new_geom.new_dataless_rwo()
+		cr.mss_ptrule_post_insert_activity(_self)
+		cr.mss_ptrule_fire_post_insert_actions(_self)
+	_endif
+
+	_if mode _is :release
+	_then 
+		# Bit of a hack here: if we got this far, then flag the
+		# int!post_release() method to restart self.  Don't just
+		# restart here, in case the configurer wants to define an
+		# action that happens after release, but before restart.
+		.one_rule_properties[:int!restart_in_post_release] << _true 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.int!terminate()
+	## 
+	## 
+
+	_if .sectors _isnt _unset
+	_then
+		_if .offset_distance _isnt _unset
+		_then 
+			.manager.undraw_geometry(.sectors, line_style)
+		_endif 
+		.sectors << _unset
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.trail_changed(new_trail, _optional a_window)
+	## 
+	## 
+
+	_super.trail_changed(new_trail, a_window)
+
+	old_off_dist << .offset_distance
+	.offset_distance << _unset
+	
+	_if new_trail _is _unset _orif
+	    new_trail.sectors _is _unset
+	_then
+		new_secs << sector_rope.new()
+	_else 
+		new_secs << new_trail.sectors.deep_copy()
+	_endif 
+	_if new_secs.line_length = 0
+	_then
+		new_secs << _unset
+	_else
+		offset_dist << _self.figure_offset_distance(new_trail)
+		_if offset_dist ~= 0.0
+		_then
+			.offset_distance << offset_dist
+			_try 
+				new_secs << new_secs.offset_left(offset_dist, :acute)
+			_when error
+				# Because the above can fail if the trail doubles back on
+				# itself. 
+				new_secs << new_secs.offset_left(offset_dist, :square)
+			_endtry 
+		_endif
+		new_secs << pseudo_chain.new_with(new_secs)
+		new_secs.world << new_trail.world
+	_endif
+
+	# Note: if a window has been specified, then XOR self's sectors
+	# on that map only, otherwise draw and undraw self's sectors
+	# on all maps.  This is done to minimize ghosting effects
+	# when dragging (map_manager does not have a protocol for
+	# XORing a geometry, just drawing or undrawing it).
+	_if a_window _isnt _unset
+	_then
+		a_map << a_window.user_data.map
+	_else
+		a_map << _unset
+	_endif
+
+	# V4.2 note: irrespective of the above, always draw and undraw
+	# it.  Why?  Somehow, the :map_trail notification is getting
+	# fired during drag operations before the trail is actually
+	# done dragging.  The result is that these sectors do not get
+	# drawn right while dragging, and this results in ghosting.
+	# The problem looks a bit bad with undraw/draw, but it looks
+	# really bad with XOR.  If a future patch fixes this in core,
+	# I may revisit this later.
+	always_draw_undraw? << _true
+	
+	_if old_off_dist _isnt _unset _andif 
+	    .sectors _isnt _unset
+	_then
+		_if a_map _isnt _unset _andif
+		    always_draw_undraw? _isnt _true 
+		_then
+			a_map.xor_sector_rope_transform(line_style, .sectors.as_sector_rope())
+		_else 
+			.manager.undraw_geometry(.sectors, line_style)
+		_endif 
+	_endif
+	
+	.sectors << new_secs
+	_if .offset_distance _isnt _unset _andif
+	    .sectors _isnt _unset
+	_then
+		_if a_map _isnt _unset _andif
+		    always_draw_undraw? _isnt _true 
+		_then
+			a_map.xor_sector_rope_transform(line_style, .sectors.as_sector_rope())
+		_else 
+			.manager.draw_geometry(.sectors, line_style)
+		_endif 
+	_endif
+			
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.dynamic_trail_changed(new_trail, add_sectors, a_window)
+	## 
+	## 
+
+	_super.dynamic_trail_changed(new_trail, add_sectors, a_window)
+
+	old_off_dist << .offset_distance
+	.offset_distance << _unset
+	
+	_if new_trail _is _unset _orif
+	    new_trail.sectors _is _unset
+	_then
+		new_secs << sector_rope.new()
+	_else 
+		new_secs << new_trail.sectors.deep_copy()
+	_endif
+	_if add_sectors _isnt _unset
+	_then
+		new_secs.add_all_last(add_sectors)
+	_endif
+	
+	_if new_secs.line_length = 0
+	_then
+		new_secs << _unset
+	_else
+		offset_dist << _self.figure_offset_distance(new_trail)
+		_if offset_dist ~= 0.0
+		_then
+			.offset_distance << offset_dist
+			_try 
+				new_secs << new_secs.offset_left(offset_dist, :acute)
+			_when error
+				# Because the above can fail if the trail doubles back on
+				# itself. 
+				new_secs << new_secs.offset_left(offset_dist, :square)
+			_endtry 
+		_endif
+		new_secs << pseudo_chain.new_with(new_secs)
+		new_secs.world << new_trail.world
+	_endif
+
+	a_map << a_window.user_data.map
+	
+	_if old_off_dist _isnt _unset _andif 
+	    .sectors _isnt _unset
+	_then
+		a_map.xor_sector_rope_transform(line_style, .sectors.as_sector_rope())
+	_endif
+	
+	.sectors << new_secs
+	_if .offset_distance _isnt _unset _andif
+	    .sectors _isnt _unset
+	_then
+		a_map.xor_sector_rope_transform(line_style, .sectors.as_sector_rope())
+	_endif
+			
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.figure_offset_distance(a_trail)
+	## 
+	## Determine what offset distance (if any) to use.
+	##
+
+	_if (v << _self.get_property(:fixed_offset_distance)) _isnt _unset
+	_then
+		# Even if a fixed distance is specified, use the right/left
+		# option.  Also note that the value specified here must be
+		# entered in database units by the configurer, so no more
+		# manipulation is needed after that.
+		_if (.manager.get_option(:offset_direction)) _is :right
+		_then
+			v *<< -1.0
+		_endif
+		_return v
+	_endif
+	
+	offset_dist << .manager.get_option(:offset_distance).default(0)
+	_if (.manager.get_option(:offset_direction)) _is :right
+	_then
+		offset_dist *<< -1.0
+	_endif
+
+	# Value is in mm: convert to unit system
+	world_unit << a_trail.world.unit.name
+	offset_dist << unit_system.new(:mm, world_unit).convert_output(offset_dist)
+	_return offset_dist
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.reactivate()
+	## 
+	## 
+
+	_super.reactivate()
+
+	# Re-get self's sectors from the current trail.
+	.sectors << _unset 
+	_self.trail_changed(_self.manager.current_trail)
+	_if .offset_distance _isnt _unset
+	_then 
+		.manager.draw_geometry(.sectors, line_style)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.deactivate()
+	## 
+	## 
+
+	_super.deactivate()
+	_if .sectors _isnt _unset
+	_then
+		_if .offset_distance _isnt _unset
+		_then 
+			.manager.undraw_geometry(.sectors, line_style)
+		_endif 
+		.sectors << _unset
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.add_to_post_render_set(a_set)
+	## 
+	## Render self's sectors.
+	##
+
+	_if .sectors _isnt _unset _andif
+	    .offset_distance _isnt _unset 
+	_then
+		.sectors.style_info << line_style
+		a_set.add(.sectors)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.complete_on_n_points(a_window, pos, n_points_str, _optional terminate_too)
+	## 
+	## Automatically complete this pointing rule if the number of
+	## trail points is >= the number represented by N_POINTS_STR.
+	##
+	## If TERMINATE_TOO is "true", this will terminate the pointing
+	## rule also.
+	##
+	## This is intended to be performed as a release action.
+	##
+
+	_if (tr << .manager.current_trail) _isnt _unset _andif
+	    tr.n_points >= n_points_str.as_number()
+	_then
+		_if terminate_too _isnt _unset _andif
+		    terminate_too.size > 0 _andif
+		    terminate_too[1].lowercase _is %t
+		_then 
+			_self.one_shot_properties[:one_shot?] << _true
+		_endif 
+		.manager.complete_active_ptrule()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.ensure_correlation_on_first_point(a_window, pos)
+	## 
+	## If this is the first pointing, ensure that something has
+	## been correlated on - if no correlation, prompt the user to
+	## possibly stop processing.
+	##
+	## This is intended to be performed as a pre-release action.
+	##
+	
+	_if (tr << .manager.current_trail) _isnt _unset _andif
+	    tr.sectors.line_length = 0.0 _andif 
+	    .pdr_data[:last_correlation_geometry] _is _unset
+	_then
+		_if .manager.show_question(_self.message(:ok),
+					   _self.message(:cancel),
+					   _self.message(:continue_no_correlation?)) _is _false
+		_then
+			tr.clear()
+			!abort!()
+		_endif
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_trail_insert_ptrule.geometry_sectors_for_relative_insert()
+	## 
+	## If superclass doesn't return anything, try using self's sectors.
+	##
+
+	(sec, ori, w) << _super.geometry_sectors_for_relative_insert()
+	_if sec _isnt _unset
+	_then
+		_return sec, ori, w
+	_endif
+
+	_if .sectors _isnt _unset
+	_then
+		_return .sectors.sectors, _unset, .sectors.world
+	_endif 
+	
+_endmethod
+$

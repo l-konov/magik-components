@@ -1,0 +1,209 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+
+
+_pragma(classify_level=debug)
+_method network_follower.debug!report_to_graphviz()
+	## 
+	## 
+
+	_local p1 , p2
+	_local p1_site , p2_site
+	_local p1_name , p2_name
+	_local p1_node , p2_node
+	_local edge_color , edge_style
+	_local ports_grouped_by_site << equality_hash_table.new()
+	_local ports_in_a_site
+
+	_local quote_string << _proc@quote_string(a_string)
+				       >> write_string(%",a_string,%")
+			       _endproc
+
+	_local port_name << _proc@port_name(a_port)
+				    >> write_string(a_port.description," (",a_port.id,")")
+			    _endproc
+	
+	_constant NL << newline_char
+	
+	_local temp_dot_file    << system.temp_file_name("graphviz.dot")
+	_local temp_output_file << system.temp_file_name("graphviz.jpg")
+
+	_local style_info << rope.new()
+	
+	_local int_str << internal_text_output_stream.new()
+
+	# first, create a suitable DOT file...
+	_local str << external_text_output_stream.new(temp_dot_file)
+
+	_protect
+		str.write("digraph G {",NL)
+		
+		_for a_link _over .done_links.fast_keys()
+		_loop
+			p1 << a_link.port1
+			p2 << a_link.port2
+			
+			p1_site << write_string(_scatter p1.gis_owner.name.split_by(%-))
+			p2_site << write_string(_scatter p2.gis_owner.name.split_by(%-))
+			
+			edge_color << _if a_link.connector.is_kind_of?(usage_info_propagation)
+				      _then
+					      >> "red"
+
+				      _else
+					      >> "black"
+				      _endif
+
+			(edge_color,edge_style) << _if a_link.connector.is_kind_of?(mit_card)
+						   _then
+							   >> ("black","dotted")
+							   
+						   _elif a_link.connector.is_kind_of?(mit_shelf)
+						   _then
+							   >> ("black","solid")
+							   
+						   _elif a_link.connector.is_kind_of?(usage_info_propagation)
+						   _then
+							   >> ("red","solid")
+						   _else
+							   >> ("green","bold")
+						   _endif 
+
+			p1_node << quote_string(port_name(p1))
+			p2_node << quote_string(port_name(p2))
+
+			style_info.empty()
+			style_info.add_last(write_string("color=",edge_color))
+			style_info.add_last(write_string("style=",edge_style))
+
+			_if a_link.connector.is_kind_of?(usage_info_propagation)
+			_then
+				style_info.add_last(write_string("label=",%",a_link.connector.name,%"))
+			_endif
+
+			int_str.reset()
+
+			int_str.write_list_with_separator(style_info,%,)
+
+			_if _not a_link.connector.is_kind_of?(mit_card)
+			_then
+				str.write(p1_node,"->",p2_node,"[",int_str.string,"];",NL)
+			_endif
+
+			_if (ports_in_a_site << ports_grouped_by_site[p1_site]) _is _unset 
+			_then
+				ports_in_a_site << ports_grouped_by_site[p1_site] << equality_set.new()
+			_endif
+
+			ports_in_a_site.add(p1)
+
+			_if (ports_in_a_site << ports_grouped_by_site[p2_site]) _is _unset 
+			_then
+				ports_in_a_site << ports_grouped_by_site[p2_site] << equality_set.new()
+			_endif
+
+			ports_in_a_site.add(p2)
+		_endloop
+
+		_local count << 0
+		_local color_names << {"pink","lightblue","lightgray","khaki","orange","rosybrown","yellowgreen","powderblue"}
+		_local color_name
+		
+		_for site_name , port_list _over ports_grouped_by_site.fast_keys_and_elements()
+		_loop
+			color_name << color_names[count +<< 1]
+
+			str.write("  subgraph cluster",count," {",NL)
+			str.write("   node [style=filled,fillcolor=white];",NL)
+			str.write("   style=filled;",NL)
+			str.write("   color=",color_name,";",NL)
+			str.write("   label = ",quote_string(site_name),";",NL)
+
+			# group ports by owning card or shelf.
+			_local ports_in_an_owner
+			_local ports_grouped_by_owner << equality_hash_table.new()
+			_local port_owner
+			
+			_for a_port _over port_list.fast_elements()
+			_loop
+				port_owner << _if a_port.mit_card _isnt _unset 
+					      _then
+						      >> a_port.mit_card
+					      _else
+						      >> a_port.rwuk_shelf
+					      _endif
+
+				_if (ports_in_an_owner << ports_grouped_by_owner[port_owner]) _is _unset 
+				_then
+					ports_in_an_owner << ports_grouped_by_owner[port_owner] << equality_set.new()
+				_endif
+
+				ports_in_an_owner.add(a_port)
+			_endloop
+
+			_local owner_count << 0
+
+			_for a_port_owner , ports_in_owner_list _over ports_grouped_by_owner.fast_keys_and_elements()
+			_loop
+				owner_count +<< 1
+				
+				str.write("  subgraph cluster",(count*100+owner_count)," {",NL)
+				str.write("   node [style=filled,color=white];",NL)
+				str.write("   style=bold;",NL)
+				str.write("   color=black;",NL)
+				str.write("   label = ",quote_string(a_port_owner),";",NL)
+				
+				_for a_port _over ports_in_owner_list.fast_elements()
+				_loop
+					str.write(quote_string(port_name(a_port)),";",NL)
+				_endloop
+				
+				str.write("}",NL)
+			_endloop
+
+			str.write("}",NL)
+
+		_endloop
+
+		str.write("}",NL)
+	_protection
+		str.close()
+	_endprotect
+
+	# ... then convert that DOT file into a JPG file.
+
+	system.do_command(write_string("dot ",quote_string(temp_dot_file)," -Tjpg > ",quote_string(temp_output_file)))
+
+	system.unlink(temp_dot_file)
+
+	temp_output_file << temp_output_file.substitute_character(%/,%\)
+
+show(temp_output_file)
+	system.do_command(write_string("start file:",quote_string(temp_output_file)))
+
+_endmethod
+$

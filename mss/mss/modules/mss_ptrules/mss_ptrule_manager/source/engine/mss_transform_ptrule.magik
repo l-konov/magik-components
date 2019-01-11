@@ -1,0 +1,394 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_transform_ptrule
+##
+## Generic superclass for pointing rules which transform a geometry,
+## set of geometries, or portion of a geometry.
+##
+
+def_slotted_exemplar(:mss_transform_ptrule,
+{
+	{:current_selection, _unset, :readable},
+	{:working_selection, _unset, :readable}
+},
+{:mss_ptrule})
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_transform_ptrule.core_default_properties
+	## 
+	## 
+
+	_local pl << _super.core_default_properties.copy()
+	pl[:do_manifold_interaction?] << _false
+	pl[:im_cursor] << "dyn_trans_mov,swaf_transform_plugin"
+	   
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_transform_ptrule.core_property_types
+	## 
+	## 
+
+	_local pl << _super.core_property_types.copy()
+	pl[:do_manifold_interaction?] << {:boolean}
+
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.transaction_required?(mode)
+	##
+	## Transactions are always required at each PDR release when
+	## transforming. 
+	##
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_transform_ptrule.draw_connected_geometries?
+	##
+	## By default, connected geometries will be drawn/undrawn.
+	##
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.int!press(a_window, pos)
+	## 
+	## 
+
+	_super.int!press(a_window, pos)
+	a_map_view << a_window.user_data
+
+	.current_selection << equality_geometry_set.new()
+	.working_selection << equality_geometry_set.new()
+
+	# N.B.: get_correlation_information() is intentionally called
+	# here - even if there is a map selection to be used,
+	# the adjusted (snapped) starting point must be known.  Calling
+	# it early, because subclasses may use it when filtering the
+	# selection. 
+	corr_info << _self.get_correlation_information(a_window, pos, :select)
+	
+	_if (cs << a_map_view.map.current_selection).size > 0
+	_then 
+		_self.figure_current_selection_from_map(a_window, pos, cs)
+	_else
+		_self.figure_current_selection_from_pointing(a_window, pos)
+	_endif 
+
+	adj_pos << corr_info[:adj_pos]
+	pdr << .pdr_data
+	xfm << pdr[:transform] << transform.new()
+	pdr[:translate_transform] << transform.new()
+	pdr[:rotate_transform] << transform.new()
+	pdr[:start_pos] << adj_pos
+	pdr[:last_pos] << adj_pos
+	pdr[:int!rotation_offset] << coordinate.new(0, 0)
+	pdr[:int!rotation_center] << _unset
+	drag_secs << pdr[:drag_sectors] << sector_rope.new()
+	_for i _over .current_selection.fast_elements()
+	_loop
+		pp << i.transformed(xfm)
+		_if (cur_rwo << i.rwo) _isnt _unset
+		_then
+			pp.add_source_rwo(cur_rwo)
+		_endif 
+		.working_selection.add(pp)
+		pp.world << i.world
+		pp.style_info << i.geometry_descriptor
+		style << a_map_view.style_for(pp)
+		_block
+			# Note: subclasses may have set the following to something
+			# non-standard: no matter what it is set to, turn it off for
+			# the purpose of getting contour sectors.
+			_dynamic !mss_transform_override! << _unset 
+			_if (pg_drag_secs << pp.contour_for(style, a_window)) _isnt _unset
+			_then
+				drag_secs.add_all_last(pg_drag_secs)
+			_endif
+		_endblock 
+	_endloop 
+	
+	a_window.xor_sector_rope_transform(line_style, drag_secs)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.int!drag(a_window, pos)
+	## 
+	## 
+
+	_dynamic !current_coordinate_system!
+	
+	_super.int!drag(a_window, pos)
+
+	a_map_view << a_window.user_data
+	pdr << .pdr_data
+
+	_if _self.manager.modmask = 1
+	_then
+		adj_pos << pos
+		_if pdr[:int!rotation_center] _is _unset
+		_then
+			pdr[:int!rotation_center] << pos + pdr[:int!rotation_offset]
+			pdr[:int!rotation_start_coord] << pos
+		_else
+			rot_center << pdr[:start_pos]
+			pdr[:rotate_transform] << transform.translate(-rot_center.x, -rot_center.y).
+						 rotate(pdr[:int!rotation_center].angle_to(pos)).
+						 translate(rot_center.x, rot_center.y)
+		_endif 
+	_else
+		_if (prev_rot_center << pdr[:int!rotation_center]) _isnt _unset
+		_then
+			pdr[:int!rotation_center] << _unset
+			pdr[:int!rotation_offset] +<< pdr[:int!rotation_start_coord] - pos
+		_endif
+
+		corr_info << _self.get_correlation_information(a_window, pos + pdr[:int!rotation_offset])
+		adj_pos << corr_info[:adj_pos]
+		
+		delta << adj_pos - pdr[:start_pos]
+		pdr[:translate_transform] << transform.translate(delta.x, delta.y)
+		pdr[:last_pos] << adj_pos
+	_endif 
+	xfm << pdr[:transform] << pdr[:rotate_transform] * pdr[:translate_transform]
+
+	old_drag_secs << pdr[:drag_sectors]
+	drag_secs << pdr[:drag_sectors] << sector_rope.new()
+	ocs << !current_coordinate_system!
+	_for pp _over .working_selection.fast_elements()
+	_loop
+		!current_coordinate_system! << _unset 
+		pp2 << pp.transformed(xfm)
+		!current_coordinate_system! << ocs
+		
+		_if (cur_rwo << pp.rwo) _isnt _unset
+		_then
+			pp2.add_source_rwo(cur_rwo)
+		_endif
+		pp2.world << pp.world
+		pp2.style_info << pp.style_info
+		style << a_map_view.style_for(pp2)
+		_block
+			# Note: subclasses may have set the following to something
+			# non-standard: no matter what it is set to, turn it off for
+			# the purpose of getting contour sectors.
+			_dynamic !mss_transform_override! << _unset 
+			_if (pg_drag_secs << pp2.contour_for(style, a_window)) _isnt _unset
+			_then
+				drag_secs.add_all_last(pg_drag_secs)
+			_endif
+		_endblock 
+	_endloop
+	
+	a_window.xor_sector_rope_transform(line_style, old_drag_secs)
+	a_window.xor_sector_rope_transform(line_style, drag_secs)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.int!release(a_window, pos)
+	## 
+	## 
+
+	_super.int!release(a_window, pos)
+	
+	pdr << .pdr_data
+	old_drag_secs << pdr[:drag_sectors]
+	a_window.xor_sector_rope_transform(line_style, old_drag_secs)
+	.manager.unhighlight_geometry(.current_selection)
+
+	_self.perform_transform()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.perform_transform()
+	## 
+	## Perform the work of transforming all elements.
+	##
+
+	# N.B.: similar to transform_transaction.int!run_first_pass(),
+	# except that this can work across multiple datasets, and it re-runs
+	# manifold interactions to allow a dragged geometry to connect.
+	
+	_dynamic !shared_nodes! << equality_set.new()
+	_dynamic !shared_links! << equality_set.new()
+	_dynamic !current_dsview!
+	
+	pdr << .pdr_data
+	xfm << pdr[:transform]
+
+	dcg? << _self.draw_connected_geometries?
+	connected_geoms << valid_record_set.new()
+	_if dcg?
+	_then 
+		_for a_geom _over .current_selection.fast_elements()
+		_loop
+			_if _not a_geom.is_valid? _then _continue _endif
+			connected_geoms.add_all(a_geom.all_connected_geometry())
+		_endloop
+		connected_geoms.remove_all(.current_selection)
+	_endif
+	
+	# Let the maps undraw the connected geometries before they are updated.
+	_for a_geom _over connected_geoms.fast_elements()
+	_loop
+		a_geom.source_view.notify_data_change_now(:pre_update_geometry, _unset, a_geom)
+	_endloop
+
+	# Undraw elements to be transformed.
+	_for a_geom _over .current_selection.fast_elements()
+	_loop
+		_if _not a_geom.is_valid? _then _continue _endif
+		sv << a_geom.source_view
+		a_geom.source_view.notify_data_change_now(:pre_update_geometry, _unset, a_geom)
+	_endloop
+
+	# Perform the transformation.
+	_for a_geom _over .current_selection.fast_elements()
+	_loop
+		_if _not a_geom.is_valid? _then _continue _endif
+		a_geom.transform(xfm)
+		a_geom.source_view.notify_data_change(:post_update_geometry, _unset, a_geom)
+	_endloop
+
+	_if _self.get_property(:do_manifold_interaction?) _is _true
+	_then 
+		# Reapply manifold interactions.
+		_for a_geom _over .current_selection.fast_elements()
+		_loop
+			_if _not a_geom.is_valid? _then _continue _endif
+			!current_dsview! << a_geom.source_view
+			a_geom.do_manifold_interaction()
+		_endloop
+	_endif
+	
+	# Let the maps redraw the connected geometries.
+	_for a_geom _over connected_geoms.fast_elements()
+	_loop
+		_if _not a_geom.is_valid? _then _continue _endif
+		a_geom.source_view.notify_data_change(:post_update_geometry, _unset, a_geom)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.figure_current_selection_from_map(a_window, pos, cs)
+	##
+	## Given the current map selection CS, initialize self's
+	## selection information.
+	##
+
+	# Note: even if there is a selection, perform a :select type of
+	# correlation so that the start position can snap appropriately.
+	corr_info << _self.get_correlation_information(a_window, pos, :select)
+
+	_for test_corr_geom _over cs.fast_elements()
+	_loop
+		_if _self.single_geometry_ok?(test_corr_geom)
+		_then
+			.current_selection.add(test_corr_geom)
+		_endif
+	_endloop 
+	
+	_if .current_selection.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_geometry_from_map))
+	_endif 
+	.manager.highlight_geometry(.current_selection)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.figure_current_selection_from_pointing(a_window, pos)
+	##
+	## Initialize self's selection information from a correlated
+	## geometry at the specified pointing.
+	##
+
+	corr_info << _self.get_correlation_information(a_window, pos, :select)
+	sorted_correlated_geoms << corr_info[:hit_list].default({})
+	_for corr_data _over sorted_correlated_geoms.fast_elements()
+	_loop @outer
+		_if _not (test_corr_thing << corr_data[1]).is_a_datastore_object?
+		_then
+			_continue
+		_endif
+		_if {:node, :link}.includes?(test_corr_thing.class_name)
+		_then
+			all_test_corr_geoms << rope.new_from_iter(test_corr_thing,
+								  :|top_level_geoms()|)
+		_else
+			all_test_corr_geoms << {test_corr_thing}
+		_endif
+		_for test_corr_geom _over all_test_corr_geoms.fast_elements()
+		_loop
+			_if _self.single_geometry_ok?(test_corr_geom)
+			_then
+				.current_selection.add(test_corr_geom)
+				_leave @outer
+			_endif
+		_endloop
+	_endloop 
+	
+	_if .current_selection.size = 0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_geometry_from_pointing))
+	_endif 
+	.manager.highlight_geometry(.current_selection)
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_transform_ptrule.single_geometry_ok?(test_corr_geom)
+	## 
+	## Return true if TEST_CORR_GEOM is OK for transforming.
+	## Otherwise, returns false plus a reason code.
+	##
+
+	_if _not test_corr_geom.source_view.writable?
+	_then
+		_return _false, :readonly
+	_endif 
+	_if (test_corr_rwo << test_corr_geom.rwo) _isnt _unset _andif
+	    _not test_corr_rwo.source_collection.write_authorised?
+	_then
+		_return _false, :auth
+	_endif
+
+	# TODO: could filter based on the specific dataset, table name,
+	# or geometry name defined in the mss_ptdef record.
+	_return _true
+	
+_endmethod
+$

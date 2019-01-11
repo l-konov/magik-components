@@ -1,0 +1,9 @@
+mss_bulk_update		1
+
+description
+	Tool to enable attribute updates for multiple records
+end
+
+requires
+	mss_application_databus
+end

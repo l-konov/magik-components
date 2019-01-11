@@ -1,0 +1,1183 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_action_ptrule
+##
+## A pointing rule that exists primarily to translate hotkeys
+## into actions.  This class does not care too much about PDR
+## operations automatically (although subclasses can be defined
+## to react to PDR operations, and custom actions can be
+## defined for PDR operations).
+##
+
+def_slotted_exemplar(:mss_action_ptrule,
+{
+	{:dynamic_geometry, _unset}
+},
+{:mss_ptrule})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_action_ptrule.define_shared_constant(
+	:highlight_vertex_line_style,
+	line_style.new_with_properties(
+		:width, 2,
+		:foreground_colour, colour.called(:red)),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_action_ptrule.core_default_properties
+	## 
+	## 
+
+	_local pl << _super.core_default_properties.copy()
+	pl[:trail_enabled?] << _false
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_action_ptrule.core_property_types
+	## 
+	## 
+
+	_local pl << _super.core_property_types.copy()
+	pl[:trail_enabled?] << {:boolean}
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.dynamic_geometry
+	## 
+	## Return a geometry set of geometry which may be dynamically
+	## drawn by actions on this pointing rule.
+	##
+
+	_if .dynamic_geometry _is _unset
+	_then
+		.dynamic_geometry << geometry_set.new()
+	_endif
+	_return .dynamic_geometry
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.xor_dynamic_geometry(a_window)
+	## 
+	## XOR self's dynamic_geometry on A_WINDOW.  This may be called
+	## directly, or it may be called as an action (for example, as
+	## a pre-relase action to tidy up from drawing done in other
+	## action methods).
+	##
+	## N.B.: currently, this only supports pseudo_chains.
+	##
+
+	gset << _self.dynamic_geometry
+	_for i _over gset.fast_elements()
+	_loop
+		_if i.is_class_of?(pseudo_chain)
+		_then
+			st << i.style_info
+			_if _not st.is_class_of?(line_style)
+			_then
+				st << line_style
+			_endif
+			a_window.xor_sector_rope_transform(st, i.sectors)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.clear_dynamic_geometry()
+	## 
+	## Clear the contents of self's dynamic geometry.
+	##
+
+	_self.dynamic_geometry.empty()
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_action_ptrule.trail_enabled?(_optional local_only?)
+	##
+	## Use the trail_enabled? property to determine if the trail
+	## should be enabled for an action pointing rule.
+	##
+
+	_return _self.get_property(:trail_enabled?).default(_false)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!press(a_window, pos)
+	## 
+	## 
+
+	_super.int!press(a_window, pos)
+
+	pdr << .pdr_data
+	corr_info << _self.get_correlation_information(a_window, pos)
+	_self.perform_correlation(corr_info, a_window, pos)
+	adj_pos << corr_info[:adj_pos]
+	pdr[:last_pos] << adj_pos
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!drag(a_window, pos)
+	## 
+	## 
+
+	_super.int!drag(a_window, pos)
+
+	pdr << .pdr_data
+	corr_info << _self.get_correlation_information(a_window, pos)
+	_self.perform_correlation(corr_info, a_window, pos)
+	adj_pos << corr_info[:adj_pos]
+	pdr[:last_pos] << adj_pos
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.ok_for_correlation?(cat, test_corr_geom)
+	## 
+	## Depending on correlation category CAT, decide if the
+	## geometry TEST_CORR_GEOM is OK for correlation.
+	##
+
+	_if (ok? << _super.ok_for_correlation?(cat, test_corr_geom)) _is _true
+	_then
+		# A custom method has said correlation is OK.  So, use it.
+		_return _true
+	_endif
+
+	_if cat.write_string.cf_subseq("cg_", 1, 1, 3) _is _maybe
+	_then
+		(junk, msel) << (_scatter .manager.databus.request_data(:map_selection).default({}))
+		_if msel _isnt _unset _andif
+		    msel.an_element() _isnt _unset
+		_then
+			# A map selection exists - the geometry must be in that
+			# selection. 
+			_if _not msel.includes?(test_corr_geom)
+			_then
+				_return _false
+			_endif
+		_endif 
+	_endif
+	
+	# No custom method: use some standard default modes.
+	_if cat _is :default
+	_then
+		_return _true
+	_elif (cat _is :point _orif cat _is :cg_point) _andif
+	      test_corr_geom.geom_category _is :point
+	_then
+		_return _true 
+	_elif (cat _is :chain _orif cat _is :cg_chain) _andif
+	      test_corr_geom.geom_category _is :linear
+	_then
+		_return _true 
+	_elif (cat _is :area _orif cat _is :cg_area) _andif
+	      test_corr_geom.geom_category _is :area
+	_then
+		_return _true 
+	_elif (cat _is :chain_or_area _orif cat _is :cg_chain_or_area) _andif
+	      {:linear, :area}.includes?(test_corr_geom.geom_category)
+	_then
+		_return _true
+	_endif
+
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.split_chain(a_window, pos)
+	## 
+	## Action method for performing a chain split operation.
+	## - Usage: as a Release action.
+	## - Prerequisites: pdr_data[:last_correlation_geometry]
+	##   must be a chain to be split, and pdr_data[:last_pos]
+	##   must be the location to split it at.
+	## - Other notes: typically used in conjunction with
+	##   a correlation_category of :chain.
+	##
+
+	pdr << .pdr_data
+	_if (split_geom << pdr[:last_correlation_geometry]) _is _unset _orif
+	    (split_rwo << split_geom.rwo) _is _unset _orif 
+	    split_geom.geom_category _isnt :linear _orif
+	    (split_coord << pdr[:last_pos]) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_chain_identified))
+	_endif
+	_self.check_write_authorised({split_rwo.source_view}, {split_rwo.source_collection})
+	
+	# Validate that the split is going to produce a legitimate result.
+	loc << split_geom.segpoint_location_near(split_coord)
+	new_geom_sectors << split_geom.sectors.split_at_locations({loc})
+	_if new_geom_sectors.size ~= 2 _orif
+	    new_geom_sectors[1].line_length = 0.0 _orif
+	    new_geom_sectors[2].line_length = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:cannot_split_at_endpoint))
+	_endif
+
+	# Perform the split in a transaction.  Note that different code
+	# paths exist for chains and simple chains.
+	_if split_geom.manifold() _is _unset
+	_then
+		meth_name << :|int!split_simple_chain()|
+	_else
+		meth_name << :|int!split_chain()|
+	_endif
+
+	# N.B.: packaging this up as a transaction is not actually
+	# required if this is used as a Release action and if the
+	# caller has set the :transaction_on_release? property to
+	# true.  However, there is no harm in doing this, and it allows
+	# this action to be used in other places if desired (i.e. bound
+	# to a hotkey).
+	trans << custom_record_transaction.new(split_geom.source_view, _self, meth_name, {split_geom, loc},
+					       .manager.message(:ptrule_transaction_description, _self.name))
+	trans.run()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!split_simple_chain(split_geom, loc)
+	## 
+	## Perform the actual split of a simple_chain geometry SPLIT_GEOM, at
+	## geom_location LOC.
+	## 
+
+	_dynamic !current_dsview! << split_geom.source_view
+	_dynamic !current_world! << split_geom.world
+	
+	new_geom_sectors << split_geom.sectors.split_at_locations({loc})
+	_if new_geom_sectors.size ~= 2 _orif
+	    new_geom_sectors[1].line_length = 0.0 _orif
+	    new_geom_sectors[2].line_length = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:cannot_split_at_endpoint))
+	_endif
+
+	fd << split_geom.geometry_descriptor
+	old_rwo << split_geom.rwo
+	_if old_rwo _is _unset _orif 
+	    (new_rwo << old_rwo.clone()) _is _unset
+	_then
+		condition.raise(:geometry_cannot_split,
+				:geometry, split_geom, :owner, old_rwo)
+	_endif
+	
+	new_chain1 << simple_chain.new(fd, new_geom_sectors[1])
+	new_rwo.set_geometry(new_chain1, _false)
+	new_chain2 << simple_chain.new(fd, new_geom_sectors[2])
+	old_rwo.set_geometry(new_chain2, _false)
+	split_geom.delete()
+
+	_return {new_chain1, new_chain2}
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!split_chain(split_geom, loc)
+	## 
+	## Perform the actual split of a chain geometry SPLIT_GEOM, at
+	## geom_location LOC.
+	##
+
+	# Implementation note: almost the same as chain.split_with_sectors(),
+	# except that it uses :endsplit_chain to ensure that the split
+	# only happens at LOC.
+
+	_dynamic !current_dsview! << split_geom.source_view
+	_dynamic !current_world! << split_geom.world
+	_dynamic !notify_database_data_changes?!
+	
+	split_c1 << loc.coord
+	ori << split_geom.sectors.angle_near(split_c1)
+
+	# The following bit finds the opposite endpoint such that it
+	# does not happen to touch the chain (which would result in a
+	# second split at that point).
+	trial_dist << 1000
+	_loop
+		split_c2 << split_c1 + transform.rotate(ori - 1.0.half_pi).
+				       convert(coordinate.new(trial_dist, 0))
+		_if _not split_geom.distance_to_within?(split_c2, 10)
+		_then
+			_leave
+		_endif
+		trial_dist *<< 1.5
+	_endloop
+
+	man << split_geom.manifold()
+	split_sr << sector_rope.new_with(sector.new_with(split_c1, split_c2))
+	temp_chain << chain.new_with_sectors(split_geom.geometry_descriptor, split_sr)
+	_protect
+		my_splits << man.interact_geom_pair(split_geom, temp_chain, :endsplit_chain, :split_link)
+	_protection
+		# Avoid DB change notifications when deleting the temporary chain
+		!notify_database_data_changes?! << _false
+		temp_chain.delete()
+	_endprotect
+
+	_return my_splits
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.add_vertex(a_window, pos)
+	## 
+	## Action method for performing an add vertex operation.
+	## - Usage: as a Release action.
+	## - Prerequisites: pdr_data[:last_correlation_geometry]
+	##   must be a chain or area to be modified, and
+	##   pdr_data[:last_pos] must be the location to modify at.
+	## - Other notes: typically used in conjunction with
+	##   a correlation_category of :chain_or_area.
+	##
+
+	pdr << .pdr_data
+	_if (mod_geom << pdr[:last_correlation_geometry]) _is _unset _orif
+	    (mod_rwo << mod_geom.rwo) _is _unset _orif 
+	    _not {:area, :linear}.includes?(gcat << mod_geom.geom_category) _orif
+	    (mod_coord << pdr[:last_pos]) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_chain_or_area_identified))
+	_endif
+	_self.check_write_authorised({mod_rwo.source_view}, {mod_rwo.source_collection})
+
+	_if gcat _is :linear
+	_then
+		pc << _self.int!geometry_for_add_vertex_chain(mod_geom, mod_coord)
+	_else
+		pc << _self.int!geometry_for_add_vertex_area(mod_geom, mod_coord)
+	_endif
+	
+	fd << mod_geom.geometry_descriptor
+	
+	# N.B.: packaging this up as a transaction is not actually
+	# required if this is used as a Release action and if the
+	# caller has set the :transaction_on_release? property to
+	# true.  However, there is no harm in doing this, and it allows
+	# this action to be used in other places if desired (i.e. bound
+	# to a hotkey).
+	trans << custom_record_transaction.new(
+			 mod_geom.source_view, _self, :|set_modify_vertex_geometry()|, {mod_rwo, mod_geom, pc, fd},
+			 .manager.message(:ptrule_transaction_description, _self.name))
+	new_geom << trans.run()
+
+	# Set the current selection to be the new geometry.
+	.manager.set_selection_set({new_geom})
+
+	# The following is an absolutely nasty trick to work around a
+	# usability situation.  The user will commonly press to drag
+	# the vertex immediately after releasing to add the vertex, and
+	# at the exact same location.  The system will treat this as a
+	# double-click event, and it will fall through standard
+	# interaction mode handling (thus causing the event to be
+	# lost).  This will prevent it from being registered as a
+	# double-click, within a catch-all handling block in case,
+	# well, in case I'm wrong about all of this.
+	_try
+		_global !window_system!
+		!window_system!.remove_key(:last_up_event)
+	_when error
+	_endtry
+	
+	# Prepare a one-shot rule to move the new vertex.
+	subrule << mss_transform_vertex_ptrule.new(.manager, _self.message(:av_transform_vertex_ptrule))
+	subrule.help_text << _self.message(:av_transform_vertex_ptrule_ht)
+	subrule.backstop_properties[:one_shot?] << _true
+	.manager.start_ptrule(subrule)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!geometry_for_add_vertex_chain(mod_geom, mod_coord)
+	## 
+	## Return a pseudo_chain representing the coordinate MOD_COORD
+	## added to geometry MOD_GEOM.
+	##
+
+	# Validate that the modification is going to produce a legitimate result.
+	loc << mod_geom.segpoint_location_near(mod_coord)
+	new_geom_sectors << mod_geom.split_at_locations({loc})
+	_if new_geom_sectors.size ~= 2 _orif
+	    new_geom_sectors[1].line_length = 0.0 _orif
+	    new_geom_sectors[2].line_length = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:cannot_add_vertex_at_endpoint))
+	_endif
+
+	# Create a new geometry with an added vertex.
+	p_sr << sector_rope.new()
+	p_sr.add_all_last(new_geom_sectors[1])
+	p_sr.add_all_last(new_geom_sectors[2])
+	p_sr.join_up()
+	pc << pseudo_chain.new(p_sr)
+	pc.world << mod_geom.world
+
+	_return pc
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!geometry_for_add_vertex_area(mod_geom, mod_coord)
+	## 
+	## Return a pseudo_area representing the coordinate MOD_COORD
+	## added to geometry MOD_GEOM.
+	##
+	
+	# Validate that the mod is going to produce a legitimate result.
+	pa << pseudo_area.new(mod_geom)
+	pa.world << mod_geom.world
+	(add_coord, dist, idx, line_geom) << pa.segpoint_near(mod_coord)
+	near_region << region.new(line_geom)
+
+	# Validate that the modification is going to produce a legitimate result.
+	loc << line_geom.segpoint_location_near(mod_coord)
+	new_geom_sectors << line_geom.split_at_locations({loc})
+	_if new_geom_sectors.size ~= 2 _orif
+	    new_geom_sectors[1].line_length = 0.0 _orif
+	    new_geom_sectors[2].line_length = 0.0
+	_then
+		# This is the endpoint of the area, but the user probably
+		# doesn't see it that way... just carry on with the add vertex
+		# operation (so that the user can then do the move vertex), but
+		# don't actually change anything.
+		_return pa
+	_endif
+
+	# Create a new geometry with an added vertex.
+	p_sr << sector_rope.new()
+	p_sr.add_all_last(new_geom_sectors[1])
+	p_sr.add_all_last(new_geom_sectors[2])
+	p_sr.join_up()
+	
+	pa.replace_boundary(near_region, p_sr)
+	
+	_return pa
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.set_modify_vertex_geometry(mod_rwo, mod_geom, pc, fd)
+	## 
+	## Set the geometry for a modify vertex operation of the RWO
+	## MOD_RWO based on the pseudo_chain PC and geometry field
+	## descriptor FD.  MOD_GEOM is the existing geometry being modified.
+	##
+
+	_dynamic !current_world! << pc.world
+	_dynamic !current_dsview! << mod_geom.source_view
+	new_geom << mod_geom.new(fd, pc)
+	mod_rwo.set_geometry(new_geom, _true)
+
+	_return new_geom
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.remove_vertex(a_window, pos)
+	## 
+	## Action method for performing a remove vertex operation.
+	## - Usage: as a Release action.
+	## - Prerequisites: pdr_data[:last_correlation_geometry]
+	##   must be a chain or area to be modified, and
+	##   pdr_data[:last_pos] must be the location to modify at.
+	## - Other notes: typically used in conjunction with
+	##   a correlation_category of :chain_or_area.
+	##
+
+	pdr << .pdr_data
+	_if (mod_geom << pdr[:last_correlation_geometry]) _is _unset _orif
+	    (mod_rwo << mod_geom.rwo) _is _unset _orif 
+	    _not {:area, :linear}.includes?(gcat << mod_geom.geom_category) _orif
+	    (mod_coord << pdr[:last_pos]) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_chain_or_area_identified))
+	_endif
+	_self.check_write_authorised({mod_rwo.source_view}, {mod_rwo.source_collection})
+
+	_if gcat _is :linear
+	_then
+		pc << _self.int!geometry_for_remove_vertex_chain(mod_geom, mod_coord)
+	_else
+		pc << _self.int!geometry_for_remove_vertex_area(mod_geom, mod_coord)
+	_endif
+	
+	fd << mod_geom.geometry_descriptor
+
+	trans << custom_record_transaction.new(
+			 mod_geom.source_view, _self, :|set_modify_vertex_geometry()|, {mod_rwo, mod_geom, pc, fd},
+			 .manager.message(:ptrule_transaction_description, _self.name))
+	trans.run()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!geometry_for_remove_vertex_chain(mod_geom, mod_coord)
+	## 
+	## Return a pseudo_chain representing the coordinate MOD_COORD
+	## removed from geometry MOD_GEOM.
+	##
+
+	# Validate that the mod is going to produce a legitimate result.
+	p_sr << mod_geom.sectors.join_up()
+	(remove_coord, dist, idx) << p_sr.vertex_near(mod_coord, _unset, _false, _false)
+	
+	# The following is a bit of trickery to use map_trail for doing
+	# the work here, because that has a robust delete coordinate
+	# protocol, whereas the sector_rope.remove_vertex() is junk.
+	mt << map_trail.new(.manager.current_map_view.map)
+	mt.set_from_geometry_no_draw(p_sr)
+	gloc << p_sr.segpoint_location_near(remove_coord)
+	mt.int!delete_coordinate(gloc)
+	p_sr << mt.sectors
+	
+	_if p_sr _is _unset _orif
+	    p_sr.line_length = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:remove_vertex_zero_length))
+	_endif
+	
+	pc << pseudo_chain.new(p_sr)
+	pc.world << mod_geom.world
+
+	_return pc
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.int!geometry_for_remove_vertex_area(mod_geom, mod_coord)
+	## 
+	## Return a pseudo_area representing the coordinate MOD_COORD
+	## removed from geometry MOD_GEOM.
+	##
+
+	# Validate that the mod is going to produce a legitimate result.
+	pa << pseudo_area.new(mod_geom)
+	pa.world << mod_geom.world
+	(remove_coord, dist, idx, line_geom) << pa.vertex_near(mod_coord, _unset, _false, _false)
+	near_region << region.new(line_geom)
+	p_sr << line_geom.sectors
+	p_sr.close()
+	
+	# The following is a bit of trickery to use map_trail for doing
+	# the work here, because that has a robust delete coordinate
+	# protocol, whereas the sector_rope.remove_vertex() is junk.
+	mt << map_trail.new(.manager.current_map_view.map)
+	mt.set_from_geometry_no_draw(p_sr)
+	gloc << p_sr.segpoint_location_near(remove_coord)
+	mt.int!delete_coordinate(gloc)
+	_if remove_coord = p_sr.first_coord _orif
+	    remove_coord = p_sr.last_coord
+	_then
+		# Need to perform a second removal, as both the first and last
+		# point need to go away.
+		gloc << mt.sectors.segpoint_location_near(remove_coord)
+		mt.int!delete_coordinate(gloc)
+	_endif
+	
+	p_sr << mt.sectors
+	_if p_sr _is _unset _orif
+	    p_sr.line_length = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:remove_vertex_zero_length))
+	_endif
+
+	p_sr.close()
+	p_area << 0.0
+	_try 
+		p_area << p_sr.as_region().area
+	_when error
+	_endtry 
+	_if p_area = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:remove_vertex_zero_area))
+	_endif
+	
+	pa.replace_boundary(near_region, p_sr)
+
+	_return pa
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.highlight_nearest_vertex(a_window, pos)
+	## 
+	## Action method to highlight the vertex of the last correlated
+	## geometry that is nearest to the last correlated coordinate.
+	##
+
+	gset << _self.dynamic_geometry
+	pdr << .pdr_data
+	_if (mod_geom << pdr[:last_correlation_geometry]) _is _unset _orif
+	    (v1 << pdr[:last_pos]) _is _unset _orif
+	    (v1 << mod_geom.vertex_near(v1, _unset, _false, _false)) _is _unset 
+	_then
+		new_geom << _unset 
+	_else
+		# Use a 10 pixel circle.
+		p1 << a_window.world_for(coordinate.new(0, 0))
+		p2 << a_window.world_for(coordinate.new(0, 10))
+		new_sr << sector_rope.new_with(circle.new(v1, p1.distance_to(p2)))
+		new_geom << pseudo_chain.new(new_sr)
+		new_geom.style_info << _self.highlight_vertex_line_style
+		new_geom.world << mod_geom.world
+	_endif
+	_self.xor_dynamic_geometry(a_window, pos)
+	gset.empty()
+	_if new_geom _isnt _unset
+	_then
+		gset.add(new_geom)
+	_endif 
+	_self.xor_dynamic_geometry(a_window, pos)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.line_intersection_correlate(a_window, pos)
+	## 
+	## Action method for performing a line intersection operation.
+	## - Usage: as a Release action.
+	## - Prerequisites: pdr_data[:last_correlation_geometry]
+	##   must be a chain to be extended, and pdr_data[:last_pos]
+	##   must identify the end to extend at.
+	## - Other notes: typically used in conjunction with
+	##   a correlation_category of :chain.
+	##
+
+	ud << .user_data
+
+	# If the interaction mode has been temporarily set to not be
+	# one-shot, then turn it back to one-shot mode now.
+	orig_im? << .manager.interaction_mode.one_shot?
+	.manager.interaction_mode.one_shot? << ud[:force_one_shot_interaction_mode?].default(_false)
+	
+	_if (c1 << ud[:chain_1]) _isnt _unset _andif
+	    _not c1.is_valid?
+	_then
+		c1 << _unset
+	_endif
+	_if (c2 << ud[:chain_2]) _isnt _unset _andif
+	    _not c2.is_valid?
+	_then
+		c2 << _unset
+	_endif
+	_if c1 _isnt _unset _andif
+	    c2 _isnt _unset
+	_then
+		# If a third pointing is made, then auto-complete or cancel,
+		# depending on the correlation distance.
+		prop_int << ud[:proposed_intersection]
+		dist << pos.distance_to(prop_int.location1)
+
+		# Tolerance for this is 50 pixels.
+		tol_dist << a_window.world_for(coordinate.new(0, 0)).
+			    distance_to(a_window.world_for(coordinate.new(50, 0)))
+		_if dist > tol_dist
+		_then
+			# Clear out the operation, 
+			_if (pc1 << ud.remove_key(:proposed_chain_1)) _isnt _unset
+			_then
+				.manager.undraw_geometry(pc1, _unset)
+			_endif 
+			_if (pc2 << ud.remove_key(:proposed_chain_2)) _isnt _unset
+			_then
+				.manager.undraw_geometry(pc2, _unset)
+			_endif 
+			_if (c1 << ud.remove_key(:chain_1)) _isnt _unset
+			_then
+				.manager.draw_geometry(c1, _unset)
+			_endif 
+			_if (c2 << ud.remove_key(:chain_2)) _isnt _unset
+			_then
+				.manager.draw_geometry(c2, _unset)
+			_endif 
+			condition.raise(:user_error, :string, _self.message(:line_int_cancelled_too_far))
+		_endif
+
+		# Go ahead and complete the operation.
+		ud[:complete_initiated_from_pointing?] << _true
+		trans << custom_record_transaction.new(
+				 .manager.dataset_group_for(_self), _self, :|line_intersection_complete()|, {},
+				 .manager.message(:ptrule_transaction_description, _self.name))
+		trans.run()
+		ud.empty()
+		_return
+	_endif
+
+	pdr << .pdr_data
+	_if (int_geom << pdr[:last_correlation_geometry]) _is _unset _orif
+	    (int_rwo << int_geom.rwo) _is _unset _orif 
+	    int_geom.geom_category _isnt :linear _orif
+	    (int_coord << pdr[:last_pos]) _is _unset
+	_then
+		# If an error happens, restart the whole interaction.
+		ud[:chain_1] << ud[:chain_2] << _unset
+		condition.raise(:user_error, :string, _self.message(:no_chain_identified))
+	_endif
+	_self.check_write_authorised({int_rwo.source_view}, {int_rwo.source_collection})
+
+	# Figure out the closest endpoint.
+	_if int_coord.distance_to(int_geom.first_coord) <=
+	    int_coord.distance_to(int_geom.last_coord)
+	_then
+		near_end << :first_coord
+	_else
+		near_end << :last_coord
+	_endif
+
+	_if c1 _is _unset
+	_then
+		# First pointing - just file it away.
+		ud[:rwo_1] << int_rwo
+		ud[:chain_1] << int_geom
+		ud[:near_end_1] << near_end
+	_else
+		# Second pointing - do a preview.
+		ud[:rwo_2] << int_rwo
+		ud[:chain_2] << int_geom
+		ud[:near_end_2] << near_end
+		_protect
+			_self.line_intersection_generate_preview(a_window)
+		_protection
+			# If the preview failed to generate, then clear out the whole interaction.
+			_if ud[:proposed_chain_1] _is _unset _orif
+			    ud[:proposed_chain_2] _is _unset
+			_then
+				# If an error happens, restart the whole interaction.
+				ud[:chain_1] << ud[:chain_2] << _unset
+			_endif 
+		_endprotect
+	_endif
+
+	# If everything got this far, then more pointings or
+	# interactions (i.e. F9 key) are anticipated.  So,
+	# set things up so that one more pointing can occur, even
+	# if this is in one-shot mode.
+	.one_shot_properties[:one_shot?] << _false
+	_if orig_im? _is _true _orif
+	    ud[:force_one_shot_interaction_mode?] _is _true
+	_then
+		# If the interaction mode is one-shot, need to temporarily let
+		# it persist in its current mode, but flag it to be undone
+		# later. 
+		ud[:force_one_shot_interaction_mode?] << _true
+		.manager.interaction_mode.one_shot? << _false
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.line_intersection_generate_preview(a_window)
+	## 
+	## Generate a preview of the proposed line intersection
+	## operation on A_WINDOW.
+	##
+
+	# Figure out the bounds of the window, as the intersection
+	# point will be validated to be in that bounds.
+	wbb << a_window.user_data.current_view_bounds.new_enlarging(1.01)
+
+	# Build two extended lines from the correlated chains.
+	ud << .user_data
+	ext_dist << wbb.width + wbb.height
+	sr1 << ud[:chain_1].sectors.copy()
+	_if ud[:near_end_1] _is :first_coord
+	_then
+		oc1 << sr1.first_coord
+		sr1 << sr1.extend_at_start(ext_dist)
+		sanity_check1 << sr1.first_coord
+	_else
+		oc1 << sr1.last_coord
+		sr1 << sr1.extend_at_end(ext_dist)
+		sanity_check1 << sr1.last_coord
+	_endif 
+	sr2 << ud[:chain_2].sectors.copy()
+	_if ud[:near_end_2] _is :first_coord
+	_then
+		oc2 << sr2.first_coord
+		sr2 << sr2.extend_at_start(ext_dist)
+		sanity_check2 << sr2.first_coord
+	_else
+		oc2 << sr2.last_coord
+		sr2 << sr2.extend_at_end(ext_dist)
+		sanity_check2 << sr2.last_coord
+	_endif 
+
+	# Locate the intersection point that is nearest to the original
+	# correlated coordinates.
+	oc_avg << (oc1 + oc2 / 2.0)
+	best_int << _unset
+	best_dist << 1/0
+	_for i _over sr1.intersections_with(sr2).fast_elements()
+	_loop
+		_if (test_dist << i.coord.distance_to(oc_avg)) < best_dist
+		_then
+			best_int << i
+			best_dist << test_dist
+		_endif
+	_endloop
+
+	_if best_int _is _unset _orif
+	    wbb.spatial_relation_with(best_int.coord) _is :disjoint
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_intersection_on_window))
+	_endif
+	ud[:proposed_intersection] << best_int
+
+	# Create proposed geometries by trimming/extending.
+	split_sr1 << sr1.split_at_locations({best_int.location1})
+	_if ud[:near_end_1] _is :first_coord
+	_then
+		prop_sr1 << split_sr1.last
+	_else
+		prop_sr1 << split_sr1.first
+	_endif 
+	split_sr2 << sr2.split_at_locations({best_int.location2})
+	_if ud[:near_end_2] _is :first_coord
+	_then
+		prop_sr2 << split_sr2.last
+	_else
+		prop_sr2 << split_sr2.first
+	_endif
+
+	# And now for the sanity check: if the user is pointing to the
+	# "wrong" end of a chain which is already intersected by the
+	# target chain, the above processing will seem OK (because the
+	# existing intersection would be found), but it will now extend
+	# that "wrong" end by EXT_DIST.  So, be sure that the sanity
+	# check points - which are the extreme ends of the construction
+	# lines and so which should not be part of the clipped gometry
+	# - are not included.
+	_if sanity_check1.distance_to(prop_sr1) <= 1.5 _orif
+	    sanity_check2.distance_to(prop_sr2) <= 1.5
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_intersection_on_window))
+	_endif
+		
+	pc1 << pseudo_chain.new_for_world(prop_sr1, ud[:chain_1].world)
+	pc1.style_info << ud[:chain_1]
+	ud[:proposed_chain_1] << pc1	
+	pc2 << pseudo_chain.new_for_world(prop_sr2, ud[:chain_2].world)
+	pc2.style_info << ud[:chain_2]
+	ud[:proposed_chain_2] << pc2
+
+	.manager.highlight_geometry(pc1)
+	.manager.highlight_geometry(pc2)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_action_ptrule.line_intersection_complete()
+	## 
+	## Complete the line intersection operation.
+	## - Usage: as a Complete action.
+	## - Prerequisites: user_data[:chain_1] and [:chain_2]
+	##   identify the chains to be updated, and [:proposed_chain_1]
+	##   and [:proposed_chain_2] are their proposed replacements.
+	## - The transaction_on_complete? property should be true.
+	##
+
+	_dynamic !current_world!
+	_dynamic !current_dsview!
+
+	ud << .user_data
+
+	# If the interaction mode has been temporarily set to not be
+	# one-shot, then turn it back to one-shot mode now.
+	orig_im? << .manager.interaction_mode.one_shot?
+	.manager.interaction_mode.one_shot? << ud[:force_one_shot_interaction_mode?].default(_false)
+	
+	_if (c1 << ud[:chain_1]) _is _unset _orif
+	    _not c1.is_valid? _orif 
+	    (pc1 << ud[:proposed_chain_1]) _is _unset _orif
+	    (c2 << ud[:chain_2]) _is _unset _orif
+	    _not c2.is_valid? _orif 
+	    (pc2 << ud[:proposed_chain_2]) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:line_int_chains_not_identified))
+	_endif 
+
+	r1 << c1.rwo
+	fd1 << c1.geometry_descriptor
+	r2 << c2.rwo
+	fd2 << c2.geometry_descriptor
+
+	!current_world! << c1.world
+	!current_dsview! << c1.source_view
+	new_geom1 << c1.new(fd1, pc1)
+	r1.set_geometry(new_geom1, _true)
+	
+	!current_world! << c2.world
+	!current_dsview! << c2.source_view
+	new_geom2 << c2.new(fd2, pc2)
+	r2.set_geometry(new_geom2, _true)
+
+	# Now that both geometries are reset, rerun manifold interactions.
+	_if new_geom1.is_valid? _andif
+	    fd1.in_manifold?
+	_then
+		new_geom1.do_manifold_interaction()
+	_endif
+	_if new_geom2.is_valid? _andif
+	    fd2.in_manifold?
+	_then
+		new_geom2.do_manifold_interaction()
+	_endif
+
+	_if ud[:complete_initiated_from_pointing?] _is _true
+	_then
+		# The natural PDR operation will take care of cleanup of
+		# one-shot activity.
+	_else
+		# If a one-shot one_shot? property has been set (yes, I really
+		# mean that...) to false, then peel back that layer, so that
+		# the original one_shot? property value (as stored in the
+		# backstop properties) is exposed.
+		.one_shot_properties.remove_key(:one_shot?)
+
+		# If the backstop property indicates that this should be a
+		# one-shot pointing rule, then tell the manager to terminate.
+		_if _self.get_property(:one_shot?) _is _true
+		_then
+			.manager.terminate_one_shot_ptrule()
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.line_trim_extend_correlate(a_window, pos)
+	##
+	## Action method for performing a line trim/extend operation.
+	## - Usage: as a Release action.
+	## - Prerequisites: pdr_data[:last_correlation_geometry]
+	##   must be a chain to be extended, and pdr_data[:last_pos]
+	##   must identify the end to extend at.
+	## - Other notes: typically used in conjunction with
+	##   a correlation_category of :chain.
+	##
+
+	ud << .user_data
+
+	# Turn off any custom one-rule correlation mode which may have
+	# been auto-created in a previous execution of this method.
+	.one_rule_properties.remove_key(:correlation_category)
+
+	# If the interaction mode has been temporarily set to not be
+	# one-shot, then turn it back to one-shot mode now.
+	orig_im? << .manager.interaction_mode.one_shot?
+	.manager.interaction_mode.one_shot? << ud[:force_one_shot_interaction_mode?].default(_false)
+
+	_if (c1 << ud[:chain_1]) _isnt _unset _andif
+	    _not c1.is_valid?
+	_then
+		c1 << _unset
+	_endif
+
+	_if c1 _is _unset
+	_then
+		# The first pointing must be a chain.
+		allow_cats << {:linear}
+	_else
+		# The second pointing can be a chain or area.
+		allow_cats << {:linear, :area}
+	_endif
+
+	pdr << .pdr_data
+	_if (int_geom << pdr[:last_correlation_geometry]) _is _unset _orif
+	    (int_rwo << int_geom.rwo) _is _unset _orif 
+	    _not allow_cats.includes?(int_geom.geom_category) _orif
+	    (int_coord << pdr[:last_pos]) _is _unset
+	_then
+		# If an error happens, restart the whole interaction.
+		ud[:chain_1] << ud[:chain_2] << _unset
+		condition.raise(:user_error, :string, _self.message(:no_chain_identified))
+	_endif
+
+	_if c1 _is _unset
+	_then
+		# First pointing - just file it away, and temporarily enter
+		# chain_or_area correlation mode.
+		_self.check_write_authorised({int_rwo.source_view}, {int_rwo.source_collection})
+
+		# Figure out the closest endpoint.
+		_if int_coord.distance_to(int_geom.first_coord) <=
+		    int_coord.distance_to(int_geom.last_coord)
+		_then
+			near_end << :first_coord
+		_else
+			near_end << :last_coord
+		_endif
+		ud[:rwo_1] << int_rwo
+		ud[:chain_1] << int_geom
+		ud[:near_end_1] << near_end
+		.one_rule_properties[:correlation_category] << :chain_or_area
+
+		# Also set things up so that one more pointing can occur, even
+		# if this is in one-shot mode.
+		.one_shot_properties[:one_shot?] << _false
+		_if orig_im? _is _true 
+		_then
+			# If the interaction mode is one-shot, need to temporarily let
+			# it persist in its current mode, but flag it to be undone
+			# later. 
+			ud[:force_one_shot_interaction_mode?] << _true
+			.manager.interaction_mode.one_shot? << _false
+		_endif 
+	_else
+		# Second pointing - do the update.
+		ud[:rwo_2] << int_rwo
+		ud[:chain_2] << int_geom
+		ud[:estimated_intersection] << pos
+		trans << custom_record_transaction.new(
+				 .manager.dataset_group_for(_self), _self, :|line_trim_extend_complete()|, {a_window, pos},
+				 .manager.message(:ptrule_transaction_description, _self.name))
+		_protect
+			trans.run()
+		_protection
+			# Whether it works or not, empty the proposed data.
+			ud.empty()
+		_endprotect 
+	_endif
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_action_ptrule.line_trim_extend_complete(a_window, pos)
+	## 
+	## Complete the line trim/extend operation.
+	##
+
+	_dynamic !current_world!
+	_dynamic !current_dsview!
+
+	# Figure out the bounds of the window, as the intersection
+	# point will be validated to be in that bounds.
+	wbb << a_window.user_data.current_view_bounds.new_enlarging(1.01)
+
+	# Build an extended line from the correlated chain.
+	ud << .user_data
+	ext_dist << wbb.width + wbb.height
+	sr1 << (c1 << ud[:chain_1]).sectors.copy()
+	_if ud[:near_end_1] _is :first_coord
+	_then
+		oc1 << sr1.first_coord
+		sr1 << sr1.extend_at_start(ext_dist)
+		sanity_check1 << sr1.first_coord
+	_else
+		oc1 << sr1.last_coord
+		sr1 << sr1.extend_at_end(ext_dist)
+		sanity_check1 << sr1.last_coord
+	_endif
+
+	# Build a sector rope for the thing being trimmed to, but don't
+	# extend it (since the first sector rope is the only one being
+	# manipulated).
+	sr2 << (c2 << ud[:chain_2]).sectors.copy()
+
+	# Locate the intersection point that is nearest to the
+	# estimated intersection.
+	oc_avg << ud[:estimated_intersection]
+	best_int << _unset
+	best_dist << 1/0
+	_for i _over sr1.intersections_with(sr2).fast_elements()
+	_loop
+		_if (test_dist << i.coord.distance_to(oc_avg)) < best_dist
+		_then
+			best_int << i
+			best_dist << test_dist
+		_endif
+	_endloop
+
+	_if best_int _is _unset _orif
+	    wbb.spatial_relation_with(best_int.coord) _is :disjoint
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_intersection_on_window))
+	_endif
+	ud[:proposed_intersection] << best_int
+	
+	# Create proposed geometries by trimming/extending.
+	split_sr1 << sr1.split_at_locations({best_int.location1})
+	_if ud[:near_end_1] _is :first_coord
+	_then
+		prop_sr1 << split_sr1.last
+	_else
+		prop_sr1 << split_sr1.first
+	_endif 
+
+	# And now for the sanity check: if the user is pointing to the
+	# "wrong" end of a chain which is already intersected by the
+	# target chain, the above processing will seem OK (because the
+	# existing intersection would be found), but it will now extend
+	# that "wrong" end by EXT_DIST.  So, be sure that the sanity
+	# check points - which are the extreme ends of the construction
+	# lines and so which should not be part of the clipped gometry
+	# - are not included.
+	_if sanity_check1.distance_to(prop_sr1) <= 1.5
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_intersection_on_window))
+	_endif
+		
+	pc1 << pseudo_chain.new_for_world(prop_sr1, c1.world)
+	r1 << c1.rwo
+	fd1 << c1.geometry_descriptor
+
+	!current_world! << c1.world
+	!current_dsview! << c1.source_view
+	new_geom1 << c1.new(fd1, pc1)
+	r1.set_geometry(new_geom1, _true)
+
+	_if new_geom1.is_valid? _andif
+	    fd1.in_manifold?
+	_then
+		new_geom1.do_manifold_interaction()
+	_endif
+	
+_endmethod
+$

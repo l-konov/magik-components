@@ -1,0 +1,9 @@
+mss_config_editor	1
+
+description
+	MSS config editors
+end
+
+requires
+	mss_user_object_editor
+end

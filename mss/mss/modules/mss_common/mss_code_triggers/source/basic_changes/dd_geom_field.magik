@@ -1,0 +1,57 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method dd_geom_field.do_run_triggers(list, record, type, value, flag, args)
+	## 
+	## In addition to running regular triggers, treat any geometry
+	## operation as an update of the owning record.
+	##
+
+	# 2004/10/02 TM  Created.  This is actually a new method,
+	#                but it is classified as a basic change since
+	#                it is a restricted subclass.
+
+	# N.B: this code path (do_run_triggers()) gets run when
+	# geometries get attached/detached.
+
+	_super.do_run_triggers(list, record, type, value, flag, args)
+	_if record _isnt _unset _andif
+	    record.is_valid?
+	_then
+		record.mss_run_code_triggers(:update, _unset, type)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_method dd_geom_field.run_triggers(record, new_value, old_value)
+	## 
+	## In addition to running regular triggers, treat any geometry
+	## operation as an update of the owning record.
+	## 
+
+	# 2004/10/02 TM  Created.  This is actually a new method,
+	#                but it is classified as a basic change since
+	#                it is a restricted subclass.
+
+	# N.B: this code path (run_triggers()) gets run when
+	# geometries get updated directly (i.e. transformed()), rather
+	# than attached/detached.
+
+	_super.run_triggers(record, new_value, old_value)
+	_if record _isnt _unset _andif
+	    record.is_valid?
+	_then
+		record.mss_run_code_triggers(:update, _unset)
+	_endif
+	
+_endmethod
+$

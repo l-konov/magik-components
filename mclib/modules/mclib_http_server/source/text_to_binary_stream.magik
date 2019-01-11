@@ -1,0 +1,37 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-08-17 12:42:30 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 08-17-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:text_to_binary_stream,
+                      { },
+		      {:proxy})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method text_to_binary_stream.write(_gather things)
+	## 
+	## 
+	##
+
+	# (08-17-2006 Brad Sileo): created.
+	_for a_thing _over things.fast_elements()
+	_loop
+		.real_subject.put_ascii_chars(a_thing.write_string)
+	_endloop
+_endmethod
+$
+
+

@@ -1,0 +1,82 @@
+#% text_encoding = iso8859_1
+########################################################################
+##
+## Last Saved Time-stamp: <2008-03-03 13:02:00 Mike.Zimmerman>
+##
+## Created By: Kyle Oedewaldt and Mike Zimmerman
+## Date: 03-03-2008
+## Copyright 2008 Kyle Oedewaldt and Mike Zimmerman
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+$
+
+_pragma(classify_level=restricted, topic={job_server})
+##
+## A subclass of jobs_list_gui_framework to add a hook to write
+## additional information about the sw_job out to the GUI.
+##
+def_slotted_exemplar( :mclib_job_information_dialog,
+	{},
+	:job_information_dialog )
+$
+
+# what a nasty method this is!  Let's clean it up...
+
+_method mclib_job_information_dialog.activate_in( a_frame )
+
+	.items << hash_table.new()
+	
+	a_frame.resizable? << _false
+	a_frame.help_id << 100580
+
+	spacing << 7
+	min_width << 75
+	
+	rc << rowcol.new( a_frame, 2 )
+	rc.top_spacing <<
+		rc.bottom_spacing <<
+		rc.left_spacing <<
+		rc.right_spacing <<
+		rc.row_spacing << spacing
+	
+	.items[:job_description] << text_window.new( rc, 20, 80,
+						     _unset,
+						     :col_alignment, :fill,
+						     :row_alignment, :fill,
+						     :editable?, _false
+						)
+	_if .job _isnt _unset
+	_then
+		job_info << internal_text_output_stream.new()
+
+		# BEGIN MCLIB
+		.job.print_job_information(job_info)
+		# END MCLIB
+		
+		.items[:job_description].value << job_info.string
+	_endif
+	
+	.items[:close] << button_item.new( rc, _self.message(:close),
+					   _self, :close|()|,
+					   :col_alignment, :centre,
+					   :min_width, min_width )
+_endmethod
+$
+

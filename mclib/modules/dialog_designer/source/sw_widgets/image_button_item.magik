@@ -1,0 +1,216 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## IMAGE_BUTTON_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+image_button_item.define_shared_constant(:dd_properties,
+					property_list.new_with(
+						:selector,:string),
+					:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+image_button_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.set_logical_properties()
+	## 
+	## Set the common logical properties.
+	
+	_self.selector << _self.dialog_element_id + "()"
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super(image_item).dd_properties()
+
+	_for k,e _over image_button_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	props.remove_key(:label)
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.default_min_height
+	## 
+	## Return the minimum default rendering height.
+	
+	>> _super(image_item).default_min_height
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.default_min_width
+	## 
+	## Return the minimum default rendering width.
+	
+	>> _super(image_item).default_min_width
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.id_changed()
+	## 
+	## Update the label when the id changes.
+	
+	key << _self.get_property(:dialog_element_id)
+	n << key.write_string.split_by(%_).last.as_number()
+	.label    << write_string("Image_button ",n)
+	.selector << key + :|()|
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	img << smallworld_product.get_raster_image(:image_button_item,:dialog_designer)
+	new_rec << _self.new(rc,"image_button",_unset,:|image_button_pressed()|,
+			     :row,row,:col,col,
+			     :col_alignment,:left,:row_alignment,:top,
+			     :has_border?,_false,
+			     :image,img)
+	new_rec.set_property(:image_file_name,:image_button_item)
+	new_rec.set_property(:image_module_name,:dialog_designer)
+	>> new_rec
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+	
+	ifn << props[:image_file_name]
+	imn << props[:image_module_name]
+	
+	img << smallworld_product.get_raster_image(ifn,imn.default(:dialog_designer))
+	_if (selector << props[:selector]) _isnt _unset
+	_then
+		selector << selector.as_symbol()
+	_endif 
+	
+	props.remove_key(:image_file_name)
+	props.remove_key(:image_module_name)
+	props.remove_key(:selector)
+	
+	new_rec << _self.new(parent,"image_button",_unset,selector,_scatter props)
+	new_rec.set_property(:image_file_name,ifn)
+	new_rec.set_property(:image_module_name,imn)
+	
+	>> new_rec
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	canv.render_raster(_self.raster_image,pbb.xmin+1,pbb.ymin+1,_false )
+
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+
+	# Handle odd sized rasters
+	(w2,h2) << _self.raster_image.size()
+
+	w << w.max(w2)
+	h << h.max(h2)
+	
+	pbb << pixel_bounding_box.new(x0,y0,x0+w,y0+h)
+	
+	!dialog_element_footprints![pbb] << _self
+
+	_if _self.has_border?.default(_true)
+	_then 
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightslategray),:width,1)
+		canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+		canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+		
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+		canv.draw_segment(ls,x0,y0,x0+w,y0)
+		canv.draw_segment(ls,x0,y0+h,x0,y0)
+		
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+		canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+		canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)
+		
+		ls.destroy()
+	_endif 
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method image_button_item.action_code(txt)
+	## 
+	## Write interpretable code for SELF on the stream TXT.
+
+	_local name << _self.get_property(:dialog_element_id)
+
+	txt.write(%newline,%tab,"_self.add_action( sw_action.new( :",name,%,,%newline)
+	txt.write(%tab*2,":toolbar_control,        :image_button_item,",%newline)
+	txt.write(%tab*2,":menubar_control,        :button_item,",%newline)
+	txt.write(%tab*2,":caption,                _self.message(:",name,"),",%newline)
+	txt.write(%tab*2,":engine,                 _self,",%newline)
+	txt.write(%tab*2,":action_message,         :|",_self.selector,"|,",%newline)
+
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%tab*2,":tooltip,                _self.message(",km[1],"),",%newline)
+		_else
+			txt.write(%tab*2,":tooltip,                ",%",km[2],%",%,)
+		_endif
+	_endif 
+		
+	f_name << _self.image_file_name
+	
+	_if (m_name << _self.get_property(:image_module_name)).default("") = ""
+	_then
+		m_name << "_self.module_name"
+	_else
+		m_name << ":"+m_name
+	_endif 
+
+	txt.write(%tab*2,":image,                 {:",f_name,",",m_name,"} ) )",%newline)
+
+	>> name.as_symbol()
+
+_endmethod
+$
+

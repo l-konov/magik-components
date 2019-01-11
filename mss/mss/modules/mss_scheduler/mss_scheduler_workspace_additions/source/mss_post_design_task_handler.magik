@@ -1,0 +1,142 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_post_design_task_handler
+##
+## Task handler for performing merge and post operations for
+## designs in the mss_workspace modules.
+##
+
+def_slotted_exemplar(:mss_post_design_task_handler,
+{},
+{:mss_scheduled_task_handler})
+$
+
+mss_scheduler_engine.define_task_handler(:post_design, mss_post_design_task_handler)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_post_design_task_handler.parameters_for_task_type(task_type)
+	## 
+	##
+
+	pl << property_list.new()
+	_if task_type _is :post_design
+	_then
+		pl[:design_id] << {:integer}
+		pl[:conflict_mode] << {:symbol, {:force_base, :force_child, :force_parent, :operator_intervention}}
+		pl[:post_complete_state] << {:string}
+		pl[:post_fail_state] << {:string}
+	_endif 
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_post_design_task_handler.int!run()
+	## 
+	## Perform the work required to complete the merge and post.
+	##
+
+	_dynamic !mss_workspace_initiator! << _self
+	
+	mss_workspace_manager_engine.view.rollforward()
+	_protect 
+		# Determine the design to be posted.
+		_if (design_id << .parameters[:design_id]) _is _unset _orif
+		    (design << mss_workspace_manager_engine.design_table.at(design_id)) _is _unset
+		_then
+			.failure_code << :missing_design
+			.error_output.write(_self.message(:design_id_not_found, design_id), newline_char)
+			_return _false 
+		_endif
+
+		# Perform merge and post processing.
+		res << _self.merge_and_post_design(design)
+	_protection
+		# Upon completion, ensure there is no active design.
+		mss_workspace_manager_engine.open_design(_unset)
+	_endprotect
+	
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_post_design_task_handler.merge_and_post_design(design)
+	## 
+	## 
+
+	_handling mss_information _with procedure
+	_handling mss_question _with procedure
+	
+	# Open the design to be posted.
+	mss_workspace_manager_engine.open_design(design)
+
+	# Determine the state transitions for success/failure.
+	wf << design.workflow()
+	_if (comp_state << .parameters[:post_complete_state].default("")) ~= ""
+	_then
+		comp_trans << wf.get_state_transition(:mss_design, design.status, comp_state)
+		_if comp_trans _is _unset
+		_then
+			.failure_code << :wrong_state
+			condition.raise(:user_error, :string, _self.message(:complete_state_not_found, comp_state))
+		_endif
+	_endif
+	_if (fail_state << .parameters[:post_fail_state].default("")) ~= ""
+	_then
+		fail_trans << wf.get_state_transition(:mss_design, design.status, fail_state)
+		_if fail_trans _is _unset
+		_then
+			.failure_code << :wrong_state
+			condition.raise(:user_error, :string, _self.message(:fail_state_not_found, fail_state))
+		_endif
+	_endif
+
+	# Perform the post of the design.
+	pd_parms << property_list.new_with(:gui_handler, _unset,
+					   :conflict_mode, .parameters[:conflict_mode])
+	post_ok?? << _false 
+	_protect 
+		post_ok?? << mss_workspace_manager_engine.post_design(pd_parms)
+	_protection
+		_if post_ok?? _isnt _true
+		_then
+			_if pd_parms[:conflicts_not_handled] _is _true
+			_then
+				.failure_code << :conflicts_not_handled
+			_endif
+			
+			# Perform the fail transition.
+			_if fail_trans _isnt _unset
+			_then
+				fail_trans.perform_state_transition(design, property_list.new())
+			_endif
+		_endif
+	_endprotect
+
+	_if post_ok?? _is _true
+	_then
+		# Perform the complete transition.
+		_if comp_trans _isnt _unset
+		_then
+			comp_trans.perform_state_transition(design, property_list.new())
+		_endif
+	_endif
+
+	_return post_ok??
+	
+_endmethod
+$

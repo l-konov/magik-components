@@ -1,0 +1,9 @@
+mss_ptdef_config_application	1
+
+description
+	Top level application for MSS pointing rule definition configuration menu
+end
+
+requires
+	mss_ptdef_config
+end

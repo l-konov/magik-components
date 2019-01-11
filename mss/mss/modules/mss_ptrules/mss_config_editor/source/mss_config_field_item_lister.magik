@@ -1,0 +1,71 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+##
+## mss_config_field_item_lister
+##
+## Subclass of field_item_lister for mss_config tables.
+##
+
+def_slotted_exemplar(:mss_config_field_item_lister,
+{},
+{:field_item_lister})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_config_field_item_lister.define_shared_constant(
+	:field_editor_class_names,
+	_block
+		# Note: superclass is private - I'm a subclass, so I'll
+		# explicitly break encapsulation to get at it.
+		_local ht << field_item_lister.sys!perform(:field_editor_class_names).copy()
+		ht[:combo_field] << :mss_config_in_place_combo_field_editor
+		>> ht
+	_endblock,
+	:private)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_private _method mss_config_field_item_lister.get_editor_exemplar_from_ace(a_field_item)
+	## 
+	## Deal with the case where self's ACE is unset.
+	##
+
+	_if _self.ace _is _unset
+	_then
+		_return _unset
+	_endif
+	_return _super.get_editor_exemplar_from_ace(a_field_item)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_config_field_item_lister.get_field_editor_name(a_field_item)
+	## 
+	## Perform special handling for field editors that should get a
+	## combo item.
+	##
+
+	fd << a_field_item.field_descriptor
+	_if fd.is_physical? _orif
+	    fd.is_derived?
+	_then
+		_if a_field_item.is_enumerated?() _andif
+		    (rec_ex << a_field_item.record_exemplar).method(:|mss_strict_enumeration?()|) _isnt _unset _andif
+		    rec_ex.mss_strict_enumeration?(fd) _is _false
+		_then
+			_return :combo_field
+		_endif
+	_endif
+	_return _super.get_field_editor_name(a_field_item)
+	
+_endmethod
+$

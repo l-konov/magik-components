@@ -1,0 +1,438 @@
+#% text_encoding = iso8859_1
+_package mclib
+########################################################################
+##
+## Author: Anon
+## Date: 2006-01-10
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Magik Components for SWAF; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+
+_pragma(classify_level=basic, topic={case}, usage={subclassable})
+## An object used to generate a linked SVG document
+## that displays information from the CASE Tool.
+def_slotted_exemplar(:case_svg_map_generator,
+		     {
+		     },:plugin)
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:pixel_width,
+				      :type, :integer,
+				      :default_value, 400)
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:pixel_height,
+				    :type, :integer,
+				    :default_value, 600)
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:rwo_set,
+				    :type, :object,
+				    :default_value, _unset)
+$
+case_svg_map_generator.def_property(:directory,
+				  :type, :string,
+				  :default_value, _unset)
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:file,
+				  :type, :string,
+				  :default_value,"case_map.svg")
+
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:background_colour,
+				  :type, :string,
+				  :default_value,"white")
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:image_map?,
+				  :type, :boolean,
+				  :default_value, _true)
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.def_property(:levels,
+				  :type, :integer,
+				  :default_value,3)
+$
+case_svg_map_generator.def_property(:soc_name,
+				  :type, :symbol,
+				  :default_value,:case)
+$
+_pragma(classify_level=basic)
+case_svg_map_generator.define_shared_constant(:databus_producer_data_types,
+					      { :map_generator },
+					      :public)
+$						       
+_pragma(classify_level=basic, usage={redefinable})
+_method case_svg_map_generator.generate_map( a_bounding_box, nlevels )
+	## Generates an SVG file for the area within
+	## A_BOUNDING_BOX. NLEVELS controls the internal resolution of
+	## the map.
+	##
+
+	_self.levels << nlevels
+	_self.create_svg_file( a_bounding_box )
+	_self.add_links( a_bounding_box )
+	_self.create_html_file( a_bounding_box )
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method case_svg_map_generator.create_svg_file( a_bounding_box )
+	## Generate the actual SVG output for the are encompassed by
+	## A_BOUNDING_BOX 
+	##
+
+	_dynamic !current_sts! 
+	
+	# Now, set up rendering. Assumes _self.application returns a
+	# GRS. these values could be supplied to remove the dependency
+	# at some point.
+	_local a_soc << gis_program_manager.spatial_object_controller(_self.soc_name)
+	_local a_ace << gis_program_manager.ace(:case_220)
+	_local an_ace_control << ace_control.new(a_ace,a_soc)
+	_local a_dsp << an_ace_control.ace.display_scale(:|Auto|)
+	!current_sts! << an_ace_control.style_system_for(a_dsp)
+	
+	# gather multi pass data from the ace_control
+	multi_pass_data << an_ace_control.multi_pass_data_for(a_dsp)
+			
+	_local w << _self.pixel_width
+	_local h <<_self.pixel_height
+	
+	# Adjust the boudns to the aspect ratio of the output canvas
+	# BSileo - changed with feedback from Kyle
+	#a_bounding_box << a_bounding_box.enclosed_with_aspect( w/h )
+	a_bounding_box << a_bounding_box.surrounded_with_aspect( w/h )
+
+
+	_local a_canvas << _self.new_window( w,h)
+	
+	_protect
+		a_canvas.transform << _self.calculate_transform(a_bounding_box, a_canvas.inner_bounds )
+		
+		
+		(mpd,rwo_preds) << (_scatter multi_pass_data)
+		
+		_for priority_data _over mpd.fast_elements()
+		_loop
+			_for a_dsm,vhs_data _over priority_data.fast_keys_and_elements()
+			_loop
+				# this is really the big change here.  This used to call
+				# render_world_in, but we needed one to work with a graphisvg_canvas
+				tc << a_dsm.actual_dataset.table_control_for( vhs_data )
+				
+				
+				a_dsm.world.render_geometry( a_canvas, tc, a_bounding_box, rwo_preds, a_dsm)
+			_endloop
+		_endloop
+		
+	_protection
+		
+		a_canvas.close()
+	_endprotect
+	
+	
+_endmethod
+$
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method case_svg_map_generator.create_html_file( a_bounding_box )
+	## Creates and HTML file that embeds the SVG file in an <OBJECT>
+	## tag. This allows the HTML file to be referenced in the
+	## template and possibly re-direct the user to the Adobe
+	## website for the SVG plugin. 
+	##
+
+	_local html_file_name << system.pathname_from_components("case_map.html", _self.directory )
+	_local svg_file_name << system.pathname_from_components(_self.file, _self.directory )
+	
+
+	_local contents << external_text_output_stream.new( html_file_name ) 
+	_protect
+		contents.write("<html>",newline_char)
+		contents.write("<body>",newline_char)
+
+		_self.write_object( contents )
+
+		contents.write("</body>",newline_char)
+		contents.write("</html>",newline_char)
+				
+	_protection
+		contents.close()
+		
+	_endprotect
+
+								 
+_endmethod
+$
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method case_svg_map_generator.calculate_transform( from_bounds, to_bounds )
+	## Some serious calculation of the transform between the real
+	## world bounds and the canvas bounds
+	##
+
+	
+	c << from_bounds.centre
+
+
+
+	# Mirror in the Y axis
+	t << transform.new()
+	t << t.translate( -c.x, -c.y)
+	t << t.scalexy(1.0,-1.0)
+	t << t.translate(c.x,c.y)
+	
+	w << to_bounds.width.as_float
+	h << to_bounds.height.as_float
+
+
+	# Pretty muuch a duplication of code from
+	# transform.new_matching_bounds()
+	
+	xtran << ytran << 0.0
+	
+	xscale << w / (from_bounds.xmax - from_bounds.xmin)
+	yscale << h / (from_bounds.ymax - from_bounds.ymin)
+	
+	
+	t << t.translate(-from_bounds.xmin,-from_bounds.ymin)
+	
+	
+	t << t.scalexy(xscale,yscale)
+	
+	
+	t << t.translate(to_bounds.xmin+xtran,to_bounds.ymin+ytran)
+	
+	>> t
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method case_svg_map_generator.new_window( pw, ph )
+	## Creates a new SVG Canvas
+	##
+	
+
+	_local w << pw * _self.levels
+	_local h << ph * _self.levels
+	
+	_local fname << _self.svg_filename
+	_local unit_type << :pixels
+	_local style_option << :inline_css
+	_local mm_per_pixel << 1.0
+	_local doctype? << _true
+	
+
+	a_window << sw:svg_canvas.new( w,h, pw,ph, fname,
+				       unit_type, style_option,
+				       doctype?, mm_per_pixel )
+
+	a_window.set_background( colour.called( _self.background_colour ) )
+	
+	>> a_window
+	
+_endmethod
+$
+_pragma(classify_level=basic, usage={redefinable})
+_private _method case_svg_map_generator.svg_filename
+	## The name of the target SVG file
+	## 
+	>> system.pathname_from_components( _self.file, _self.directory)
+_endmethod
+$
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method case_svg_map_generator.write_object( a_stream )
+	## Writes the <OBJECT> tag with associated data. This will be
+	## used to referenced the SVG file.
+	##
+
+	# The URL where the user can download the SVG plugin. this is
+	# automatically displayed if the plugins isn't installed.
+	_local plugins_url << "http://www.adobe.com/svg/viewer/install/"
+	
+
+	a_stream.write("<OBJECT TYPE=",%","image/svg+xml",%"," data=",%","./",_self.file,%")
+	a_stream.write(" width=",%",_self.pixel_width,%"," height=", %",_self.pixel_height,%")
+
+	_if _self.image_map?
+	_then
+		a_stream.write(" usemap=",%","#image_map",%",">")
+	_else
+		a_stream.write(">")
+	_endif
+	
+	a_stream.write(newline_char)
+	a_stream.write("This page requires the Adobe SVG Image viewer. Dowload it ")
+	a_stream.write("<A HREF=",%",plugins_url,%"," target=",%","_blank",%",">")
+	a_stream.write("here</HREF>")
+	a_stream.write(newline_char)
+	a_stream.write("</OBJECT>")
+	a_stream.write(newline_char)
+		
+	
+_endmethod
+$
+_pragma(classify_level=advanced, usage={redefinable})
+_private _method case_svg_map_generator.add_links()
+	## Add HREF Links to the SVG document after it has been
+	## rendered.
+	## 
+
+	_local fname << _self.svg_filename
+	_local a_doc << simple_xml.read_document_file( fname )
+
+	# Get the top SVG document
+	_local top_element << a_doc.top_element
+
+	_local new_elements << rope.new()
+
+	# Add links to the element
+	_for an_element _over top_element.elements.fast_elements()
+	_loop
+		
+		_if an_element.type _is :text
+		_then
+			new_element << _self.generate_linked_element_for( an_element )
+		_else
+			new_element << an_element
+		_endif
+
+		new_elements.add( new_element )
+	_endloop
+
+	new_top << simple_xml_thing.new( top_element.xml_tag, new_elements, top_element.attributes )
+
+	
+	# Rewrite the SVG file with the embedded links.
+	#
+	e << external_text_output_stream.new( fname )
+
+	_protect
+		simple_xml.write_element( e, new_top )
+	_protection
+		e.close()
+	_endprotect
+
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_private _method case_svg_map_generator.generate_linked_element_for( an_element )
+	## Make an XLINK:REF for a text element. the basic structure of
+	## the incoming element is:
+	##
+	## <text><tspan>External Name of Case Object</tspan></text>
+	##
+	## This needs to be re-written as:
+	##
+	## <a xlink:href="<url_to_case_object>">
+	##   <text>
+	##     <tspan>External Name of Case Object</tspan>
+	##   </text>
+	## </a>
+	##
+
+	# Break down the text element into it's components. We are
+	# looking for the <tspan> element containing the External Name
+	# of the CASE Object.
+
+	_local new_element << an_element
+	
+	tsp <<  an_element.element_matching_name( :tspan )
+	
+	_if tsp _isnt _unset 
+	_then
+		# Get the external name from the tspan data
+		all_elements << tsp.elements
+		_if all_elements.is_class_of?( sw:rope) _andif
+		    all_elements.size = 1
+		_then
+			external_name << all_elements.an_element()
+			a_case_object << _self.find_case_object( external_name )
+
+			_if a_case_object _isnt _unset _andif
+			    (link << _self.href_for( a_case_object.name) ) _isnt _unset 
+			_then
+				# Now, here's the sneaky part. Make a new encapsulated element
+				# based on the link
+			
+				new_element <<
+					simple_xml_thing.new( :a, {an_element},
+							      property_list.new_with(
+								      :|xlink:href|, link
+									    )
+							 )
+			_endif	
+		_endif
+	_endif
+
+
+	>> new_element
+	
+_endmethod
+$
+_pragma(classify_level=restricted, usage={redefinable})
+_private _method case_svg_map_generator.find_case_object( an_external_name )
+	## Finds the case object with the external_name
+	## AN_EXTERNAL_NAME. this will only exist if it's data has been
+	## output.
+	##
+
+	_local pred << predicate.eq(:e_name, an_external_name )
+	a_set << _self.rwo_set.select( pred )
+	
+	_if _not a_set.empty? _andif
+	    a_set.size = 1 
+	_then
+		_return a_set.an_element()
+	_endif
+
+	
+	
+_endmethod
+$
+_pragma(classify_level=basic, topic={html_map_generator})
+_private _method case_svg_map_generator.href_for( case_object_name )
+	# Assumes the case object URL's live in the same directory as
+	# this document.
+		
+	
+	_local fname << write_string("object_",case_object_name,".html")
+	_local ref_file << system.pathname_from_components(fname , _self.directory)
+	_local rel_path << "./"
+
+	
+	_if system.file_exists?( system.pathname_from_components(fname , _self.directory))
+	_then
+	
+		_return system.pathname_from_components(fname,rel_path)
+	_endif
+_endmethod
+$
+_pragma(classify_level=basic, topic={html_map_generator})
+_method case_svg_map_generator.sw_databus_data_requested( data_type_name )
+	## Produces _self as the service provider for CASE SVG map creation
+	##
+
+	_if data_type_name _is :map_generator 
+	_then
+		_return _self 
+	_endif
+_endmethod
+$

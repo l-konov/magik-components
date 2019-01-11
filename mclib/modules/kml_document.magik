@@ -1,0 +1,58 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-08-08 05:30:03 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 08-07-2007
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package mclib
+
+def_slotted_exemplar(:kml_document,
+                             {},
+			     {:simple_xml_document})
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.init(elements,context)
+	## 
+	## 
+	##
+
+	# (08-07-2007 Brad Sileo): created.
+	_if context _is _unset 
+	_then
+		context << mclib:kml_element 
+	_endif
+	_super.init(elements,context)
+	>> _self 
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method kml_document.rwo_set()
+	## Returns an rwo_set for me....
+	## 
+	##
+
+	# (08-07-2007 Brad Sileo): created.
+	todo << stack.new()
+	res << rwo_set.new()
+	#res << geometry_set.new()
+	todo.push(_self.top_element)
+	_loop
+		next << todo.pop()
+		_if next _is _unset _then _leave _endif
+		res.add_all(next.rwo_set())
+	_endloop
+	>> res
+_endmethod
+$

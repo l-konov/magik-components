@@ -1,0 +1,22 @@
+<config base="mss_qa_gui.config">
+  <plugins>
+    <plugin name="mss_qa_engine" class_name="mss_qa_engine">
+      <managed_checks>
+        <check name="mss_qa_cable_connectivity" value="true"/>
+        <check name="mss_qa_roundabout_connectivity" value="false"/>
+        <check name="mss_qa_everythings_an_error" value="false"/>
+      </managed_checks>
+      <managed_groups>
+        <group name="All Checks">
+          <check name="mss_qa_cable_connectivity"/>
+	  <check name="mss_qa_roundabout_connectivity"/>
+	  <check name="mss_qa_everythings_an_error"/>
+	</group>
+        <group name="Cables and Roundabouts">
+          <check name="mss_qa_cable_connectivity"/>
+	  <check name="mss_qa_roundabout_connectivity"/>
+	</group>
+      </managed_groups>
+    </plugin>
+  </plugins>
+</config>

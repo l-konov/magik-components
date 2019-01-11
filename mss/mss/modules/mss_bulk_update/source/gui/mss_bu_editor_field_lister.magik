@@ -1,0 +1,108 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_bulk_update})
+##
+## mss_bu_editor_field_lister
+##
+## Subclass of object_editor_field_lister for editing fields displayed
+## by the bulk update menu.
+##
+
+def_slotted_exemplar(:mss_bu_editor_field_lister,
+{
+	{:force_rebuild?, _unset, :readable}
+},
+{:object_editor_field_lister})
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+mss_bu_editor_field_lister.define_shared_constant(
+	:databus_consumer_data_types,
+	_block
+		_local super_values << object_editor_field_lister.databus_consumer_data_types
+		>> {:bu_field_names,
+		    :bu_field_names_changed}.new_appending(_scatter super_values)
+	_endblock,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_method mss_bu_editor_field_lister.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :bu_field_names_changed
+	_then
+		.force_rebuild? << _true
+	_else 
+		_super.sw_databus_data_available(data_type_name, data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_bulk_update})
+_private _method mss_bu_editor_field_lister.build_field_item_holder()
+	## 
+	## Rebuild my field items.
+	##
+
+	a_collection << _self.collection
+	an_object << _self.current_object
+	_if .force_rebuild? _isnt _true _andif
+	    a_collection _isnt _unset _andif
+	    .item_holder _isnt _unset 
+	_then
+		any_fields? << _false
+		all_fields_from_collection? << _true
+		_for i _over .item_holder.field_items()
+		_loop
+			any_fields? << _true 
+			_if i.collection _isnt a_collection
+			_then
+				all_fields_from_collection? << _false
+				_leave
+			_endif
+		_endloop
+
+		_if any_fields? _andif all_fields_from_collection?
+		_then
+			# Don't need to fully rebuild - just update record.
+			_for i _over .item_holder.field_items()
+			_loop
+				i.current_object << an_object
+			_endloop
+			.field_lister.changed(:field_item_list, :data, .field_lister.field_item_list())
+			_return 
+		_endif
+	_endif
+	
+	.force_rebuild? << _unset
+	_self.item_holder << field_item_holder.new()
+
+	_if a_collection _isnt _unset
+	_then
+		td << a_collection.descriptor
+		vis_field_names << _self.databus_request_data(:bu_field_names).default({})
+		_for field_name _over vis_field_names.fast_elements()
+		_loop
+			fd << td.field( field_name )
+			_if fd _isnt _unset
+			_then
+				a_field_item  << _self.build_field_item(fd, a_collection, an_object)
+				.item_holder.add_field_item( fd.name, a_field_item )
+			_endif 
+		_endloop
+	_endif
+
+	.field_lister.item_holder << .item_holder
+	
+_endmethod
+$

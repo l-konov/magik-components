@@ -1,0 +1,246 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_NUMBER_INPUT .... facade class to ease the creation of a managed_value_text_item with a
+## numeric_value_manager
+##
+##########################################################################################
+_package user
+$
+
+def_slotted_exemplar(:dd_number_input,{},:text_item)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_number_input.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :value,:string,
+					  :activate_selector,:string,
+					  :change_selector,:string,
+					  :display_length,:integer,
+					  :integer?,:boolean,
+					  :value_required?,:boolean,
+					  :precision,:integer,
+					  :valid_interval,:string,
+					  :invalid_entry_handler,{:alert,:correct},
+					  :incremental_change_selector,:string),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_number_input.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	rec << _self.new(rc,_unset,
+			 :row,row,:col,col,
+			 :col_alignment,:fill,
+			 :display_length,10,
+			 :row_alignment,:top )
+	id << _self.get_property(:dialog_element_id).write_string.split_by(%_).last
+	rec.integer? << _true
+	rec.value_required? << _true
+	rec.valid_interval << ""
+	rec.precision << 4
+	rec.invalid_entry_handler << :alert
+	rec.value << "123"
+	>> rec
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	_if _self.valid_interval.default("").empty?
+	_then
+		val << _self.value.default(10).as_number()
+		_self.valid_interval << write_string(val-20,%,,val+20)
+	_endif
+
+	(low,high) << _if (i_bounds << _self.valid_interval.split_by(%,)).size _is 2
+		      _then
+			      low  << i_bounds[1].as_number()
+			      high << i_bounds[2].as_number()
+			      
+			      _if low > high
+			      _then
+				      (low,high) << (high,low)
+			      _endif
+			      >> low,high
+		      _endif
+
+	txt.write(%tab,"nvm << numeric_value_manager.new(",%newline,
+		  %tab*2,":integer?, _",_self.integer?.write_string.lowercase,%,,%newline,
+		  %tab*2,":value_required?, _",_self.value_required?.write_string.lowercase)
+	_if _not _self.integer?
+	_then
+		txt.write(%,,%newline,%tab*2,":precision, ",_self.precision.as_number().default(2))
+	_else
+		txt.write(%,,%newline,%tab*2,":precision, 0")
+	_endif
+
+	_if low _isnt _unset
+	_then
+		txt.write(%,,%newline,%tab*2,":valid_interval, interval.new(",low,%,,high,")")
+	_endif
+
+	txt.write(%),%newline*2)
+
+	id << _self.dialog_element_id
+	
+	txt.write(%tab,".items[:",id,
+		  "] << managed_value_text_item.new(",parent_id,",_unset,",%newline,
+		  %tab*2,":manager, nvm,:model,_self,",%newline,
+		  %tab*2,":fail_selector,{:","failed_value|()|,:",_self.invalid_entry_handler,",:",id,",nvm}")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		_if {:integer?,:value_required?,:valid_interval,:precision,:value,:invalid_entry_handler}.includes?(n.as_symbol())
+		_then
+			_continue
+		_endif
+		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*2,%:,n2,%,,%tab,v2)
+	_endloop
+
+	_if _self.value_required?
+	_then
+		def_val << low.default(1)
+		txt.write(%,,%newline,%tab*2,":value, ",_self.value.as_number().default(def_val))		
+	_endif
+	
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, _self.message(",km[1],%))
+		_else
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, ",%",km[2],%")
+		_endif
+	_endif 
+		
+	txt.write(" )",%newline)
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.gui_element_methods()
+	## 
+	## Return the GUI element methods for SELF.
+	
+	rp << _super.gui_element_methods()
+	rp.add(:failed_value|()|)
+	
+	>> rp
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.id_changed()
+	## 
+	## Do nothing.
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.integer?
+	## 
+	## Return the :integer? property.
+	>> _self.properties[:integer?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.integer? << val
+	## 
+	## Set the :integer? property.
+	_self.properties[:integer?] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.value_required? << val
+	## 
+	## Set the :value_required? property.
+	_self.properties[:value_required?] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.value_required?
+	## 
+	## Return the :value_required? property.
+	>> _self.properties[:value_required?]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.precision
+	## 
+	## Return the :precision property.
+	>> _self.properties[:precision]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.precision << val
+	## 
+	## Set the :precision property.
+	_self.properties[:precision] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.valid_interval
+	## 
+	## Return the :valid_interval property.
+	>> _self.properties[:valid_interval]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.valid_interval << val
+	## 
+	## Set the :valid_interval property.
+	_self.properties[:valid_interval] << val
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.invalid_entry_handler
+	## 
+	## Return the :invalid_entry_handler property.
+	>> _self.properties[:invalid_entry_handler]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_number_input.invalid_entry_handler << val
+	## 
+	## Set the :invalid_entry_handler property.
+	_self.properties[:invalid_entry_handler] << val
+_endmethod
+$

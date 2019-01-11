@@ -1,0 +1,182 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-09-25 13:16:53 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 07-18-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+## Magik Components for SWAF is free software; you can redistribute it and/or modify
+## modify it under the terms of the GNU Lesser General Public
+## License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+
+## This library is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## Lesser General Public License for more details.
+
+## You should have received a copy of the GNU Lesser General Public
+## License along with this library; if not, write to the Free Software
+## Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+##
+########################################################################
+_package mclib
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method sw_component.mclib_df!as_display_tree(_optional a_context)
+	## 
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	dt <<  display_tree.new(_self,_unset,_unset,_self.mclib_df!children())
+	dt.styled_string << _self.mclib_df!styled_string(a_context)
+	>> dt
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method sw_component.mclib_df!styled_string(_optional a_context)
+	## 
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> styled_string.new(:image,{:generic_object,:ui_resources},_self.name.write_string)
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method sw_component.mclib_df!children(_optional context)
+	## Returns my properties by default
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo):
+	res << rope.new()
+	res.add_all_last(_self.mclib_df!properties(context))
+	res.add_all_last(_self.mclib_df!referenced_resources(context))
+	res.add_all_last(_self.mclib_df!actions(context))
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method sw_component.mclib_df!properties(_optional context)
+	## 
+	## 
+	##
+
+	# (07-29-2006 Brad Sileo): created.
+	res << rope.new()
+	sigs << _self.get_signatures(:property)[_self.exemplar].default({})
+	props << _self.properties
+	_for a_name,a_prop _over sigs.fast_keys_and_elements()
+	_loop
+		val << property_list.new_with(
+			       :name,a_name,
+			       :value,_self.perform_private(a_prop.name),
+			       :description,a_prop.description,
+			       :owner,_self,
+			       :signature,a_prop)
+		res.add_last(dt << display_tree.new(a_name,val)
+		    )
+		dt.styled_string <<
+			_self.mclib_df!property_styled_string(a_name,a_prop)
+		
+	_endloop
+	>> res
+_endmethod
+$
+
+
+_pragma(classify_level=basic)
+_method sw_component.mclib_df!property_styled_string(a_key, a_property_sig)
+	## 
+	## 
+	##
+
+	# (07-17-2006 Brad Sileo): created.
+	>> styled_string.new(:image,{:alpha_field,:ui_resources},
+			     :value,:name,
+			     :tab,
+			     :value,:value,
+			     :tab,
+			     :value,:description)
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method sw_component.mclib_df!actions(_optional context)
+	## Returns actions display trees to include for me on the
+	## framework display
+	## 
+	##
+
+	# (07-26-2006 Brad Sileo): created.
+	res << rope.new()
+	_for a_action _over _self.actions()
+	_loop
+		base << write_string(a_action.caption,%[,%:,a_action.name,%])
+		_if (am << a_action.properties[:action_message]) _isnt _unset 
+		_then
+			hl_string << write_string("Execute '",
+						  a_action.properties[:engine].class_name,
+						  %.,
+						  am,%')
+			ss << styled_string.new(:image,{:activate,:ui_resources},
+						base,
+						:hyperlink,hl_string)
+		_else
+			ss << styled_string.new(:image,{:activate,:ui_resources},
+						base)
+		_endif 
+		res.add_last(dt << display_tree.new(a_action.name,a_action))
+		dt.styled_string << ss
+
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_method sw_component.mclib_df!referenced_resources(_optional context)
+	## Returns any resources referenced by me as disply_trees 
+	## 
+	##
+
+	# (07-20-2006 Brad Sileo): created.
+	res << rope.new()
+	_for a_name,a_file,a_label _over _self.mclib_df!referenced_resource_items(context)
+	_loop
+		res.add_last(dt << display_tree.new(a_name,a_file))
+		dt.styled_string << styled_string.new(:image,{:bookmark,:ui_resources},
+						      a_label.default(a_name),
+						      :hyperlink,a_file)
+	_endloop
+	>> res
+_endmethod
+$
+
+_pragma(classify_level=advanced, usage={redefinable})
+_iter _method sw_component.mclib_df!referenced_resource_items(_optional context)
+	## yields the tag, file, external name(optional) for each
+	## resource referenced by me.  This backstop does nothing.
+	## Well built components should call the super to get default
+	## items from above, then add in references for their
+	## resources, such as specialized XML files, etc.
+	## 
+	##
+
+	# (07-20-2006 Brad Sileo): created.
+	# _loopbody (tag,file,e_name)
+_endmethod
+$

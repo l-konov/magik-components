@@ -1,0 +1,336 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_summary_engine
+##
+## Processor used to summarize CUs for reporting purposes.
+##
+
+def_slotted_exemplar(:mss_cu_summary_engine,
+{
+	{:designs, _unset, :readable},
+	{:cu_job_type, _unset, :readable},
+	{:cu_cost_group, _unset, :readable},
+	{:raw_cus, _unset, :readable},
+	{:results, _unset, :readable},
+	{:combine_similar_cus?, _unset, :readable},
+	{:include_cus_with_no_operation?, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_summary_engine.new()
+	## 
+	## 
+
+	_return _clone.init()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_summary_engine.init()
+	## 
+	## 
+
+	.designs << rope.new()
+	.cu_job_type << _unset 
+	.cu_cost_group << _unset 
+	.raw_cus << rope.new()
+	.results << sorted_collection.new(100, mss_cu_holder.standard_sort_proc)
+	.combine_similar_cus? << _true
+	.include_cus_with_no_operation? << _false 
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_summary_engine.clear()
+	## 
+	## Clear all current results.
+	##
+
+	.designs.empty()
+	.raw_cus.empty()
+	.results.empty()
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_summary_engine.set_designs(designs_to_do)
+	## 
+	## Prepare self to provide a summary of CU data in the
+	## collection DESIGNS_TO_DO (a collection of mss_design records).
+	##
+	## This assumes that if DESIGNS_TO_DO contains a single design,
+	## then that design is the active design.  If it contains
+	## multiple designs, then those are ancestors of the active
+	## design.  Either way, only those CUs that exist in the active
+	## design are considered by this method (that is, it does not
+	## use replica views to pull CUs out of other database
+	## alternatives).
+	##
+	## Note that this does not immediately perform a recalculation
+	## of results (to allow other parameters to be changed as
+	## well).  Therefore, the caller must call set_results() before
+	## examining the results slot.
+	##
+	
+	.designs.empty()
+	.raw_cus.empty()
+	_for a_design _over designs_to_do.fast_elements()
+	_loop
+		.designs.add_last(a_design)
+		_for cu_ref _over a_design.tracking_records(_unset, _unset, _unset, :mss_cu_reference)
+		_loop
+			.raw_cus.add_last(cu_ref)
+		_endloop
+	_endloop 
+
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_summary_engine.cu_job_type << new_jt
+	## 
+	## Set the CU job type to be NEW_JT - if there are any
+	## existing results, update them directly.
+	##
+
+	.cu_job_type << new_jt
+	_for i _over .results.fast_elements()
+	_loop
+		# Do children first, so that the parent aggregator gets the
+		# right updated costs. 
+		_for j _over i.children.fast_elements()
+		_loop
+			j.key.cu_job_type << new_jt
+			j.key.as_report_display_tree(j)
+		_endloop 
+		i.key.cu_job_type << new_jt
+		i.key.as_report_display_tree(i)
+	_endloop
+	_return new_jt
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_summary_engine.cu_cost_group << new_group
+	## 
+	## Set the CU cost group to be NEW_GROUP - if there are any
+	## existing results, update them directly.
+	##
+
+	.cu_cost_group << new_group
+	_for i _over .results.fast_elements()
+	_loop
+		# Do children first, so that the parent aggregator gets the
+		# right updated costs. 
+		_for j _over i.children.fast_elements()
+		_loop
+			j.key.cu_cost_group << new_group
+			j.key.as_report_display_tree(j)
+		_endloop 
+		i.key.cu_cost_group << new_group
+		i.key.as_report_display_tree(i)
+	_endloop
+	_return new_group
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_summary_engine.combine_similar_cus? << new_val
+	## 
+	## If this is true, then similar CUs (based on work point, CU
+	## code, and operation) will be combined into one line item.
+	##
+	## Note that this does not immediately perform a recalculation
+	## of results (to allow other parameters to be changed as
+	## well).  Therefore, the caller must call set_results() before
+	## examining the results slot.
+	##
+
+	.combine_similar_cus? << new_val
+	_return new_val
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_summary_engine.include_cus_with_no_operation? << new_val
+	## 
+	## If this is true, then CUs with no operation value entered
+	## will still be included in the results.
+	##
+	## Note that this does not immediately perform a recalculation
+	## of results (to allow other parameters to be changed as
+	## well).  Therefore, the caller must call set_results() before
+	## examining the results slot.
+	##
+
+	.include_cus_with_no_operation? << new_val
+	_return new_val
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu})
+_method mss_cu_summary_engine.set_results()
+	## 
+	## Populate the results slot, which will be a sorted collection
+	## of mss_cu_holder records.  Note that this method does not
+	## repopulate the set of CUs being considered - use the
+	## set_designs() method to do that.
+	##
+
+	keep_no_ops? << .include_cus_with_no_operation?
+	jt << _self.cu_job_type
+	cg << _self.cu_cost_group
+	.results.empty()
+	_for i _over .raw_cus.fast_elements()
+	_loop
+		_if _not i.is_valid?
+		_then
+			_continue
+		_endif
+		_if _not keep_no_ops? _andif
+		    i.operation.default("") = ""
+		_then
+			_continue
+		_endif
+		
+		cu_holder << mss_cu_holder.new_from_cu_reference(i)
+		cu_holder.cu_job_type << jt
+		cu_holder.cu_cost_group << cg
+		dt << cu_holder.as_report_display_tree()
+		.results.add(dt)
+	_endloop
+
+	_if .combine_similar_cus?
+	_then
+		_self.combine_similar_cus()
+	_endif
+	
+	_return .results
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_summary_engine.combine_similar_cus()
+	## 
+	## Filter the results to combine records if possible, based on
+	## work point, CU code, and operation.
+	##
+
+	temp_rope << rope.new_from(.results)
+	.results.empty()
+	prev_item << _unset
+	cur_accum << _unset 
+	_for cur_dt _over temp_rope.fast_elements()
+	_loop
+		_if prev_item _is _unset
+		_then
+			# First time through - initialize.
+			prev_dt << cur_dt
+			prev_item << prev_dt.key
+			_continue
+		_endif
+
+		cur_item << cur_dt.key
+		
+		_if _not prev_item.can_aggregate_with?(cur_item)
+		_then
+			_if cur_accum _isnt unset
+			_then
+				# The previous item is an accumulator, which can now be closed out.
+				prev_dt << cur_accum.as_report_display_tree()
+				_for i _over dt_children.fast_elements()
+				_loop
+					i.parent << prev_dt
+				_endloop 
+			_endif
+
+			.results.add(prev_dt)
+			cur_accum << _unset 
+			prev_dt << cur_dt
+			prev_item << prev_dt.key
+			_continue
+		_endif
+
+		# At this point, things must be accumulated.
+		_if cur_accum _is _unset
+		_then
+			dt_children << rope.new()
+			dt_children.add_last(prev_dt)
+			dt_children.add_last(cur_dt)
+			
+			cur_accum << mss_cu_holder_aggregator.new(
+					     property_list.new_with(:internal_usage, :aggregator))
+			cur_accum.add_child(prev_item)
+			cur_accum.add_child(cur_item)
+			prev_dt << _unset
+			prev_item << cur_accum
+		_else
+			cur_accum.add_child(cur_item)
+			dt_children.add_last(cur_dt)
+		_endif 
+	_endloop
+
+	# Finally, add the last thing (either a regular item or an
+	# accumulator).
+	_if prev_item _isnt _unset
+	_then
+		_if cur_accum _isnt unset
+		_then
+			# The previous item is an accumulator, which can now be closed out.
+			prev_dt << cur_accum.as_report_display_tree()
+			_for i _over dt_children.fast_elements()
+			_loop
+				i.parent << prev_dt
+			_endloop 
+		_endif
+		.results.add(prev_dt)
+	_endif 
+		
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_cu}, usage={redefinable})
+_method mss_cu_summary_engine.export_raw_results(f)
+	## 
+	## Export self's results in a raw form to stream F.  This is
+	## designed to export CUs to an external system, and therefore
+	## it may be redefined to suit the particular needs of any
+	## external system.
+	##
+
+	sep << %,
+	qc << %"
+	_for i _over .results.fast_elements()
+	_loop
+		cu_holder << i.key
+		f.write(cu_holder.work_point_number.default("").mss_format_for_csv(sep, qc), sep)
+		f.write(cu_holder.cu_code.default("").mss_format_for_csv(sep, qc), sep)
+		f.write(cu_holder.operation.default("").mss_format_for_csv(sep, qc), sep)
+		f.write(cu_holder.combined_quantity.as_float.as_fixed_string(0, 2), newline_char)
+	_endloop
+	f.flush()
+	
+_endmethod
+$

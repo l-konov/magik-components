@@ -1,0 +1,9 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method bounding_box_mixin.convert_to_json()
+	_return json_object.new_with(:xmin,_self.xmin,:ymin,_self.ymin,
+				     :xmax,_self.xmax,:ymax,_self.ymax)
+_endmethod
+$

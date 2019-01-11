@@ -1,0 +1,438 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## This is a data structure that stores information about
+## calls in a method in memory.
+## All method call will be translated into an instance of
+## this class (or the information of a call will be added
+## to an existing instance of the class).
+##
+def_slotted_exemplar( :sf!method_call_stats,
+{
+	{ :method_name,	    _unset },
+	{ :receivers,	    _unset },
+	{ :receiver_count,  _unset },
+	{ :line_info,	    _unset },
+	{ :call_count,	    _unset },
+	{ :call_infos,	    _unset },
+	{ :sorted_methods,  _unset },
+	{ :top_level_calls, _unset },
+	{ :file_path,       _unset }
+},
+{ :slotted_format_mixin } )
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+sf!method_call_stats.define_shared_variable( :message_handler,
+	_unset,
+	:private )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :method_name, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :receivers, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :receiver_count, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :line_info, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :call_count, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :call_infos, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :sorted_methods, :write, :private )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :top_level_calls, :write, :readonly )
+$
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+sf!method_call_stats.define_slot_access( :file_path, :write, :readonly )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_call_stats.new( a_method_name, a_receiver, a_line_info,
+				  _optional top_level?, a_source_file_path )
+
+	## Returns an initialized instance of _self
+
+	>> _clone.init( a_method_name, a_receiver, a_line_info,
+			top_level? _is _true, a_source_file_path )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_call_stats.add_call_info( a_method_name, a_receiver, a_line_info )
+
+	## Add the information to _self that A_METHOD_NAME was
+	## called from A_RECEIVER. The call was specified on line
+	## A_LINE_INFO.
+
+	_local lookup
+
+	_if _not _self.sorted_methods.includes?( a_method_name )
+	_then
+		_self.sorted_methods.add( a_method_name )
+	_endif
+
+	_if ( data << _self.call_infos[ a_method_name ] ) _isnt _unset
+	_then
+		data.increment_call_count()
+		data.add_to_receivers( a_receiver, a_line_info )
+		data.add_line_info_list( a_line_info )
+	_else
+		_self.call_infos[ a_method_name ] <<
+			_self.new( a_method_name, a_receiver, a_line_info )
+	_endif
+
+	_self.top_level_calls +<< 1
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_call_stats.message( a_msg_id, _gather args )
+
+	## Helper method to obtain a string from the message system.
+
+	_local mh << _self.message_handler
+
+	_if mh _is _unset
+	_then
+		mh << _self.message_handler <<
+			sw:message_handler.new( _self.class_name )
+	_endif
+
+	>> mh.human_string( a_msg_id, _unset, _scatter args )
+_endmethod
+$
+
+
+_pragma(classify_level=debug, topic={Magik,QA})
+_method sf!method_call_stats.print_on( a_stream )
+
+	## Provide an external representation of _self.
+
+	_local data
+	_local info
+	_local cnt
+
+	_if .method_name _is _unset
+	_then
+		a_stream.write(
+		    _self.message( :no_object_info_nl, _self.class_name ) )
+		_return
+	_else
+		a_stream.write(
+		    _self.message( :object_info_nl,
+				   _self.class_name, .receivers.an_element(),
+				   .method_name, .line_info.an_element() ) )
+	_endif
+
+	a_stream.write( _self.message( :header_info_nl ) )
+	_for a_key _over _self.sorted_methods()
+	_loop
+	    data << .call_infos[ a_key ]
+	    _for a_rcv _over data.receivers.fast_elements()
+	    _loop
+		    info << data.receiver_count[ a_rcv ]
+		    a_stream.write(
+			_self.message( :call_info_nl,
+				       cnt << info.first,
+				       a_rcv, data.method_name,
+				       info.last.join_as_strings( %, ) ) )
+		_endloop
+	_endloop
+
+	a_stream.write( _self.message( :footer_info_nl, .top_level_calls ) )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_call_stats.as_display_tree( _optional expand? )
+
+	## Convert the information in _self to a display_tree object.
+
+	_local tl_ss    << _self.top_level_styled_string
+	_local ss       << _self.styled_string
+	_local children << sw:rope.new()
+	_local data
+	_local pl
+	_local dt
+
+	_for a_key _over _self.sorted_methods()
+	_loop
+		data << .call_infos[ a_key ]
+		_for a_rcv _over data.receivers.fast_elements()
+		_loop
+			vals << data.receiver_count[ a_rcv ]
+			pl   << sw:property_list.new_with(
+				    :count,  vals.first,
+				    :model,  a_rcv,
+				    :method, data.method_name,
+				    :lines,  vals.last.join_as_strings( %, ) )
+			dt << sw:display_tree.new( data, pl )
+			dt.styled_string << ss
+			children.add_last( dt )
+		_endloop
+	_endloop
+
+	pl << sw:property_list.new_with(
+		  :call_count, _self.top_level_calls,
+		  :model,      .receivers.an_element(),
+		  :method,     .method_name,
+		  :line,       .line_info.an_element() )
+	dt << sw:display_tree.new( _self, pl, _unset, children )
+	dt.styled_string << tl_ss
+
+	_if expand? _isnt _false _then dt.expand_fully() _endif
+
+	>> dt
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+_method sf!method_call_stats.remove_call_info(
+		a_min_call_count, _optional ignore_call_info )
+
+	## Remove all items from the call information where fewer
+	## than A_MIN_CALL_COUNT have been found.
+	##
+	## A_MIN_CALL_COUNT must be an integer greater or equal to zero.
+	##
+	## IGNORE_CALL_INFO is a nested equality_hash_table, where the
+	##	first key is a method name and the second key is a
+	##	class name.
+
+	_if a_min_call_count < 1 _andif
+	    ( ignore_call_info _is _unset _orif
+	      ignore_call_info.empty? )
+	_then
+		_return
+	_endif
+
+	_local data
+	_local rcv_info
+	_local cnt_info
+	_local lookup
+
+	_if ignore_call_info _is _unset
+	_then
+		ignore_call_info << equality_hash_table
+	_endif
+
+	_for a_key _over _self.sorted_methods()
+	_loop
+		lookup << ignore_call_info[ a_key ]
+		data   << .call_infos[ a_key ]
+
+		_for a_rcv _over data.receivers.elements()
+		_loop
+			rcv_info << data.receiver_count
+			cnt_info << rcv_info[ a_rcv ]
+
+			_if cnt_info.first <= a_min_call_count _orif
+			    ( lookup _isnt _unset _andif
+			      ( lookup.includes_key?( a_rcv ) _orif
+				lookup.includes_key?( :|*| ) ) )
+			_then
+				rcv_info.remove_key( a_rcv )
+				data.receivers.remove( a_rcv )
+			_endif
+		_endloop
+	_endloop
+
+	>> _self
+_endmethod
+$
+
+
+##
+##	P R I V A T E   I N T E R F A C E
+##	_________________________________
+##
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _method sf!method_call_stats.init( a_method_name, a_receiver,
+					    a_line_info, top_level?,
+					    a_source_file_path )
+
+	## Initialize and return _self.
+
+	.method_name << a_method_name
+	.receivers   << sw:sorted_collection.new_with( a_receiver )
+	.line_info   << { a_line_info }
+	.file_path   << a_source_file_path
+
+	_if top_level?
+	_then
+		.call_count      << _unset
+		.top_level_calls << 0
+		.call_infos      << sw:equality_hash_table.new()
+		.sorted_methods  << sw:sorted_collection.new()
+		.receiver_count  << 0
+	_else
+		.call_count      << 1
+		.top_level_calls << _unset
+		.call_infos      << _unset
+		.sorted_methods  << _unset
+		.receiver_count  << sw:equality_hash_table.new_with(
+					   a_receiver,
+					   { 1, { a_line_info } } )
+	_endif
+
+	>> _self
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_private _iter _method sf!method_call_stats.sorted_methods()
+
+	## Helper method to retrieve all method names that
+	## have been collected within a method.
+
+	_for a_method_name _over .sorted_methods.default( {} ).fast_elements()
+	_loop
+		_loopbody( a_method_name )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA})
+_private _method sf!method_call_stats.top_level?
+
+	## Returns a Boolean to indicate if self represents data
+ 	## *for* a method (_true) or is a call *in* a method (false)
+
+	>> .call_count _is _unset
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA})
+_private _method sf!method_call_stats.top_level_styled_string
+
+	## Styled string for a display_tree object (of _self) that
+	## represents a method definition.
+
+	>> { :blue, :value, :call_count, :tab_left,
+	     :blue, :value, :model, :tab,
+	     :blue, :value, :method, :tab,
+	     :blue, :value, :line }
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={Magik,QA})
+_private _method sf!method_call_stats.styled_string
+
+	## Styled string for a display_tree object (of _self) that
+	## represents a method call.
+
+	>> { :value, :count,  :tab, :value, :model, :tab,
+	     :value, :method, :tab, :value, :lines }
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!method_call_stats.increment_call_count( _optional a_value )
+
+	## Add A_VALUE to the current value in slot call_count.
+
+	>> .call_count +<< a_value.default( 1 )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!method_call_stats.add_to_receivers( a_model_name, a_line_number )
+
+	## Add A_MODEL_NAME to the call_infos list if not there yet.
+	## Returns a Boolean to indicate if the alue has been added or not.
+
+	_local lookup
+	_local list
+
+	>> _if ( lookup << _self.receivers ).includes?( a_model_name )
+	   _then
+		   data << _self.receiver_count[ a_model_name ]
+		   data[ 1 ] +<< 1
+		   _if _not ( list << data[ 2 ] ).includes?( a_line_number )
+		   _then
+			   data[ 2 ] << {}.concatenation(
+						  list, { a_line_number } )
+		   _endif
+		   >> _false
+	   _else
+		   _self.receiver_count[ a_model_name ] <<
+			   { 1, { a_line_number } }
+		   lookup.add( a_model_name )
+		   >> _true
+	   _endif	
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Magik,QA})
+_method sf!method_call_stats.add_line_info_list( a_line_number )
+
+	## Add A_LINE_NUMBER to the line_info list if not there yet.
+	## Returns a Boolean to indicate if the alue has been added or not.
+
+	_local lookup
+
+	>> _if _not ( lookup << _self.line_info ).includes?( a_line_number )
+	   _then
+		   _self.line_info <<
+			   {}.concatenation( lookup, { a_line_number } )
+		   >> _true
+	   _else
+		   >> _false
+	   _endif	
+_endmethod
+$

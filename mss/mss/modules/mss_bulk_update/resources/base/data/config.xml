@@ -1,0 +1,6 @@
+<config>
+  <plugins>
+    <plugin name="mss_bulk_update_plugin" class_name="mss_bulk_update_plugin"/>
+    <plugin name="mss_bu_editor_field_lister" class_name="mss_bu_editor_field_lister"/>
+  </plugins>
+</config>

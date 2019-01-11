@@ -1,0 +1,404 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_common})
+##
+## mss_http_generic_request_response
+##
+## Behavior common to general HTTP requests and responses.
+##
+## Note that some of these methods may only be applicable to
+## certain types of requests and/or responses.  For example,
+## it only makes sense to set a header (using the
+## set_header_field() method) on a client request or on a
+## server response; but not on a client response or a server
+## request.  But, it is legitimate to ask for a header field
+## (using the get_header_field() method) on anything.  In cases 
+## where the caller is responsible for knowing whether or
+## not something applies, the method will be marked as
+## advanced. 
+##
+
+def_slotted_exemplar(:mss_http_generic_request_response,
+{
+	{:connection, _unset},
+	{:header_fields, _unset},
+	{:options, _unset},
+	{:timed_out?, _unset},
+	{:int!heartbeat_manager, _unset}
+},
+{})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_generic_request_response.define_slot_access(
+	:connection,
+	## The underlying tcpip_connection.
+	:writable, :readonly)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_generic_request_response.define_slot_access(
+	:timed_out?,
+	## For operations which are subject to timeout, this will be
+	## true if it did in fact time out.
+	:writable)
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+mss_http_generic_request_response.define_shared_constant(
+	:option_types,
+	## A set of option types recongized by this class.
+	set.new(),
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_common}, usage={subclassable})
+_method mss_http_generic_request_response.new(_gather keys_and_vals)
+	## 
+	## Create a new instance.  KEYS_AND_VALS are key/value pairs
+	## that represent either an option to set (if the key is found
+	## in self.option_types), or a slot to set.
+	##
+
+	_return _clone.init(_scatter keys_and_vals)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_generic_request_response.init(_gather keys_and_vals)
+	## 
+	## Initialize standard defaults, and override these with
+	## whatever is provided in KEYS_AND_VALS.
+	##
+
+	_self.init_defaults()
+	
+	args << property_list.new_with(_scatter keys_and_vals)
+	opt_types << _self.option_types
+	_for i, j _over args.fast_keys_and_elements()
+	_loop
+		_if opt_types.includes?(i)
+		_then
+			_self.set_option(i, j)
+		_else 
+			_self.perform_private(i.with_chevron, j)
+		_endif 
+	_endloop
+
+	_self.have_post_mortem(_true)
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_generic_request_response.init_defaults()
+	## 
+	## Set standard defaults for this request.
+	## 
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_generic_request_response.header_fields
+	## 
+	## An equality_property_list of header information.
+	##
+
+	_if .header_fields _is _unset
+	_then 
+		.header_fields << equality_property_list.new()
+	_endif
+	_return .header_fields
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_generic_request_response.options
+	## 
+	## A property_list of extensible option information.
+	## Subclasses can store any request-specific options here.
+	##
+
+	_if .options _is _unset
+	_then 
+		.options << property_list.new()
+	_endif
+	_return .options
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_generic_request_response.message_handler
+	##
+	## Returns self's message_handler.
+	##
+
+	# As for sw_component: each subclass gets its own message
+	# handler, which will use the top-level message handler on this
+	# class. 
+	
+	_if (meth << _self.method(:local_message_handler)) _is _unset _orif 
+	    meth.owner _isnt _self.method_table
+	_then
+		mh << message_handler.new(_self.class_name)
+		_if _self.class_name _isnt :mss_http_generic_request_response _andif
+		    _not mh.uses?(:mss_http_generic_request_response)
+		_then
+			mh.add_use(:mss_http_generic_request_response)
+		_endif
+		_self.define_shared_constant(:local_message_handler, mh, :private)
+	_endif
+
+	_return _self.local_message_handler
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_generic_request_response.message(message_id, _gather args)
+	## 
+	## Standard message accessor protocol.
+	##
+
+	_return _self.message_handler.human_string(message_id, _unset, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_generic_request_response.get_header_field(key)
+	## 
+	## Get the header field named KEY.
+	##
+
+	# N.B.: Check for existing key is done in a case-insensitive
+	# manner.
+	pl << _self.header_fields
+	lc_key << key.write_string.lowercase
+	_for i, j _over pl.fast_keys_and_elements()
+	_loop
+		_if i.lowercase = lc_key
+		_then
+			_return j
+		_endif
+	_endloop
+
+	_return _unset 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_generic_request_response.set_header_field(key, val)
+	## 
+	## Set the header field named KEY to be VAL.
+	##
+
+	# N.B.: Check for existing key is done in a case-insensitive
+	# manner, but the key itself is stored in whatever
+	# capitalization is specified if provided for the first time.
+	pl << _self.header_fields
+	lc_key << key.write_string.lowercase
+	_for i, j _over pl.fast_keys_and_elements()
+	_loop
+		_if i.lowercase = lc_key
+		_then
+			pl[i] << val
+			_return val
+		_endif
+	_endloop
+
+	# No matching key - set a new one.
+	pl[key.write_string] << val
+	_return val
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_generic_request_response.get_option(x)
+	## 
+	## Get the value of the option named X.
+	##
+
+	_return _self.options[x]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_generic_request_response.set_option(x, val)
+	## 
+	## Set the value of the option named X to be VAL.
+	##
+
+	_self.options[x] << val
+	_return val
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_generic_request_response.post_mortem()
+	## 
+	## If a local heartbeat manager exists, clean it up.
+	##
+
+	_self.terminate_local_heartbeat_manager()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_generic_request_response.terminate()
+	## 
+	## Terminate all resources that are no longer needed.
+	##
+
+	_self.terminate_local_heartbeat_manager()
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_generic_request_response.terminate_local_heartbeat_manager()
+	##
+	## If a local heartbeat manager is used, terminate it now.
+	##
+	
+	_if (x << .int!heartbeat_manager) _isnt _unset
+	_then
+		.int!heartbeat_manager << _unset
+		x.stop()
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_generic_request_response.close_connection()
+	## 
+	## Close self's connection, if it exists.
+	##
+
+	_if (x << .connection) _isnt _unset
+	_then
+		.connection << _unset
+		_try
+			x.close()
+		_when error
+		      # Forcibly close it.
+		      _try
+			      x.close(_true)
+		      _when error
+		      _endtry
+		_endtry
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common})
+_method mss_http_generic_request_response.perform_with_timeout(timeout, keep_local_hb?, meth, _gather args)
+	## 
+	## Perform method METH / ARGS with a timeout period of TIMEOUT
+	## milliseconds.  If KEEP_LOCAL_HB? is true, and if a local
+	## hearbeat manager was generated for this request, then it
+	## will be retained (so that it can be reused across multiple
+	## invocations) - but the caller must ensure that it is cleaned
+	## up eventually, via terminate_local_heartbeat_manager().
+	##
+
+	_local tag << write_string("perform_with_timeout_", meth).copy()
+	_local me << _self
+	.timed_out? << _false 
+	_protect
+		new_hbm? << (.int!heartbeat_manager _is _unset)
+		_if (hb_mgr <<_self.local_heartbeat_manager()) _is _unset
+		_then
+			# Can't get a heartbeat manager, so have to automatically say
+			# that self is timed out.
+			.timed_out? << _true
+			_return
+		_endif 
+		timeout_mgr << hb_mgr.timeout_manager
+
+		# N.B.: this is intentionally NOT clearing any pre-existing
+		# timeout on this thread.  It is legitimate for multiple
+		# instances of timeouts for a thread to be managed by the
+		# timeout manager, and so if there is already one on there,
+		# assume it is intentional.
+		timeout_mgr.set_timeout(timeout, _unset, tag, _self)
+		_catch :timeout
+		       _handling mss_timeout_expiry _with
+		       _proc(cond)
+			       _import me, tag
+			       _if cond[:tag] _is tag
+			       _then
+				       # This is my timeout.
+				       me.timed_out? << _true
+				       _throw :timeout
+			       _else
+				       # This is a timeout placed on the heartbeat manager by
+				       # something else.
+				       cond.continue_handling()
+			       _endif 
+		       _endproc 
+		       _return _self.perform_private(meth, _scatter args)
+		_endcatch
+	_protection
+		_if .timed_out? _isnt _true
+		_then
+			# If timed out, then the timeout manager has already popped
+			# this thread from the queue.  But if not, then pop it now.
+			timeout_mgr.mss_clear_earliest_timeout_with_tag(tag)
+		_endif 
+
+		# If the heartbeat thread was obtained from elsewhere, it can
+		# just keep running.  But if it was instantiated just for self,
+		# then kill it unless told otherwise.
+		_if new_hbm? _is _true _andif
+		    keep_local_hb? _isnt _true
+		_then
+			_self.terminate_local_heartbeat_manager()
+		_endif
+	_endprotect
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_generic_request_response.local_heartbeat_manager()
+	##
+	## Start running a manager to provide a heartbeat for self.
+	## These should be reused wherever possible, so if a
+	## subclass can get this from a central location (i.e. a server
+	## managing server connections), it should do so.
+	## 
+
+	_if (x << .int!heartbeat_manager) _is _unset
+	_then
+		x << .int!heartbeat_manager << mss_http_heartbeat_manager.new()
+	_endif
+	_if x.thread _is _unset
+	_then
+		x.run()
+	_endif 
+	_return x
+	
+_endmethod
+$

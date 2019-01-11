@@ -1,0 +1,10 @@
+mclib_dynamic_case_application	4000
+
+description
+	An example CASE application setup to load the CASE modules dynamically into any image before starting
+end
+
+requires
+	mclib_dynamic_applications
+	mclib_package
+end

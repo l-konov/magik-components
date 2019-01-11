@@ -1,0 +1,193 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2007 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_common})
+##
+## mss_http_client_response
+##
+## Wrapper to format information received as part of a
+## mss_http_client_request.
+##
+
+def_slotted_exemplar(:mss_http_client_response,
+{
+	{:http_version, _unset},
+	{:status_code, _unset},
+	{:reason_phrase, _unset},
+	{:response_body, _unset}
+},
+{:mss_http_generic_request_response})
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_response.define_slot_access(
+	:http_version,
+	## The HTTP protocol version returned.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_response.define_slot_access(
+	:status_code,
+	## The status code returned, as an integer.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_response.define_slot_access(
+	:reason_phrase,
+	## The reason phrase returned, as an string.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+mss_http_client_response.define_slot_access(
+	:response_body,
+	## The body of the response, as a stream.
+	:readable)
+$
+
+_pragma(classify_level=basic, topic={mss_common})
+_method mss_http_client_response.new_from_stream(s)
+	## 
+	## Build a response from the data on stream S.
+	##
+
+	_return _clone.init_from_stream(s)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common})
+_method mss_http_client_response.init_from_stream(s)
+	## 
+	## Build a response from the data on stream S.
+	##
+
+	_self.process_response_header(s)
+	_self.process_response_body(s)
+
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_response.process_response_header(in)
+	## 
+	## Get header data from IN, the input stream of the connection.  
+	##
+
+	# Treat everything up to the first empty line as the header.
+	pl << _self.header_fields
+	first? << _true 
+	_loop
+		_if (l << in.mss_get_ascii_line()) _is _unset _then _leave _endif
+		l << l.trim_spaces()
+		_if l = ""
+		_then
+			_leave
+		_endif
+		
+		_if first?
+		_then
+			# The first line contains response code and text.
+			l << l.trim_spaces()
+			r << rope.new()
+			_if (idx1 << l.index_of(% )) _isnt _unset
+			_then
+				r.add_last(l.slice(1, idx1 - 1).trim_spaces())
+				l << l.slice_to_end(idx1 + 1).trim_spaces()
+			_endif 
+			_if (idx1 << l.index_of(% )) _isnt _unset
+			_then
+				r.add_last(l.slice(1, idx1 - 1).trim_spaces())
+				l << l.slice_to_end(idx1 + 1).trim_spaces()
+			_endif
+			_if l.size > 0
+			_then 
+				r.add_last(l)
+			_endif
+
+			_if r.size >= 1 _andif
+			    r[1].index_of_seq("HTTP/") = 1
+			_then
+				.http_version << r[1].slice_to_end(6)
+			_endif
+			_if r.size >= 2
+			_then
+				.status_code << r[2].default("").as_integer()
+			_endif
+			_if r.size >= 3
+			_then
+				.reason_phrase << r[3]
+			_endif 
+			first? << _false
+			_continue 
+		_endif
+
+		# For remaining lines, split result by :
+		_if (idx << l.index_of(%:)) _isnt _unset
+		_then
+			pl[l.slice(1, idx - 1).trim_spaces()] << l.slice_to_end(idx + 1).trim_spaces()
+		_endif 
+	_endloop
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_common}, usage={subclassable})
+_method mss_http_client_response.process_response_body(in)
+	## 
+	## Get response body data from IN, the input stream of the connection.  
+	##
+	## N.B.: this is NOT HTTP/1.1 compliant, as it assumes that the
+	## input stream connection is immediately closed.  If you have a
+	## specific HTTP/1.1 requirement to satisfy (and must therefore
+	## support a persistent connection that will not immediately be
+	## closed), then this must be changed to make use of the
+	## Content-Length header and/or Transfer-Encoding = chunked
+	## header.  Otherwise, it will hang  after reading the last
+	## input line due to the blocking but still-open input connection.
+	##
+	
+	s << internal_text_output_stream.new()
+	nl << newline_char
+	size_c << 0
+	line_c << 0
+	_loop
+		_if (l << in.mss_get_ascii_line()) _is _unset _then _leave _endif
+		size_c +<< l.size + 2  # For CR and LF.
+		line_c +<< 1
+		s.write(l, nl)
+	_endloop
+	
+	.response_body << s
+	_return s
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_common}, usage={subclassable})
+_method mss_http_client_response.response_body_as_xml()
+	## 
+	## Convert self's response_body stream to a simple_xml_thing.
+	## Caller must ensure that it can be processed as XML input.
+	##
+
+	_if .response_body _is _unset
+	_then
+		_return _unset
+	_endif 
+	_return simple_xml.read_document_from(.response_body.string.read_stream())
+
+_endmethod
+$

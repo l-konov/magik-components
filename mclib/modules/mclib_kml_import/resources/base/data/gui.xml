@@ -1,0 +1,18 @@
+<gui>
+
+  <toolbar name="import">
+    <action name="kml_import.open_dataset"/>
+    <action name="kml_import.close_dataset"/>
+    <action name="kml_import.url"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="import"/>
+  </dock>
+  
+  <work_area>
+    <paned_window>
+      <plugin plugin_name="explorer"/>
+    </paned_window>
+  </work_area>
+</gui>

@@ -1,0 +1,11 @@
+mss_cu_editor	1
+
+description
+	MSS editor extensions for Compatible Units
+end
+
+requires
+	mss_cu_data_model
+	mss_cu_engine
+	mss_cu_query
+end

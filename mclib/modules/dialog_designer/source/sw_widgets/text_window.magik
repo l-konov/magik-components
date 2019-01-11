@@ -1,0 +1,254 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## TEXT_WINDOW - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+text_window.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :contents,:string,
+					  :horizontal_scrollbar?,:boolean,
+					  :vertical_scrollbar?,:boolean,
+					  :row_alignment,  {:fill,:top,:centre,:bottom},
+					  :col_alignment,  {:fill,:left,:centre,:right},
+					  :rows,:integer,
+					  :cols,:integer,
+					  :editable?,:boolean),
+#					  :overlay?,:boolean),
+#				  :font_size,:integer),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over text_window.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	props.remove_key(:label)
+	props.remove_key(:balloon_tooltip)
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.font_size
+	## 
+	## Return font size, default = 12.
+	
+	>> _if _self.font _is _unset 
+	   _then
+		   >> 12
+	   _else 
+		   >> _self.font.point_size  
+	   _endif
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.font_size << newval
+	## 
+	## Set the font size.
+	
+	_self.font << font.new_with_properties(:type,:logical,
+					       :name,"fixed",
+					       :point_size,newval.as_number().default(12))
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.default_min_width
+	## 
+	## Return the minimum default rendering width.
+
+	_self.cols << max(5,_self.cols.default(10).abs)
+
+	vts << vtext_style.new(_self.font)
+	txt_w << vts.box_coordinates(".").bounds.width.floor
+
+	>> max(_self.cols*txt_w / 1.35,30).floor
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.default_min_height
+	## 
+	## Return the minimum default rendering height.
+
+	_self.rows << max(2,_self.rows.default(5).abs)
+	>> _self.font_size * _self.rows
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	>> _self.new(rc,_unset,_unset,_unset,
+		     :font,font.new_with_properties(:type,:logical,:name,"fixed",:point_size,12),
+		     :row,row,:col,col,
+		     :col_alignment,:fill,
+		     :row_alignment,:fill,
+		     :cols,20,:rows,10,
+		     :editable?,_true,
+		     :vertical_scrollbar?,_true,
+		     :horizontal_scrollbar?,_false )
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+	
+	>> _self.new(parent,_unset,_unset,_unset,_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.render_on(canv,bb)
+	## 
+	## Render SELF on the canvas CANV.
+
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	!dialog_element_footprints![pbb] << _self
+	
+	_if _self.editable?.default(_true)
+	_then
+		fs << fill_style.new_solid(colour.called(:white))	
+	_else 
+		fs << fill_style.new_solid(colour.called(:lightgrey))		
+	_endif
+	
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	st << fill_style.new_with_properties(:foreground_colour,colour.new_rgb(0.4,0.4,0.4),
+					     :wash_percent,25)
+
+	_if _self.vertical_scrollbar?.default(_false)
+	_then
+		sbb << pixel_bounding_box.new(pbb.xmax-8,pbb.ymin,pbb.xmax,pbb.ymax)
+		st.realise()
+
+		pp << pseudo_polygon.new_with_sectors(sbb.boundary.sectors)
+		pp.draw_filled_on(canv,st)	
+	_endif
+	
+	_if _self.horizontal_scrollbar?.default(_false)
+	_then
+		sbb << pixel_bounding_box.new(pbb.xmin,pbb.ymax-8,pbb.xmax,pbb.ymax)
+		st.realise()
+
+		pp << pseudo_polygon.new_with_sectors(sbb.boundary.sectors)
+		pp.draw_filled_on(canv,st)	
+	_endif
+	
+	x0 << pbb.xmin
+	y0 << pbb.ymin
+
+#	_if _not _self.overlay?
+#	_then
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:lightgrey),:width,1)
+		canv.draw_segment(ls,x0,y0+h-1,x0+w,y0+h-1)
+		canv.draw_segment(ls,x0+w-1,y0+h-1,x0+w-1,y0)
+
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:black),:width,1)
+		canv.draw_segment(ls,x0,y0,x0+w,y0)
+		canv.draw_segment(ls,x0,y0+h,x0,y0)
+
+		ls << line_style.new_with_properties(:foreground_colour,colour.called(:white),:width,1)
+		canv.draw_segment(ls,x0,y0+h,x0+w,y0+h)
+		canv.draw_segment(ls,x0+w,y0+h,x0+w,y0-1)		
+#	_endif
+
+	ts << text_style.new_with_properties(:colour,colour.called(:black),
+					     :font,_self.font)
+	canv.draw_text(ts,pbb.xmin+3,pbb.ymin+15,_self.truncated_text(_self.value,w))
+
+	ras << smallworld_product.get_raster_image(:text_window,:dialog_designer)
+	canv.render_raster(ras,pbb.centre.x-8,pbb.centre.y-8,_false)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.truncated_text(txt,max_width)
+	## 
+	## Return the truncated version of SELF's text that fits into
+	## the rendering.
+	
+	vts << vtext_style.new(_self.font)
+	new_txt << txt.default("").write_string
+
+	t << 3
+	_loop
+		txt_w << vts.box_coordinates(new_txt).bounds.width.floor
+
+		_if txt_w < max_width-9
+		_then
+			_leave 
+		_endif
+
+		t +<< 1
+
+		new_txt << txt.slice(1,txt.size-t) + " ..."
+	_endloop
+
+	>> new_txt
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method text_window.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id,
+		  "] << text_window.new(",parent_id,%,,"_unset,_unset,_unset")
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		_if _self.parent.dialog_element_id.index_of_seq("paned_window") _isnt _unset _andif
+		    (n.index_of_seq("_alignment") _isnt _unset _orif n = "row" _orif n="col")
+		_then
+			_continue
+		_endif
+		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*3,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	txt.write(" )",%newline)
+_endmethod
+$

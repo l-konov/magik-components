@@ -1,0 +1,553 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_plugin
+##
+## GUI used to display and select pointing rules.
+##
+
+def_slotted_exemplar(:mss_ptrule_plugin,
+{
+	{:ptdef_list, _unset, :readable},
+	{:active_ptrule, _unset, :readable},
+	{:items, _unset, :readable}
+},
+{:plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_plugin.define_shared_constant(
+	:databus_producer_data_types,
+	{:active_ptrule, :ptrule_plugin},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.init(name, framework)
+	## 
+	## 
+
+	_super.init(name, framework)
+	
+	.items << property_list.new()
+	_self.set_ptdef_list()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:refresh,
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh()|))
+	_self.add_action(sw_action.new(:activate_options_dialog,
+				       :image, {:settings, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|activate_options_dialog()|))
+
+	# Note that in the current architecture, self's ptrule_manager
+	# must exist, and there is a parent-child dependency from the
+	# manager to the GUI (or multiple GUIs).
+	_if (mgr << _self.ptrule_manager) _is _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_ptrule_manager))
+	_endif
+	_for i _over mgr.actions()
+	_loop 
+		_self.add_action(i)
+	_endloop
+	mgr.add_dependent(_self)
+	.active_ptrule << mgr.active_ptrule
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.build_gui(a_container, _optional xml_element)
+	## 
+	## Standard build_gui method.
+	##
+
+	_if xml_element _isnt _unset _andif
+	    xml_element.attributes["gui_usage"] = "long_help"
+	_then
+		_return _self.build_long_help_gui(a_container, xml_element)
+	_endif 
+	
+	p << panel.new(a_container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << p.resize_y? << _true
+
+	.items[:ptdef_list] <<
+		tree_item.new(p,
+			      :resize_x?, _true,
+			      :resize_y?, _true,
+			      :width_in_chars, 50,
+			      :height_in_chars, 15,
+			      :model, _self,
+			      :aspect, :ptdef_list,
+			      :mode, :one,
+			      :data_selector, :ptdef_list,
+			      :select_notifier, {:|perform_safely()|, :|ptdef_list_select()|})
+
+	p.start_row()
+	.items[:active_ptrule_text] <<
+		label_item.new(p, _self.active_ptrule_text,
+			      :model, _self,
+			      :aspect, :active_ptrule_text)
+
+	_return p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.build_long_help_gui(a_container, _optional xml_element)
+	## 
+	## Create the long help window only.
+	##
+
+	p << panel.new(a_container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << 2
+	p.width_spacing << 6
+	p.resize_x? << p.resize_y? << _true
+	p.tab_label << _self.message(:help)
+	
+	p.start_row()
+	.items[:help_text] << text_window.new(p, 8, 50, _unset,
+					      :resize_x?, _true,
+					      :resize_y?, _true,
+					      :editable?, _false,
+					      :horizontal_scrollbar?, _false)
+
+	_return p
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.post_build_gui()
+	## 
+	## 
+
+	# Note that in the current architecture, self's ptrule_manager
+	# must exist, and there is a parent-child dependency from the
+	# manager to the GUI (or multiple GUIs).
+	mgr << _self.ptrule_manager
+	mgr.add_dependent(_self)
+	.active_ptrule << mgr.active_ptrule
+	_self.report_active_ptrule(.active_ptrule)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.terminate()
+	## 
+	## 
+
+	_super.terminate()
+	_if (mgr << _self.ptrule_manager) _isnt _unset
+	_then
+		mgr.remove_dependent(_self)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.note_change(who, what, data)
+	## 
+	## 
+
+	_if what _is :active_ptrule
+	_then
+		.active_ptrule << data
+		_self.report_active_ptrule(data)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_if data_type_name _is :active_ptrule
+	_then
+		_return .active_ptrule
+	_elif data_type_name _is :ptrule_plugin
+	_then
+		_return _self
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_plugin.ptdef_list_tree_item
+	## 
+	## Return the tree_item displaying ptdef_list.
+	##
+
+	_return .items[:ptdef_list]
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.activate_options_dialog()
+	## 
+	## 
+
+	_if (m << _self.get_dialog(:options)) _is _unset
+	_then
+		m << mss_ptrule_options_menu.new_dialog(_self, _self.ptrule_manager)
+		_self.cache_dialog(:options, m)
+		_if (ti << _self.ptdef_list_tree_item) _isnt _unset
+		_then
+			m.activate_relative_to(_unset, ti, 5, 5)
+		_else 
+			m.activate()
+		_endif 
+	_else
+		m.reactivate()
+	_endif
+	
+_endmethod
+$
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.ptdef_list_select(selection, user_initiated?)
+	## 
+	## 
+
+	ptdef << _unset 
+	_if selection.size = 1
+	_then 
+		ptdef << selection.an_element().value[:ptdef]
+		_if ptdef _isnt _unset _andif
+		    _not ptdef.is_valid?
+		_then
+			ptdef << _unset
+		_endif
+	_endif
+	_if ptdef _isnt _unset
+	_then
+		_if user_initiated? _is _false
+		_then
+			# Do not do anything if this is a result of a refresh list
+			# operation, and if this is the same as the ptdef of the active
+			# pointing rule.
+			_if (old_pr << _self.active_ptrule) _isnt _unset _andif
+			    (old_ptdef << old_pr.ptdef) _isnt _unset _andif
+			    old_ptdef.is_valid? _andif
+			    old_ptdef = ptdef
+			_then
+				_return
+			_endif 
+		_endif 
+		
+		_self.activate_ptdef(ptdef)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_plugin.ptrule_manager
+	## 
+	## 
+
+	_return _self.application.plugin(:mss_ptrule_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_plugin.activate_ptdef(ptdef)
+	## 
+	## 
+
+	_if ptdef _isnt _unset
+	_then 
+		_if (mgr << _self.ptrule_manager) _is _unset
+		_then
+			condition.raise(:user_error, :string, _self.message(:no_ptrule_manager))
+		_endif
+		ptrule << mgr.add_pointing_rule_from_definition(ptdef, _self)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.report_active_ptrule(a_ptrule)
+	## 
+	## 
+
+	_dynamic !mss_ptrule_plugin_check_select?!
+	
+	_self.databus_make_data_available(:active_ptrule, a_ptrule)
+	_if (hti << .items[:help_text]) _isnt _unset
+	_then
+		_if a_ptrule _isnt _unset
+		_then
+			ht << a_ptrule.help_text.default("").as_charvec()
+		_else
+			ht << ""
+		_endif 
+		hti.contents << ht
+	_endif
+	_self.changed(:active_ptrule_text)
+
+	_if (ti << _self.ptdef_list_tree_item) _isnt _unset _andif
+	    !mss_ptrule_plugin_check_select?! _isnt _false 
+	_then
+		_if (sel << (all_sel << ti.selection).an_element()) _isnt _unset
+		_then
+			_if (sel_ptdef << sel.value[:ptdef]) _is _unset _orif
+			    a_ptrule _is _unset _orif
+			    sel_ptdef ~= a_ptrule.ptdef
+			_then
+				# De-select this item.
+				all_sel.select_clear()
+			_endif
+		_endif 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.active_ptrule_text
+	## 
+	## 
+
+	_if .active_ptrule _is _unset
+	_then
+		_return _self.message(:no_active_pointing_rule)
+	_else
+		_return _self.message(:active_pointing_rule, .active_ptrule.name)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.refresh()
+	## 
+	## Refresh the contents of the pointing rule list.
+	##
+
+	_self.ptrule_manager.dbview.rollforward()
+	_self.set_ptdef_list()
+	_self.changed(:ptdef_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.set_ptdef_list()
+	## 
+	## Populate the tree structure for displaying pointing
+	## definitions organized into folders.
+	##
+
+	r << .ptdef_list << rope.new()
+	_if (root_name << _self.framework.root_ptdef_folder) _is _unset _orif
+	    root_name = ""
+	_then
+		_return r
+	_endif 
+
+	_if (dbv << mss_ptrule_manager.dbview) _is _unset _orif
+	    (tbl << dbv.collections[:mss_ptdef_folder]) _is _unset
+	_then
+		_return r
+	_endif
+	
+	_if (top_rec << tbl.select(predicate.eq(:parent_id, _unset) _and
+				   predicate.eq(:name, root_name)).an_element()) _is _unset
+	_then
+		condition.raise(:warning, :string, _self.message(:missing_root_folder))
+		_return r
+	_endif 
+
+	sstr1 << {:image, :folder, :value, :description}
+	sstr2 << {:image, :internal_table, :value, :description}
+
+	# For each top_rec, add child folders recursively.  Note that
+	# the root folder doesn't actually get displayed.
+	done << equality_set.new()
+	q << queue.new()
+	_for child_rec _over top_rec.child_folders.fast_elements()
+	_loop
+		q.add({child_rec, _unset})
+	_endloop
+	_for child_rec _over top_rec.child_ptdefs.fast_elements()
+	_loop
+		q.add({child_rec, _unset})
+	_endloop
+
+	_loop
+		_if q.size = 0 _then _leave _endif
+		data << q.next()
+		rec << data[1]
+		parent_tree << data[2]
+
+		_if rec.source_collection.name _is :mss_ptdef_folder
+		_then
+			# Only need to keep track of looping references for folders,
+			# not ptdefs.
+			_if done.includes?(rec) _then _continue _endif
+			done.add(rec)
+			
+			pl << property_list.new_with(
+				      :folder, rec,
+				      :description, rec.name.as_charvec())
+			new_tree << display_tree.new(rec.id, pl, parent_tree)
+			new_tree.styled_string << sstr1
+		_else
+			pl << property_list.new_with(
+				      :ptdef, rec,
+				      :description, rec.name.as_charvec())
+			new_tree << display_tree.new(rec.id, pl, parent_tree)
+			new_tree.styled_string << sstr2
+		_endif
+		
+		_if parent_tree _is _unset
+		_then
+			# This is a top-level folder: add it to the list.
+			r.add_last(new_tree)
+		_endif
+
+		_if rec.source_collection.name _is :mss_ptdef_folder
+		_then 
+			_for child_rec _over rec.child_folders.fast_elements()
+			_loop
+				q.add({child_rec, new_tree})
+			_endloop
+			_for child_rec _over rec.child_ptdefs.fast_elements()
+			_loop
+				q.add({child_rec, new_tree})
+			_endloop
+		_endif 
+	_endloop 
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_plugin.next_element_matching(description)
+	## 
+	## Return the next element in ptdef_list that matches
+	## DESCRIPTION.
+	##
+
+	# Deal with "\" being an escape character.
+	mod_desc << description.substitute_string("\", "\\")
+	
+	_if (ti << _self.ptdef_list_tree_item) _is _unset
+	_then
+		_return _unset
+	_endif
+	tm << ti.tree_manager
+	_if tm.selection.empty?
+	_then
+		cur_max << 0
+	_else
+		cur_max << tm.selection.end_row
+	_endif
+
+	first_tree << _unset 
+	_for tree _over ti.elements_matching(mod_desc)
+	_loop
+		_if first_tree _is _unset 
+		_then
+			# Set the first tree.
+			first_tree << tree
+		_endif
+
+		# Examine upwards from TREE through all parents, looking for
+		# the deepest visible display_tree greater than CUR_MAX.
+		_for test_tree _over tree.branch_to_root()
+		_loop
+			_if test_tree _is tree
+			_then
+				# If we're looking at the matching tree in question, then the
+				# comparison index must be greater than CUR_MAX.
+				cmp_index << cur_max
+			_else
+				# If we're looking at a parent of the matching tree in
+				# question, then the comparison index must be greater than or
+				# equal to CUR_MAX.  This allows for the possibility that the
+				# currently selected element is a folder that matches MOD_DESC,
+				# and that it contains (not-yet-visible) pointing rules that
+				# also match MOD_DESC.
+				cmp_index << cur_max - 1
+			_endif 
+			_if test_tree.visible? _andif
+			    (new_index << tm.index_of_tree(test_tree)) _isnt _unset _andif
+			    new_index > cmp_index
+			_then
+				_return tree
+			_endif 
+		_endloop
+	_endloop
+
+	# Either if no matching tree found at all, or if the next
+	# matching tree was after the end of the list, then return the
+	# first element found (if set), which will wrap the search back
+	# to the start.
+	_return first_tree
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method mss_ptrule_plugin.find_next_ptdef_list_entry_by_name(description)
+	## 
+	## Locate and select the next element in the ptdef_list that
+	## matches DESCRIPTION.
+	##
+
+	_if (dt << _self.next_element_matching(description)) _is _unset
+	_then
+		# Remove first/last wildcards.
+		mod_desc << description
+		_if mod_desc.size > 0 _andif mod_desc.first = %*
+		_then
+			mod_desc << mod_desc.slice_to_end(2)
+		_endif 
+		_if mod_desc.size > 0 _andif mod_desc.last = %*
+		_then
+			mod_desc << mod_desc.slice(1, mod_desc.size - 1)
+		_endif 
+		condition.raise(:user_error, :string, _self.message(:no_match_by_name, mod_desc))
+	_endif 
+
+	ti << _self.ptdef_list_tree_item
+	ti.set_elements_current({dt})
+	
+_endmethod
+$

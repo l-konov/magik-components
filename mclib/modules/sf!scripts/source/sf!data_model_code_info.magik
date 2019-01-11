@@ -1,0 +1,569 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - April 2006
+##
+_package mclib
+$
+
+########################################################################
+##
+## Description:
+## This class allows to determine how spread out code for record
+## exemplars in a specified dataset is.
+##
+## Once the analysis is completed, a simple GUI will be launched
+## that displays this information:
+## - the record exemplar class
+## - a list of files that provides the names of the files that
+##   define methods for that record exemplar
+## - for each file a list of methods that are defined in that file.
+##
+## Example:
+## MagikSF> mclib:sf!data_model_code_info.check_dataset( :gis )
+## This will launch the analysis for the :gis dataset.
+##
+## A call like this:
+## MagikSF> mclib:sf!data_model_code_info.check_dataset( :gis, _false )
+## will all output at the Magik prompt.
+##
+## From the GUI it is also possible to create a text output by
+## choosing the "Export to HTML" option from the right-click menu.
+## The file <dataset name>_rec_ex_files.html will be created in the
+## current working folder of the session (system.working_directory).
+##
+## By double clicking on a file entry in the GUI an editor will be
+## launched. By default the file would be sent to Emacs (assuming
+## that the gnuclientw.exe file is in the current searchpath). It's
+## also possible to specify any executable by defining the environment
+## variable sf!editor_cmd.
+########################################################################
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+##
+## This subclass of sw:equality_hash_table provides the
+## keys in alphabetically sorted order. However, this
+## class may only be used for keys that are strings or
+## can be compared with the _cf operator.
+##
+def_slotted_exemplar( :sf!sorted_key_equality_hash_table,
+{},
+{ :equality_hash_table } )
+$
+
+
+_pragma(classify_level=basic, topic={Tools,QA})
+_iter _method sf!sorted_key_equality_hash_table.fast_keys_and_elements()
+
+	_local keys << sw:sorted_collection.new()
+
+	_for k,e _over _super.fast_keys_and_elements()
+	_loop
+		keys.add( k )
+	_endloop
+
+	_for i_key _over keys.fast_elements()
+	_loop
+		_loopbody( i_key, _self[ i_key ] )
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+def_slotted_exemplar( :sf!data_model_code_info,
+{
+	{ :tree_data,    _unset },
+	{ :dataset,      _unset },
+	{ :class_list,   _unset },
+	{ :code_info,    _unset },
+	{ :initialized?, _false }
+},
+{ :model } )
+$
+
+
+_pragma(classify_level=advanced, topic={Tools,QA})
+sf!data_model_code_info.define_slot_externally_readable( :tree_data )
+$
+
+
+##
+##	P U B L I C   I N T E R F A C E
+##	_______________________________
+##
+
+
+_pragma(classify_level=debug, topic={Tools,QA})
+_method sf!data_model_code_info.check_dataset(
+		p_dataset_name, _optional p_gui?, p_show_methods? )
+
+	## Determine the source file where methods are defined for
+	## record exemplar objects.
+	##
+	## P_DATASET_NAME
+	##	The internal name of the dataset where we want to
+	## 	obtain the information. The passed symbol must refer
+	##	to a dataset in sw:gis_program_manager.databases.
+	##
+	## P_GUI?
+	##	A Boolean value that defaults to _true.
+	##	Determines how the output is presented; if _false is
+	##	passed, all output will be written to the Magik prompt.
+	##	By default a GUI is launched that displays the same
+	##	information.
+	##
+	## P_SHOW_METHODS?
+	##	This Boolean value determines how much information is
+	##	displayed in the output (defaults to _false).
+	##	When _true, all methods defined in one file will be
+	##	displayed (which can result in a lengthy output).
+	##	By default only the files that define methods for a
+	##	given record exemplar are displayed.
+
+	_self.reset( p_dataset_name )
+
+	_for i_tbl _over .dataset.user_tables()
+	_loop
+		l_rec_ex << i_tbl.descriptor.record_exemplar
+
+		_if l_rec_ex _isnt _unset
+		_then
+			.class_list.add( l_rec_ex )
+		_endif
+	_endloop
+
+	_self.process_record_exemplar_list()
+
+	_if p_gui? _is _false
+	_then
+		_self.print_data( p_show_methods? _is _true )
+	_else
+		_self.activate()
+		_self.show_data( p_show_methods? _is _true )
+
+		_for i_widget _over _self.top_frame.children()
+		_loop
+			i_widget.items.an_element().sf!adjust_column_widths()
+		_endloop
+
+		_self.changed( :tree_data, :refresh )
+	_endif
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_private _method sf!data_model_code_info.reset( p_dataset_name )
+
+	## Initialize _self or reset all existing data...
+
+	_if .initialized? _isnt _true
+	_then
+		.tree_data  << sw:rope.new()
+		.class_list << sw:sorted_collection.new()
+		.code_info  << sf!sorted_key_equality_hash_table.new()
+
+		.class_list.sort_by( :class_name )
+
+		.initialized? << _true
+
+		.message_accessor << sw:message_handler.
+				     new( _self.class_name )
+	_else
+		.tree_data.empty()
+		.class_list.empty()
+		.code_info.empty()
+	_endif
+
+	.dataset << gis_program_manager.cached_dataset( p_dataset_name )
+
+	_self.changed( :tree_data, :renew )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_private _method sf!data_model_code_info.process_record_exemplar_list()
+
+	## Gather all method information for the record exemplars
+	## collected in slot class_list.
+
+	_local l_unset_file << _self.message( :unset_file )
+	_local l_file_info
+	_local l_meth_list
+	_local l_file
+
+	_for i_class _over .class_list.fast_elements()
+	_loop
+	    l_file_info << .code_info[ i_class.class_name ] <<
+		    sf!sorted_key_equality_hash_table.new()
+
+	    _for i_method _over i_class.define_method_target.
+				local_methods( _true )
+	    _loop
+		    l_file << i_method.source_file
+
+		    _if l_file _isnt _unset
+		    _then
+			    l_file << system.canonicalise( l_file )
+		    _else
+			    l_file << l_unset_file
+		    _endif
+
+		    _if ( l_meth_list << l_file_info[ l_file ] ) _is _unset
+		    _then
+			    l_meth_list << l_file_info[ l_file ] <<
+				    sw:sorted_collection.new_with( i_method )
+#			    l_meth_list.sort_by( :name )
+			    #
+			    # We can't use the commented way to order items
+			    # because slot access methods don't return
+			    # a string but a symbol when asked for the name,
+			    # which causes the _cf operator to fail...
+			    #
+			    l_meth_list.order_proc <<
+				    _proc @method_name_sorter( p_m1, p_m2 )
+					    >> p_m1.name.write_string _cf
+					       p_m2.name.write_string
+				    _endproc
+		    _else
+			    l_meth_list.add( i_method )
+		    _endif
+	    _endloop
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_private _method sf!data_model_code_info.print_data( p_show_methods? )
+
+	## Provide some output at the Magik prompt...
+
+	_local l_files
+	_local l_count
+
+	_for i_class,i_info _over .code_info.fast_keys_and_elements()
+	_loop
+	    _if i_info _is _unset _then _continue _endif
+
+	    l_files << l_count << 0
+	    _for i_file,i_method_list _over i_info.fast_keys_and_elements()
+	    _loop
+		    l_files +<< 1
+		    l_count +<< i_method_list.size
+	    _endloop
+
+	    write( _self.message( :class_count_info, _unset,
+				  i_class, l_count, l_files ) )
+
+	    _for i_file,i_method_list _over i_info.fast_keys_and_elements()
+	    _loop
+		    write( _self.message( :file_method_info, _unset,
+					  i_file, i_method_list.size ) )
+		    _if _not p_show_methods? _then _continue _endif
+
+		    _for i_method _over i_method_list.fast_elements()
+		    _loop
+			    write( _self.message( :method_name_info, _unset,
+						  i_method ) )
+		    _endloop
+	    _endloop
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_private _method sf!data_model_code_info.show_data( p_show_methods? )
+
+	## Provide some output in a GUI...
+
+	_local l_files
+	_local l_count
+	_local l_dt
+	_local l_dtc
+	_local l_dtcc
+
+	_for i_class,i_info _over .code_info.fast_keys_and_elements()
+	_loop
+	    _if i_info _is _unset _then _continue _endif
+
+	    l_files << l_count << 0
+	    _for i_file,i_method_list _over i_info.fast_keys_and_elements()
+	    _loop
+		    l_files +<< 1
+		    l_count +<< i_method_list.size
+	    _endloop
+
+	    l_dt << sw:display_tree.new( i_class,
+			sw:property_list.new_with(
+				:count, l_count,
+				:name,  i_class.write_string,
+				:files, _self.message(
+						_if l_files = 1
+						_then >> :gui_file_info
+						_else >> :gui_files_info
+						_endif, _unset, l_files ) ) )
+	    l_dt.styled_string << { :align, :right, :value, :count,
+				    :tab, :bold, :value, :name,
+				    :space, :normal, :value, :files }
+	    .tree_data.add_last( l_dt )
+
+	    _for i_file,i_method_list _over i_info.fast_keys_and_elements()
+	    _loop
+		    l_dtc << sw:display_tree.new( i_file,
+				sw:property_list.new_with(
+					:count, i_method_list.size,
+					:path,  i_file.write_string ) )
+		    l_dtc.styled_string << { :align, :right, :value, :count,
+					     :tab, :value, :path }
+		    l_dt.add_child( l_dtc )
+
+		    _for i_method _over i_method_list.fast_elements()
+		    _loop
+			    l_dtcc << sw:display_tree.new( i_method,
+					sw:property_list.new_with(
+						:name,  i_method.name ) )
+			    l_dtcc.styled_string <<  { :tab, :blue,
+						       :value, :name }
+			    l_dtc.add_child( l_dtcc )
+		    _endloop
+
+		    _if p_show_methods? _then l_dtc.expanded? << _true _endif
+	    _endloop
+	    _if p_show_methods? _then l_dt.expanded? << _true _endif
+	_endloop
+
+	_self.changed( :tree_data, :renew )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_method sf!data_model_code_info.on_activation()
+
+	## Updates the title in _self's frame.
+
+	_super.on_activation()
+
+	_self.title << _self.message( :title, _unset,
+				      .dataset.external_name )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_method sf!data_model_code_info.activate_in( p_frame )
+
+	## Create a GUI for _self - it's the bare minimum.
+
+	_local l_pnl  << sw:panel.new( p_frame )
+	_local l_args << { :model,   _self,
+			   :aspect,  :tree_data,
+			   :resize?, _true,
+			   :mode,    :many,
+			   :width,   500,
+			   :distribute_spare_width, :initial_extend,
+			   :double_click_notifier,  :|double_clicked()|,
+			   :col_resize_values,      { 5, 95 } }
+	_local l_ti
+	_local l_menu
+
+	_if sw:tree_item.responds_to?( :allow_filtering? )
+	_then
+		l_args << l_args.new_appending(
+				  :allow_filtering?, _true )
+	_endif
+
+	l_ti << sw:tree_item.new( l_pnl,
+		:column_headings, { _self.message( :count_hdr ),
+				    _self.message( :data_hdr ) },
+		_scatter l_args )
+	#
+	# Add all options to the list pop-up menu.
+	#
+	l_menu << l_ti.default_popup_menu
+
+	sw:separator_item.new( l_menu )
+	sw:button_item.new_safe( l_menu, _self.message( :export2html ),
+				 _self, { :|export_to_html()|, l_ti } )
+	sw:separator_item.new( l_menu )
+	sw:button_item.new_safe( l_menu, _self.message( :refresh ),
+				 _self, { :|changed()|,
+					  :tree_data, :refresh } )
+	sw:separator_item.new( l_menu )
+	sw:button_item.new_safe( l_menu, _self.message( :expand_l2 ),
+				 _self, { :|expand_l2?()|, _true } )
+	sw:button_item.new_safe( l_menu, _self.message( :compress_l2 ),
+				 _self, { :|expand_l2?()|, _false } )
+	sw:separator_item.new( l_menu )
+	sw:button_item.new_safe( l_menu, _self.message( :expand_all ),
+				 _self, { :|expand_all?()|, _true } )
+	sw:button_item.new_safe( l_menu, _self.message( :compress_all ),
+				 _self, { :|expand_all?()|, _false } )
+	sw:separator_item.new( l_menu )
+	sw:button_item.new_safe( l_menu, _self.message( :remove_from_list ),
+				 _self, { :|remove_from_list()|, l_ti } )
+	sw:button_item.new_safe( l_menu, _self.message( :resize_columns ),
+				 _self, { :|resize_columns()|, l_ti } )
+
+	l_ti.set_property( :popup_menu, l_menu )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_method sf!data_model_code_info.export_to_html(
+		p_tree_item, _optional p_file )
+
+	## Export the displayed data to HTML - which
+	## can be slow for bigger lists...
+
+	_local l_file << p_file
+
+	_if l_file _is _unset
+	_then
+		l_file << _self.message( :export_file_name, _unset,
+					 .dataset.name )
+	_endif
+
+	p_tree_item.sf!export_to_html( l_file )
+
+	_self.show_message(
+		_self.message( :export_completed, _unset, l_file ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_method sf!data_model_code_info.expand_l2?( p_expanded? )
+
+	## Expand or compress the display trees below
+	## the top-level.
+
+	_dynamic !updating_trees?! << _true
+
+	_for i_dt _over .tree_data.fast_elements()
+	_loop
+		i_dt.expanded? << p_expanded?
+	_endloop
+
+	!updating_trees?! << _false
+	_self.changed( :tree_data, :refresh )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={Tools,QA})
+_method sf!data_model_code_info.expand_all?( p_expanded? )
+
+	## Expand or compress all display trees.
+	## To really compress trees, the list must be
+	## processed in reverse!
+
+	_dynamic !updating_trees?! << _true
+
+	_local l_iterator << _if p_expanded?
+			     _then >> :|fast_elements()|
+			     _else >> :|elements_in_reverse()|
+			     _endif
+
+	_for i_dt _over .tree_data.perform_iter( l_iterator )
+	_loop
+		_for i_dtc _over i_dt.children.perform_iter( l_iterator )
+		_loop
+			i_dtc.expanded? << p_expanded?
+		_endloop
+
+		i_dt.expanded? << p_expanded?
+	_endloop
+
+	!updating_trees?! << _false
+	_self.changed( :tree_data, :refresh )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Tools,QA})
+_method sf!data_model_code_info.remove_from_list( p_tree_item )
+
+	## Remove the currently selected items from the list data
+
+	_dynamic !updating_trees?! << _true
+	#
+	# Not really the most efficient solution, but it works...
+	# Remove items from the lowest level first, then go one
+	# level up and so on.
+	#
+	_for i_level _over range( 4, 2, -1 )
+	_loop
+		_for i_dt _over p_tree_item.selection.fast_elements()
+		_loop
+			_if i_dt.level <> i_level _then _continue _endif
+
+			i_dt.parent.remove_child_with_key( i_dt.key )
+		_endloop
+	_endloop
+
+	_self.changed( :tree_data, :renew )
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Tools,QA})
+_method sf!data_model_code_info.resize_columns( p_tree_item )
+
+	## Resize the columns to their "optimal" width.
+
+	p_tree_item.sf!adjust_column_widths()
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Tools,QA})
+_method sf!data_model_code_info.double_clicked( p_display_tree )
+
+	## Launch an editor (if possible) for the file the user
+	## double-clicked on.
+
+	_local l_path
+
+	#
+	# File information is located on the third level in the hierarchy;
+	# also, for _unset file - we can't launch an editor...
+	#
+	_if p_display_tree.level <> 3 _orif
+	    ( ( l_path << p_display_tree.value( :path ) ) =
+	      _self.message( :unset_file ) )
+	_then
+		_return
+	_endif
+
+	_local l_ed << sw:system.getenv( :sf!editor_cmd )
+	_local l_cmd
+
+	_if l_ed _is _unset
+	_then
+		l_ed << _self.message( :gnuclient_cmd )
+	_endif
+	l_cmd << _self.message( :edit_file_command, _unset, l_ed, l_path )
+
+	sw:system.do_command( l_cmd.trim_spaces() )
+_endmethod
+$

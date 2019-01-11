@@ -1,0 +1,1610 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_qa})
+##
+## mss_qa_engine.magik
+##
+## Engine class for performing the central processing for the
+## MSS Quality Assurance tool.  Also includes its own thread
+## handling actions that can be plugged in to any GUI.
+##
+
+def_slotted_exemplar(:mss_qa_engine,
+{
+	{:items, _unset, :readable},
+	{:thread, _unset, :readable},
+	{:run_status, _unset, :readable},
+	{:managed_datasets, _unset, :readable},
+	{:managed_check_names, _unset, :readable},
+	{:managed_groups, _unset, :readable},
+	{:visited_cache, _unset, :readable},
+	{:raw_errors, _unset, :readable},
+	{:replicas, _unset, :readable},
+	{:user_data, _unset, :readable}
+},
+{:mss_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+mss_qa_engine.define_shared_constant(
+	:databus_producer_data_types,
+	{:status_string, :run_status_string, :managed_check_names, :managed_datasets, :raw_errors},
+	:public)
+$
+
+# Thread handling methods - copied from engine_model.
+#
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.run_status << status
+	## 
+	## Similar functionality as for engine_model.
+	##
+
+	_if (fw << _self.framework) _isnt _unset _andif
+	    (tf << fw.top_frame) _isnt _unset
+	_then
+		tf.busy? << status _is :running
+	_endif 
+	_self.action(:run_qa).enabled? << status _isnt :running
+	_self.action(:interrupt).enabled? << status _is :running
+	.run_status << status
+	_self.changed(:run_status)
+	_self.changed(:run_status_string)
+	_self.databus_make_data_available(:run_status_string, _self.run_status_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.run_status_string
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_return _self.message(.run_status)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.run_engine(priority, method_name, _gather args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		_self.user_error(:engine_running)
+	_endif
+	_self.action(:run_qa).enabled? << _false 
+	_self.action(:interrupt).enabled? << _true
+	.thread << _proc(model, method, args)
+			   model.int!run_engine(method, args)
+		   _endproc.fork_at(priority, _self, method_name, args)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.int!run_engine(method, _optional args)
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_protect
+		_handling user_error _with _self.user_error_handler
+		_handling error _with _self.error_handler
+		_handling warning _with _self.warning_handler
+		_self.run_status << :running
+		_if method.is_class_of?({})
+		_then
+			method.new_appending(_scatter args).send_to(_self)
+		_else
+			_self.perform(method,_scatter args)
+		_endif
+	_protection
+		.thread << _unset
+		_self.run_status << :ready
+	_endprotect
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.interrupt()
+	## 
+	## Similar functionality as for engine_model.
+	## 
+
+	_if .thread _isnt _unset
+	_then
+		.thread.kill_and_wait()
+	_endif
+	_self.run_status << :ready
+	_self.status_string << _self.message(:interrupted)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_engine.status_string << x
+	## 
+	## 
+
+	_self.databus_make_data_available(:status_string, x)
+	_return x
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.init(_gather args)
+	## 
+	##
+
+	_super.init(_scatter args)
+	.items << property_list.new()
+	.thread << _unset
+	.run_status << :ready
+	_self.set_option(:input_mode, :trail)
+	_self.set_option(:input_area, _unset)
+	.managed_check_names << property_list.new()
+
+	_for i _over mss_qa_check_definition.defined_qa_check_definitions.fast_elements()
+	_loop
+		.managed_check_names[i.name] << _true
+	_endloop
+	_self.figure_managed_datasets()
+	.managed_groups << property_list.new()
+
+	.visited_cache << equality_set.new()
+	.raw_errors << equality_hash_table.new()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:run_qa,
+				       :short_help_text, _self.message(:run_qa_sh),
+				       :engine, _self,
+				       :image, {:forward, :ui_resources},
+				       :action_message, {:|run_engine()|, _thisthread.background_priority,
+							 :|run_qa()|}))
+	_self.add_action(sw_action.new(:interrupt,
+				       :short_help_text, _self.message(:interrupt_sh),
+				       :enabled?, _false,
+				       :engine, _self,
+				       :image, {:stop, :ui_resources},
+				       :action_message, :|interrupt()|))
+
+	_self.add_action(sw_action.new(:mcn_select_all,
+				       :short_help_text, _self.message(:mcn_select_all_sh),
+				       :engine, _self,
+				       :action_message, :|mcn_select_all()|))
+	_self.add_action(sw_action.new(:mcn_select_clear,
+				       :short_help_text, _self.message(:mcn_select_clear_sh),
+				       :engine, _self,
+				       :action_message, :|mcn_select_clear()|))
+	_self.add_action(sw_action.new(:mcn_enable_selection,
+				       :short_help_text, _self.message(:mcn_enable_selection_sh),
+				       :engine, _self,
+				       :action_message, :|mcn_enable_selection()|))
+	_self.add_action(sw_action.new(:mcn_disable_selection,
+				       :short_help_text, _self.message(:mcn_disable_selection_sh),
+				       :engine, _self,
+				       :action_message, :|mcn_disable_selection()|))
+	
+	_self.add_action(sw_action.new(:mg_select_all,
+				       :short_help_text, _self.message(:mg_select_all_sh),
+				       :engine, _self,
+				       :action_message, :|mg_select_all()|))
+	_self.add_action(sw_action.new(:mg_select_clear,
+				       :short_help_text, _self.message(:mg_select_clear_sh),
+				       :engine, _self,
+				       :action_message, :|mg_select_clear()|))
+	_self.add_action(sw_action.new(:mg_enable_selection,
+				       :short_help_text, _self.message(:mg_enable_selection_sh),
+				       :engine, _self,
+				       :action_message, :|mg_enable_selection()|))
+	_self.add_action(sw_action.new(:mg_disable_selection,
+				       :short_help_text, _self.message(:mg_disable_selection_sh),
+				       :engine, _self,
+				       :action_message, :|mg_disable_selection()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.post_activation()
+	## 
+	## 
+
+	_super.post_activation()
+	_self.changed(:managed_dataset_list)
+	_self.changed(:managed_group_list)
+	_self.changed(:managed_check_name_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.terminate()
+	## 
+	## 
+
+	_self.interrupt()
+	_super.terminate()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.sw_databus_data_requested(data_type_name)
+	## 
+	## 
+
+	_if data_type_name _is :managed_check_names
+	_then
+		_return .managed_check_names
+	_elif data_type_name _is :managed_datasets
+	_then
+		_return .managed_datasets
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.build_gui(container, xml_element)
+	## 
+	## 
+
+	_if (type << xml_element.attributes["type"]) = "input_mode"
+	_then
+		_return _self.build_gui_input_mode(container)
+	_elif type = "managed_datasets"
+	_then
+		_return _self.build_gui_managed_datasets(container)
+	_elif type = "managed_groups"
+	_then
+		_return _self.build_gui_managed_groups(container)
+	_elif type = "managed_checks"
+	_then
+		_return _self.build_gui_managed_checks(container)
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.build_gui_input_mode(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	ps << :|perform_safely()|
+	go << :|get_option()|
+	so << :|set_option()|
+	
+	p.tab_label << _self.message(:tab_label_input_mode)
+	p.start_row()
+	text_choice_item.new(p, _self.message(:input_mode),
+			     :items, {{:trail, _self.message(:input_mode_trail)},
+				      {:scrapbook, _self.message(:input_mode_scrapbook)},
+				      {:difference_stream, _self.message(:input_mode_difference_stream)},
+				      {:entire_database, _self.message(:input_mode_entire_database)}},
+			     :model, _self,
+			     :aspect, :input_mode,
+			     :change_selector, {ps, so, :input_mode},
+			     :value_selector, {go, :input_mode})
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.build_gui_managed_datasets(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.tab_label << _self.message(:tab_label_managed_datasets)
+	p.start_row()
+	.items[:managed_dataset_list] << ti <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :managed_dataset_list,
+			      :data_selector, :managed_dataset_list,
+			      :value_changed_notifier, :|managed_dataset_value_changed()|,
+			      :column_widths, {60, 150},
+			      :column_headings, {_self.message(:ch_enabled?),
+						 _self.message(:ch_dataset)},
+			      :column_allow_sort?, _false,
+			      :mode, :none,
+			      :resize_x?, _true,
+			      :resize_y?, _true) 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.build_gui_managed_groups(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.tab_label << _self.message(:tab_label_managed_groups)
+	p.start_row()
+	.items[:managed_group_list] << ti <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :managed_group_list,
+			      :data_selector, :managed_group_list,
+			      :value_changed_notifier, :|managed_group_value_changed()|,
+			      :column_widths, {60, 200},
+			      :column_headings, {_self.message(:ch_enabled?),
+						 _self.message(:ch_group)},
+			      :column_allow_sort?, _false,
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :managed_group_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.build_gui_managed_checks(container)
+	## 
+	## 
+
+	p << panel.new(container)
+	p.border_width << p.border_height << 2
+	p.height_spacing << p.width_spacing << 6
+
+	p.tab_label << _self.message(:tab_label_managed_checks)
+	p.start_row()
+	.items[:managed_check_name_list] << ti <<
+		tree_item.new(p,
+			      :grid_lines?, _true,
+			      :model, _self,
+			      :aspect, :managed_check_name_list,
+			      :data_selector, :managed_check_name_list,
+			      :value_changed_notifier, :|managed_check_name_value_changed()|,
+			      :column_widths, {60, 300},
+			      :column_headings, {_self.message(:ch_enabled?),
+						 _self.message(:ch_check_name)},
+			      :column_allow_sort?, _false,
+			      :mode, :many,
+			      :resize_x?, _true,
+			      :resize_y?, _true)
+	ti.popup_menu << _self.framework.gui_manager.popup_menu(ti, :managed_check_name_list)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.process_initialisation_data_element(an_xml_element)
+	## 
+	## 
+
+	_if an_xml_element.type _is :managed_checks
+	_then
+		pl << property_list.new()
+		_for i _over an_xml_element.elements.fast_elements()
+		_loop
+			_if (check_name << i.attribute(:name)) _is _unset
+			_then
+				_continue
+			_endif
+			check_name << check_name.as_symbol()
+			check_val << i.attribute(:value)
+			_if check_val.lowercase = "false"
+			_then
+				check_val << _false
+			_else
+				check_val << _true
+			_endif
+			pl[check_name] << check_val
+		_endloop
+		_self.set_managed_check_names(pl)
+
+	_elif an_xml_element.type _is :managed_groups
+	_then
+		.managed_groups << rope.new()
+		sstr << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+					  :value, :external_name)
+		_for i _over an_xml_element.elements.fast_elements()
+		_loop
+			_if i.type _is :group
+			_then 
+				_if (group_name << i.attribute(:name)) _is _unset
+				_then
+					_continue
+				_endif
+				pl << property_list.new()
+				pl[:external_name] << group_name
+				pl[:enabled?] << _maybe 
+				r << pl[:group_checks] << rope.new()
+				_for j _over i.elements.fast_elements()
+				_loop
+					_if j.type _is :check
+					_then
+						_if (check_name << j.attribute(:name)) _is _unset
+						_then
+							_continue
+						_endif
+						check_name << check_name.as_symbol()
+						r.add_last(check_name)
+					_endif
+				_endloop
+				
+				dt << display_tree.new(group_name, pl)
+				dt.styled_string << sstr
+				.managed_groups.add_last(dt)
+			_endif 
+		_endloop
+		
+		_self.figure_managed_groups()
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_engine.set_managed_check_names(pl)
+	## 
+	## Set the names of checks being managed by self to the data in
+	## PL.  Each key is a check name, and each value is true/false.
+	##
+
+	.managed_check_names << property_list.new()
+	_for i, j _over pl.fast_keys_and_elements()
+	_loop
+		_if (qa_check << mss_qa_check_definition.get_by_name(i)) _is _unset
+		_then
+			condition.raise(:user_error, :string,
+					_self.message(:undefined_check_name, i))
+		_endif
+		.managed_check_names[i] << j
+	_endloop
+
+	_self.changed(:managed_check_name_list)
+	_self.figure_managed_datasets()
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.figure_managed_datasets()
+	## 
+	## 
+
+	# The following will determine all datasets that could be
+	# involved, if all checks are enabled.
+	sc << sorted_collection.new(5,
+				    _proc(a, b)
+					    _return a.external_name _cf b.external_name
+				    _endproc)
+	done_names << equality_set.new()
+	_for i _over .managed_check_names.fast_keys_and_elements()
+	_loop
+		_if (qa_check << mss_qa_check_definition.get_by_name(i)) _is _unset
+		_then
+			_continue
+		_endif
+		_for j _over qa_check.table_info.fast_keys_and_elements()
+		_loop
+			_if done_names.includes?(j)
+			_then
+				_continue
+			_endif
+			done_names.add(j)
+			_if (dbv << gis_program_manager.cached_dataset(j)) _isnt _unset
+			_then
+				sc.add(dbv)
+			_endif
+		_endloop
+	_endloop
+
+	.managed_datasets << property_list.new()
+	_for i _over sc.fast_elements()
+	_loop
+		.managed_datasets[i.name] << _true
+	_endloop
+
+	_return .managed_datasets
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.figure_managed_groups()
+	## 
+	## Set the :enabled? property on all managed_groups elements,
+	## based on the :enabled? status of the individual checks that
+	## comprise the group.
+	##
+
+	mcn << .managed_check_names
+	_for i _over .managed_groups.fast_elements()
+	_loop
+		c_on << 0
+		c_off << 0
+		_for j _over i.value[:group_checks].fast_elements()
+		_loop
+			_if (cval << mcn[j]) _is _true
+			_then
+				c_on +<< 1
+			_elif cval _is _false
+			_then
+				c_off +<< 1
+			_else
+				# Mis-configured: a group refers to a non-existent check.
+			_endif
+		_endloop
+
+		_if c_on > 0
+		_then
+			_if c_off = 0
+			_then
+				enable_me?? << _true
+			_else
+				enable_me?? << _maybe
+			_endif
+		_else
+			_if c_off = 0
+			_then
+				# Mis-configured: a group with no checks.
+				enable_me?? << _maybe
+			_else
+				enable_me?? << _false
+			_endif
+		_endif
+		i.value[:enabled?] << enable_me??
+	_endloop 
+	_self.changed(:managed_group_list, :refresh)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.managed_check_name_list
+	## 
+	## 
+
+	r << rope.new()
+
+	sstr << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+				  :value, :external_name)
+	_for i, j _over .managed_check_names.fast_keys_and_elements()
+	_loop
+		_if (qa_check << mss_qa_check_definition.get_by_name(i)) _is _unset
+		_then
+			_continue
+		_endif
+		
+		pl << property_list.new_with(:external_name, qa_check.external_name,
+					     :enabled?, j)
+		dt << display_tree.new(i, pl)
+		dt.styled_string << sstr
+		r.add(dt)
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.managed_dataset_list
+	## 
+	## 
+
+	r << rope.new()
+
+	sstr << styled_string.new(:align, :centre, :toggle, :enabled?, :tab,
+				  :value, :external_name)
+	_for i, j _over .managed_datasets.fast_keys_and_elements()
+	_loop
+		_if (dbv << gis_program_manager.cached_dataset(i)) _is _unset 
+		_then
+			_continue
+		_endif
+		
+		pl << property_list.new_with(:external_name, dbv.external_name,
+					     :enabled?, j)
+		dt << display_tree.new(i, pl)
+		dt.styled_string << sstr
+		r.add(dt)
+	_endloop
+
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.managed_group_list
+	## 
+	## The .managed_groups slot can be used directly for displaying
+	## managed group data.
+	##
+
+	_return .managed_groups
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.managed_check_name_value_changed(a_tree, value_id, new_value)
+	## 
+	## 
+
+	.managed_check_names[a_tree.key] << new_value
+	_self.databus_make_data_available(:managed_check_names, .managed_check_names)
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.managed_dataset_value_changed(a_tree, value_id, new_value)
+	## 
+	## 
+
+	.managed_datasets[a_tree.key] << new_value
+	_self.databus_make_data_available(:managed_datasets, .managed_datasets)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.managed_group_value_changed(a_tree, value_id, new_value)
+	## 
+	## When a managed group value changes, set the value of all
+	## checks for that group.
+	##
+
+	_if new_value _is _true _orif
+	    new_value _is _false
+	_then
+		# Carry on.
+	_else
+		_return
+	_endif
+
+	mcn << .managed_check_names
+	_for i _over a_tree.value[:group_checks].fast_elements()
+	_loop
+		_if _not mcn.includes_key?(i) _then _continue _endif
+		mcn[i] << new_value
+	_endloop
+	_self.changed(:managed_check_name_list, :refresh)
+
+	# Changing the managed checks can impact groups whose checks
+	# overlap this group's checks.  Sort that out.
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mcn_select_all()
+	## 
+	## Select all rows in the managed_check_name_list tree_item.
+	##
+
+	_if (ti << .items[:managed_check_name_list]) _is _unset
+	_then
+		_return
+	_endif
+	ti.selection.select_all()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mcn_select_clear()
+	## 
+	## Deselect all rows in the managed_check_name_list tree_item.
+	## 
+
+	_if (ti << .items[:managed_check_name_list]) _is _unset
+	_then
+		_return
+	_endif
+	ti.selection.select_clear()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mcn_enable_selection()
+	##
+	## Enable all selected rows in the managed_check_name_list.
+	## 
+
+	_if (ti << .items[:managed_check_name_list]) _is _unset
+	_then
+		_return
+	_endif
+
+	mcn << .managed_check_names
+	_for i _over ti.selection.fast_elements()
+	_loop
+		mcn[i.key] << _true
+	_endloop 
+	_self.changed(:managed_check_name_list, :refresh)
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mcn_disable_selection()
+	##
+	## Disable all selected rows in the managed_check_name_list.
+	## 
+
+	_if (ti << .items[:managed_check_name_list]) _is _unset
+	_then
+		_return
+	_endif
+
+	mcn << .managed_check_names
+	_for i _over ti.selection.fast_elements()
+	_loop
+		mcn[i.key] << _false
+	_endloop 
+	_self.changed(:managed_check_name_list, :refresh)
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mg_select_all()
+	## 
+	## Select all rows in the managed_group_list tree_item.
+	##
+
+	_if (ti << .items[:managed_group_list]) _is _unset
+	_then
+		_return
+	_endif
+	ti.selection.select_all()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mg_select_clear()
+	## 
+	## Deselect all rows in the managed_group_list tree_item.
+	## 
+
+	_if (ti << .items[:managed_group_list]) _is _unset
+	_then
+		_return
+	_endif
+	ti.selection.select_clear()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mg_enable_selection()
+	##
+	## Enable all selected rows in the managed_group_list.
+	## 
+
+	_if (ti << .items[:managed_group_list]) _is _unset
+	_then
+		_return
+	_endif
+
+	mcn << .managed_check_names
+	_for i _over ti.selection.fast_elements()
+	_loop
+		i.value[:enabled?] << _true
+		_for j _over i.value[:group_checks].fast_elements()
+		_loop
+			_if _not mcn.includes_key?(j) _then _continue _endif
+			mcn[j] << _true 
+		_endloop
+	_endloop 
+	_self.changed(:managed_check_name_list, :refresh)
+
+	# Changing the managed checks can impact groups whose checks
+	# overlap this group's checks.  Sort that out.
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.mg_disable_selection()
+	##
+	## Disable all selected rows in the managed_group_list.
+	## 
+
+	_if (ti << .items[:managed_group_list]) _is _unset
+	_then
+		_return
+	_endif
+
+	mcn << .managed_check_names
+	_for i _over ti.selection.fast_elements()
+	_loop
+		i.value[:enabled?] << _false
+		_for j _over i.value[:group_checks].fast_elements()
+		_loop
+			_if _not mcn.includes_key?(j) _then _continue _endif
+			mcn[j] << _false
+		_endloop
+	_endloop 
+	_self.changed(:managed_check_name_list, :refresh)
+
+	# Changing the managed checks can impact groups whose checks
+	# overlap this group's checks.  Sort that out.
+	_self.figure_managed_groups()
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_engine.run_qa()
+	## 
+	## Do the work of performing QA checks.
+	##
+
+	_dynamic !mss_qa_initiator! << _self
+	_local me << _self
+	_local stop_on_qa_error? << _self.get_option(:stop_on_qa_error?) _is _true
+	
+	# Store current parameters in a separate data structure, so
+	# that any changes made while running this in a background
+	# thread do not affect the start conditions.
+	rp << property_list.new_with(
+		      :input_mode, _self.get_option(:input_mode),
+		      :input_area, _self.get_option(:input_area),
+		      :managed_datasets, .managed_datasets.copy(),
+		      :managed_check_names, .managed_check_names.copy())
+	_self.set_option(:run_parameters, rp)
+	_self.set_option(:results, _unset)
+	_self.validate_run_parameters(rp)
+
+	.raw_errors.empty()
+	_self.databus_make_data_available(:raw_errors, .raw_errors)
+	
+	check_c << 0
+	total_c << 0
+	ok? << _false 
+	_protect
+		_self.create_replicas(rp)
+		_catch :exit_qa
+		       _handling mss_qa_information _with
+		       _proc(cond)
+			       _import me, stop_on_qa_error?
+			       me.report_qa_condition(cond)
+			       _if stop_on_qa_error?
+			       _then 
+				       sev << cond[:severity].default(:error)
+				       _if sev _is :error
+				       _then
+					       _throw :exit_qa
+				       _endif
+			       _endif 
+		       _endproc
+		       
+		       _for qa_check_name, enabled? _over rp[:managed_check_names].fast_keys_and_elements()
+		       _loop
+			       _if enabled? _isnt _true
+			       _then
+				       _continue
+			       _endif 
+			       _if (qa_check << mss_qa_check_definition.get_by_name(qa_check_name)) _is _unset
+			       _then
+				       _continue
+			       _endif
+			       
+			       _self.set_run_parameters_for_qa_check(rp, qa_check)
+			       .user_data << property_list.new()
+			       _if (pre_meth_name << qa_check.pre_run_method_name) _isnt _unset
+			       _then
+				       _self.perform(pre_meth_name, qa_check)
+			       _endif
+			       
+			       meth_name << qa_check.method_name
+			       qa_check_ext_name << qa_check.external_name
+			       _self.status_string << _self.message(:doing_check_start, qa_check_ext_name)
+			       check_c +<< 1
+			       c << 0
+			       _for i _over _self.all_objects_to_check(rp)
+			       _loop
+				       c +<< 1
+				       _if c _mod 100 = 0
+				       _then
+					       _self.status_string << _self.message(:doing_check_progress, qa_check_ext_name, c)
+				       _endif
+				       i.perform(meth_name, _self, qa_check)
+			       _endloop
+			       total_c +<< c
+
+			       _if (post_meth_name << qa_check.post_run_method_name) _isnt _unset
+			       _then
+				       _self.perform(post_meth_name, qa_check)
+			       _endif
+		       _endloop
+		       
+		       ok? << _true
+		_endcatch
+
+		# Discard replicas now, as they are not needed anymore.  In
+		# case anything has gone south, this will be re-performed as a
+		# cleanup in the protection block.
+		_self.discard_replicas()
+
+		# The act of publishing the raw_errors to anyone who cares is
+		# explicitly done before the protection block.  It may be time
+		# consuming, and must be interruptable.
+		_self.databus_make_data_available(:raw_errors, .raw_errors)
+ 	_protection
+		_self.discard_replicas()
+		_if ok?
+		_then
+			err_count << 0
+			warn_count << 0
+			_for i _over .raw_errors.fast_elements()
+			_loop
+				_for j _over i.fast_elements()
+				_loop
+					sev << j[:severity].default(:error)
+					_if sev _is :error
+					_then
+						err_count +<< 1
+					_elif sev _is :warning
+					_then
+						warn_count +<< 1
+					_endif
+				_endloop 
+			_endloop 
+			_self.status_string << _self.message(:complete_status, check_c, total_c, err_count, warn_count)
+			results << property_list.new_with(
+					   :checks_performed, check_c,
+					   :total_checked, total_c,
+					   :total_errors, err_count)
+			_self.set_option(:results, results)
+		_else
+			_self.status_string << _self.message(:failed)
+		_endif
+	_endprotect
+
+	_return ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.create_replicas(rp)
+	## 
+	## If required (based on the run parameters RP), create replica
+	## views. 
+	##
+
+	_self.discard_replicas()
+	.replicas << hash_table.new()
+	_if rp[:input_mode] _is :difference_stream
+	_then
+		mds << rp[:managed_datasets]
+		_for ds_name, i _over mds.fast_keys_and_elements()
+		_loop
+			_if i _is _true
+			_then
+				dbv << gis_program_manager.cached_dataset(ds_name)
+				rv << dbv.replicate(:base)
+				.replicas[ds_name] << rv
+			_endif
+		_endloop
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.discard_replicas()
+	## 
+	## Discard all replica views.
+	##
+
+	_if .replicas _isnt _unset
+	_then
+		_for i _over .replicas.fast_elements()
+		_loop
+			i.discard()
+		_endloop
+		.replicas << _unset 
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.report_qa_condition(cond)
+	## 
+	## Add the error information contained in the condition COND to
+	## the error list.
+	##
+
+	error_code << cond[:error_code]
+	error_sub_code << cond[:error_sub_code]
+	record << cond[:record]
+
+	_if (re << .raw_errors[record]) _is _unset
+	_then
+		re << .raw_errors[record] << rope.new()
+	_endif
+	
+	# If error_code is specified, then check the cache to prevent
+	# double-reporting.
+	_if error_code _isnt _unset
+	_then
+		_for i _over re.fast_elements()
+		_loop
+			_if i[:error_code] = error_code _andif
+			    i[:error_sub_code] = error_sub_code
+			_then
+				_return
+			_endif
+		_endloop
+	_endif
+	re.add_last(cond)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.validate_run_parameters(rp)
+	## 
+	## 
+
+	# Parse through the intersection of tables provided by the
+	# managed_datasets and managed_check_names, and ensure that
+	# something is going to be processed.
+	mds << rp[:managed_datasets]
+	mcn << rp[:managed_check_names]
+	
+	# Raise an error if no datasets selected.
+	any_dataset? << _false 
+	_for i _over mds.fast_elements()
+	_loop
+		_if i _is _true
+		_then
+			any_dataset? << _true
+			_leave
+		_endif
+	_endloop
+	_if _not any_dataset?
+	_then
+		condition.raise(:user_error, :string,
+				_self.message(:no_datasets_selected))
+	_endif
+
+	# Raise an error if no checks selected.
+	any_checks? << _false 
+	_for i _over mcn.fast_elements()
+	_loop
+		_if i _is _true
+		_then
+			any_checks? << _true
+			_leave
+		_endif
+	_endloop
+	_if _not any_checks?
+	_then
+		condition.raise(:user_error, :string,
+				_self.message(:no_checks_selected))
+	_endif
+
+	_if (input_mode << rp[:input_mode]) _is :trail
+	_then
+		# Additional checks for trail input mode: either an area must
+		# be explicitly provided, or a trail must be available to
+		# create an area.
+		_if rp[:input_area] _is _unset
+		_then
+			# A trail must exist.
+			_if (tr << _self.trail) _is _unset
+			_then
+				condition.raise(:user_error, :string,
+						_self.message(:no_trail))
+			_endif
+
+			# The trail must be suitable for creating an area.
+			_if area.check_proposed_sectors(tr.sectors) _is _false
+			_then
+				condition.raise(:user_error, :string,
+						_self.message(:incomplete_trail))
+			_endif
+			sr << tr.sectors.deep_copy()
+			sr.close()
+			pa << pseudo_area.new(sr)
+			pa.world << tr.world
+			rp[:input_area] << pa
+		_endif
+
+	_elif input_mode _is :scrapbook
+	_then
+		# Additional checks for scrapbook input mode: there must be
+		# something in the scrapbook.
+		sb << gis_program_manager.scrapbook()
+		any_recs? << _false 
+		_if (cb << sb.clipboard) _isnt _unset
+		_then
+			_for res_set _over cb.fast_elements()
+			_loop @outer
+				_for test_rec _over res_set.fast_elements()
+				_loop
+					any_recs? << _true
+					_leave @outer
+				_endloop
+			_endloop 
+		_endif
+		_if _not any_recs?
+		_then
+			condition.raise(:user_error, :string,
+					_self.message(:no_scrapbook_records))
+		_endif
+		
+	_elif input_mode _is :difference_stream
+	_then
+		# Additional checks for difference_stream input mode: each
+		# dataset to be processed must not be at the top alternative.
+		_for ds_name, i _over mds.fast_keys_and_elements()
+		_loop
+			_if i _is _true
+			_then
+				dbv << gis_program_manager.cached_dataset(ds_name)
+				_if dbv.alternative_level = 0
+				_then
+					condition.raise(:user_error, :string,
+							_self.message(:dbv_at_top, dbv.external_name))
+				_endif 
+			_endif
+		_endloop
+	_endif
+
+	_return rp
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.set_run_parameters_for_qa_check(rp, qa_check)
+	## 
+	## 
+
+	mds << rp[:managed_datasets]
+	mcn << rp[:managed_check_names]
+	rp[:current_check_table_info_by_dataset] << tbd << property_list.new()
+	rp[:current_check_tables] << cct << equality_hash_table.new()
+	_for ds_name, tbl_info _over qa_check.table_info.fast_keys_and_elements()
+	_loop
+		_if mds[ds_name] _isnt _true
+		_then
+			_continue
+		_endif
+		tbd[ds_name] << tbl_info
+
+		_if (dbv << gis_program_manager.cached_dataset(ds_name)) _is _unset
+		_then
+			_continue
+		_endif
+		_for tbl_name, gf_names _over tbl_info.fast_keys_and_elements()
+		_loop
+			_if (tbl << dbv.collections[tbl_name]) _isnt _unset
+			_then
+				cct[tbl] << _true
+			_endif
+		_endloop
+	_endloop 
+
+	_return rp
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.map_manager
+	## 
+	## Return self's map_manager component.
+	##
+
+	_if (app << _self.application) _is _unset _then _return _endif 
+	_return app.get_service_provider(:map_manager)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.trail
+	## 
+	## Use the trail from the active map view.
+	##
+	
+	_if (mm << _self.map_manager) _isnt _unset _andif
+	    (amv << mm.active_map_view) _isnt _unset
+	_then
+		_return amv.trail
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_iter _method mss_qa_engine.all_objects_to_check(rp)
+	## 
+	## Iterate over all objects to be checked for the input mode
+	## specified in the run parameters property list RP.
+	##
+
+	.visited_cache.empty()
+	
+	_if (input_mode << rp[:input_mode]) _is :trail
+	_then
+		meth_name << :|all_objects_to_check_by_area()|
+	_elif input_mode _is :scrapbook
+	_then
+		meth_name << :|all_objects_to_check_by_scrapbook()|
+	_elif input_mode _is :difference_stream
+	_then
+		meth_name << :|all_objects_to_check_by_difference_stream()|
+	_elif input_mode _is :entire_database
+	_then
+		meth_name << :|all_objects_to_check_by_entire_database()|
+	_endif
+
+	_for i _over _self.perform_iter(meth_name, rp)
+	_loop
+		_loopbody(i)
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_iter _method mss_qa_engine.all_objects_to_check_by_area(rp)
+	## 
+	## 
+
+	input_mode << rp[:input_mode]
+	all_tbls << rp[:current_check_tables]
+	pa << rp[:input_area]
+	
+	_for ds_name, tbl_info _over rp[:current_check_table_info_by_dataset].fast_keys_and_elements()
+	_loop
+		_if (dbv << gis_program_manager.cached_dataset(ds_name)) _is _unset
+		_then
+			_continue
+		_endif
+
+		_if (w << pa.world.world_for_dataset(dbv)) _is _unset
+		_then
+			# No world available to scan within.
+			_continue
+		_endif
+		
+		# Build a table control for all geometry fields to be searched.
+		gf_set << equality_set.new()
+		_for tbl_name, gf_names _over tbl_info.fast_keys_and_elements()
+		_loop
+			_if (tbl << dbv.collections[tbl_name]) _is _unset
+			_then
+				_continue
+			_endif
+			_for gf_name _over gf_names.fast_elements()
+			_loop
+				_if (gf << tbl.geometry_fields[gf_name]) _is _unset
+				_then
+					_continue
+				_endif
+				_if gf.mapped?
+				_then
+					gf_set.add_all(gf.mapped_geometry_fields)
+				_else
+					gf_set.add(gf)
+				_endif
+			_endloop
+		_endloop
+		_if gf_set.size = 0
+		_then
+			_continue
+		_endif
+		
+		tc << dbv.table_control_for(simple_vector.new_from(gf_set))
+		orig_w << _unset
+		sc << _unset 
+		_protect
+			sc << dbv.geometry_scanner(:general)
+			orig_w << sc.world
+			sc.world << w
+
+			sc.start_scan(pa.bounds, tc)
+			_loop
+				_if (a_geom << sc.get()) _is _unset _then _leave _endif
+				_if (a_rec << a_geom.rwo) _is _unset _then _continue _endif
+				interact? << _false
+				_try _with cond
+					_if a_geom.spatial_relation_with(pa) _isnt :disjoint
+					_then
+						interact? << _true
+					_endif
+				_when primitive_failed
+					# Probably due to a too-many-intersections type of thing.  If
+					# this is the case, then the things do interact.
+					interact? << _true 
+				_endtry
+
+				_if _not interact?
+				_then
+					_continue
+				_endif
+				
+				_for rec_data _over a_rec.mss_qa_records_for(input_mode, _self).fast_elements()
+				_loop
+					process_rec << rec_data[1]
+					
+					# Recheck validity, as this can return other records not
+					# eligible for the churrent check.
+					_if all_tbls[process_rec.source_collection] _is _unset 
+					_then
+						_continue
+					_endif
+					
+					_if rec_data[2] _is _true
+					_then
+						_if _self.do_duplicate_check(process_rec) _is _false
+						_then
+							_continue
+						_endif 
+					_endif
+					_loopbody(process_rec)
+				_endloop
+			_endloop
+		_protection
+			_if sc _isnt _unset
+			_then
+				_if orig_w _isnt _unset
+				_then
+					sc.world << orig_w
+				_endif
+				sc.return_to_scanner_pool()
+			_endif 
+		_endprotect
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_iter _method mss_qa_engine.all_objects_to_check_by_scrapbook(rp)
+	## 
+	## 
+
+	input_mode << rp[:input_mode]
+	all_tbls << rp[:current_check_tables]
+
+	sb << gis_program_manager.scrapbook()
+	any_recs? << _false 
+	_if (cb << sb.clipboard) _is _unset
+	_then
+		_return
+	_endif
+	
+	_for res_set _over cb.fast_elements()
+	_loop
+		_for test_rec _over res_set.fast_elements()
+		_loop
+			_if test_rec _is _unset _orif
+			    _not test_rec.is_valid?
+			_then
+				_continue
+			_endif
+			
+			# Clipboard may have detached records - attach them.
+			_if test_rec.is_detached?
+			_then
+				a_rec << test_rec.attached()
+			_else
+				a_rec << test_rec
+			_endif
+			_if a_rec _is _unset _then _continue _endif
+			_if all_tbls[a_rec.source_collection] _is _unset 
+			_then
+				_continue
+			_endif
+			
+			_for rec_data _over a_rec.mss_qa_records_for(input_mode, _self).fast_elements()
+			_loop
+				process_rec << rec_data[1]
+
+				# Recheck validity, as this can return other records not
+				# eligible for the churrent check.
+				_if all_tbls[process_rec.source_collection] _is _unset 
+				_then
+					_continue
+				_endif
+				
+				_if rec_data[2] _is _true
+				_then
+					_if _self.do_duplicate_check(process_rec) _is _false
+					_then
+						_continue
+					_endif 
+				_endif
+				_loopbody(process_rec)
+			_endloop
+		_endloop
+	_endloop 
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_iter _method mss_qa_engine.all_objects_to_check_by_difference_stream(rp)
+	## 
+	## 
+
+	input_mode << rp[:input_mode]
+	all_tbls << rp[:current_check_tables]
+
+	# Process one dataset at a time.
+	_for ds_name, tbl_info _over rp[:current_check_table_info_by_dataset].fast_keys_and_elements()
+	_loop
+		_if (dbv << gis_program_manager.cached_dataset(ds_name)) _is _unset
+		_then
+			_continue
+		_endif
+		_if (rv << .replicas[ds_name]) _is _unset
+		_then
+			_continue
+		_endif
+
+		# Note that tbl_info will contain all table names to be processed.
+		_for tc _over dbv.table_changes_to(rv).fast_elements()
+		_loop
+			_if tbl_info[tbl_name << tc.tablename] _is _unset
+			_then
+				_continue
+			_endif
+			diff_str << ds_difference_stream.new_on(dbv.collections[tbl_name], rv.collections[tbl_name])
+			_loop
+				(change, a_rec) << diff_str.get()
+				_if change _is _unset _then _leave _endif
+				_if _not {:insert, :update}.includes?(change) _then _continue _endif
+
+				_for rec_data _over a_rec.mss_qa_records_for(input_mode, _self).fast_elements()
+				_loop
+					process_rec << rec_data[1]
+
+					# Recheck validity, as this can return other records not
+					# eligible for the current check.
+					_if all_tbls[process_rec.source_collection] _is _unset 
+					_then
+						_continue
+					_endif
+					
+					_if rec_data[2] _is _true
+					_then
+						_if _self.do_duplicate_check(process_rec) _is _false
+						_then
+							_continue
+						_endif 
+					_endif
+					_loopbody(process_rec)
+				_endloop
+			_endloop 
+		_endloop
+	_endloop
+		
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_iter _method mss_qa_engine.all_objects_to_check_by_entire_database(rp)
+	## 
+	## 
+
+	input_mode << rp[:input_mode]
+	all_tbls << rp[:current_check_tables]
+	
+	_for ds_name, tbl_info _over rp[:current_check_table_info_by_dataset].fast_keys_and_elements()
+	_loop
+		_if (dbv << gis_program_manager.cached_dataset(ds_name)) _is _unset
+		_then
+			_continue
+		_endif
+
+		_for tbl_name, gf_names _over tbl_info.fast_keys_and_elements()
+		_loop
+			_if (tbl << dbv.collections[tbl_name]) _is _unset
+			_then
+				_continue
+			_endif
+			
+			_for a_rec _over tbl.fast_elements()
+			_loop 
+				_for rec_data _over a_rec.mss_qa_records_for(input_mode, _self).fast_elements()
+				_loop
+					process_rec << rec_data[1]
+					
+					# Recheck validity, as this can return other records not
+					# eligible for the churrent check.
+					_if all_tbls[process_rec.source_collection] _is _unset 
+					_then
+						_continue
+					_endif
+					
+					_if rec_data[2] _is _true
+					_then
+						_if _self.do_duplicate_check(process_rec) _is _false
+						_then
+							_continue
+						_endif 
+					_endif
+					_loopbody(process_rec)
+				_endloop
+			_endloop
+		_endloop
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_method mss_qa_engine.do_duplicate_check(a_rec)
+	## 
+	## Return FALSE if A_REC is in .visited_cache already.
+	## Otherwise, add it and return true.  Note that the size of
+	## .visited_cache is limited in this method.
+	##
+
+	_if .visited_cache.size >= 250000
+	_then
+		_return _true
+	_endif
+
+	_if .visited_cache.includes?(a_rec)
+	_then
+		_return _false
+	_endif
+	.visited_cache.add(a_rec)
+	_return _true
+	
+_endmethod
+$

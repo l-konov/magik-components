@@ -1,0 +1,13 @@
+mss_cu_ptrule_extensions	1
+
+description
+	Extensions to mss_ptrule modules to enable Compatible Units
+end
+
+requires
+	mss_cu
+	mss_ptrules
+	mss_cu_ptrule_attribute_dialog
+	mss_cu_ptrule_changes
+	mss_cu_work_point_ptrule
+end

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="windows-1252" standalone="yes"?>
+<dialog class="fourth_dialog" extra_slots="one">
+	<module name="fourth_dialog">
+		<property name="version" value="1"/>
+		<property name="description" value="Module Description?"/>
+		<property name="package" value="user"/>
+		<property name="pragma_classify_level" value="restricted"/>
+		<property name="pragma_usage" value="internal"/>
+		<property name="pragma_topic" value="fourth_dialog"/>
+	</module>
+
+	<widget name="a_frame">
+		<property name="dd_class" value="frame"/>
+		<property name="maximizable?" value="True"/>
+		<property name="minimizable?" value="True"/>
+		<property name="resizable?" value="True"/>
+	</widget>
+
+	<widget name="rowcol_01">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="a_frame"/>
+		<property name="bottom_spacing" value="6"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="6"/>
+		<property name="right_spacing" value="6"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="top_level"/>
+		<property name="top_spacing" value="6"/>
+		<property name="ncols" value="1"/>
+		<property name="nrows" value="2"/>
+	</widget>
+
+	<widget name="rowcol_02">
+		<property name="dd_class" value="rowcol"/>
+		<property name="dd_parent" value="rowcol_01"/>
+		<property name="bottom_spacing" value="0"/>
+		<property name="col" value="1"/>
+		<property name="col_spacing" value="7"/>
+		<property name="default_col_alignment" value="fill"/>
+		<property name="default_row_alignment" value="fill"/>
+		<property name="left_spacing" value="0"/>
+		<property name="right_spacing" value="0"/>
+		<property name="row" value="1"/>
+		<property name="row_spacing" value="6"/>
+		<property name="rowcol_style" value="nested"/>
+		<property name="top_spacing" value="0"/>
+		<property name="ncols" value="4"/>
+		<property name="nrows" value="1"/>
+	</widget>
+
+	<widget name="plugin_item_02">
+		<property name="dd_class" value="dd_plugin_item"/>
+		<property name="dd_parent" value="rowcol_01"/>
+		<property name="col" value="1"/>
+		<property name="has_border?" value="False"/>
+		<property name="plugin_name" value="spatial_context_viewer"/>
+		<property name="row" value="2"/>
+		<property name="insert" value="plugin"/>
+	</widget>
+
+	<widget name="open_file_dir_01">
+		<property name="dd_class" value="dd_open_file_dir"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="col" value="1"/>
+		<property name="col_alignment" value="left"/>
+		<property name="filter" value="*.*"/>
+		<property name="has_border?" value="True"/>
+		<property name="image_file_name" value="open_file_dir"/>
+		<property name="image_module_name" value="dialog_designer"/>
+		<property name="operation" value="open"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+		<property name="selector" value="open_file_dir_01()"/>
+	</widget>
+
+	<widget name="plugin_item_01">
+		<property name="dd_class" value="dd_plugin_item"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="action_name" value="view_zoom_to_trail"/>
+		<property name="col" value="2"/>
+		<property name="has_border?" value="False"/>
+		<property name="plugin_name" value="maps"/>
+		<property name="row" value="1"/>
+		<property name="insert" value="action"/>
+	</widget>
+
+	<widget name="style_choice_item_01">
+		<property name="dd_class" value="dd_style_choice_item"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="col" value="3"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+		<property name="style_type" value="dash_pattern"/>
+	</widget>
+
+	<widget name="date_time_item_01">
+		<property name="dd_class" value="dd_date_time_item"/>
+		<property name="dd_parent" value="rowcol_02"/>
+		<property name="aspect" value="date_time_item_01_aspect"/>
+		<property name="col" value="4"/>
+		<property name="col_alignment" value="fill"/>
+		<property name="data_type" value="date"/>
+		<property name="row" value="1"/>
+		<property name="row_alignment" value="top"/>
+		<property name="value_changed_notifier" value="date_time_item_01_changed()"/>
+		<property name="width" value="60"/>
+	</widget>
+</dialog>

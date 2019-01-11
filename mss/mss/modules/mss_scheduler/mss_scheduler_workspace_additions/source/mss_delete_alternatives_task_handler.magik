@@ -1,0 +1,343 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_delete_alternatives_task_handler
+##
+## Task handler for deleting database alternatives that have no
+## children, and no changes.
+##
+
+def_slotted_exemplar(:mss_delete_alternatives_task_handler,
+{
+	{:delete_alternative_count, _unset, :readable},
+	{:delete_failed_count, _unset, :readable}
+},
+{:mss_scheduled_task_handler})
+$
+
+mss_scheduler_engine.define_task_handler(:delete_alternatives, mss_delete_alternatives_task_handler)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+mss_delete_alternatives_task_handler.define_shared_constant(
+	:delete_mss_design_alternatives_only?,
+	## If this is true, then only alternatives that begin with
+	## mss_workspace_manager_engine.alternative_name_prefix will be
+	## considered for deletion.
+	_true,
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler}, usage={redefinable})
+_method mss_delete_alternatives_task_handler.top_level_alternatives_to_process()
+	## 
+	## Return a data structure that describes the top level
+	## alternatives to be processed.  This is a collection of vectors,
+	## where each inner vector is as follows:
+	##  1: The name of the database partition to process.
+	##  2: The top level alternative in that database.
+	## 
+	## Default processing will make use of
+	## mss_workspace_manager_engine.root_alternative_name_for_view_name
+	## to derive this information.
+	##
+
+	r << rope.new()
+	_for i, j _over mss_workspace_manager_engine.root_alternative_name_for_view_name.
+		fast_keys_and_elements()
+	_loop
+		r.add_last({i, j})
+	_endloop
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_delete_alternatives_task_handler.parameters_for_task_type(task_type)
+	## 
+	##
+
+	pl << property_list.new()
+
+	# Note: currently there are no parameters to this task type.
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_delete_alternatives_task_handler.int!run()
+	## 
+	## Perform the work required to complete the deletion of
+	## database alternatives.
+	##
+
+	.delete_alternative_count << 0
+	.delete_failed_count << 0
+	
+	msg << _self.message(:delete_alternatives_start, date_time.now())
+	write(msg)
+	.standard_output.write(msg, newline_char)
+	
+	mss_workspace_manager_engine.view.rollforward()
+	mss_workspace_manager_engine.open_design(_unset)
+	res << _self.delete_alternatives()
+
+	msg << _self.message(:delete_alternatives_end, date_time.now(),
+			     .delete_alternative_count, .delete_failed_count)
+	write(msg)
+	.standard_output.write(newline_char)
+	.standard_output.write(msg, newline_char)
+	
+	_return res
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_delete_alternatives_task_handler.delete_alternatives()
+	## 
+	## Delete all database alternatives that have no changes to
+	## post, and no children.
+	##
+
+	_handling information _with procedure
+	_handling mss_information _with procedure
+	_handling mss_question _with procedure
+
+	_local me << _self
+
+	# N.B.: This logic (of doing one pass to get the alternatives
+	# to be deleted, and doing a second pass to actually delete
+	# them) is relatively simple and straightforward to implement,
+	# but it does lead to the case where once a child is deleted,
+	# the parent alternative may now be a candidate for deletion,
+	# but it isn't detected as such.  This is not considered to be
+	# a problem worth worrying about, because it will be detected
+	# the next time that this task gets run.
+
+	_for alt_data _over _self.top_level_alternatives_to_process().fast_elements()
+	_loop
+		db_name << alt_data[1]
+		root_name << alt_data[2]
+		_if (main_dbv << gis_program_manager.cached_dataset(db_name)) _is _unset
+		_then
+			_continue
+		_endif 
+
+		# N.B.: because the specific table changes are interrogated
+		# here, this must be a database_view (or subclass), not a
+		# ds_version_view.  So, can't use replicate_without_collections(),
+		# although that would be faster to work with.
+		repl_dbv << main_dbv.replicate()
+		_protect
+			msg << _self.message(:determine_to_del_start, date_time.now(),
+					     main_dbv.name, root_name)
+			write(msg)
+			.standard_output.write(msg, newline_char)
+			repl_dbv.go_to_alternative(root_name)
+			to_del << _self.determine_alternatives_to_delete(repl_dbv)
+			msg << _self.message(:determine_to_del_end, date_time.now(),
+					     main_dbv.name, to_del.size)
+			write(msg)
+			.standard_output.write(msg, newline_char)
+			_self.delete_specified_alternatives(repl_dbv, to_del)
+		_protection
+			repl_dbv.discard()
+		_endprotect
+	_endloop
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_delete_alternatives_task_handler.determine_alternatives_to_delete(repl_dbv)
+	## 
+	## Examine all alternatives under REPL_DBV, and return a rope
+	## that describes the ones that can be deleted.
+	##
+
+	r << rope.new()
+	start_level << repl_dbv.alternative_level
+	start_dd_version << repl_dbv.current_dd_version
+	
+	#write("DEBUG starting to check: ", repl_dbv.original_view_name)
+	_for test_dbv _over repl_dbv.actual_alternatives(:same_view?, _true)
+	_loop
+		# Can't process if this is the root, or if it has children.
+		_if (tal << test_dbv.alternative_level) <= start_level _orif
+		    test_dbv.alternatives.size > 0
+		_then
+			_continue
+		_endif
+
+		# If delete_mss_design_alternatives_only? is true, then check
+		# to see if the name conforms.
+		leaf_alt_name << test_dbv.alternative_path.last
+		_if _self.delete_mss_design_alternatives_only? _is _true
+		_then
+			pref << mss_workspace_manager_engine.alternative_name_prefix
+			_if leaf_alt_name.index_of_seq(pref) ~= 1
+			_then
+				_continue
+			_endif
+		_endif
+		
+		any_change? << _self.any_change_in_alternative?(repl_dbv, start_dd_version)
+		
+		#write("DEBUG check: ", any_change?, %,, leaf_alt_name)
+		 _if any_change? _isnt _false 
+		 _then
+			 # Something is different - don't delete.
+			 _continue
+		 _endif
+		 
+		_if tal = 1
+		_then
+			parent_alt_name << "|"
+		_else
+			parent_alt_name << test_dbv.alternative_path_name(-1)
+		_endif
+
+		r.add_last({parent_alt_name, leaf_alt_name})
+	_endloop
+	
+	_return r
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler}, usage={redefinable})
+_method mss_delete_alternatives_task_handler.any_change_in_alternative?(test_dbv, _optional start_dd_version)
+	## 
+	## Return true if there is any change of interest in the
+	## database view TEST_DBV, indicating that it is a candidate
+	## for deletion.  If START_DD_VERSION is set, then it will be
+	## checked to ensure that current_dd_version of test_dbv's base
+	## view will match this before it is considered as a candidate.
+	##
+	## This may be redefined to alter the criteria for deletion
+	## (for example, to disallow deletion if specific checkpoints
+	## exist). 
+	##
+	
+	# Get a base replica and decide if there is anything to post.
+	# N.B.: I've seen cases where table_changes_to() returns a
+	# non-empty collection, even though none of the tables really
+	# has any changes.  I don't know why this is... but to cater to
+	# that case, explicitly look for a change, even if
+	# table_changes_to() says that something is postable.
+	any_change? << _false
+	v2 << test_dbv.replicate(:base)
+	_protect
+		_if start_dd_version _isnt _unset _andif
+		    v2.current_dd_version ~= start_dd_version
+		_then
+			# Don't delete any alternatives with data model changes.
+			any_change? << _true
+		_else 
+			_for tc _over test_dbv.table_changes_to(v2).fast_elements()
+			_loop
+				tbl_name << tc.tablename
+				_if (t1 << test_dbv.collections[tbl_name]) _is _unset _orif
+				    (t2 << v2.collections[tbl_name]) _is _unset
+				_then
+					# Can this happen?  If it does, don't mess with it.
+					any_change? << _true
+					_leave
+				_endif
+				
+				diff_str << ds_difference_stream.new_on(t1, t2)
+				_if (a_change << diff_str.get()) _isnt _unset
+				_then
+					any_change? << _true 
+					diff_str.close()
+					_leave
+				_endif 
+			_endloop
+		_endif 
+	_protection
+		v2.discard()
+	_endprotect 
+	
+	_return any_change?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_delete_alternatives_task_handler.delete_specified_alternatives(repl_dbv, to_del)
+	## 
+	## Delete all alternatives given in the rope TO_DEL.
+	##
+
+	des_tbl << mss_workspace_manager_engine.design_table
+	pref << mss_workspace_manager_engine.alternative_name_prefix
+	_for to_del_data _over to_del.fast_elements()
+	_loop
+		parent_alt << to_del_data[1]
+		leaf_alt << to_del_data[2]
+
+		_try _with cond
+		     # Do some work to figure out the design description, if possible.
+		     des_rec << _unset 
+		     _if des_tbl _isnt _unset _andif
+			 leaf_alt.index_of_seq(pref) = 1 _andif
+			 (des_id << leaf_alt.slice_to_end(pref.size + 1).as_number()) _isnt _unset _andif
+			 des_id.species _is 1.species
+		     _then 
+			     des_rec << des_tbl.at(des_id)
+		     _endif
+
+		     _if des_rec _is _unset
+		     _then 
+			     msg << _self.message(:removing_alternative, date_time.now(),
+						  parent_alt, leaf_alt)
+		     _else
+			     msg << _self.message(:removing_alternative_design, date_time.now(),
+						  parent_alt, leaf_alt, des_rec.short_description)
+		     _endif
+		     write(msg)
+		     .standard_output.write(msg, newline_char)
+		     
+		     repl_dbv.go_to_alternative(parent_alt)
+
+		     # Before deleting, perform one last check to see if anything
+		     # has changed since we started running.
+		     repl_dbv.down(leaf_alt)
+		     _if _self.any_change_in_alternative?(repl_dbv) _isnt _false
+		     _then
+			     condition.raise(:user_error, :string, _self.message(:something_changed))
+		     _endif
+
+		     repl_dbv.up()
+		     repl_dbv.remove_alternative(leaf_alt, _false)
+		     .delete_alternative_count +<< 1
+		     
+		_when ds_alternative_has_readers,
+		      ds_alternative_has_sub_alternatives,
+		      ds_file_inaccessible,
+		      db_thing_not_found,
+		      user_error
+		      
+		      .delete_failed_count +<< 1
+		      msg << _self.message(:cannot_delete_alternative, cond.report_contents_string)
+		      write(msg)
+		      .standard_output.write(msg, newline_char)
+		_endtry 
+	_endloop 
+	
+_endmethod
+$

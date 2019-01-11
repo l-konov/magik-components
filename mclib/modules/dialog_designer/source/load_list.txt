@@ -1,0 +1,11 @@
+sw_widgets/
+dd_widgets/
+additions/
+dialog_design
+dd_element_editor
+dialog_designer_framework
+dialog_designer
+dialog_designer_plugin
+about_dialog_designer
+select_path       # for SW4 compatibility
+language_procs	# for checking internationalisation

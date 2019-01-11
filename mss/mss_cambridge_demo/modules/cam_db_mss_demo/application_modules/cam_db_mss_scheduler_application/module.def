@@ -1,0 +1,9 @@
+cam_db_mss_scheduler_application	1
+
+description
+	Provides an application to support running the task scheduler from the application manager.
+end
+
+requires
+	mss_scheduler_processor_gui
+end

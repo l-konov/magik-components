@@ -1,0 +1,2 @@
+#% text_encoding = cp1252
+json_test

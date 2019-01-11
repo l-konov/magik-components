@@ -1,0 +1,130 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method travel_details.mss_ptrule_ok_for_correlation?(cat, corr_geom, ptrule)
+	## 
+	## Allow snapping to pub_rest and car_park.
+	##
+
+	_if (corr_rwo << corr_geom.rwo) _isnt _unset _andif 
+	    {:pub_rest, :car_park}.includes?(corr_rwo.source_collection.name) _andif 
+	    corr_geom.geom_category _is :point
+	_then
+		_return _true
+	_endif
+	
+	_return _false
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method travel_details.mss_select_related_pub_rest(ptrule)
+	## 
+	## This action can be bound to a hotkey to select a related
+	## pub_rest.
+	##
+
+	# Only run this operation if the hotkey is pressed during a PDR.
+	_if ptrule.manager.pdr_running_ptrule _is _unset
+	_then
+		_return
+	_endif
+
+	_if (corr_geom << ptrule.pdr_data[:last_correlation_geometry]) _isnt _unset _andif
+	    (corr_rwo << corr_geom.rwo) _isnt _unset _andif 
+	    corr_geom.rwo_type _is :pub_rest
+	_then
+		dr << ptrule.detached_record
+		dr.pub_rest_name << corr_rwo.name
+		dr.pub_rest_street << corr_rwo.street
+
+		ptrule.user_data[:rel_pub_rest] << corr_rwo
+		ptrule.manager.flash_geometry(corr_geom)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method travel_details.mss_select_related_car_park(ptrule)
+	## 
+	## This action can be bound to a hotkey to select a related
+	## car_park.
+	##
+
+	# Only run this operation if the hotkey is pressed during a PDR.
+	_if ptrule.manager.pdr_running_ptrule _is _unset
+	_then
+		_return
+	_endif
+
+	_if (corr_geom << ptrule.pdr_data[:last_correlation_geometry]) _isnt _unset _andif
+	    (corr_rwo << corr_geom.rwo) _isnt _unset _andif 
+	    corr_geom.rwo_type _is :car_park
+	_then
+		dr << ptrule.detached_record
+		dr.car_park_name << corr_rwo.name
+		
+		ptrule.user_data[:rel_car_park] << corr_rwo
+		ptrule.manager.flash_geometry(corr_geom)
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method travel_details.mss_ptrule_validate_pre_release(ptrule)
+	##
+	## Validate that sufficient correlation information is
+	## available to insert this object.
+	##
+
+	_if (corr_rwo << ptrule.user_data[:rel_pub_rest]) _is _unset
+	_then
+		condition.raise(:user_error, :string, "No pub/restaurant selected.")
+	_endif
+
+	_if (corr_rwo << ptrule.user_data[:rel_car_park]) _is _unset
+	_then
+		condition.raise(:user_error, :string, "No car park selected.")
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_ptrule})
+_method travel_details.mss_ptrule_post_insert_activity(ptrule)
+	##
+	## Forge relationships, if they have been set up.
+	##
+
+	_super.mss_ptrule_post_insert_activity(ptrule)
+
+	_protect
+		_if (corr_rwo << ptrule.user_data[:rel_pub_rest]) _is _unset
+		_then
+			condition.raise(:user_error, :string, "No pub/restaurant selected.")
+		_endif
+		_self.pub_rest << corr_rwo
+
+		_if (corr_rwo << ptrule.user_data[:rel_car_park]) _is _unset
+		_then
+			condition.raise(:user_error, :string, "No car park selected.")
+		_endif
+		_self.car_park << corr_rwo
+	_protection
+		# If any errors occur, still clear out correlation
+		# information.
+		ptrule.user_data.empty()
+	_endprotect
+	
+_endmethod
+$

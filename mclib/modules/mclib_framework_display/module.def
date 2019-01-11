@@ -1,0 +1,10 @@
+mclib_framework_display	4000
+
+description
+	Provides basic support for showing a GUI interface into the structure of some frameworks
+end
+
+requires
+	mclib_package
+	component_framework
+end

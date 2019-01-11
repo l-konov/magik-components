@@ -1,0 +1,412 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+##
+## mss_merge_and_post_task_handler
+##
+## Task handler for performing merge and post operations.
+##
+
+def_slotted_exemplar(:mss_merge_and_post_task_handler,
+{},
+{:mss_scheduled_task_handler})
+$
+
+mss_scheduler_engine.define_task_handler(:merge, mss_merge_and_post_task_handler)
+mss_scheduler_engine.define_task_handler(:merge_and_post, mss_merge_and_post_task_handler)
+mss_scheduler_engine.define_task_handler(:merge_all_children, mss_merge_and_post_task_handler)
+mss_scheduler_engine.define_task_handler(:merge_and_post_from_file, mss_merge_and_post_task_handler)
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.parameters_for_task_type(task_type)
+	## 
+	##
+
+	pl << property_list.new()
+	_if task_type _is :merge _orif
+	    task_type _is :merge_and_post _orif
+	    task_type _is :merge_all_children
+	_then
+		pl[:partition_name] << {:symbol}
+		pl[:alternative_name] << {:symbol}
+		pl[:conflict_mode] << {:symbol, {:force_base, :force_child, :force_parent, :operator_intervention}}
+	_elif task_type _is :merge_and_post_from_file
+	_then
+		pl[:input_file] << {:filename}
+	_endif
+	
+	_return pl
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.int!run()
+	## 
+	## Perform the work required to complete the merge and post.
+	##
+
+	# Determine the operations to be performed.
+	op_list << _self.figure_vmds_operation_list()
+
+	# Save the current state of all datastores that will be
+	# processed.
+	vmds_state << _self.save_vmds_state(op_list)
+
+	# Perform the operations, and be sure to restore the original
+	# state.
+	ok? << _false
+	_protect
+		_if op_list.size = 1
+		_then
+			.standard_output.write(_self.message(:starting_process, date_time.now()), newline_char)
+		_else 
+			.standard_output.write(_self.message(:starting_process_multi, date_time.now(), op_list.size), newline_char)
+		_endif 
+		_self.perform_vmds_operation_list(op_list)
+		ok? << _true 
+	_protection
+		_if .failure_code _is _unset
+		_then 
+			.standard_output.write(_self.message(:process_complete, date_time.now()),
+					       newline_char)
+		_else
+			.standard_output.write(_self.message(:process_complete_errors, date_time.now()),
+					       newline_char)
+		_endif 
+		_self.restore_vmds_state(vmds_state, ok?)
+	_endprotect
+
+	_if .failure_code _isnt _unset
+	_then
+		ok? << _false 
+	_endif
+	_return ok?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.figure_vmds_operation_list()
+	## 
+	## Parse parameters to determine the list of VMDS operations to
+	## perform.
+	##
+
+	# If an input file has been defined, use the contents of that file.
+	_if (fname << .parameters[:input_file]) _isnt _unset
+	_then 
+		r << rope.new()
+		f << external_text_input_stream.new(fname)
+		_protect
+			_loop
+				_if (l << f.get_line()) _is _unset _then _leave _endif
+				data_vec << l.mss_parse_for_csv()
+				_if data_vec.size >= 4
+				_then
+					conflict_mode << data_vec[4]
+				_else
+					conflict_mode << _unset
+				_endif 
+				r.add_last({data_vec[1].as_symbol(),
+					    data_vec[2].as_symbol(),
+					    data_vec[3],
+					    conflict_mode.default(:operator_intervention).as_symbol()})
+			_endloop 
+		_protection
+			f.close()
+		_endprotect
+		_return r
+	_endif 
+
+	# If an input file has not been defined, then the individual
+	# parameters for a single alternative must be defined.
+	partition_name << .parameters[:partition_name].as_symbol()
+	alternative_name << .parameters[:alternative_name]
+	conflict_mode << .parameters[:conflict_mode].default(:operator_intervention).as_symbol()
+
+	_if .type = "merge"
+	_then 
+		_return {{:merge, partition_name, alternative_name, conflict_mode}}
+	_elif .type = "merge_and_post"
+	_then
+		_return {{:post, partition_name, alternative_name, conflict_mode}}
+	_elif .type = "merge_all_children"
+	_then
+		# Need to do a bunch of work to figure out children.
+		r << rope.new()
+		v2 << gis_program_manager.cached_dataset(partition_name).replicate_without_collections()
+		_protect
+			v2.go_to_alternative(alternative_name)
+			v2_level << v2.alternative_level
+			_for i _over v2.actual_alternatives()
+			_loop
+				_if i.alternative_level > v2_level
+				_then
+					# Don't actually merge the named alternative - only it's children.
+					r.add_last({:merge, partition_name, i.alternative_path_name(), conflict_mode})
+				_endif 
+			_endloop
+		_protection
+			v2.discard()
+		_endprotect
+		_return r
+	_else
+		condition.raise(:user_error, :string, _self.message(:unknown_type, .type))
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.save_vmds_state(op_list)
+	## 
+	## Return a property list of information describing the state
+	## of all VMDS alternatives managed by self, based on the
+	## contents of OP_LIST.
+	##
+
+	all_view_names << set.new()
+	_for i _over op_list.fast_elements()
+	_loop
+		all_view_names.add(i[2])
+	_endloop
+	
+	vmds_state << equality_property_list.new()
+	_for a_view_name _over all_view_names.fast_elements()
+	_loop
+		a_view << gis_program_manager.cached_dataset(a_view_name)
+		_if a_view.updated?
+		_then
+			a_view.commit()
+		_endif 
+		vmds_state[a_view] << {a_view.alternative_path_name(), a_view.mode, a_view.params[:conflict_mode]}
+	_endloop
+	_return vmds_state
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.restore_vmds_state(vmds_state, ok?)
+	## 
+	## Restore the views in VMDS_STATE (a structure created by the
+	## save_vmds_state() method).  If OK? is true, then any changes
+	## will be committed - otherwise they will be rolled back.
+	## 
+
+	_for a_view, view_info _over vmds_state.fast_keys_and_elements()
+	_loop
+		_if a_view.updated?
+		_then
+			_if ok? _is _true
+			_then
+				a_view.commit()
+			_else
+				a_view.rollback()
+			_endif
+		_endif
+		a_view.go_to_alternative(view_info[1])
+		a_view.switch(view_info[2])
+		a_view.params[:conflict_mode] << view_info[3]
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.perform_vmds_operation_list(op_list)
+	## 
+	## Perform the VMDS operations in OP_LIST, with handling to log
+	## results appropriately.
+	##
+
+	_local me << _self
+
+	# If there are a lot of operations, then only report every Nth one.
+	_if op_list.size >= 1000
+	_then
+		rpt_interval << 100
+	_elif op_list.size >= 100
+	_then
+		rpt_interval << 10
+	_else
+		rpt_interval << 1
+	_endif
+	
+	_for count, op_data _over op_list.fast_keys_and_elements()
+	_loop
+		ok? << _false 
+		_catch :any_error
+		       _handling user_error, ds_alternative_parent_has_changed,
+		       ds_alternative_already_open_for_write, db_thing_readonly,
+		       db_thing_not_found _with
+		       _proc(cond)
+			       _import me, op_data
+			       msg << me.message(:generic_vmds_error, date_time.now(),
+						 op_data[1], op_data[2], op_data[3])
+			       me.error_output.write(msg, newline_char)
+			       me.error_output.write(cond.report_contents_string, newline_char)
+
+			       # If no failure code set yet, and if this is not a generic
+			       # error, set it now.
+			       _if me.failure_code _is _unset _andif
+				   cond.name _isnt :user_error
+			       _then 
+				       me.failure_code << cond.name
+			       _endif 
+			       _throw :any_error
+		       _endproc 
+		       _handling error _with
+		       _proc(cond)
+			       _import me, op_data
+			       msg << me.message(:generic_vmds_error, date_time.now(),
+						 op_data[1], op_data[2], op_data[3])
+			       me.error_output.write(msg, newline_char)
+			       me.error_output.write(cond.report_contents_string, newline_char)
+			       me.failure_code << cond.name
+			       !traceback!(me.error_output)
+			       _throw :any_error
+		       _endproc 
+
+		       _if count _mod rpt_interval = 0
+		       _then 
+			       .standard_output.write(_self.message(:starting_operation, date_time.now(),
+								    count, op_data[1], op_data[2], op_data[3]),
+						      newline_char)
+		       _endif
+		       
+		       ok? << _self.perform_single_vmds_operation(op_data)
+		_endcatch
+		_if ok? _isnt _true
+		_then
+			.standard_output.write(_self.message(:error_reported), newline_char)
+		_endif 
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_merge_and_post_task_handler.perform_single_vmds_operation(op_data)
+	## 
+	## Perform a single VMDS operation.  OP_DATA is a four-item vector:
+	## 1) :merge or :post
+	## 2) Partition name (as a symbol)
+	## 3) Alternative name
+	## 4) Conflict mode (as a symbol, default to :operator_intervention)
+	##
+
+	_local merged_ok?
+	_local posted_ok?
+	_local post_max_loops << 10
+	
+	op << op_data[1]
+	ds_name << op_data[2]
+	alt_name << op_data[3]
+	conf_mode << op_data[4].default(:operator_intervention)
+		
+	dbv << gis_program_manager.cached_dataset(ds_name)
+	dbv.go_to_alternative(alt_name)
+	dbv.switch(:write)
+
+	_if op _is :merge _orif
+	    op _is :post
+	_then
+		dbv.params[:conflict_mode] << conf_mode
+		(changed?, roots, detector) << dbv.merge(_false, _false)
+		_if changed? _is _maybe _orif
+		    roots _isnt _unset
+		_then
+			_if detector _isnt _unset
+			_then
+				detector.undo_merge()
+				detector.terminate()
+			_endif
+			.failure_code << :conflicts_not_handled
+			condition.raise(:user_error, :string, _self.message(:conflicts_not_handled))
+		_endif
+	_endif
+	
+	_if op _is :post
+	_then
+		merged_ok? << _true 
+		posted_ok? << _false
+		_for loop_count _over 1.upto(post_max_loops)
+		_loop @post_retry
+			_catch :re_post
+			       _handling ds_alternative_parent_has_changed _with 
+			       _proc(cond)
+				       # There is a small window of opportunity for the parent
+				       # alternative to be changed between the previous merge and the
+				       # post.  If this happens, need to re-merge.  However, if the
+				       # maximum number of iterations has been exceeded, give up.
+				       _import loop_count, post_max_loops
+				       _if loop_count = post_max_loops
+				       _then
+					       cond.continue_handling()
+				       _endif
+				       
+				       _import merged_ok?
+				       merged_ok? << _false
+				       _throw :re_post
+			       _endproc
+			       
+			       _handling ds_alternative_already_open_for_write _with 
+			       _proc(cond)
+				       # Someone else is writing to the parent alternative.  Sleep for
+				       # a second, and try again.
+				       _import loop_count, post_max_loops
+				       _if loop_count = post_max_loops
+				       _then
+					       cond.continue_handling()
+				       _endif
+				       
+				       _thisthread.sleep(1000)
+				       _throw :re_post
+			       _endproc
+			       
+			       _if _not merged_ok?
+			       _then
+				       dbv.params[:conflict_mode] << conf_mode
+				       (changed?, roots, detector) << dbv.merge(_false, _false)
+				       _if changed? _is _maybe _orif
+					   roots _isnt _unset
+				       _then
+					       _if detector _isnt _unset
+					       _then
+						       detector.undo_merge()
+						       detector.terminate()
+					       _endif
+					       .failure_code << :conflicts_not_handled
+					       condition.raise(:user_error, :string, _self.message(:conflicts_not_handled))
+				       _else
+					       merged_ok? << _true 
+				       _endif
+			       _endif
+			       
+			       dbv.post()
+			       posted_ok? << _true
+			       _leave @post_retry
+			_endcatch
+		_endloop
+
+		_if _not posted_ok?
+		_then
+			# This seems impossible, but it is too important to let it pass by.
+			condition.raise(:user_error, :string, _self.message(:unknown_error_during_post))
+		_endif 
+	_endif
+
+	_return _true
+	
+_endmethod
+$

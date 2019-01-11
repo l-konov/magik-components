@@ -1,0 +1,543 @@
+########################################################################
+##
+## Description: 
+## A small utitily to add or replace strings in a text file.
+##
+## It is necessary that the files to be changed are writable.
+##
+## Here are a few example calls:
+## 1)
+## Magik2> sf!replace_string_in_files( "c:\*.magik", :recursive?, _true,
+##                                     "B_B", "b_b", :show_files?, _true )
+## This call looks for all *.magik files in the c:\ directory (and
+## also in the sub-directories) and replaces the string B_B by b_b.
+## When a matching file has been found, the complete path is printed.
+##
+## 2)
+## To run the utility in a directory only (and not the sub-directories)
+## the call should be changed like this:
+## Magik2> sf!replace_string_in_files( "c:\*.magik",
+##                                     "B_B", "b_b", :show_files?, _true )
+##
+## 3)
+## It is also possible to specify line that should be added at the
+## beginning or the end of the file with the options :add_first
+## and :add.
+## To add the two lines
+##       #% text_encoding = iso8859_1
+##       _package sw
+## at the beginning of a file this command can be used:
+## Magik2> sf!replace_string_in_files( "c:\temp\new_file.magik",
+##                       :add_first,
+##                       "#% text_encoding = iso8859_1%n_package sw" )
+##
+## The %n in the passed string will be replaced by a newline character
+## in the file. Similarly a %t would be replaced by a tab character.
+##
+## More options are explained in the invoke() method comment.
+########################################################################
+
+
+_pragma(classify_level=advanced, topic={tools})
+def_slotted_exemplar( :sf!replace_string_in_files,
+{
+	{ :replace_info,   equality_hash_table.new() },
+	{ :skip_files,     sorted_collection.new() },
+	{ :options,        property_list.new() },
+	{ :processed,      0 },
+	{ :updated,        0 },
+	{ :failed_reads,   sorted_collection.new() },
+	{ :failed_updates, sorted_collection.new() }
+} )
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :replace_info, :write, :private )
+$
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :skip_files, :write, :private )
+$
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :options, :write, :private )
+$
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :processed, :write, :private )
+$
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :updated, :write, :private )
+$
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :failed_reads, :write, :private )
+$
+_pragma(classify_level=restricted, topic={tools})
+sf!replace_string_in_files.define_slot_access( :failed_updates, :write, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={tools})
+_method sf!replace_string_in_files.invoke( a_file_path,
+					   _gather a_key_value_list )
+
+	## Interface method to perform the replace string operation
+	## in the FILE referenced by A_FILE_PATH. Two (potentially
+	## empty) lists with file names are returned:
+	## the first refers to files that could not be read,
+	## the second one refers to files that could not be written.
+	##
+	## A_FILE_PATH
+	##    This can either be a complete (and unique) file path
+	##    (like c:\ab.magik) or a path pattern (like c:\tmp\*.magik).
+	##    In the latter case all files matching the given file name
+	##    pattern will be processed (see also the optional parameter
+	##    :recursive?)
+	##    The string passed in this parameter is considered a path
+	##    pattern when (one or more) % and/or * characters are found.
+	##
+	## A_KEY_VALUE_LIST
+	##    An optional list of key-value parameters. Currently
+	##    supported keywords are:
+	##
+	##    :show_files?, a Boolean value, default value is _false
+	##        If _true the code will show wch file is currently
+	##        processed - else nothing will be reported.
+	##
+	##    :show_stats?, a Boolean value, default value is _true
+	##        Displays a short message how many files have been
+	##        processed and how many files have been updated. If
+	##        set to _false this message will not be shown.
+	##
+	##    :recursive?, a Boolean value, default value is _false
+	##        If A_FILE_PATH is not a path pattern this option is
+	##        ignored.
+	##
+	##    :skip, a string
+	##        This option can be used to specify a file pattern
+	##        or a single file name that shall be ignored from
+	##        processing. The option can be specified multiple times.
+	##
+	##    :add_first, a string
+	##        Adds STRING at the beginning of the file;
+	##        unless string ends with a newline character
+	##        this character is added to STRING.
+	##
+	##    :add, a string
+	##        Like option :add_first - only that STRING is added
+	##        at the end of the file.
+	##
+	##    <string>, <string>
+	##    If key and value are a strings, these two paramaters are
+	##    treated as find/replace tokens. It is possible to add some
+	##    special "functions" to the search and/or replace string:
+	##    - %n,#n  will be replaced by a newline charater
+	##    - %t,#t  will be replaced by a tab character
+	##    - %var%  will be replaced by the value of the environment
+	##             variable VAR (or "" if the variable is not defined)
+	##    To avoid that a passed string is changed/evaluated, it has
+	##    to start with a single quote ' (which will be removed from
+	##    the string; if the string starts with a quote and shall not
+	##    be evaluated use two single quotes).
+
+	>> _self.perform_replace( a_file_path, a_key_value_list )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.perform_replace(
+			 a_file_path, a_key_value_list )
+
+	## Processes user options and starts the replace operation
+
+	_local props << _self.options
+
+	_self.process_options( a_key_value_list )
+
+	_if _self.replace_info.empty? _andif
+	    _not props.includes_key?( :add_first ) _andif
+	    _not props.includes_key?( :add )
+	_then
+		write( "No change information was given." )
+		_return
+	_endif
+
+	_self.processed << 0
+	_self.updated   << 0
+	_self.failed_reads.empty()
+	_self.failed_updates.empty()
+
+	_self.process_files( a_file_path )
+
+	#
+	# Produce some statistics...
+	#
+	_if _self.options[ :show_stats? ] _isnt _false
+	_then
+		_self.write_statistics()
+	_endif
+
+	>> _self.failed_reads, _self.failed_updates
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.process_options( a_key_value_list )
+
+	## Looks at all passed options and put them in the right
+	## place for later processing...
+
+	_local props
+	_local lookup
+	_local skip
+	_local key
+	_local str_val?
+
+	( props  << _self.options ).empty()
+	( lookup << _self.replace_info ).empty()
+	( skip   << _self.skip_files ).empty()
+
+	_for idx _over range( 2, a_key_value_list.size, 2 )
+	_loop
+		key   << a_key_value_list[ idx - 1 ]
+		value << a_key_value_list[ idx ]
+		str_val? << value.is_kind_of?( "" )
+
+		_if key _is :skip _andif str_val?
+		_then
+			skip.add( _self.evaluate_string( value ) )
+
+		_elif key.is_kind_of?( symbol )
+		_then
+			props[ key ] <<
+				_if str_val?
+				_then >> _self.evaluate_string( value )
+				_else >> value
+				_endif
+
+		_elif key.is_kind_of?( "" ) _andif str_val?
+		_then
+			lookup[ _self.evaluate_string( key ) ] <<
+				_self.evaluate_string( value )
+		_endif
+	_endloop
+
+	#
+	# get rif of any empty search strings...
+	#
+	lookup.remove_key( "" )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.evaluate_string( a_string )
+
+	## Replaces these (sub)strings in A_STRING
+	## %n,#n  by a newline charaters
+	## %t,#t  by a tab character
+	## %var%  by the value of the environment variable VAR or "".
+	## If the A_STRING starts with a single quote ('), it is
+	## not evaluated and the quote is removed.
+
+	_if _not a_string.empty? _andif
+	    a_string.first = %'
+	_then
+		_return a_string.subseq( 2 )
+	_endif
+
+	_local new << _self.replace_any_env_vars_in( a_string )
+
+	new << new.substitute_string( "%n", character.newline )
+	new << new.substitute_string( "#n", character.newline )
+	new << new.substitute_string( "%t", character.tab )
+	new << new.substitute_string( "#t", character.tab )
+
+	>> new
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.replace_any_env_vars_in( a_string )
+
+	## Replaces any environment variables in A_STRING by their
+	## values (or "" if not defined).
+	## Currently this method does nothing...
+
+	_local s_idx, e_idx
+
+	_if ( s_idx << a_string.index_of( %% ) ) _isnt _unset _andif
+	    a_string.size > s_idx + 1
+	_then
+		e_idx << a_string.index_of( %%, s_idx + 1 )
+	_endif
+
+	#
+	# No replacement possible; badly formed string...
+	#
+	_if s_idx _is _unset _orif e_idx _is _unset
+	_then
+		_return a_string
+	_endif
+
+	_local ref  << a_string.subseq( s_idx + 1, e_idx - s_idx - 1 )
+	_local val  << system.getenv( ref ).default( "" )
+	_local pre  << _if s_idx > 1
+		       _then >> a_string.subseq( 1, s_idx - 1)
+		       _else >> ""
+		       _endif
+	_local post << _if e_idx < a_string.size
+		       _then >> a_string.subseq( e_idx + 1 )
+		       _else >> ""
+		       _endif
+
+	>> _self.replace_any_env_vars_in( pre + val + post )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.process_files(
+			 a_file_path, _optional level )
+
+	## This method decides which files are actually processed.
+	## The actual work of replacing/updating data is done in
+	## another method...
+
+	_local recurse?        << _self.options[ :recursive? ] _is _true
+	_local show_file_info? << _self.options[ :show_files? ] _is _true
+	_local dir
+	_local file
+
+	level         << level.default( 0 )
+	( file, dir ) << system.pathname_components( a_file_path )
+
+	#
+	# The "only 1 file" case:
+	# The file name does not contain a wild card and the user
+	# has not explicitly requested that this tool works recusivly...
+	#
+	_if _not file.includes_any?( "%*" ) _andif
+	    _not recurse?
+	_then
+		_if _not system.file_exists?( a_file_path )
+		_then
+			write( "File ", a_file_path, " does not exist!" )
+		_else
+			_self.process_file( a_file_path, file,
+					    show_file_info? )
+		_endif
+		_return
+	_endif
+
+	#
+	# The multi-file case:
+	# Either we process only the current directory or we
+	# also have to process all subdirectories...
+	#
+	_local dcn
+	_local item
+	_local type
+	_local c_file
+	_local path
+
+	_protect
+	    #
+	    # On NT we might encounter some directories that can not
+	    # be opened by user applications - that's why we also use
+	    # the try statement here...
+	    #
+	    _try _with cond
+	        dcn << directory_channel.new( dir, "*" )
+	    _when error
+		_self.write_error_info( cond )
+		_return
+	    _endtry
+
+	    _loop
+		item << dcn.get_status()
+		_if item _is _unset _then _leave _endif
+
+		_if ( type << item.type ) _is :directory _andif
+		    recurse?
+		_then
+			_self.process_files(
+				system.pathname_from_components(
+					file, item.name ), level + 1)
+
+		_elif type _is :file
+		_then
+			path            << item.name
+			( c_file, dir ) << system.pathname_components( path )
+			_if c_file.matches?( file )
+			_then
+				_self.process_file( path, c_file,
+						    show_file_info? )
+			_endif
+		_endif
+	    _endloop
+	_protection
+	    _if dcn _isnt _unset _then dcn.close() _endif
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.process_file(
+			 a_file_path, a_file_name, show_file_info? )
+
+	## Perform any replacements in the file referenced by A_FILE_PATH.
+	## To avoid any unneccessary file rewrites we read the file in memory
+	## first and then perform any changes. If no changes were made we
+	## don't do anything else...
+
+	_local lookup   << _self.replace_info
+	_local updated? << _false
+	_local lines    << rope.new()
+	_local strm
+	_local line
+	_local upd_line
+
+	#
+	# Shall we process the file at all?
+	#
+	_for a_pattern _over _self.skip_files.fast_elements()
+	_loop
+		_if a_pattern.includes_any?( "%" ) _andif
+		    a_pattern.matches?( a_file_name )
+		_then
+			_return
+
+		_elif a_pattern = a_file_name
+		_then
+			_return
+		_endif
+	_endloop
+
+	_if show_file_info?
+	_then
+		write( "Processing ", a_file_path )
+	_endif
+
+	_self.processed +<< 1
+	#
+	# read the file in memory...
+	#
+	_protect
+	    _try _with cond
+	        strm << external_text_input_stream.new( a_file_path )
+	    _when error
+		_self.write_error_info( cond )
+		_self.failed_reads.add( a_file_path )
+		_return
+	    _endtry
+
+	    _loop
+		_if ( line << strm.get_line() ) _is _unset _then _leave _endif
+		lines.add_last( line )
+	    _endloop
+	    
+	_protection
+	    _if strm _isnt _unset _then strm.close() _endif
+	_endprotect
+
+	#
+	# Look for :add_first or :add options...
+	#
+	_if ( str << _self.options[ :add_first ] ) _isnt _unset
+	_then
+		lines.add_first( str )
+		updated? << _true
+	_endif
+	_if ( str << _self.options[ :add ] ) _isnt _unset
+	_then
+		lines.add_last( str )
+		updated? << _true
+	_endif
+
+	#
+	# process the file contents...
+	#
+	_for idx,a_line _over lines.keys_and_elements()
+	_loop
+	    _for fin,rep _over lookup.fast_keys_and_elements()
+	    _loop
+		    upd_line << a_line.substitute_string( fin, rep )
+
+		    _if _not ( a_line = upd_line )
+		    _then
+			    lines[ idx ] << upd_line
+			    updated? << _true
+		    _endif   
+	    _endloop
+	_endloop
+
+	_if _not updated? _then _return _endif
+
+	#
+	# Dump out the data if anything has changed...
+	#
+	_protect
+	    _try _with cond
+	        strm << external_text_output_stream.new( a_file_path )
+	    _when error
+		_self.write_error_info( cond )
+		_self.failed_updates.add( a_file_path )
+		_return
+	    _endtry
+
+	    _for a_line _over lines.fast_elements()
+	    _loop
+		    strm.write( a_line, newline_char )
+	    _endloop
+	_protection
+	    _if strm _isnt _unset _then strm.close() _endif
+	_endprotect
+
+	_self.updated +<< 1
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.write_error_info( a_cond )
+
+	## Produces an error message on the terminal...
+
+	write( %*.repeated( 25 ), newline_char,
+	       "    ", a_cond.report_contents_string, newline_char,
+	       %*.repeated( 25 ) )
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={tools})
+_private _method sf!replace_string_in_files.write_statistics()
+
+	## Just provide some information what has happened
+	## on the terminal...
+
+	write( newline_char,
+	       "Processed Files: ", _self.processed, newline_char,
+	       "Updated Files  : ", _self.updated, newline_char,
+	       "Failed Reads   : ", _if _self.failed_reads.empty?
+				   _then >> "0"
+		                   _else >> _self.failed_reads.size
+		                   _endif )
+	_for a_file _over _self.failed_reads.fast_elements()
+	_loop
+		write( "  ", a_file )
+	_endloop
+
+	write( "Failed Updates : ", _if _self.failed_updates.empty?
+				   _then >> "0"
+		                   _else >> _self.failed_updates.size
+		                   _endif )
+	_for a_file _over _self.failed_updates.fast_elements()
+	_loop
+		write( "  ", a_file )
+	_endloop
+_endmethod
+$

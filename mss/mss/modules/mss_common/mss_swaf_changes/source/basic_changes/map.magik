@@ -1,0 +1,148 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=restricted)
+_method map.note_change( who, aspect, _gather data )
+	##
+	## Change notification
+	## Handles database observer notifications
+	##
+
+	# 2004/10/01 TM  Do not refresh screen during short transactions.
+	# 2007/02/16 TM  Updated for V4.1 compatibility.
+	# 2008/10/22 TM  Integrated with P121272_1 in TSB 120.
+	# 2009/08/10 TM  Integrated with TSB 123, P125817_2b and P128287_2b.
+	# 2011/04/25 TM  Updated for V4.2 compatibility.
+	# 2013/07/10 RH  Updated for V4.3 compatibility.
+	
+	# START CHANGE
+	_dynamic !dsst_operation!
+	# END CHANGE
+	
+	#DEBUG show( who, "note_change()", _self, aspect, _scatter data )
+	
+	_if aspect _is :attach_geometry _orif
+	    aspect _is :post_update_geometry
+	_then
+		do_transient? << _false 
+		a_geom <<  data[2]
+
+                # Draw the new/updated geometry in normal style
+                _self.draw_geometry( a_geom )
+
+                # then draw node count flags if that option is active
+		_if a_geom.has_topology? _andif
+		    _self.manager.get_preference(:verify_topology) _is _true
+		_then
+			ts << topology_style.new( _true )
+			_self.draw_geometry( a_geom, ts )
+		_endif
+
+		_if _self.current_selection.includes?(a_geom)
+		_then
+			do_transient? << _true
+		_endif
+
+		_if do_transient?
+		_then 
+			_self.trigger_transient_redraw()
+		_endif 
+	_elif aspect _is :detach_geometry _orif
+	      aspect _is :pre_delete_geometry _orif 
+	      aspect _is :pre_update_geometry
+	_then
+		# a geometry is about to be deleted
+		# When a geometry is moved, we get both detach_geometry and
+		# pre_delete_geometry but we only want to undraw once.
+		_dynamic !rwo_unsetting_geometry!
+		_if !rwo_unsetting_geometry! _isnt _true
+		_then 
+			_self.undraw_geometry( data[2] )
+		_endif 
+	_elif aspect _is :post_delete_geometry 
+	_then
+		_self.refresh_selection()
+		_self.manage_actions()
+	_elif aspect _is :cancelled_notification
+	_then
+		# A previous immediate notification issued during a lwt has
+		# been cancelled because the lwt failed.
+		( prev_aspect, _gather data ) << ( _scatter data )
+
+		_if prev_aspect _is :detach_geometry _orif
+		    prev_aspect _is :pre_update_geometry
+		_then
+			# the geometry has been undrawn, but not actually deleted, so
+			# draw it again
+			_self.draw_geometry( data[2] )
+		_endif 
+	_elif aspect _is :view _andif
+	      (data[1] _is :added_dsm _orif 
+	       data[1] _is :removed_dsm)
+	_then
+		_self.refresh_world()
+		refresh_views? << _true
+	_elif aspect _is :view _orif
+	      aspect _is :suppressed_data_changes _orif
+	      aspect _is :post_discard _orif
+	      aspect _is :world_deleted
+	_then 
+		# Handles alternative/view changes or change notifications from datasets with
+		# aspect :suppressed_data_changes. This is typically issued
+		# after a number of changes have been made to the database
+		# with notification switched off.
+		
+		_self.refresh_world()
+		_self.refresh_selection()
+		refresh_views? << _true 
+		_self.manage_actions()
+	_elif aspect _is :mode
+	_then
+		# :mode notification is the first notification to be sent out
+		# when a change of alternative between a readonly and writable
+		# view has occured. This change might possibly result in stale
+		# records in the selection for example. We have no way of
+		# knowing this at this point, so refresh world and selection to
+		# avoid stale record handles when managing actions. However,
+		# there should be no need to refresh maps at this point.
+		
+		_self.refresh_world()
+		_self.refresh_selection()
+		_self.manage_actions()
+		
+	_elif who _is .gs_factory
+	_then
+	      _if aspect _is :reset_sets
+	      _then
+		      ( change, set_type, geoms ) << ( _scatter data )
+		      _self.handle_reset_sets_notification( change, set_type, geoms )
+		      
+	      _elif aspect _is :visibility
+	      _then
+		      ( ace_name, has_overrides? ) << ( _scatter data )
+		      _self.manage_actions()
+		      # Refresh views immediately if the change is a change to
+		      # visibility overrides (which will be from one of the override
+		      # actions).  If the change comes from a change to the actual
+		      # setting (e.g. from Object Control), let the user refresh
+		      # explicitly.
+		      refresh_views? << has_overrides? _isnt _unset 
+	      _endif
+	_endif
+	
+	# START CHANGE
+	_if refresh_views? _is _true _andif
+	    !dsst_operation! _is _unset
+	# END CHANGE
+	_then
+		_self.render_views()
+	_endif
+
+_endmethod
+$

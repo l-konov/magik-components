@@ -1,0 +1,80 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package mclib
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA})
+##
+## This mixin provides functionality that is used in all plugins
+## from this module:
+## - to locate a GUI container
+## - to create a 'standardized' sw:sw_action object.
+##
+def_mixin( :sf!component_mixin )
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable})
+_method sf!component_mixin.sf!gui_container_for(
+		a_container_name, _optional a_caller )
+
+	## Returns the requested GUI container - if it has been
+	## created by _self.
+
+	>> _try
+		   >> _self.gui_items[ a_container_name ]
+	   _when error
+	   _endtry
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={Magik,QA}, usage={redefinable})
+_private _method sf!component_mixin.sf!create_standard_action_for(
+			 an_action_name, _optional create_image?,
+			 _gather action_property_value_pairs )
+
+	## Returns a new instance of sw_action using default messages
+	## and an action message that is the action name with parentheses.
+	## By default the created action is disabled.
+
+	_local the_action
+
+	the_action <<
+	    sw:sw_action.new( an_action_name,
+		:caption,         _self.message( an_action_name ),
+		:engine,          _self,
+		:tooltip,         _self.message( an_action_name + :|_tt| ),
+		:enabled?,        _false,
+		:action_message,  an_action_name.with_parentheses,
+		:short_help_text, _self.message( an_action_name + :|_sht| ),
+		_scatter action_property_value_pairs )
+	#
+	# Also try to create a default bitmap if necessary...
+	#
+	_if create_image? _isnt _false _andif
+	    the_action.image _is _unset
+	_then
+		the_action.image << { an_action_name, _self.module_name }
+	_endif
+
+	>> the_action
+_endmethod
+$

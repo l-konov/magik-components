@@ -1,0 +1,128 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+##
+## mss_scheduler_record_mixin
+##
+## Generic superclass for mss_scheduler datastore records.
+##
+
+def_mixin(:mss_scheduler_record_mixin)
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.message(message_id, _gather args)
+	## 
+	## 
+
+	_if _self.responds_to?(:source_collection) _andif
+	    (tbl << _self.source_collection) _isnt _unset
+	_then
+		mh_name << tbl.name
+	_else
+		mh_name << _self.class_name
+	_endif 
+	_return message_handler.new(mh_name).human_string(message_id, _unset, _scatter args)
+				    
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.insert_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.update_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.delete_trigger()
+	## 
+	## 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.general_validator()
+	## 
+	## 
+
+	_return _true
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.parameters()
+	## 
+	## Derive this from parameter_text field.
+	##
+
+	_return _self.property_list_for_parameter_text(_self.parameter_text)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.parameter_text_for_property_list(pl)
+	## 
+	## Convert property_list PL to XML text.
+	##
+
+	_if pl _is _unset _orif
+	    pl.size = 0
+	_then
+		_return ""
+	_endif
+	
+	s << internal_text_output_stream.new()
+	serial_xml_thing.write_thing_to(pl, s)
+	_return s.string
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.property_list_for_parameter_text(str)
+	## 
+	## Convert string STR (XML text) to a property_list.
+	##
+
+	_if str _is _unset _orif
+	    str = ""
+	_then
+		_return property_list.new()
+	_endif
+	
+	s << internal_text_input_stream.new(str)
+	_return serial_xml_thing.read_thing_from(s)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_scheduler})
+_method mss_scheduler_record_mixin.user_error(_gather args)
+	## 
+	## Raise a user error condition with a message constructed from ARGS.
+	##
+
+	condition.raise(:user_error, :string, _self.message(_scatter args))
+	
+_endmethod
+$

@@ -1,0 +1,10 @@
+mclib_plugin_threading_mixin	4000
+
+description
+	A plugin and mixin that supports using threads within any plugin class.
+end	
+
+requires
+	component_framework
+	mclib_package
+end

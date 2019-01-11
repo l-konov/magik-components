@@ -1,0 +1,165 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2005-04-06 10:04:12 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 04-06-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+_pragma(classify_level=basic)
+## Just like the parent class, except the data elements for
+## visible and listed field names are included instead of just
+## an ACE option. This measn that when passing rwo_sets accross
+## to me, you can include:
+##     :ace_name, making it just like the super
+##   or you can include:
+##     :available_field_names The available fields for this element
+##     :visible_field_names   The visible fields for this element
+##     :field_formats         The column formats for this element
+##     :column_widths         The column widths for this element
+##
+##  To put this in place, include a line in
+## explorer_model_config.xml like:
+##       <plugin name="application_rwo_sets"  class_name="explorer_model_fielded_rwo_sets_plugin"/>
+##       This would generally replace the use of the explorer_model_rwo_sets_plugin
+##
+##  To pass data, use a command like:
+##    data << { _self, recs,
+##		  :set_current?,_true,
+##		  #:ace_name, _self.ace_name,
+##		  :visible_field_names, {:house_number,:street_name,:street_suffix},
+##                :available_field_names, {:house_number,:street_name,:street_suffix},
+##		  :name, "Set Name" }
+##    _self.application.databus.make_data_available(:rwo_set, data)
+##
+def_slotted_exemplar(:explorer_model_fielded_rwo_sets_plugin,
+                       {},
+		       {:explorer_model_application_rwo_sets_plugin})
+$
+
+
+_pragma(classify_level=restricted, topic={explorer_model_plugin})
+_method explorer_model_fielded_rwo_sets_plugin.add_rwo_set( data )
+	##
+	## Adds DATA as rwo set information to our explorer elements. 
+	##
+	## This version is updated to support the visible_fields, available_fields, field_formats, column_widths
+	## properties returned below by the rwo_set_info() method
+	## This allows these extra tags to be passed along by the
+	## framework for display of data within me
+
+	# START CHANGE
+	_local (owner, rwo_set, group_name, group_image, name, image, keep, ace_name,
+		          visible_fields, available_fields, field_formats, column_widths) << _self.rwo_set_info( data )
+	# END CHANGE
+	_local owner_element << _self.add_group_element( owner, group_name, group_image )
+
+	_over 1.upto( owner_element.number_of_children - keep + 1)
+	_loop
+		_if (a_child << owner_element.children.an_element()) _isnt _unset 
+		_then
+			a_child.detach()
+		_endif
+	_endloop
+
+	_if keep > 1
+	_then
+		# If we want to keep elements, they must all be placed in group
+		# elements.
+		_for child _over owner_element.children.elements()
+		_loop
+			_if child.is_collection?
+			_then
+				child.detach()
+			_endif
+		_endloop
+
+		owner_element << _self.add_group_element( owner, name, image, owner_element )
+	_endif
+
+	all_collections<< rwo_set.all_collections().as_sorted_collection( _proc(a, b) >> a.external_name _cf b.external_name _endproc )
+	_for collection _over all_collections.fast_elements()
+	_loop
+		_local col_rwo_set<< rwo_set.select( :collection, { collection.name } )
+
+		data << rope.new_with(:owner, _self,
+				      :name, collection.external_name,
+				      :parent, owner_element,
+				      :rwo_set, col_rwo_set)
+		# START CHANGE
+		_if visible_fields _isnt _unset
+		_then
+			data.add_all_last({:visible_field_names,visible_fields})
+		_endif
+		_if ace_name _isnt _unset
+		_then
+			data.add_all_last({:ace_name,ace_name})
+		_endif
+		_if available_fields _isnt _unset
+		_then
+			data.add_all_last({:available_field_names,available_fields})
+		_endif 
+		_if field_formats _isnt _unset
+		_then
+			data.add_all_last({:field_formats, field_formats})
+		_endif 
+		_if column_widths _isnt _unset
+		_then
+			data.add_all_last({:column_widths,column_widths})
+		_endif
+		# END CHANGE
+		explorer_collection_element.new_with(_scatter data)
+	_endloop
+
+	_self.databus_make_data_available( :explorer_elements, { _self, .explorer_elements } )
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={explorer_model_plugin})
+_private _method explorer_model_fielded_rwo_sets_plugin.rwo_set_info( data )
+	##
+	## Returns information on the rwo set identified by DATA (which
+	## is :rwo_set data put on the application databus).
+	##
+	_local (owner, rwo_set, _gather info) << (_scatter data)
+	_local props << property_list.new_from_gathered( info )
+	_local name << props[:name].default(owner.write_string)
+	_local group_name << props[:group_name].default(name)
+	_local image << props[:image].default( { :my_explorer, :explorer_plugin } )
+	_local group_image << props[:group_image].default( image )
+	_local keep << props[:keep].default(0)
+	_local ace_name << props[:ace_name]  #.default("default")
+
+	# Start change
+	_local visible_fields << props[:visible_field_names]
+	_local available_fields << props[:available_field_names]
+	_local field_formats << props[:field_formats]
+	_local column_widths << props[:column_widths]
+	
+	>> owner, rwo_set, group_name, group_image, name, image, keep, ace_name,
+	         visible_fields, available_fields, field_formats, column_widths
+	 # End change
+_endmethod
+$
+
+		       

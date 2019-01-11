@@ -1,0 +1,68 @@
+#% text_encoding = iso8859_1
+##
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 1, or (at your option)
+## any later version.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this code; if not, you can download it from the web:
+## http://www.gnu.org/licenses/gpl.txt
+##
+## Author: Holger Schirnick <Holger_Schirnick@yahoo.com> - June 2005
+##
+_package sw
+$
+
+
+_pragma(classify_level=restricted, topic={SourceForge})
+magik_rep.define_shared_variable( :sf!load_file_model, _unset, :private )
+$
+_pragma(classify_level=restricted, topic={SourceForge})
+magik_rep.define_shared_variable( :sf!load_file_callback, _unset, :private )
+$
+
+
+_pragma(classify_level=advanced, topic={SourceForge})
+_method magik_rep.sf!load_file_list( a_directory, a_model, a_callback )
+
+	## Instead of implementing our own load_file_list procedure
+	## we use this core class to read/analyze the load_list.txt
+	## files. Instead of compiling the code, we ask this class
+	## to simply provide the path for the file to be processed.
+
+	_protect
+	    _self.sf!load_file_model    << a_model
+	    _self.sf!load_file_callback << a_callback
+
+	    _self.do_load_file_list( a_directory, _unset, _unset, _unset,
+				     :|sf!yield_file_path()| )
+	_protection
+	    _self.sf!load_file_model    <<
+	    _self.sf!load_file_callback << _unset 
+	_endprotect
+_endmethod
+$
+
+
+_pragma(classify_level=advanced, topic={SourceForge})
+_method magik_rep.sf!yield_file_path( a_file_path )
+
+	## Helper method to pass A_FILE_PATH to A_MODEL by calling
+	## the public method A_CALLBACK.
+
+	_self.sf!load_file_model.perform(
+		_self.sf!load_file_callback, a_file_path )
+
+	>> _true, 0
+_endmethod
+$
+
+
+
+

@@ -1,0 +1,46 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-03-23 22:12:04 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method line_geometry_mixin.as_kml_entity(_optional height)
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic !print_float_precision! << 12
+	line << _self.projected_for_kml()
+	>> line.int!as_kml_entity(height)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method line_geometry_mixin.int!as_kml_entity(_optional height)
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	coords << _self.sectors.as_kml_coords(height)
+	>> simple_xml_thing.new("LineString",{
+						     #simple_xml_thing.new(:extrude,{"1"}),
+						     simple_xml_thing.new(:tessellate,{"1"}),
+						     simple_xml_thing.new("altitudeMode",{"relativeToGround"}),
+						     coords
+					 })
+_endmethod
+$

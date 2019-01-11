@@ -1,0 +1,120 @@
+Release notes for MSS V4.3.0 2015.09.09:
+
+This release is intended entirely as an upgrade to MSS V4.2.0 2011.04.25, for
+compatibility with Smallworld Core Spatial Technology V4.3.0 including
+Technical Support Bulletin 4.3.0.6. Developers, who want to use this
+release together with a CST TSB level lower than 4.3.0.3, should at
+least integrate P150766_1b.magik into the image.
+
+Functional changes:
+- mss_ptrule_attribute_dialog now handles non-text join fields in the
+  same way as physical fields. Previous behaviour has been propably
+  incorrect in most cases.
+- mss_ptrule mandatory attribute check is done for join fields as well
+- If an embedded object editor is behind another window in the tab
+  box (such as object control) TM's change to the editor_manager
+  prevented the embedded editor to update to any changed
+  record_selection. Now the change is restricted to cases, when on the
+  databus together with the record selection also a geom_set is given,
+  which is likely to be the case only, if the current selection of the
+  current map is changed. So now (like in CST standard) other plugins
+  may change the embedded editor's content, even if it is not on top.
+
+Developers who are upgrading from any previous version are strongly encouraged to
+perform a source code comparison relative to that previous version, in order to
+understand any relevant upgrade code changes, and to ensure that any local
+customizations are properly re-integrated where appropriate.
+
+
+MSS_BULK_UPDATE modules:
+
+not yet upgraded from V4.2
+
+MSS_COMMON modules:
+
+mss_core_changes
+- geometry_set_factory.get_application_world_for_world(): removed,
+  basic change no longer required. 
+
+mss_swaf_changes
+- map.note_change(): integrated with V4.3.0 changes.
+- map_trail.probe_from(): integrated with V4.3.0 changes.
+- layout_plugin.mss_start_layout_designer(): deprecated as the code
+  base has been changed with CST TSB 4.3.0.2 and on the other hand the
+  method is not needed for the currently only supported functionality
+  of mss_ptrules. Nevertheless the new version is compatible with the
+  changed code base.
+
+mss_user_object_editor
+- editor_manager.sw_databus_data_available()
+  dynamic !edit_from_record_selection?! change to
+  !edit_from_map_selection?! and set to _true only, if geom_selection
+  isnt empty
+- editor_manager.update_viewers()
+  dynamic !edit_from_record_selection?! change to
+  !edit_from_map_selection?!
+- mss_user_rwo_specials_plugin.show_special_actions(): 
+  integrated with CST TSB 4.3.0.3 changes. Subclassing will be removed
+  in future release
+- sw_component.mss_user_rwo_specials_actions(): classified as
+  deprecated. Developers who have customized this method should move
+  customizations to editor_plugin.special_action_names instead, which is part
+  of CST TSB 4.3.0.3. 
+
+MSS_CU modules:
+
+not yet upgraded from V4.2
+
+MSS_HTTP modules:
+
+not yet upgraded from V4.2
+
+MSS_PTRULES modules:
+
+mss_ptrule_construction_manager
+- mss_ptrule_construction_plugin.manage_actions_for_trail(): changed,
+  taking into account, that since V4.3.0
+  map_manager.sw_databus_data_requested(:map_trail) now may yield
+  {_unset,_unset} instead of {}
+- mss_ptrule_construction_plugin.manage_actions_for_selection(): changed,
+  taking into account, that since V4.3.0
+  map_manager.sw_databus_data_requested(:map_selection) now may yield
+  {_unset,{}} instead of {}
+
+mss_ptrule_attribute_dialog
+- mss_ptrule_attribute_dialog.update_current_detached_record():
+  changed for correct handling of non text join fields
+- mss_ptrule_attribute_dialog.work_record(): changed for correct
+  handling of non text join fields
+
+mss_ptrule_manager
+- dd_record_mixin.mss_ptrule_validate_mandatory_attributes():
+  mandatory check is done for join fields as well
+
+MSS_QA modules:
+
+not yet upgraded from V4.2
+
+
+MSS_SCHEDULER modules:
+
+not yet upgraded from V4.2
+
+MSS_WORKSPACE modules:
+
+not yet upgraded from V4.2
+
+
+RELEASE_PATCHES
+
+not yet upgraded from V4.2
+
+source
+- case_ds_view.archive_data_model(): integrated with V4.2.0 changes.  (Note: this
+  is not part of regularly-compiled MSS code; it is compiled on-demand so that
+  CASE archives get created with a more regular ordering of objects, to facilitate
+  source code compares).
+
+MSS_CAMBRIDGE_DEMO modules:
+
+not yet upgraded from V4.2

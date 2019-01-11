@@ -1,0 +1,10 @@
+mclib_dynamic_case_launcher		4000
+
+description
+	Allows any CASE SOC to be started after prompting the user to pick one.	
+end
+
+requires
+	mclib_dynamic_applications	
+	mclib_package
+end

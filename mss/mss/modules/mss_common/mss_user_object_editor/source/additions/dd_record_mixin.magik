@@ -1,0 +1,56 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2006 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=advanced)
+_method dd_record_mixin.mss_get_transaction_context_aspect(an_aspect)
+	## 
+	## Return the requested aspect AN_ASPECT of the current
+	## transaction context, or unset if not found.
+	##
+
+	_dynamic !current_transaction!
+	_if !current_transaction! _is _unset _orif
+	    (context << !current_transaction!.transaction_context) _is _unset
+	_then
+		_return _unset
+	_endif
+
+	# Currently, this only works if the context is a property_list.
+	_if _not context.is_class_of?(property_list)
+	_then
+		_return _unset
+	_endif
+	_return context[an_aspect]
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_method dd_record_mixin.mss_set_transaction_context_aspect(an_aspect, value)
+	## 
+	## Set the requested aspect AN_ASPECT of the current
+	## transaction context.
+	##
+
+	_dynamic !current_transaction!
+	_if !current_transaction! _is _unset _orif
+	    (context << !current_transaction!.transaction_context) _is _unset
+	_then
+		_return _unset
+	_endif
+
+	# Currently, this only works if the context is a property_list.
+	_if _not context.is_class_of?(property_list)
+	_then
+		_return _unset
+	_endif
+	_return context[an_aspect] << value
+	
+_endmethod
+$

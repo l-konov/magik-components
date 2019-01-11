@@ -1,0 +1,10 @@
+cam_mss_ptrules	1
+
+description
+	Cambridge DB glue code for mss_ptrules
+end
+
+requires
+	mss_ptrules
+	cam_db_mss_ptrule_glue
+end

@@ -1,0 +1,218 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2007-08-21 10:26:44 brad.sileo>
+##
+## Created By: Brad Sileo
+## Date: 02-17-2005
+## Copyright 2005 Brad Sileo
+##
+## This file is part of Magik Components for SWAF.
+##
+##     Magik Components for SWAF is free software; you can redistribute it and/or modify
+##     it under the terms of the GNU General Public License as published by
+##     the Free Software Foundation; either version 2 of the License, or
+##     (at your option) any later version.
+##
+##     Magik Components for SWAF is distributed in the hope that it will be useful,
+##     but WITHOUT ANY WARRANTY; without even the implied warranty of
+##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##     GNU General Public License for more details.
+##
+##     You should have received a copy of the GNU General Public License
+##     along with Foobar; if not, write to the Free Software
+##     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+##
+########################################################################
+_package mclib
+
+
+_pragma(classify_level=basic, topic={GUI})
+## provides behavior to support use of threading_plugins
+## within a plugin class. Children of this mixin must provide a
+## property or slot thread_engines to hold the instances and
+## make sure it is initilized as a property_list()
+def_mixin(:plugin_threading_mixin)
+$
+
+_pragma(classify_level=basic, topic={GUI})
+## defines the types of thread engines available on me. This is
+## a list of types followed by the properties available in
+## them. See threading_plugin for possible properties
+## By default, there is a single :standard threading engine,
+## which will call the method run_engine_standard() which
+## subclasses must impement.  A method thread_engines which
+## returns a property_list used to hold the engines must also
+## be created by thew subclass. A readable
+## slot will generally suffice for this.
+plugin_threading_mixin.define_shared_constant(:thread_engine_types,
+				   property_list.new_with(
+					    :standard, _unset
+						 ),
+				   _true)
+$
+
+_pragma(classify_level=basic, topic={GUI})
+_method plugin_threading_mixin.build_threading_actions()
+	## Create the actions for my navigation functions. Subclasses
+	## should call this from their init_actions()
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_for a_type, type_properties _over _self.thread_engine_types.fast_keys_and_elements()
+	_loop
+		te << _self.thread_engine(a_type, type_properties.default({}))
+		
+		_for a_action _over te.actions()
+		_loop
+			_self.add_action(a_action)
+		_endloop
+	_endloop
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.run_engine(_optional a_message, _gather args)
+	## Starta  thread running A_MESSAGE on me in the background
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_self.run_engine_type(:standard, a_message, _scatter args)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.run_engine_type(a_tag, a_message, _gather args)
+	## Runs my yhread angine called a_tag doing A_MESSAGE WITH args
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	te << _self.thread_engine(a_tag)
+	#debug show(te, a_message, args)
+	te.run_engine(_self, a_message, _scatter args)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.run_engine_standard()
+	## Backstop method - Subclasses should override this to do
+	## something in the standard engine run.
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.thread_engine(a_tag, _optional properties)
+	## returns my thread_engine for a_tag, or creates a new one if I
+	## don't have one. PROPERTIES are used if a new one is created
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	properties << properties.default({})
+	_if (te << _self.thread_engines[a_tag]) _is _unset 
+	_then
+		te << _self.thread_engines[a_tag] << _self.threading_engine_plugin_exemplar.new(a_tag,_self, _scatter properties)
+		te.add_dependent(_self)
+	_endif
+	>> te
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.threading_engine_plugin_exemplar
+	## returns the class to use as my threading engine exemplar
+	## This version just returns threading_plugin
+	##
+
+	# (02-17-2005 Brad Sileo): created.
+	>> threading_plugin
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.interrupt_engine(_optional a_tag)
+	## Interrupt my threading engine called A_TAG. If not
+	## specified, try it on all my engines
+	## 
+	##
+
+	# (12-20-2004 Brad Sileo, TenSails): created.
+	_if a_tag _isnt _unset 
+	_then
+		te << _self.threading_engine(a_tag)
+		engines << {te}
+	_else
+		engines << _self.thread_engines
+	_endif
+	_for a_engine _over engines.fast_elements()
+	_loop
+		a_engine.interrupt_engine()
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.engine_status(_optional a_tag)
+	## returns the status of my A_TAG engine, which default to standard
+	## 
+	##
+
+	# (01-14-2005 Brad Sileo, TenSails): created.
+	>> _self.thread_engine(a_tag.default(:standard)).run_status
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.extra_threading_run_actions(a_tag)
+	## returns actiond efintiions for any other run actions this
+	## class want to have for the engine type A_TAG.  The threading
+	## engine wqill create each of these actions and they are then
+	## available on me after calling
+	## buiuld_threading_actions(). The enabled status of these
+	## actions is managed by the threading_plugin
+	##
+	##
+	## This version returns an empty vector
+	##
+	## You can add entries here if you would like to have several
+	## different actions that start a single engine, such that only
+	## one of them may be launched at a time.
+	##
+	##  The items are instances of sw_action_definition, such as
+	## shown below. The action message is responsible for ensuring
+	## that run_engine() is called with an appropriate tag to start
+	## the actual background processing.
+	##
+	## sw_action_def.new(:convert_selected,
+	##			       :engine,_self,
+	##			       :action_message,:|convert_selected()| ,
+	##			       :toolbar_control,:button_item ,
+	##			       :caption,_self.message(:convert_selected),
+	##			       :short_help_text,_self.message(:convert_selected_sh  ),
+	##			       :tooltip,_self.message(:convert_selected_tt)  )
+	# (01-14-2005 Brad Sileo, TenSails): created.
+	>> {}
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={GUI}, usage={redefinable, subclassable})
+_method plugin_threading_mixin.add_run_disabled_action(a_action, _optional a_tag)
+	## Adds A_ACTION to the set that are managed by my
+	## threading_engine called A_TAG. This action will be disabled
+	## and enabled automatically when the engine starts and stops.
+	## 
+	##
+
+	# (01-14-2005 Brad Sileo, TenSails): created.
+	_self.thread_engine(a_tag.default(:standard)).add_run_action(a_action)
+_endmethod
+$

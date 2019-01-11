@@ -1,0 +1,8 @@
+mss_wm_overlay_view	1
+
+description
+	Ability to overlay the database views for a design.
+end
+
+requires
+end

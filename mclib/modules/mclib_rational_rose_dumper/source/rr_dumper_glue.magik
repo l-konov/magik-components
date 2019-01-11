@@ -1,0 +1,51 @@
+## redifine the initial settings hash for company code standards
+
+_block
+	rr_hdr << rope.new_with("#-----------------------------------------------------------------------------",
+				"# ",
+				"# FILE     : $Workfile: $",
+				"# ",
+				"# DESCRIPTION  : ",
+				"# ",
+				"# ",
+				"#-----------------------------------------------------------------------------")
+	
+	rr_ftr << rope.new_with("#-----------------------------------------------------------------------------",
+				"# ",
+				"# HISTORY     : $History: $",
+				"# ",
+				"#-----------------------------------------------------------------------------")
+_endblock
+$
+
+
+rr_dumper.define_shared_constant(:initial_settings,
+				 ## hash table containing initial settings
+				 ## stored in settings slot of new dumper
+				 ## Use self.set(:<setting_name>,new_value) to change
+				 ## the values in the slot
+				 
+	property_list.new_with(
+		:make_load_lists?,      _true,                             #create a load list in each directory
+		:recursive?,            _true,                             #do all sub-categories of start category
+		:make_sub_dirs?,        _true,                             #make a sub dir per sub category
+		:make_pragmas?,         _true ,                            #add pragma statements
+		:pragma_classify_level, "basic",                           #classify level for pragmas
+		:pragma_topic,          {"CompanyX"},               #{} of topics for all pragmas
+		:pragma_usage,          _unset,                   #{} of usage for all pragmas
+		:package,               "sw",                              #_package sw added to each file (after header)
+		:file_header,           rr_hdr,     #notice at start of each file
+					            # - one line per rope item
+		:file_footer,           rr_ftr,     #notice at start of each file
+					            # - one line per rope item
+		:class_notice,          _unset,     #notice after each class comment
+		                                    # - one line per rope item
+		:method_notice,         _unset ,    #notice after each method comment
+						    # - one line per rope item
+		:slot_access_mapping,   _unset ,    # - public in rose
+		:shared_const_label,    "Shared Constant",                 # string for shared constant stereotype
+		:shared_var_label,      "Shared Variable",                 # string for shared variable stereotype
+		:include_class_stereos, equality_set.new_with(""),         # class stereotypes to recognise as classes for dump
+		:show_param_types?,     _true),                            # list param names/types in method comments
+	_false)
+$

@@ -1,0 +1,18 @@
+<config>
+  <plugins>
+    <plugin name="http_server" class_name="mss_http_server_engine">
+      <properties>
+         <property name="default_port" value="7314"/>
+         <property name="default_logfile_name" value="c:\temp\mss_http_log.txt"/>
+      </properties>
+      <service_managers>
+        <service class_name="mss_http_wsdl_service" directory="/ws/wsdl" subdirectories="false">
+	  <properties>
+	    <property name="wsdl_file_module_name" value="mss_ws_http_services"/>
+	  </properties>
+	</service>
+        <service class_name="mss_http_soap_workspace_service" directory="/ws/svc" subdirectories="false"/>
+      </service_managers>
+    </plugin>
+  </plugins>
+</config>

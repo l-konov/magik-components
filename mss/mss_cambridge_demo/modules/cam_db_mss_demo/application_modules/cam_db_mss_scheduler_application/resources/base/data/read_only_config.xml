@@ -1,0 +1,11 @@
+<config base="mss_scheduler_processor_gui.config">
+   <plugins>
+       <plugin name="editor_manager" class_name="editor_manager">
+      <properties>
+        <property name="editor_gui_definition_module_name" value="cam_db_mss_scheduler_application"/>
+        <property name="editor_gui_definition_file_name" value="read_only_editor_gui.xml"/>
+        <property name="default_editor_class" value="mss_scheduler_object_editor"/>
+      </properties>
+    </plugin>
+   </plugins>
+</config>

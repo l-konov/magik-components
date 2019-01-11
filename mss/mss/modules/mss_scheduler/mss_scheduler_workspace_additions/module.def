@@ -1,0 +1,10 @@
+mss_scheduler_workspace_additions	1
+
+description
+	MSS scheduler workspace additions
+end
+
+requires
+	mss_scheduler
+	mss_workspace
+end

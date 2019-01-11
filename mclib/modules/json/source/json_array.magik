@@ -1,0 +1,52 @@
+#% text_encoding = cp1252
+_package sw
+$
+_pragma(classify_level=basic)
+## simply a subclass of rope.
+def_slotted_exemplar(:json_array,{},{:rope})
+$
+_pragma(classify_level=basic)
+_method json_array.write_as_json(out_stream)
+	## write_as_json(output_stream OUT_STREAM) : _unset
+	##
+	## writes self out to OUT_STREAM
+
+	out_stream.write("[")
+
+	_local first? << _true
+
+	_for i_val _over _self.fast_elements()
+	_loop
+		_if _not first?
+		_then
+			out_stream.write(",")
+		_else 
+			first? << _false
+		_endif
+
+		i_val.write_as_json(out_stream)
+	_endloop
+	
+	out_stream.write("]")
+
+_endmethod
+$
+_pragma(classify_level=basic)
+_method json_array.new_from(a_collection)
+
+	_local result << _self.new()
+	
+	_for i _over a_collection.fast_elements()
+	_loop
+		result.add_last(i.convert_to_json())
+	_endloop
+
+	_return result
+_endmethod
+$
+_pragma(classify_level=basic)
+_method json_array.convert_to_json()
+	_return _self 
+_endmethod
+$
+

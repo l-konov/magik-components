@@ -1,0 +1,426 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+##
+## mss_ptrule_construction_plugin
+##
+## GUI used to manage additional construction geometry.
+##
+
+def_slotted_exemplar(:mss_ptrule_construction_plugin,
+{
+	{:engine, _unset, :readable},
+	{:items, _unset, :readable},
+	{:cur_map, _unset, :readable}
+},
+{:mss_application_databus_plugin})
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+## Name of the mss_ptrule_construction_manager plugin 
+mss_ptrule_construction_plugin.define_property(
+	:construction_manager_name, :string,
+	"Name of construction manager plugin",
+	_false, _false, "mss_ptrule_construction_manager")
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+mss_ptrule_construction_plugin.define_shared_constant(
+	:application_databus_consumer_data_types,
+	{:map_trail, :map_selection, :map_properties},
+	:public)
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+mss_ptrule_construction_plugin.define_shared_constant(
+	:application_databus_disconnect_on_deactivation?,
+	## Stay on databus until terminated.
+	_false,
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.init(name, framework)
+	## 
+	## 
+
+	_super.init(name, framework)
+	.items << property_list.new()
+	.cur_map << _unset
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:set_chain_from_trail,
+				       :image, {:offset_trail, :map_trail},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|set_chain_from_trail()|))
+	_self.add_action(sw_action.new(:set_chain_from_selection,
+				       :image, {:select_geometry, :ui_resources},
+				       :enabled?, _false,
+				       :engine, _self,
+				       :action_message, :|set_chain_from_selection()|))
+	_self.add_action(sw_action.new(:clear,
+				       :image, {:clear, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|clear()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.pre_activation()
+	## 
+	## 
+
+	_super.pre_activation()
+	_self.manage_actions_for_trail()
+	_self.manage_actions_for_selection()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.application_databus << a_databus
+	## 
+	## When attaching to application databus, forge connection to
+	## the engine that performs self's construction processing.
+	##
+
+	retval << (_super.application_databus << a_databus)
+	_if a_databus _is _unset
+	_then
+		# Unhook from engine.
+		_if .engine _isnt _unset
+		_then
+			.engine.remove_dependent(_self)
+			.engine << _unset 
+		_endif
+	_else
+		# Hook to new engine.
+		_if (cm << _self.construction_manager) _isnt .engine
+		_then
+			_if .engine _isnt _unset
+			_then
+				.engine.remove_dependent(_self)
+				.engine << _unset 
+			_endif
+			.engine << cm
+			.engine.add_dependent(_self)
+		_endif
+	_endif 
+
+	_return retval
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.build_gui(a_container, _optional xml_element)
+	## 
+	## Standard build_gui method.
+	##
+
+	_if _self.int!application_databus _is _unset
+	_then
+		# This can happen when embedded in the main tab control of the
+		# application.  Hook in the application databus now.
+		_self.application_databus << _self.application.databus
+		_self.manage_actions_for_trail()
+		_self.manage_actions_for_selection()
+	_endif
+
+	_if .engine _is _unset
+	_then
+		condition.raise(:warning, :string, _self.message(:no_construction_manager))
+		_return
+	_endif
+	
+	p << panel.new(a_container)
+	p.border_width << p.border_height << 0
+	p.height_spacing << 0
+	p.width_spacing << 0
+	p.resize_x? << p.resize_y? << _true
+	p.tab_label << _self.message(:tab_label)
+	
+	p.start_row()
+	_self.action(:set_chain_from_trail).place_control_on(p, :toolbar)
+	_self.action(:set_chain_from_selection).place_control_on(p, :toolbar)
+	_self.action(:clear).place_control_on(p, :toolbar)
+
+	p.start_row()
+	rc << rowcol.new(p, _unset, 3, :pixel,
+			 :row_spacing, 2,
+			 :col_spacing, 2)
+
+	ldf << .engine.get_length_display_format()
+	mgr << unit_value_manager.new_with_properties(:mm,
+						      :display_unit_format, ldf,
+						      :value_required?, _true,
+						      :output_value_with_unit?, _false)
+
+	label_item.new(rc, _self.message(:extend_distance))
+	.items[:extend_distance] <<
+		managed_value_text_item.new(rc, "",
+					    :display_length, 8,
+					    :manager, mgr,
+					    :model, _self,
+					    :aspect, :extend_distance,
+					    :change_selector, {:|perform_safely()|, :|set_option()|, :extend_distance},
+					    :value_selector, {:|get_option()|, :extend_distance})
+	.items[:use_centerline?] <<
+		toggle_item.new(rc, _self.message(:use_centerline?),
+				:model, _self,
+				:aspect, :use_centerline?,
+				:change_selector, {:|perform_safely()|, :|set_option()|, :use_centerline?},
+				:value_selector, {:|get_option()|, :use_centerline?})
+	
+	label_item.new(rc, _self.message(:offset_distance))
+	.items[:offset_distance] <<
+		managed_value_text_item.new(rc, "",
+					    :display_length, 8,
+					    :manager, mgr,
+					    :model, _self,
+					    :aspect, :offset_distance,
+					    :change_selector, {:|perform_safely()|, :|set_option()|, :offset_distance},
+					    :value_selector, {:|get_option()|, :offset_distance})
+	.items[:use_offset?] <<
+		toggle_item.new(rc, _self.message(:use_offset?),
+				:model, _self,
+				:aspect, :use_offset?,
+				:change_selector, {:|perform_safely()|, :|set_option()|, :use_offset?},
+				:value_selector, {:|get_option()|, :use_offset?})
+	
+	label_item.new(rc, _self.message(:dynamic_mode))
+
+	# In case options have been customized, ensure that a
+	# legitimate option is chosen as default.
+	dm_options << .engine.dynamic_mode_options
+	cur_dm_option << _self.get_option(:dynamic_mode)
+	cur_dm_option_ok? << _false
+	_for i _over dm_options.fast_elements()
+	_loop
+		_if i[1] _is cur_dm_option
+		_then
+			cur_dm_option_ok? << _true
+			_leave
+		_endif
+	_endloop
+	_if _not cur_dm_option_ok?
+	_then
+		_self.set_option(:dynamic_mode, dm_options.an_element()[1])
+	_endif
+	
+	.items[:dynamic_mode] <<
+		text_choice_item.new(rc, "",
+				     :items, dm_options,
+				     :model, _self,
+				     :aspect, :dynamic_mode,
+				     :change_selector, {:|perform_safely()|, :|set_option()|, :dynamic_mode},
+				     :value_selector, {:|get_option()|, :dynamic_mode})
+	.items[:use_dynamic?] <<
+		toggle_item.new(rc, _self.message(:use_dynamic?),
+				:model, _self,
+				:aspect, :use_dynamic?,
+				:change_selector, {:|perform_safely()|, :|set_option()|, :use_dynamic?},
+				:value_selector, {:|get_option()|, :use_dynamic?})
+
+	_return p
+
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.sw_databus_data_available(data_type_name, data)
+	## 
+	## 
+
+	_if data_type_name _is :map_trail
+	_then
+		_self.manage_actions_for_trail(data)
+	_elif data_type_name _is :map_selection
+	_then
+		_self.manage_actions_for_selection(data)
+	_elif data_type_name _is :map_properties
+	_then
+		(mv, mp) << (_scatter data)
+		_if mp _isnt _unset _andif
+		    (ludf << mp.get_length_unit_display_format()) _isnt _unset _andif
+		    (ti << .items[:extend_distance]) _isnt _unset
+		_then
+			ti.manager.display_unit_format << ludf
+		_endif 
+	_endif 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.manage_actions_for_trail(_optional data)
+	## 
+	## 
+
+	_if data _is _unset
+	_then
+		data << _self.application_databus_request_data(:map_trail)
+	_endif
+	_if data _is _unset
+	_then
+		.cur_map << _unset
+		enable? << _false
+	_else
+		(.cur_map,tr) << (_scatter data)
+		enable? << tr _isnt _unset _andif
+			   tr.sectors.line_length > 0.0
+	_endif
+	_self.action(:set_chain_from_trail).enabled? << enable?
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.manage_actions_for_selection(_optional data)
+	## 
+	## 
+
+	_if data _is _unset
+	_then
+		data << _self.application_databus_request_data(:map_selection)
+	_endif
+	_if data _is _unset 
+	_then
+		.cur_map << _unset
+		enable? << _false
+	_else
+		(.cur_map,cur_sel) << (_scatter data)
+		enable? << _false
+		_for i _over cur_sel.fast_elements()
+		_loop
+			_if {:area, :linear}.includes?(i.geom_category)
+			_then
+				enable? << _true
+				_leave
+			_endif
+		_endloop 
+	_endif
+	_self.action(:set_chain_from_selection).enabled? << enable?
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.construction_manager
+	## 
+	## 
+
+	_return _self.application.plugin(_self.construction_manager_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.get_option(key)
+	## 
+	## 
+
+	_return .engine.get_option(key)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.set_option(key, val)
+	## 
+	## 
+
+	_return .engine.set_option(key, val)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.set_chain_from_trail()
+	## 
+	## Create construction chains from the current trail.
+	##
+
+	_if .cur_map _is _unset _orif
+	    (tr << .cur_map.trail) _is _unset _orif
+	    tr.sectors.line_length = 0.0
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_trail_for_chain))
+	_endif
+	.engine.set_static_chain_from_sectors(tr.sectors.deep_copy(), tr.world)
+
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.set_chain_from_selection()
+	## 
+	## Create construction chains from the current selection.
+	##
+
+	_if .cur_map _is _unset _orif
+	    (sel << .cur_map.current_selection) _is _unset _orif
+	    sel.an_element() _is _unset 
+	_then
+		condition.raise(:user_error, :string, _self.message(:no_selection_for_chain))
+	_endif
+	
+	cm << .engine
+	_for sel_geom _over sel.fast_elements()
+	_loop 
+		_if sel_geom.geom_category _is :linear
+		_then 
+			cm.set_static_chain_from_chain(sel_geom)
+		_elif sel_geom.geom_category _is :area
+		_then
+			cm.set_static_chain_from_area(sel_geom)
+		_endif 
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.clear()
+	## 
+	## Clear all construction geometries.
+	##
+
+	.engine.clear_static_construction_geometry()
+	.engine.clear_dynamic_construction_geometry()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_ptrule})
+_method mss_ptrule_construction_plugin.note_change(who, what, data)
+	## 
+	## 
+
+	_if what _is :set_option
+	_then
+		key << data[1]
+		value << data[2]
+		_self.changed(key, value)
+	_endif
+	
+_endmethod
+$

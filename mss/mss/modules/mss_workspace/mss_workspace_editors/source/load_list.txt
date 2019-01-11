@@ -1,0 +1,8 @@
+data_model/
+
+message_usages.magik
+
+mss_job_history_viewer.magik
+mss_design_history_viewer.magik
+mss_job_editor_plugin.magik
+mss_design_editor_plugin.magik

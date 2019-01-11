@@ -1,0 +1,217 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_cu})
+##
+## mss_cu_config_application
+##
+## Top level application for Compatible Unit configuration. 
+##
+
+def_slotted_exemplar(:mss_cu_config_application,
+{
+	{:dummy_actions, _unset, :readable}
+},
+{:application})
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+mss_cu_config_application.define_shared_constant(
+	:databus_consumer_data_types,
+	{:status_string},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.init(_gather args)
+	## 
+	## 
+
+	_super.init(_scatter args)
+	.dummy_actions << property_list.new()
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.init_actions()
+	## 
+	## 
+
+	_super.init_actions()
+	
+	# Proxy the application exit action to self's close action, to
+	# make it easier to share GUIs.
+	_self.add_action(sw_proxy_action.new_for(_self.action(:exit), :close))
+	
+	_self.add_action(sw_action.new(:activate_cu_definition_editor,
+				       :engine, _self,
+				       :action_message, {:|activate_editor_for_table()|, :mss_cu_definition}))
+	_self.add_action(sw_action.new(:activate_cu_group_definition_editor,
+				       :engine, _self,
+				       :action_message, {:|activate_editor_for_table()|, :mss_cu_group_definition}))
+	_self.add_action(sw_action.new(:activate_cu_job_type_editor,
+				       :engine, _self,
+				       :action_message, {:|activate_editor_for_table()|, :mss_cu_job_type}))
+	_self.add_action(sw_action.new(:activate_cu_cost_group_editor,
+				       :engine, _self,
+				       :action_message, {:|activate_editor_for_table()|, :mss_cu_cost_group}))
+
+	# Proxy actions for cut/copy/paste, etc.
+	_for i _over {:cut, :copy, :paste, :refresh,
+		      :edit_selected_cu_definition,
+		      :edit_selected_cu_properties,
+		      :edit_selected_cu_group_definition,
+		      :edit_selected_cu_job_type,
+		      :edit_selected_cu_cost_group,
+		      :clone_selected_cu_definition
+	}.fast_elements()
+	_loop 
+		.dummy_actions[i] << sw_action.new(i,
+						   :engine, _self,
+						   :action_message, :|do_nothing()|,
+						   :enabled?, _false)
+		_self.add_action(action_proxy.new(.dummy_actions[i]))
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.post_build_gui()
+	## 
+	## 
+
+	tb << _self.get_gui_element_with_role(:main_tab_box)
+	tb.page_change_selector << :|set_current_main_tab()|
+	_self.manage_proxy_actions()
+
+	# Force versions to display system info, since there is no
+	# options dialog to control that.
+	versions << _self.plugin(:versions)
+	pl << versions.get_preferences()
+	pl[:show_system_info?] << _true
+	versions.set_preferences(pl)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.sw_databus_data_available(data_type_name, data)
+	## 
+	## Update the status bar to indicate status messages from any
+	## plugin.
+	##
+
+	_if data_type_name _is :status_string
+	_then
+		_self.status_string << data
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.popup_for_child(ti, menu_name)
+	## 
+	## Returns the popup menu as defined under the menu name
+	## MENU_NAME in the gui_manager's definition file, parented to
+	## the tree_item TI.
+	##
+
+	_return _self.gui_manager.popup_menu(ti, menu_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.set_current_main_tab(page_nr)
+	## 
+	## Handle changes to the current tab.
+	##
+
+	_self.manage_proxy_actions()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_cu})
+_method mss_cu_config_application.manage_proxy_actions()
+	## 
+	## Based on the current tab, update proxy actions to represent
+	## whatever is current.
+	## 
+
+	_handling component_no_such_action _with procedure
+	
+	_if (tb << _self.get_gui_element_with_role(:main_tab_box)) _is _unset
+	_then
+		_return
+	_endif 
+
+	# Let all components decide if they should be updating the
+	# proxy actions with their own thing when the tab changes.
+	new_actions << .dummy_actions.copy()
+
+	_for i _over _self.components()
+	_loop
+		_if i.responds_to?(:|set_proxy_actions_for_active_page()|)
+		_then
+			i.set_proxy_actions_for_active_page(tb.active_page, new_actions)
+		_endif
+	_endloop
+
+	_for i, j _over new_actions.fast_keys_and_elements()
+	_loop
+		_if (my_act << _self.action(i)) _isnt _unset
+		_then 
+			my_act.real_subject << j
+		_endif 
+	_endloop 
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_config_application.status_string << a_string
+	## 
+	## 
+
+	_self.changed(:status_string, :text, a_string)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_config_application.activate_editor_for_table(tbl_or_name)
+	## 
+	## Activate the editor for TBL_OR_NAME (either a database
+	## table, or the name of one).
+	##
+
+	_if tbl_or_name.is_class_of?(symbol)
+	_then
+		tbl_or_name << mss_cu_engine.view.collections[tbl_or_name]
+	_endif
+	_return _self.get_service_provider(:editor_manager).edit_collection(tbl_or_name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_cu})
+_method mss_cu_config_application.activate_editor_for_object(rec)
+	## 
+	## Activate the editor for REC.
+	##
+
+	_return _self.get_service_provider(:editor_manager).edit_object(rec)
+	
+_endmethod
+$

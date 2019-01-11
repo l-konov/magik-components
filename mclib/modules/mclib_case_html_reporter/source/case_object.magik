@@ -1,0 +1,71 @@
+#% text_encoding = iso8859_1
+_package sw
+########################################################################
+##
+## Created By: Anon
+##
+##
+## Description: Fix for the CASE Object outline rendering which
+## breaks SVG rendering
+##
+########################################################################
+
+
+_pragma(classify_level=restricted, topic={case}, usage={external})
+_method case_object.draw_outline(a_canvas, my_geom, an_as, draw?)
+	## 
+	## special drawing method for a case object outline. This also
+	## draws the text for the case object.
+	##
+	
+	sts << an_as.parent_system
+	type << an_as.style_type.write_string
+
+	subcode << _if _self.view?
+		   _then
+			   >> _if _self.writable?
+			      _then
+				      >> 2
+			      _else
+				      >> 3
+			      _endif
+		   _elif _self.external?
+		   _then
+			   >> 1
+		   _else
+			   >> 0
+		   _endif
+
+	area_style << sts.get_rwo_style( _self.rwo_type,:outline,subcode,type,:area).actual_gis_style
+	ts << sts.get_rwo_style(_self.rwo_type,:label,0,type,:text).actual_style
+	
+
+
+	# Start Change
+	# The following code fails when rendering to anything besides a
+	# canvas. This really makes it impossible to render this to
+	# svg_canvas.
+	#text_bounds << ts.string_bounds(_self.e_name.write_string)
+
+	# Replace by calculating the approximate text size from the
+	# area outline
+	text_bounds << _self.outline.bounds.new_enlarging( 0.8 )
+	# End Change
+	
+	width << text_bounds.width
+	height << text_bounds.height
+	pt << my_geom.bounds.centre
+	x << pt.x - width/2
+	y << pt.y - height/3
+	_if draw?
+	_then
+		my_geom.draw_physically(a_canvas,area_style)
+		a_canvas.draw_vtext_transform(ts,x,y,_self.e_name.write_string)
+	_else
+		my_geom.undraw_physically(a_canvas,area_style)
+		a_canvas.undraw_vtext_transform(ts,x,y,_self.e_name.write_string)
+	_endif
+	
+_endmethod
+$
+

@@ -1,0 +1,7 @@
+additions/
+condition.magik
+mss_http_heartbeat_manager.magik
+mss_http_url_parser.magik
+mss_http_generic_request_response.magik
+mss_http_client_request.magik
+mss_http_client_response.magik

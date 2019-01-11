@@ -1,0 +1,9 @@
+mss_geocode_google	1
+
+description
+	Geocoder using Google Geocoding API V3
+end
+
+requires
+	mss_http_client
+end

@@ -1,0 +1,6 @@
+<config>
+   <plugins>
+      <plugin name="case_html_report" class_name="mclib:case_html_report_plugin"/>
+      <plugin name="case_map_generator" class_name="mclib:case_svg_map_generator"/>
+   </plugins>
+</config>

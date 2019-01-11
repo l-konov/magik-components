@@ -1,0 +1,125 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_workspace})
+##
+## mss_wm_related_document_framework
+##
+## GUI framework for handling MSS workspace manager related
+## document functionality. 
+##
+
+def_slotted_exemplar(:mss_wm_related_document_framework,
+{
+	{:current_object, _unset}
+},
+{:gui_framework})
+$
+
+_pragma(classify_level=basic)
+mss_wm_related_document_framework.define_shared_constant(
+	:databus_producer_data_types,
+	{:current_object},
+	:public)
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_framework.init_actions()
+	## 
+	## 
+
+	_self.add_action(sw_action.new(:close,
+				       :engine, _self,
+				       :action_message, :|close()|))
+	_self.add_action(sw_action.new(:help,
+				       :engine, _self,
+				       :action_message, :|help()|))
+	_self.add_action(sw_action.new(:refresh,
+				       :short_help_text, _self.message(:refresh_sh),
+				       :image, {:refresh, :ui_resources},
+				       :engine, _self,
+				       :action_message, :|refresh()|))
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_framework.sw_databus_data_requested(data_type_name)
+	## 
+	##
+
+	_if data_type_name _is :current_object
+	_then
+		_return _self.current_object
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_framework.current_object
+	## 
+	## 
+
+	_if (rec << .current_object) _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << .current_object << _unset
+	_endif
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_workspace})
+_method mss_wm_related_document_framework.current_object << rec
+	## 
+	## 
+
+	_if rec _isnt _unset _andif
+	    _not rec.is_valid?
+	_then
+		rec << _unset
+	_endif
+	.current_object << rec
+	_self.databus_make_data_available(:current_object, rec)
+	_return rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_framework.note_change(who, what, data)
+	## 
+	## 
+
+	_if what _is :current_object
+	_then
+		_self.current_object << data
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_workspace})
+_method mss_wm_related_document_framework.refresh()
+	## 
+	## Ask all plugins to refresh.
+	##
+
+	_for i _over _self.plugins()
+	_loop
+		_if i.responds_to?(:|refresh()|)
+		_then
+			i.refresh()
+		_endif
+	_endloop
+	
+_endmethod
+$

@@ -1,0 +1,52 @@
+<gui>
+  <accelerators>
+    <accelerator id="refresh_a" name="refresh"/>
+  </accelerators>
+
+  <menu name="menubar" type="menubar">
+    <submenu name="file">
+      <action name="close"/>
+    </submenu>
+    <submenu name="view">
+      <action name="mss_wm_related_document_plugin.display_selected_related_document"/>
+      <separator/>
+      <action name="refresh"/>
+    </submenu>
+    <submenu name="edit">
+      <action name="mss_wm_related_document_plugin.insert_related_document"/>
+      <action name="mss_wm_related_document_plugin.update_selected_related_document"/>
+      <action name="mss_wm_related_document_plugin.delete_selected_related_document"/>
+    </submenu>
+  </menu>
+
+  <menu name="related_document_result_list" type="popup">
+    <action name="mss_wm_related_document_plugin.display_selected_related_document"/>
+  </menu>
+
+  <toolbar name="view_1">
+    <action name="mss_wm_related_document_plugin.display_selected_related_document"/>
+  </toolbar>
+
+  <toolbar name="view_2">
+    <action name="refresh"/>
+  </toolbar>
+
+  <toolbar name="edit">
+    <action name="mss_wm_related_document_plugin.insert_related_document"/>
+    <action name="mss_wm_related_document_plugin.update_selected_related_document"/>
+    <action name="mss_wm_related_document_plugin.delete_selected_related_document"/>
+  </toolbar>
+
+  <dock name="top">
+    <toolbar name="view_1"/>
+    <toolbar name="view_2"/>
+    <toolbar name="edit"/>
+  </dock>
+ 
+  <work_area>
+    <paned_window side_by_side="no">
+      <plugin plugin_name="mss_wm_related_document_plugin" gui_type="result_list" stretch="1"/>
+      <plugin plugin_name="mss_wm_related_document_plugin" gui_type="attribute_list" stretch="0"/>
+    </paned_window>
+  </work_area>
+</gui>

@@ -1,0 +1,43 @@
+#% text_encoding = cp1252
+########################################################################
+##
+## Last Saved Time-stamp: <2006-03-31 22:12:50 Brad.Sileo>
+##
+## Created By: Brad Sileo
+## Date: 03-22-2006
+##
+##
+## Description: 
+##
+## ---------- Revision History -----------
+##
+## -------- end revision history ---------
+########################################################################
+_package user
+
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method geometry_mixin.projected_for_kml()
+	## 
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	_dynamic !current_coordinate_system! << _self.world.coordinate_system
+	target_cs << coordinate_system.new_proj_long_lat(:wgs84,:degree)
+	trans << transform.new_converting_cs_to_cs(_self.world.coordinate_system, target_cs)
+	_self.transformed(trans)
+	>> _self.transformed(trans)
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={redefinable})
+_method geometry_mixin.as_kml_entity()
+	## Backstop does nothing
+	## 
+	##
+
+	# (03-22-2006 Brad Sileo): created.
+	>> _unset 
+_endmethod
+$

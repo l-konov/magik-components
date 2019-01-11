@@ -1,0 +1,50 @@
+#% text_encoding = cp1252
+_package sw
+$
+########################################################################
+##
+## Created By: Alfred Sawatzky
+## Date: Dec 9, 2009
+## Copyright 2009 Alfred Sawatzky
+##
+########################################################################
+
+_pragma(classify_level=basic)
+## the Graphviz DOT language graph.
+def_slotted_exemplar(:dot_graph,
+      {
+	      
+      },
+      {:dot_container}
+)
+$
+_pragma(classify_level=basic)
+_method dot_graph.new(id)
+	## new(string ID) : dot_graph
+	## 
+	## creates a new dot_graph
+
+	_return _clone.init(id)
+_endmethod
+$
+
+_pragma(classify_level=restricted)
+_private _method dot_graph.init(id)
+	## init(string ID) : dot_graph
+	##
+	## initialises self
+
+	_super.init(id)
+	
+	_return _self 
+_endmethod
+$
+_pragma(classify_level=restricted)
+_private _method dot_graph.graph_type
+	## graph_type : string
+	##
+	## returns "digraph"
+
+	_return "digraph"
+_endmethod
+$

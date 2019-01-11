@@ -1,0 +1,133 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## DD_RADIO_GROUP - object for grouping radio_items into a
+## managed set.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+def_slotted_exemplar(:dd_radio_group,{},:rowcol)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_radio_group.define_shared_constant(
+	:dd_properties,
+	property_list.new_with(:label,:string),:public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_radio_group.define_shared_variable(
+	:interior_cell_line_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:black),
+		:width,1,
+		:dash_pattern,dash_pattern.long_dash),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+dd_radio_group.define_shared_variable(
+	:rc_outline_style,
+	line_style.new_with_properties(
+		:foreground_colour,colour.called(:blue),
+		:width,1,
+		:dash_pattern,dash_pattern.long_dash),:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_radio_group.dd_properties()
+	## Return the editable properties for SELF.
+	## 
+
+	props << _super.dd_properties()
+
+	_for k,e _over dd_radio_group.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	props.remove_key(:label)
+	props.remove_key(:height)
+	props.remove_key(:width)
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_radio_group.label
+	## Return the label for SELF.
+	## 
+	>> _self.properties[:caption]
+_endmethod
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_radio_group.label << new_val
+	## Set SELF's label.
+	## 
+	>> _self.properties[:caption] << new_val
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_radio_group.gui_code(txt)
+	## Write the GUI code for SELF to the stream TXT.
+	## 
+	
+	overrides << property_list.new_with(
+			     :top_spacing,6,
+			     :bottom_spacing,6,
+			     :left_spacing,6,
+			     :right_spacing,6,
+			     :row,_self.row,
+			     :col,_self.col)
+
+	_dynamic !current_radio_group!
+	!current_radio_group! << "rg"
+	
+	_super.gui_code(txt,_unset,overrides)
+	
+	txt.write(%tab,".items[:",_self.dialog_element_id,"] << rg << radio_group.new(",
+		  _self.dialog_element_id,")",%newline)
+
+	_for e _over .items.fast_elements()
+	_loop
+		_if e.class_name _is :radio_item
+		_then
+			e.gui_code(txt)
+		_endif
+	_endloop
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method dd_radio_group.new_with_xml_properties(parent,props)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+	
+	gb << radio_group.new_dialog_default(parent,props[:row],props[:col])
+
+	_for k,e _over props.fast_keys_and_elements()
+	_loop
+		_if e _isnt _unset 
+		_then
+			gb.perform(k.with_chevron,e)			
+		_endif
+	_endloop
+
+	>> gb
+_endmethod
+$
+
+

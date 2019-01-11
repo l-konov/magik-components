@@ -1,0 +1,9 @@
+<gui>
+  <work_area>
+    <paned_window side_by_side="no" dynamic="no">
+      <plugin plugin_name="attribute_lister" stretch="100"/>
+      <plugin plugin_name="hierarchy_display" stretch="0"/>
+      <self stretch="0"/>
+    </paned_window>
+  </work_area>
+</gui>

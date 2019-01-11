@@ -1,0 +1,12 @@
+#% text_encoding = cp1252
+
+dot_attribute_list
+
+dot_container
+
+dot_graph
+dot_subgraph
+
+dot_node
+dot_edge
+

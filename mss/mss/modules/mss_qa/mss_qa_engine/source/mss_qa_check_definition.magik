@@ -1,0 +1,185 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2005 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic, topic={mss_qa})
+##
+## mss_qa_check_definition
+##
+## This represents the parameters used to perform a specific QA
+## check. 
+##
+
+def_slotted_exemplar(:mss_qa_check_definition,
+{
+	{:name, _unset, :readable},
+	{:table_info, _unset, :readable},
+	{:method_name, _unset, :readable},
+	{:pre_run_method_name, _unset, :readable},
+	{:post_run_method_name, _unset, :readable},
+	{:parameters, _unset, :readable}
+},
+{})
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+mss_qa_check_definition.define_shared_variable(
+	:defined_qa_check_definitions,
+	## Property list of all defined mss_qa_check_definitions, keyed on
+	## name.
+	property_list.new(),
+	:public)
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_check_definition.new(name, method_name)
+	## 
+	## Return a new, empty mss_qa_check_definition with the given
+	## NAME (a symbol).  METHOD_NAME is the name of the method to
+	## run on all objects subject to this QA check.
+	##
+
+	_if _self.defined_qa_check_definitions[name] _isnt _unset
+	_then
+		condition.raise(:user_error, :string, _self.message(:duplicate_name, name))
+	_endif
+
+	new_rec << _clone.init(name, method_name)
+	_self.defined_qa_check_definitions[name] << new_rec
+
+	_return new_rec
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={mss_qa})
+_private _method mss_qa_check_definition.init(name, method_name)
+	## 
+	## 
+
+	.name << name
+	.table_info << property_list.new()
+	.method_name << method_name
+	.parameters << property_list.new()
+	
+	_return _self
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_check_definition.message(message_id, _gather args)
+	## 
+	## 
+
+	_return message_handler.new(_self.class_name).human_string(message_id, _unset, _scatter args)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_check_definition.external_name
+	## 
+	## External description of self.
+	##
+
+	_return _self.message(_self.name)
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_check_definition.get_by_name(name)
+	## 
+	## Returns the mss_qa_check_definition with a name value of NAME
+	##
+
+	_return _self.defined_qa_check_definitions[name]
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_check_definition.remove_qa_check_definition(name)
+	## 
+	## Removes the mss_qa_check_definition named NAME.
+	##
+
+	_return _self.defined_qa_check_definitions.remove_key(name)
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_check_definition.add_table_info(partition_name, table_name, _optional geom_names)
+	##
+	## Add a table to be examined by this definition.
+	## PARTITION_NAME is the database partition name, and
+	## TABLE_NAME is the name of the table.  GEOM_NAMES is a vector
+	## of geometry field names to use when locating objects in this
+	## table by a spatial scan.
+	##
+
+	_if (tbl_pl << .table_info[partition_name]) _is _unset
+	_then
+		tbl_pl << .table_info[partition_name] << property_list.new()
+	_endif
+	tbl_pl[table_name] << geom_names.default({})
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_check_definition.get_parameter(key)
+	## 
+	## Get the parameter named KEY.
+	##
+
+	_return .parameters[key]
+	
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={mss_qa})
+_method mss_qa_check_definition.set_parameter(key, value)
+	## 
+	## Set the parameter named KEY to VALUE.
+	##
+
+	.parameters[key] << value
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_check_definition.set_pre_run_method_name(meth_name)
+	## 
+	## Set the pre_run_method_name to be METH_NAME.  If entered,
+	## this represents a method to be run on the mss_qa_engine
+	## managing self before self's check is performed.
+	##
+
+	.pre_run_method_name << meth_name
+	_return meth_name
+	
+_endmethod
+$
+
+_pragma(classify_level=advanced, topic={mss_qa})
+_method mss_qa_check_definition.set_post_run_method_name(meth_name)
+	## 
+	## Set the post_run_method_name to be METH_NAME.  If entered,
+	## this represents a method to be run on the mss_qa_engine
+	## managing self after self's check is performed.
+	##
+
+	.post_run_method_name << meth_name
+	_return meth_name
+	
+_endmethod
+$

@@ -1,0 +1,219 @@
+#% text_encoding = iso8859_1
+#
+# Copyright © 2007 iFactor Consulting, Inc. (http://www.ifactorconsulting.com)
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the Dialog Designer product
+# directory, and is also available at http://www.fsf.org.
+#
+##########################################################################################
+##
+## @author Graham Garlick
+##
+## SLIDER_ITEM - added functionality specific to the dialog_designer.
+##
+##########################################################################################
+_package user
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+slider_item.define_shared_constant(:dd_properties,
+				  property_list.new_with(
+					  :value,:integer,
+					  :min_value,:integer,
+					  :max_value,:integer,
+					  :change_selector, :string
+						),
+				  :public)
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.dd_properties()
+	## 
+	## Return the editable properties for SELF.
+
+	props << _super.dd_properties()
+
+	_for k,e _over slider_item.dd_properties.fast_keys_and_elements()
+	_loop
+		props[k] << e
+	_endloop
+
+	>> props
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.default_min_width
+	## 
+	##  Return the minimum default rendering width.
+	>> 70
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.default_min_height
+	## 
+	##  Return the minimum default rendering height.
+
+	vts << vtext_style.new(_self.font)
+	>> 30 + vts.box_coordinates("Ab").bounds.height.rounded
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.new_dialog_default(rc,row,col)
+	## 
+	## Return the default instance for SELF.
+	
+	>> _self.new(rc,_unset,0,100,
+		     :row,row,:col,col,
+		     :col_alignment,:fill,
+		     :row_alignment,:top)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.new_with_xml_properties(parent,props)
+         ##  Create a new instance of SELF with properties PROPS and
+	##  parent PARENT.
+
+	lab  << props[:label]
+	minv <<  props[:min_value].default(0)
+	maxv <<  props[:max_value].default(100)
+	props.remove_key(:label)
+	props.remove_key(:min_value)
+	props.remove_key(:max_value)
+
+	>> _self.new(parent,lab,minv,maxv,_scatter props)
+_endmethod
+$
+
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.render_on(canv,bb)
+	## 
+	## Create a new instance of SELF with properties PROPS and
+	## parent PARENT.
+	
+	_dynamic !dialog_element_footprints!
+
+	(r,c,h,w,pbb) << _self.dialog_footprint(bb)
+
+	fs << fill_style.new_solid(colour.called(:lightgrey))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(pbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	x << pbb.xmin
+	y << pbb.ymin
+	
+	_if _self.col_alignment _is :right
+	_then
+		x << pbb.xmax - w
+	_elif _self.col_alignment _is :centre
+	_then
+		x << pbb.centre.x - w _div 2
+	_endif
+
+	sbb << pixel_bounding_box.new(x,y+14,x+w,y+29)
+
+	!dialog_element_footprints![pbb] << _self
+
+	fs << fill_style.new_solid(colour.new_rgb(0.85,0.85,0.85))
+	fs.realise()
+	pp << pseudo_polygon.new_with_sectors(sbb.boundary.sectors)
+	pp.draw_filled_on(canv,fs)
+
+	canv.render_raster(_self.slider_raster(:left),x,y+15,_false)
+	canv.render_raster(_self.slider_raster(:right),x+w-15,y+15,_false)
+
+	_if w > 50
+	_then
+		canv.render_raster(_self.slider_raster(:middle),x+(w _div 2)-8,y+15,_false)
+	_endif
+
+	# Text
+	ts << text_style.new_with_properties(:colour,colour.called(:black))
+	canv.draw_text(ts,x+(w _div 2)-8,y+10,_self.value.write_string)
+	lab << _self.message_from_keyed_message(_self.label)
+	canv.draw_text(ts,x,y+47,lab)
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.slider_raster(which)
+	## 
+	## Return the WHICH (:left,:middle or :right) raster
+	
+	>> smallworld_product.get_raster_image(:slider_ + which,:dialog_designer)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.gui_messages(txt)
+	## 
+	## Write SELF's messages to the text stream TXT.
+
+	txt.write(%:,_self.get_property(:dialog_element_id),%tab,_self.value,%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.gui_code(txt)
+	## 
+	## Generate gui_code for SELF.
+
+	parent_id << _self.ensure_rc_parent(txt)
+
+	txt.write(%tab,".items[:",_self.dialog_element_id, 
+		  "] << slider_item.new(",parent_id,%,,%",_self.label.default(""),%",%,,   #%"
+		  _self.min_value.default(0),%,,_self.max_value.default(100))
+
+	_for n,v _over _self.valid_properties()
+	_loop
+		_if n = "max_value" _orif
+		    n = "min_value" 
+		_then
+			_continue 
+		_endif
+		
+		(n2,v2) << _self.gui_name_and_value(n,v)
+		txt.write(%,,%newline,%tab*2,%:,n2,%,,%tab,v2)
+	_endloop
+	
+	_if _self.balloon_tooltip.default("") <> ""
+	_then
+		km << _self.key_and_message(_self.balloon_tooltip)
+
+		_if km[1] _isnt _unset 
+		_then
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, _self.message(",km[1],%))
+		_else
+			txt.write(%,,%newline,%tab*3,":balloon_help_text, ",%",km[2],%")
+		_endif
+	_endif 
+		
+	txt.write(%,,%newline,%tab*2,":model,  _self")
+	
+	txt.write(" )",%newline)
+_endmethod
+$
+
+_pragma(classify_level=restricted, topic={dialog_designer})
+slider_item.define_shared_constant(:has_logical_properties?,_true,:public)
+$
+_pragma(classify_level=restricted, topic={dialog_designer})
+_method slider_item.set_logical_properties(_optional all?)
+	##
+	## Set the common logical properties, ALL? toggles inclusion of less
+	## common properties.
+
+	_if all?.default(_false)
+	_then
+		_self.change_selector << _self.dialog_element_id + "_changed()"
+	_endif
+
+_endmethod
+$

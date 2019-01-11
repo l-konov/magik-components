@@ -1,0 +1,10 @@
+mclib_xslt_reports_scheduler		4000
+
+description
+	Provides support for scheduled tasks to run xslt reports within the MSS Scheduler
+end
+
+requires
+	mclib_xslt_reports
+	mss_scheduler_engine
+end

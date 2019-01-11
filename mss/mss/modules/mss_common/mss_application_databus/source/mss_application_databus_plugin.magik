@@ -1,0 +1,77 @@
+#% text_encoding = iso8859_1
+_package user
+# Copyright © 2004 Minto Spatial Solutions Ltd.
+#
+# This software is released under the terms of version 2 of the
+# GNU General Public License.  The full license text is
+# provided in the license.txt file in the mss product
+# directory, and is also available at http://www.fsf.org.
+
+_pragma(classify_level=basic)
+##
+## mss_application_databus_plugin
+##
+## Superclass for plugins which implement
+## mss_application_databus_mixin behavior.  Connects to the
+## application databus during pre_activation(), and disconnects
+## during terminate().  Also disconnects during
+## on_deactivation(), if the value of the subclassibe shared
+## constant application_databus_disconnect_on_deactivation? is
+## true. 
+##
+
+def_slotted_exemplar(:mss_application_databus_plugin,
+{
+	{:int!application_databus, _unset, :writable}
+},
+{:mss_plugin, :mss_application_databus_mixin})
+$
+
+_pragma(classify_level=basic)
+mss_application_databus_plugin.define_shared_constant(
+	:application_databus_disconnect_on_deactivation?,
+	## If true, then self will disconnect from application databus
+	## during on_deactivation().
+	_true,
+	:public)
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method mss_application_databus_plugin.pre_activation()
+	## 
+	## Connect to application databus during pre-activation.
+	##
+
+	_self.application_databus << _self.application.databus
+	_super.pre_activation()
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method mss_application_databus_plugin.on_deactivation()
+	## 
+	## Optionally disconnect from application databus during
+	## deactivation.
+	##
+
+	_super.on_deactivation()
+	_if _self.application_databus_disconnect_on_deactivation?
+	_then
+		_self.application_databus << _unset
+	_endif
+	
+_endmethod
+$
+
+_pragma(classify_level=restricted, usage={subclassable})
+_method mss_application_databus_plugin.terminate()
+	## 
+	## Disconnect from application databus during termination.
+	##
+
+	_super.terminate()
+	_self.application_databus << _unset 
+	
+_endmethod
+$
