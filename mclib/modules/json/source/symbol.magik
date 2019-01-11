@@ -11,4 +11,15 @@ _method symbol.write_as_json( out_stream )
 
 	out_stream.write( '"', ":", _self.write_string.json_quote_for_string(), '"' )
 
-_endmethod  
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={JSON}, usage={redefinable, subclassable})
+_method symbol.convert_to_json()
+
+	_return _self 
+	
+_endmethod
+$
+
+

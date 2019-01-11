@@ -12,3 +12,12 @@ _method	date_mixin.write_as_json(a_stream)
 	a_stream.write(%")
 _endmethod
 $
+
+_pragma(classify_level=restricted)
+_method date_mixin.convert_to_json()
+
+	_return _self 
+	
+_endmethod
+$
+

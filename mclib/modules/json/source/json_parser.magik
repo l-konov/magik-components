@@ -27,7 +27,6 @@ json_parser.define_shared_constant(
 	:public)
 $
 
-
 _pragma(classify_level=restricted)
 _private _method json_parser.fastforward_white_space(json_stream)
 	## fastforward_white_space(internal_text_input_stream JSON_STREAM) : _unset
@@ -88,6 +87,35 @@ _method json_parser.parse_file(a_filename)
 	_return obj
 _endmethod
 $
+
+_pragma(classify_level=basic)
+_method json_parser.parse_file_newline_delimiter(a_filename)
+	## parse_file_with_line_delimiter(string A_FILENAME) : rope(json_object)
+	##
+	## parses A_JSON_STRING to return a rope of json_objects
+
+	_local a_stream << external_text_input_stream.new(a_filename)
+	_local a_rope << rope.new()
+
+	_protect
+		_loop
+			a_line << a_stream.get_line()
+			_if a_line _is _unset 
+			_then
+				_leave
+			_endif
+			a_obj << _self.parse_string(a_line)
+			a_rope.add_last(a_obj)
+		_endloop
+	_protection
+		a_stream.close()
+	_endprotect
+
+	_return a_rope
+	
+_endmethod
+$
+
 
 
 _pragma(classify_level=restricted)
