@@ -52,7 +52,13 @@ _method json_object.write_as_json(out_stream)
 		#  now write the key/value pairs
 		
 		out_stream.write( '"',i_attribute_name,'":' )
-		i_attribute_value.convert_to_json().write_as_json(out_stream)
+		_if i_attribute_name.responds_to?(:|convert_to_json|)
+		_then
+			val << i_attribute_value.convert_to_json()
+		_else
+			val << i_attribute_value
+		_endif
+		val.write_as_json(out_stream)
 	_endloop
 	
 	out_stream.write( "}" )

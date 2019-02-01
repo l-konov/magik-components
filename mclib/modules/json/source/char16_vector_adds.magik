@@ -20,6 +20,9 @@ _method	char16_vector.json_quote_for_string()
 	_if _self.includes_any?(l_vec << _self.json_quote_character_vec)
 	_then
 		l_result << _self
+		l_result << l_result.substitute_string(backspace_char, "\b")
+		l_result << l_result.substitute_string(newline_char, "\n")
+		l_result << l_result.substitute_string(tab_char, "\t")
 		_for i_char _over l_vec.fast_elements()
 		_loop
 			l_result << l_result.substitute_string(i_char, write_string(%\, i_char))

@@ -38,7 +38,13 @@ _method json_array.new_from(a_collection)
 	
 	_for i _over a_collection.fast_elements()
 	_loop
-		result.add_last(i.convert_to_json())
+		_if i.responds_to?(:|convert_to_json|)
+		_then
+			val << i.convert_to_json()
+		_else
+			val << i
+		_endif
+		result.add_last(val)
 	_endloop
 
 	_return result
