@@ -1,6 +1,7 @@
 #% text_encoding = iso8859_1
 _package sw 
 
+
 _pragma(classify_level=restricted)
 _method	area.write_as_json(a_stream)
 	##

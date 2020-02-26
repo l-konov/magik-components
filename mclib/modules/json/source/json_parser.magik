@@ -5,19 +5,19 @@ _pragma(classify_level=basic)
 ## a JSON parser that reads a JSON string and converts it into
 ## relevant data types in Magik (e.g., jason_object,
 ## jason_array, and other basic Magik types).
-def_slotted_exemplar(:json_parser,{},{})
+def_slotted_exemplar(:mclib_json_parser,{},{})
 $
 
 
 _pragma(classify_level=basic)
-json_parser.define_shared_variable(
+mclib_json_parser.define_shared_variable(
 	:debug_mode?,
 	_false,
 	:public)
 $
 
 _pragma(classify_level=basic)
-json_parser.define_shared_constant(
+mclib_json_parser.define_shared_constant(
 	:forward_character_vec,
 	{
 		space_char,
@@ -28,7 +28,7 @@ json_parser.define_shared_constant(
 $
 
 _pragma(classify_level=restricted)
-_private _method json_parser.fastforward_white_space(json_stream)
+_private _method mclib_json_parser.fastforward_white_space(json_stream)
 	## fastforward_white_space(internal_text_input_stream JSON_STREAM) : _unset
 	##
 	## fastforward to the next non-space, non-newline and non-tab character.
@@ -51,7 +51,7 @@ _private _method json_parser.fastforward_white_space(json_stream)
 _endmethod
 $
 _pragma(classify_level=basic)
-_method json_parser.parse_stream(a_text_stream)
+_method mclib_json_parser.parse_stream(a_text_stream)
 	## parse_stream(text_input_stream A_TEXT_STREAM) : json_object
 	##
 	## parses A_TEXT_STREAM to return a json_object
@@ -60,7 +60,7 @@ _method json_parser.parse_stream(a_text_stream)
 _endmethod
 $
 _pragma(classify_level=basic)
-_method json_parser.parse_string(a_json_string)
+_method mclib_json_parser.parse_string(a_json_string)
 	## parse_string(string A_JSON_STRING) : json_object
 	##
 	## parses A_JSON_STRING to return a json_object
@@ -70,7 +70,7 @@ _method json_parser.parse_string(a_json_string)
 _endmethod
 $
 _pragma(classify_level=basic)
-_method json_parser.parse_file(a_filename)
+_method mclib_json_parser.parse_file(a_filename)
 	## parse_file(string A_FILENAME) : json_object
 	##
 	## parses A_JSON_STRING to return a json_object
@@ -89,7 +89,7 @@ _endmethod
 $
 
 _pragma(classify_level=basic)
-_method json_parser.parse_file_newline_delimiter(a_filename)
+_method mclib_json_parser.parse_file_newline_delimiter(a_filename)
 	## parse_file_with_line_delimiter(string A_FILENAME) : rope(json_object)
 	##
 	## parses A_JSON_STRING to return a rope of json_objects
@@ -119,7 +119,7 @@ $
 
 
 _pragma(classify_level=restricted)
-_private _method json_parser.get_json_value(json_stream)
+_private _method mclib_json_parser.get_json_value(json_stream)
 	## get_json_value(internal_text_input_stream JSON_STREAM) : object
 	##
 	## returns a suitable JSON value.  One of:
@@ -167,7 +167,7 @@ _private _method json_parser.get_json_value(json_stream)
 _endmethod 
 $
 _pragma(classify_level=restricted)
-_private _method json_parser.get_json_string(json_stream)
+_private _method mclib_json_parser.get_json_string(json_stream)
 	## get_json_string(internal_text_input_stream JSON_STREAM) : string
 	##
 	## returns the JSON string
@@ -217,7 +217,7 @@ _private _method json_parser.get_json_string(json_stream)
 _endmethod
 $
 _pragma(classify_level=restricted)
-_private _method json_parser.get_json_number(json_stream)
+_private _method mclib_json_parser.get_json_number(json_stream)
 	## get_json_number(internal_text_input_stream JSON_STREAM) :number
 	##
 	## returns a number
@@ -247,7 +247,7 @@ _private _method json_parser.get_json_number(json_stream)
 _endmethod
 $
 _pragma(classify_level=restricted)
-_private _method json_parser.get_json_object(json_stream)
+_private _method mclib_json_parser.get_json_object(json_stream)
 	## get_json_object(internal_text_input_stream JSON_STREAM) : json_object
 	##
 	## returns the JSON string
@@ -304,7 +304,7 @@ _private _method json_parser.get_json_object(json_stream)
 		_then
 			_if l_temp_result _is _unset
 			_then
-				l_temp_result << "Set json_parser.debug_mode? = _true to get debug information"
+				l_temp_result << "Set mclib_json_parser.debug_mode? = _true to get debug information"
 			_endif
 			condition.raise(:error,
 					:string,
@@ -322,7 +322,7 @@ _private _method json_parser.get_json_object(json_stream)
 _endmethod 
 $
 _pragma(classify_level=restricted)
-_private _method json_parser.get_json_array(json_stream)
+_private _method mclib_json_parser.get_json_array(json_stream)
 	## get_json_array(internal_text_input_stream JSON_STREAM) : json_array
 	##
 	## returns the JSON array
@@ -371,7 +371,7 @@ _private _method json_parser.get_json_array(json_stream)
 		_then
 			_if l_temp_result _is _unset
 			_then
-				l_temp_result << "Set json_parser.debug_mode? = _true to get debug information"
+				l_temp_result << "Set mclib_json_parser.debug_mode? = _true to get debug information"
 			_endif
 			condition.raise(:error,
 					:string,
